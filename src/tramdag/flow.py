@@ -629,7 +629,8 @@ class CausalFlowDAG(nn.Module):
         values: dict[str, Tensor] = {}
         for name in self.order:
             if name in do:
-                values[name] = torch.full((n,), float(do[name]), device=self.device)
+                values[name] = torch.full((n,), float(do[name]),
+                                          dtype=self._dtype, device=self.device)
                 continue
             node = self.nodes[name]
             feats = self._features({p: values[p] for p in node.parents})
