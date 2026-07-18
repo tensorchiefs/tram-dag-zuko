@@ -4,6 +4,22 @@
 
 ### Added
 
+- **Propensity-centered VC: `VC(..., center=True, center_folds=5)`** (issue
+  #30): the R-learner orthogonalization `beta(x)·(t − ê(x))` inside the
+  likelihood, as a **two-stage frozen** design — training uses **out-of-fold**
+  ê (K refits of the treatment node only; DML cross-fitting, bookkeeping in
+  `flow.vc_center_info`, pinned by tests so an in-sample "simplification"
+  fails CI), frozen as data (zero gradient into the treatment node from the
+  outcome loss — tested); inference recomputes ê from the flow's own fitted
+  treatment node and re-derives `t − ê(x)` under `do` (never cached — tested
+  on fresh rows). `center="colname"` supplies user cross-fitted propensities;
+  binary ordinal treatments only; `center=False` (default) is bit-identical
+  to the uncentered term (tested). Measured (the Dandl et al. 2024
+  reproduction, `tests/test_vc_centered.py`): under strong confounding + an
+  under-specified prognostic part, centering cuts β̂ bias **5–10×**
+  (1.10–1.24 → 0.11–0.27 over 3 seeds). Docs:
+  `docs/varying-coefficients.md`.
+
 - **`flow.scores(df, node)` + `flow.effect_modifier_scan(df, node, on)`**
   (issue #29): per-observation scores ψᵢ = ∂ℓᵢ/∂θ for every `LS` weight and
   `VC` `beta0` — **analytic and exact** (shifts enter the latent additively, so

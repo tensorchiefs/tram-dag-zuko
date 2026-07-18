@@ -78,6 +78,46 @@ effect but that they **regularize** it (Nie & Wager 2021; Athey–Tibshirani–W
   abduction; for a binary treatment it equals the abduct-difference
   `u(x, t=1, y) − u(x, t=0, y)` identically (pinned by a test).
 
+## Propensity-centered VC: `center=True` (R-learner orthogonalization)
+
+```python
+td.VC("T", "X2", "X3", penalty=1.0, center=True, center_folds=5)
+# contributes  beta(x) * (t - e_hat(x))  to the shift
+```
+
+Robinson/R-learner centering inside the likelihood — Dandl et al. (2024) found
+treatment-centering to be *the* decisive ingredient for effect estimation under
+confounding in model-based forests, and it reproduces here: on a strongly
+confounded DGP whose prognostic part the model deliberately under-specifies
+(true g(x) quadratic, model linear), the uncentered β̂ absorbs the confounded
+misfit (mean |β̂ − τ| ≈ 1.1–1.2, effectively destroying the effect estimate)
+while the centered β̂ stays near truth (≈ 0.1–0.3) — a **5–10× bias reduction**
+(`tests/test_vc_centered.py`). If the prognostic part is correctly specified,
+centering changes little; it is insurance against the misspecification you
+don't know you have.
+
+The naive implementations are wrong, so this is a **two-stage frozen** design:
+
+- **Training** uses **out-of-fold** ê: `center_folds` refits of the treatment
+  node *only*, each predicting the fold it never saw (the DML cross-fitting
+  requirement — in-sample ê reintroduces the own-observation bias and can be
+  *worse* than no centering). The OOF values enter the outcome loss as frozen
+  data, so **no gradient reaches the treatment node** from the outcome node
+  (per-node factorization intact; pinned by a gradient-isolation test). Fold
+  bookkeeping is exposed in `flow.vc_center_info` and pinned by tests.
+  `center="colname"` supplies your own cross-fitted propensities instead.
+- **Inference** (`log_prob` / `sample` / `abduct` / `pmf` / `scores`) recomputes
+  ê from the flow's **own fitted treatment node** — the full-data fit (the
+  standard DML train/predict split) — detached, from the current parent
+  values. Under `do(T=t)` the regressor is re-derived as `t − ê(x)`; nothing is
+  ever cached.
+- **Interpretation**: `beta0` is now the effect at the treatment margin (the
+  observed propensities); `varying_coef` is unchanged (centering moves the
+  regressor, not β). The LS-nesting reading applies to the uncentered term
+  only. Requires a binary ordinal treatment (continuous-treatment centering
+  E[T|x] is a follow-up). `center=False` (default) is bit-identical to the
+  uncentered term.
+
 ## Validation
 
 `tramdag.simulations.VCLogisticShift` (`data/vc-shift/`, frozen contract) is a

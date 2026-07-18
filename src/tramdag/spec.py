@@ -53,6 +53,8 @@ class Term:
     slot: str
     parents: tuple[str, ...]
     penalty: float | None = None
+    center: bool | str = False
+    center_folds: int = 5
 
 
 def I(*parents: str) -> Term:  # noqa: E743 - single-letter name is the intended notation
@@ -74,7 +76,8 @@ def CS(*parents: str) -> Term:
     return Term("CS", "shift", tuple(parents))
 
 
-def VC(on: str, *modifiers: str, penalty: float = 1.0) -> Term:
+def VC(on: str, *modifiers: str, penalty: float = 1.0,
+       center: bool | str = False, center_folds: int = 5) -> Term:
     """Varying-coefficient shift ``beta(modifiers) * x_on`` — the treatment-effect
     term of issue #28.
 
@@ -92,12 +95,30 @@ def VC(on: str, *modifiers: str, penalty: float = 1.0) -> Term:
     ``on`` must be continuous or a binary (2-level) ordinal node; the term is
     linear in ``x_on``. Unlike other effects, VC *modifiers* may also appear in
     the node's prognostic terms (``CS``/``LS``/``I``) — only ``on`` owns its edge.
+
+    ``center=True`` (issue #30) uses the **propensity-centered** regressor
+    ``beta(x) * (x_on - e_hat(pa_on))`` — the Robinson/R-learner
+    orthogonalization inside the likelihood; requires a binary ordinal ``on``.
+    Training uses **out-of-fold** ``e_hat`` (``center_folds``-fold refits of the
+    ``on`` node only — the DML requirement; in-sample centering can be *worse*
+    than none), frozen as data so no gradient reaches the ``on`` node from this
+    node's loss. Inference (``log_prob``/``sample``/``abduct``/``pmf``) recomputes
+    ``e_hat`` from the flow's own fitted ``on`` node — the full-data fit, the
+    standard DML train/predict split — and always re-derives ``x_on - e_hat``
+    under ``do`` (never cached). ``center="colname"`` instead takes the
+    training-time cross-fitted propensity from that column of ``train_df``.
+    With centering, ``beta0`` is the effect at the treatment margin (the
+    observed propensities); the LS-nesting reading applies to the uncentered
+    term only.
     """
     if on in modifiers:
         raise ValueError(f"VC(): '{on}' cannot be both the treatment (on) and a modifier.")
     if penalty < 0:
         raise ValueError(f"VC(): penalty must be >= 0, got {penalty}.")
-    return Term("VC", "shift", (on, *modifiers), penalty=float(penalty))
+    if center_folds < 2:
+        raise ValueError(f"VC(): center_folds must be >= 2, got {center_folds}.")
+    return Term("VC", "shift", (on, *modifiers), penalty=float(penalty),
+                center=center, center_folds=int(center_folds))
 
 
 # explicit aliases (avoid confusion with the conditioner classes ComplexShift /
@@ -200,6 +221,11 @@ def validate_and_sort(spec: dict[str, NodeSpec]) -> list[str]:
                         f"Node '{name}': VC treatment '{on}' is ordinal with "
                         f"{on_node.levels} levels; only binary (2-level) ordinal "
                         "treatments are supported (multi-level is a follow-up).")
+                if term.center and not isinstance(on_node, OrdinalNode):
+                    raise ValueError(
+                        f"Node '{name}': VC(center=...) needs a binary ordinal "
+                        f"treatment ('{on}' is continuous — E[T|x] centering is "
+                        "a follow-up).")
                 owners = (on,)
             else:
                 owners = term.parents
@@ -233,7 +259,8 @@ def spec_to_dict(spec: dict[str, NodeSpec]) -> dict:
     out = {}
     for name, node in spec.items():
         terms = [{"effect": t.effect, "parents": list(t.parents),
-                  **({"penalty": t.penalty} if t.effect == "VC" else {})}
+                  **({"penalty": t.penalty, "center": t.center,
+                      "center_folds": t.center_folds} if t.effect == "VC" else {})}
                  for t in node_terms(node)]
         d = {"kind": node.kind, "terms": terms}
         if isinstance(node, ContinuousNode):
@@ -250,7 +277,10 @@ def _terms_from_dict(nd: dict) -> list[Term]:
     layout and the legacy ``parents`` dict (so old checkpoints still load)."""
     if "terms" in nd:
         ctor = {"I": I, "LS": LS, "CS": CS}
-        return [VC(*t["parents"], penalty=t["penalty"]) if t["effect"] == "VC"
+        return [VC(*t["parents"], penalty=t["penalty"],
+                   center=t.get("center", False),
+                   center_folds=t.get("center_folds", 5))
+                if t["effect"] == "VC"
                 else ctor[t["effect"]](*t["parents"]) for t in nd["terms"]]
     # legacy checkpoint: {"parents": {parent: "ls"|"cs"|"ci"}}
     out: list[Term] = []
