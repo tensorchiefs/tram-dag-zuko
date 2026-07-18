@@ -43,10 +43,11 @@ CRIT_5PCT = 1.3581
 CRIT_1PCT = 1.6276
 
 
-def _dl_ds(nd, feats: dict, x: torch.Tensor, n: int) -> torch.Tensor:
+def _dl_ds(nd, feats: dict, x: torch.Tensor, n: int,
+           vc_ehat: dict | None = None) -> torch.Tensor:
     """d l_i / d s_i (n,) — derivative of the per-row log-likelihood w.r.t. the
     node's total shift, in closed form."""
-    theta, shift = nd.theta_shift(feats, n)
+    theta, shift = nd.theta_shift(feats, n, vc_ehat=vc_ehat)
     if nd.kind == "continuous":
         z0, _ = nd.ut.forward(theta, x)
         return 1.0 - 2.0 * torch.sigmoid(z0 + shift)
@@ -76,7 +77,8 @@ def node_scores(flow, df: pd.DataFrame, node: str) -> pd.DataFrame:
             f"node {node!r} has no LS or VC terms; params='shift' scores need "
             "at least one interpretable shift coefficient.")
 
-    needed = list(nd.parents) + [node]        # scores are NOT y-free: l_i needs x
+    needed = (list(nd.parents) + [node]       # scores are NOT y-free: l_i needs x
+              + flow._vc_ehat_columns(nd))    # + e_hat inputs of centered terms
     missing = [c for c in needed if c not in df.columns]
     if missing:
         raise KeyError(f"data is missing column(s): {missing}")
@@ -84,7 +86,8 @@ def node_scores(flow, df: pd.DataFrame, node: str) -> pd.DataFrame:
     values = {c: torch.as_tensor(df[c].to_numpy(dtype=np_dtype),
                                  device=flow.device) for c in needed}
     feats = flow._features({p: values[p] for p in nd.parents})
-    dlds = _dl_ds(nd, feats, values[node], len(df))
+    ehat = flow._vc_ehat_live(nd, values, len(df))
+    dlds = _dl_ds(nd, feats, values[node], len(df), vc_ehat=ehat)
 
     cols: dict[str, np.ndarray] = {}
     for key, ps in ls_groups:
@@ -99,9 +102,11 @@ def node_scores(flow, df: pd.DataFrame, node: str) -> pd.DataFrame:
         else:                                   # joint LS cannot occur (LS is
             for k in range(psi.shape[1]):       # single-parent); keep generic
                 cols[f"{key}[{k}]"] = psi[:, k]
-    for on, mods, on_is_ord in nd._vc_groups:
-        t = feats[on][:, -1:] if on_is_ord else feats[on]
-        cols[on] = (dlds * t.squeeze(-1)).cpu().numpy()
+    for g in nd._vc_groups:
+        t = feats[g.on][:, -1:] if g.on_is_ord else feats[g.on]
+        if g.center:                          # d s / d beta0 = t - e_hat(x)
+            t = t - ehat[g.on].view(-1, 1)
+        cols[g.on] = (dlds * t.squeeze(-1)).cpu().numpy()
     return pd.DataFrame(cols, index=df.index)
 
 

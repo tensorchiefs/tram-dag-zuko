@@ -18,6 +18,7 @@ import copy
 import json
 import time
 from pathlib import Path
+from typing import NamedTuple
 
 import numpy as np
 import pandas as pd
@@ -33,6 +34,17 @@ from .transforms import (StandardLogistic, make_univariate_transform,
                          ordinal_sample)
 
 __all__ = ["CausalFlowDAG"]
+
+
+class _VCGroup(NamedTuple):
+    """One VC term of a node: treatment name, modifier names, whether the
+    treatment is (binary) ordinal, and the propensity-centering config
+    (``center`` False / True / a train-df column name; ``folds`` for OOF)."""
+    on: str
+    mods: tuple[str, ...]
+    on_is_ord: bool
+    center: bool | str
+    folds: int
 
 
 class _Node(nn.Module):
@@ -84,13 +96,15 @@ class _Node(nn.Module):
         # that edge — and carries (on, modifiers, on-is-ordinal) in _vc_groups.
         self.shifts = nn.ModuleDict()
         self._shift_groups: list[tuple[str, tuple[str, ...]]] = []
-        self._vc_groups: list[tuple[str, tuple[str, ...], bool]] = []
+        self._vc_groups: list[_VCGroup] = []
         for term in terms:
             if term.effect == "VC":
                 on, mods = term.parents[0], tuple(term.parents[1:])
                 self.shifts[on] = VaryingCoef(sum(width(p) for p in mods),
                                               penalty=term.penalty)
-                self._vc_groups.append((on, mods, isinstance(spec[on], OrdinalNode)))
+                self._vc_groups.append(_VCGroup(
+                    on, mods, isinstance(spec[on], OrdinalNode),
+                    term.center, term.center_folds))
                 continue
             if term.effect not in ("LS", "CS"):
                 continue
@@ -101,8 +115,13 @@ class _Node(nn.Module):
                                 else ComplexShift(feat_width))
             self._shift_groups.append((key, ps))
 
-    def theta_shift(self, feats: dict[str, Tensor], n: int) -> tuple[Tensor, Tensor]:
-        """Transform parameters (n, P) and total shift (n,) from parent features."""
+    def theta_shift(self, feats: dict[str, Tensor], n: int,
+                    vc_ehat: dict[str, Tensor] | None = None) -> tuple[Tensor, Tensor]:
+        """Transform parameters (n, P) and total shift (n,) from parent features.
+
+        ``vc_ehat`` supplies the propensity ``e_hat(pa_on)`` per centered VC
+        treatment (required whenever a term has ``center``): training passes the
+        frozen out-of-fold values, inference paths the live full-fit ones."""
         if self.intercept_nets is not None:          # additive complex intercept
             theta = sum(net(torch.cat([feats[p] for p in grp], dim=1))
                         for net, grp in zip(self.intercept_nets, self._intercept_groups))
@@ -114,12 +133,19 @@ class _Node(nn.Module):
         for key, ps in self._shift_groups:
             feat = feats[ps[0]] if len(ps) == 1 else torch.cat([feats[p] for p in ps], dim=1)
             shift = shift + self.shifts[key](feat)
-        for on, mods, on_is_ord in self._vc_groups:
+        for g in self._vc_groups:
             # treatment column raw: one-hot level-1 indicator for a binary
             # ordinal on; the (n, 1) value itself for a continuous on
-            t = feats[on][:, -1:] if on_is_ord else feats[on]
-            mod_feat = torch.cat([feats[p] for p in mods], dim=1) if mods else None
-            shift = shift + self.shifts[on](t, mod_feat)
+            t = feats[g.on][:, -1:] if g.on_is_ord else feats[g.on]
+            if g.center:
+                if vc_ehat is None or g.on not in vc_ehat:
+                    raise RuntimeError(
+                        f"centered VC term on {g.on!r} needs e_hat; internal "
+                        "callers must supply vc_ehat (never evaluate a centered "
+                        "term without its propensity).")
+                t = t - vc_ehat[g.on].view(-1, 1)    # regressor t - e_hat(x)
+            mod_feat = torch.cat([feats[p] for p in g.mods], dim=1) if g.mods else None
+            shift = shift + self.shifts[g.on](t, mod_feat)
         return theta, shift
 
 
@@ -146,6 +172,7 @@ class CausalFlowDAG(nn.Module):
         self.device = torch.device(device)
         self.history: dict = {"train": [], "val": [], "lr": [], "time": []}
         self.meta: dict = {}   # provenance attached at save() (machine, versions)
+        self.vc_center_info: dict = {}   # OOF bookkeeping of centered VC terms (fit)
         self.to(self.device)
 
     # ------------------------------------------------------------------ data
@@ -175,19 +202,61 @@ class CausalFlowDAG(nn.Module):
     def _features(self, values: dict[str, Tensor]) -> dict[str, Tensor]:
         return {name: self._encode_parent(name, vals) for name, vals in values.items()}
 
+    # ------------------------------------------- centered-VC propensity (e_hat)
+    def _vc_ehat_live(self, nd: "_Node", values: dict[str, Tensor],
+                      n: int) -> dict[str, Tensor] | None:
+        """Live ``e_hat(pa_on) = P(on = 1 | pa_on)`` for each centered VC term of
+        ``nd``, recomputed from the flow's **own fitted** ``on`` node — the
+        full-data propensity fit (the DML prediction convention; training uses
+        frozen out-of-fold values instead, see ``fit``). Detached, so no
+        gradient ever flows into the ``on`` node from this node's loss. Because
+        it is re-derived from the *current* parent values, ``do``-mutilated
+        sampling automatically uses ``t - e_hat(x)`` with the intervened ``t``
+        and the observed ``x`` — never a cached value."""
+        out = {}
+        for g in nd._vc_groups:
+            if not g.center:
+                continue
+            on_nd = self.nodes[g.on]
+            feats = self._features({p: values[p] for p in on_nd.parents})
+            theta, shift = on_nd.theta_shift(
+                feats, n, vc_ehat=self._vc_ehat_live(on_nd, values, n))
+            # binary ordinal on: P(on <= 0) = sigmoid(theta_0 - s) -> e = sigmoid(s - theta_0)
+            out[g.on] = torch.sigmoid(shift - theta[:, 0]).detach()
+        return out or None
+
+    def _vc_ehat_columns(self, nd: "_Node") -> list[str]:
+        """Extra columns (beyond ``nd.parents``) needed to evaluate ``nd``'s
+        centered VC terms: the treatment nodes' own parents, recursively."""
+        cols: list[str] = []
+        for g in nd._vc_groups:
+            if not g.center:
+                continue
+            on_nd = self.nodes[g.on]
+            cols += [p for p in on_nd.parents] + self._vc_ehat_columns(on_nd)
+        return [c for c in dict.fromkeys(cols) if c not in nd.parents]
+
     # ------------------------------------------------------------- likelihood
     def node_log_prob(self, values: dict[str, Tensor],
-                      nodes: list[str] | None = None) -> dict[str, Tensor]:
+                      nodes: list[str] | None = None,
+                      vc_ehat: dict[str, dict[str, Tensor]] | None = None
+                      ) -> dict[str, Tensor]:
         """Per-node log-likelihood contributions, each (n,).
 
         ``nodes`` restricts computation to a subset (used to skip frozen nodes
-        during training — valid because the per-node losses are independent)."""
+        during training — valid because the per-node losses are independent).
+        ``vc_ehat`` ({node: {on: e_hat}}) overrides the propensity used by
+        centered VC terms — ``fit`` passes the frozen **out-of-fold** values for
+        the training rows; when omitted, the live full-fit propensity is
+        recomputed from the flow's own treatment node."""
         feats = self._features(values)
         n = next(iter(values.values())).shape[0]
         out = {}
         for name in (self.order if nodes is None else nodes):
             node = self.nodes[name]
-            theta, shift = node.theta_shift(feats, n)
+            ehat = (vc_ehat.get(name) if vc_ehat is not None
+                    else self._vc_ehat_live(node, values, n))
+            theta, shift = node.theta_shift(feats, n, vc_ehat=ehat)
             x = values[name]
             if node.kind == "continuous":
                 z0, ladj = node.ut.forward(theta, x)
@@ -298,7 +367,11 @@ class CausalFlowDAG(nn.Module):
         penalized-likelihood convention; ``beta0`` unpenalized). The recorded
         ``history`` NLLs stay pure likelihoods. After training, each ``b_theta``
         is re-centered to mean zero over the training data (function-preserving;
-        the constant moves into ``beta0``).
+        the constant moves into ``beta0``). ``VC(center=...)`` terms run a
+        stage-1 out-of-fold propensity computation before the loop
+        (:meth:`_vc_oof_stage`); the training loss uses those frozen OOF values,
+        while the epoch-level validation monitor (and every post-fit query)
+        uses the live full-fit treatment node.
 
         Calling ``fit`` again continues training (e.g. a second phase with a
         lower learning rate); freezing state does not carry across calls.
@@ -311,10 +384,14 @@ class CausalFlowDAG(nn.Module):
         if vc_warm_start:
             self._vc_warm_start(train_df)
         # VC effect heads whose L2 penalty joins the loss, per owning node
-        vc_penalized = {name: [self.nodes[name].shifts[on]
-                               for on, mods, _ in self.nodes[name]._vc_groups
-                               if mods and self.nodes[name].shifts[on].penalty > 0]
+        vc_penalized = {name: [self.nodes[name].shifts[g.on]
+                               for g in self.nodes[name]._vc_groups
+                               if g.mods and self.nodes[name].shifts[g.on].penalty > 0]
                         for name in self.order}
+        # stage 1 for centered VC terms (issue #30): frozen OUT-OF-FOLD e_hat
+        # for the training rows — a plain tensor, so the Y-node loss has no
+        # gradient path into the treatment node (per-node factorization intact).
+        vc_ehat_train = self._vc_oof_stage(train_df)
 
         train_vals = self._tensorize(train_df)
         val_vals = self._tensorize(val_df) if val_df is not None else train_vals
@@ -353,7 +430,11 @@ class CausalFlowDAG(nn.Module):
             for start in range(0, n, batch_size):
                 idx = perm[start:start + batch_size]
                 batch = {k: v[idx] for k, v in train_vals.items()}
-                per_node = self.node_log_prob(batch, nodes=active)
+                ehat_batch = (None if vc_ehat_train is None else
+                              {nm: {on: e[idx] for on, e in d.items()}
+                               for nm, d in vc_ehat_train.items()})
+                per_node = self.node_log_prob(batch, nodes=active,
+                                              vc_ehat=ehat_batch)
                 node_nlls = {k: -v.mean() for k, v in per_node.items()}
                 loss = torch.stack(list(node_nlls.values())).sum()
                 for name in active:            # VC penalty (excluded from history)
@@ -468,13 +549,109 @@ class CausalFlowDAG(nn.Module):
                     terms=ls_terms)
             proxy = CausalFlowDAG(proxy_spec, device=str(self.device))
             proxy.fit_classical(train_df[list(nd.parents) + [name]], verbose=False)
-            for on, mods, on_is_ord in todo:
-                w = proxy.nodes[name].shifts[on].weight.detach()
-                b0 = float(w[-1] - w[0]) if on_is_ord else float(w[0])
-                m = nd.shifts[on]
+            for g in todo:
+                w = proxy.nodes[name].shifts[g.on].weight.detach()
+                b0 = float(w[-1] - w[0]) if g.on_is_ord else float(w[0])
+                m = nd.shifts[g.on]
                 with torch.no_grad():
                     m.beta0.fill_(b0)
                 m.warm_started.fill_(True)
+
+    @torch.no_grad()
+    def _predict_p1(self, on: str, df: pd.DataFrame) -> np.ndarray:
+        """P(on = 1 | pa_on) from this flow's ``on`` node (binary ordinal):
+        ``sigmoid(shift - theta_0)``."""
+        nd = self.nodes[on]
+        np_dtype = np.float64 if self._dtype == torch.float64 else np.float32
+        values = {p: torch.as_tensor(df[p].to_numpy(dtype=np_dtype),
+                                     device=self.device) for p in nd.parents}
+        feats = self._features(values)
+        theta, shift = nd.theta_shift(feats, len(df),
+                                      vc_ehat=self._vc_ehat_live(nd, values, len(df)))
+        return torch.sigmoid(shift - theta[:, 0]).cpu().numpy()
+
+    def _vc_oof_stage(self, train_df: pd.DataFrame
+                      ) -> dict[str, dict[str, Tensor]] | None:
+        """Stage 1 of the two-stage centered-VC design (issue #30): frozen
+        training-time propensities, {node: {on: (n,) tensor}}.
+
+        For ``center=True`` the values are **out-of-fold** — K refits of the
+        treatment node only, each predicting its held-out fold (the DML
+        cross-fitting requirement; in-sample e_hat reintroduces the
+        own-observation bias and can be worse than no centering). For
+        ``center="col"`` the user-supplied cross-fitted column is taken as-is.
+        Bookkeeping lands in ``self.vc_center_info[(node, on)]`` (``e_oof``,
+        ``fold_id``, ``folds``, ``source``) so tests can assert the fold
+        structure — a later "simplification" to in-sample e_hat fails CI."""
+        jobs = [(name, g) for name in self.order
+                for g in self.nodes[name]._vc_groups if g.center]
+        if not jobs:
+            return None
+        self.vc_center_info = {}
+        np_dtype = np.float64 if self._dtype == torch.float64 else np.float32
+        out: dict[str, dict[str, Tensor]] = {}
+        rng_state = torch.get_rng_state()   # proxies reseed; keep fit reproducible
+        try:
+            for name, g in jobs:
+                if isinstance(g.center, str):     # user-supplied cross-fitted col
+                    if g.center not in train_df.columns:
+                        raise KeyError(
+                            f"center column {g.center!r} not in train_df.")
+                    e = train_df[g.center].to_numpy(dtype=np.float64)
+                    if not ((e > 0.0) & (e < 1.0)).all():
+                        raise ValueError(
+                            f"center column {g.center!r} must hold propensities "
+                            "strictly inside (0, 1).")
+                    fold_id = None
+                else:
+                    e, fold_id = self._vc_oof_propensity(g.on, train_df, g.folds)
+                out.setdefault(name, {})[g.on] = torch.as_tensor(
+                    e.astype(np_dtype), device=self.device)
+                self.vc_center_info[(name, g.on)] = {
+                    "source": g.center if isinstance(g.center, str) else "oof-refit",
+                    "folds": None if fold_id is None else int(g.folds),
+                    "fold_id": fold_id, "e_oof": e.copy(), "n": len(train_df)}
+        finally:
+            torch.set_rng_state(rng_state)
+        return out
+
+    def _vc_oof_propensity(self, on: str, train_df: pd.DataFrame,
+                           k: int) -> tuple[np.ndarray, np.ndarray]:
+        """Out-of-fold P(on=1|pa_on): K deterministic refits of the ``on`` node
+        *only* (single-node proxy, parents as sources — their marginals cannot
+        influence the conditional), each predicting the fold it never saw.
+        ``fit_classical`` when the treatment terms are all-``ls`` (deterministic,
+        seconds), else a fixed-budget Adam fit."""
+        on_nd = self.nodes[on]
+        if any(g.center for g in on_nd._vc_groups):
+            raise NotImplementedError(
+                f"treatment node {on!r} itself has a centered VC term; "
+                "chained centering is not supported.")
+        node_spec = self.spec[on]
+        proxy_spec: dict[str, NodeSpec] = {}
+        for p in on_nd.parents:
+            pn = self.spec[p]
+            proxy_spec[p] = (OrdinalNode(levels=pn.levels)
+                             if isinstance(pn, OrdinalNode)
+                             else ContinuousNode(transform="affine"))
+        terms = list(node_spec.terms) if node_spec.terms else None
+        proxy_spec[on] = OrdinalNode(levels=2, terms=terms)
+        all_ls = all(t.effect == "LS" for t in (terms or []))
+        cols = list(on_nd.parents) + [on]
+
+        n = len(train_df)
+        fold_id = np.random.default_rng(0).permutation(n) % k
+        e = np.empty(n, dtype=np.float64)
+        for j in range(k):
+            proxy = CausalFlowDAG(proxy_spec, device=str(self.device), seed=0)
+            held_in = train_df.iloc[fold_id != j][cols]
+            if all_ls:
+                proxy.fit_classical(held_in, verbose=False)
+            else:
+                proxy.fit(held_in, epochs=300, learning_rate=1e-2, verbose=0,
+                          seed=0, restore_best=False)
+            e[fold_id == j] = proxy._predict_p1(on, train_df.iloc[fold_id == j])
+        return e, fold_id
 
     @torch.no_grad()
     def _recenter_vc(self, values: dict[str, Tensor]) -> None:
@@ -483,12 +660,13 @@ class CausalFlowDAG(nn.Module):
         feats: dict[str, Tensor] | None = None
         for name in self.order:
             nd = self.nodes[name]
-            for on, mods, _ in nd._vc_groups:
-                if not mods:
+            for g in nd._vc_groups:
+                if not g.mods:
                     continue
                 if feats is None:
                     feats = self._features(values)
-                nd.shifts[on].recenter(torch.cat([feats[p] for p in mods], dim=1))
+                nd.shifts[g.on].recenter(
+                    torch.cat([feats[p] for p in g.mods], dim=1))
 
     @torch.no_grad()
     def varying_coef(self, node: str, data: pd.DataFrame,
@@ -501,7 +679,10 @@ class CausalFlowDAG(nn.Module):
         no abduction. For a binary treatment it equals the abduct-difference
         ``u(x, t=1, y) - u(x, t=0, y)`` identically. The value lives on the
         node's latent (log-odds) scale — additive for a continuous node,
-        subtracted from the cutpoints for an ordinal node.
+        subtracted from the cutpoints for an ordinal node. For a **centered**
+        term (``center=...``) the returned ``beta`` is unchanged in form, but
+        ``beta0`` reads as the effect at the treatment margin (the observed
+        propensities).
 
         Args:
             node: name of the node carrying the VC term.
@@ -514,7 +695,7 @@ class CausalFlowDAG(nn.Module):
         if node not in self.nodes:
             raise KeyError(f"unknown node {node!r}")
         nd = self.nodes[node]
-        vcs = {o: mods for o, mods, _ in nd._vc_groups}
+        vcs = {g.on: g.mods for g in nd._vc_groups}
         if not vcs:
             raise ValueError(f"node {node!r} has no VC term.")
         if on is None:
@@ -790,7 +971,11 @@ class CausalFlowDAG(nn.Module):
                 continue
             node = self.nodes[name]
             feats = self._features({p: values[p] for p in node.parents})
-            theta, shift = node.theta_shift(feats, n)
+            # centered VC: e_hat(pa_on) is re-derived from the already-sampled
+            # ancestor values — under do the regressor is t_do - e_hat(x), never
+            # a cached training value
+            theta, shift = node.theta_shift(
+                feats, n, vc_ehat=self._vc_ehat_live(node, values, n))
             z = u_vals[name]
             if node.kind == "continuous":
                 values[name] = node.ut.inverse(theta, z - shift)
@@ -815,7 +1000,8 @@ class CausalFlowDAG(nn.Module):
         u = {}
         for name in self.order:
             node = self.nodes[name]
-            theta, shift = node.theta_shift(feats, n)
+            theta, shift = node.theta_shift(
+                feats, n, vc_ehat=self._vc_ehat_live(node, values, n))
             x = values[name]
             if node.kind == "continuous":
                 z0, _ = node.ut.forward(theta, x)
@@ -835,10 +1021,12 @@ class CausalFlowDAG(nn.Module):
             df_local[col] = val
         nd = self.nodes[node]
         np_dtype = np.float64 if self._dtype == torch.float64 else np.float32
+        cols = list(nd.parents) + self._vc_ehat_columns(nd)   # + e_hat inputs
         values = {p: torch.as_tensor(df_local[p].to_numpy(dtype=np_dtype),
-                                     device=self.device) for p in nd.parents}
-        feats = self._features(values)
-        theta, shift = nd.theta_shift(feats, len(df_local))
+                                     device=self.device) for p in cols}
+        feats = self._features({p: values[p] for p in nd.parents})
+        theta, shift = nd.theta_shift(
+            feats, len(df_local), vc_ehat=self._vc_ehat_live(nd, values, len(df_local)))
         return ordinal_pmf(theta, shift).cpu().numpy()
 
     # ------------------------------------------------------------------ scores
