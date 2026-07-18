@@ -49,7 +49,9 @@ Experiments default to the synthetic data (`magic-mrclean/nl`). The `magic` sour
   (`P(Y<=k) = sigmoid(theta_k - shift)`, cutpoints `[t0, t0+cumsum(exp(...))]`).
 - `conditioners.py` — ls/cs/ci networks (widths replicate the original Keras/TF implementation).
 - `flow.py` — `CausalFlowDAG`: `fit`, `sample(n, do=, u=)`, `abduct`, `pmf`,
-  `log_prob`, `save/load`. NLL decomposes per node → one Adam fits all nodes jointly.
+  `log_prob`, `save/load`, `varying_coef` (VC read-out), `scores` /
+  `effect_modifier_scan` (analytic per-row ∂ℓᵢ/∂θ + CUSUM modifier scan,
+  `scores.py`). NLL decomposes per node → one Adam fits all nodes jointly.
 - `simulations/` — numpy-only SCM generators with known ground truth, looked up via
   `REGISTRY`; each module has a CLI that regenerates its frozen `data/<name>/` CSVs:
   `magic_mrclean.py` (stroke SCM, `ls`/`nl`), `triangle.py` (paper §6 continuous +

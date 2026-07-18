@@ -83,6 +83,10 @@ flow.intercept_contributions("NIHSSa", df) # interpret: per-parent partial effec
 # e.g. terms=[CS("Age", "NIHSSa"), VC("T", "Age")] ->
 # flow.varying_coef("mRS_3m", df)          # beta(x): deterministic, y-free
 
+flow.scores(df, node="mRS_3m")             # per-observation scores dl_i/dtheta
+flow.effect_modifier_scan(df, "mRS_3m", on="T")  # which VC modifiers? (CUSUM
+                                           # scan from a cheap all-ls fit) — docs/scores.md
+
 flow.save("flow.pt"); flow = CausalFlowDAG.load("flow.pt")
 
 td.simulations.REGISTRY                    # synthetic DGPs with known ground truth
@@ -178,7 +182,8 @@ data/                   frozen synthetic CSVs + truth.json — a test contract
 experiments/            stroke pipeline, paper replications, training benchmark
 notebooks/              intro (didactic) + Colab demo   (jupytext .py — see README there)
 tests/                  unit, known-truth recovery, R regression
-docs/                   training-speed.md, stroke-case-study.md, varying-coefficients.md
+docs/                   training-speed.md, stroke-case-study.md,
+                        varying-coefficients.md, scores.md
 ```
 
 Implementation conventions (latent-scale signs, raw/one-hot parent encoding,

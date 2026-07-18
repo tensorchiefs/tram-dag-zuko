@@ -841,6 +841,34 @@ class CausalFlowDAG(nn.Module):
         theta, shift = nd.theta_shift(feats, len(df_local))
         return ordinal_pmf(theta, shift).cpu().numpy()
 
+    # ------------------------------------------------------------------ scores
+    @torch.no_grad()
+    def scores(self, df: pd.DataFrame, node: str,
+               params: str = "shift") -> pd.DataFrame:
+        """Per-observation scores ``psi_i = d l_i / d theta`` (issue #29) for a
+        node's interpretable shift coefficients — analytic and exact (see
+        ``tramdag.scores``). ``params="shift"`` (the only option) covers every
+        ``LS`` weight and every ``VC`` term's ``beta0``. At a fitted MLE the
+        per-column sums are ~0; ordered by a covariate that truly modifies the
+        treatment effect, the treatment column's cumulative sum drifts — see
+        :meth:`effect_modifier_scan`. Pure read-out; touches no fitting or
+        sampling code path."""
+        if params != "shift":
+            raise ValueError(f"params='shift' is the only option, got {params!r}.")
+        from .scores import node_scores
+        return node_scores(self, df, node)
+
+    @torch.no_grad()
+    def effect_modifier_scan(self, df: pd.DataFrame, node: str, on: str,
+                             candidates: list[str] | None = None) -> pd.DataFrame:
+        """Zeileis–Hornik fluctuation scan (issue #29): rank candidate
+        covariates by how strongly the ``on``-coefficient scores drift when
+        ordered by them — the measured shortlist for ``VC`` modifiers, from a
+        cheap all-``ls`` fit. Returns stat / p_value / crit_5pct / flag per
+        candidate (see ``tramdag.scores.effect_modifier_scan``)."""
+        from .scores import effect_modifier_scan
+        return effect_modifier_scan(self, df, node, on, candidates=candidates)
+
     # ------------------------------------------------------------------- io
     def save(self, path: str | Path) -> None:
         """Checkpoint the model (spec + weights), its training ``history``, and a

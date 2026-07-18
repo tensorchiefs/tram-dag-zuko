@@ -4,6 +4,19 @@
 
 ### Added
 
+- **`flow.scores(df, node)` + `flow.effect_modifier_scan(df, node, on)`**
+  (issue #29): per-observation scores ψᵢ = ∂ℓᵢ/∂θ for every `LS` weight and
+  `VC` `beta0` — **analytic and exact** (shifts enter the latent additively, so
+  ∂ℓᵢ/∂β = (∂ℓᵢ/∂sᵢ)·xᵢ with the latent derivative in closed form; pinned by a
+  float64 finite-difference test and the score-sums≈0-at-MLE property) — and
+  the Zeileis–Hornik fluctuation scan packaged on top: order the treatment
+  coefficient's scores by each candidate covariate, `sup|CUSUM|` vs the
+  Kolmogorov 5% critical value ranks candidates for `VC` modifiers from a
+  seconds-long all-`ls` `fit_classical`. Pure read-out, no fitting/sampling
+  path touched. End-to-end test: the scan flags the true (X2, X3) modifiers of
+  a heterogeneous-effect SCM and not the inert prognostic X1. Docs:
+  `docs/scores.md`.
+
 - **`VC(on, *modifiers, penalty=)` — varying-coefficient shift term** (issue #28):
   a treatment-effect head `beta(x) = beta0 + b_theta(x)` with a small (16-unit),
   **penalized**, zero-initialised network that only multiplies `x_on`, plus the
