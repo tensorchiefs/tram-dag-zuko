@@ -12,11 +12,19 @@ Term constructors name the parent(s) a term depends on:
   implicit simple-intercept baseline (always present, optional to write).
 - :func:`LS` — *linear shift*: ``beta * x`` (one interpretable weight), one parent.
 - :func:`CS` — *complex shift*: an additive MLP ``g(x)`` on the latent scale.
+- :func:`VC` — *varying-coefficient shift*: ``beta(modifiers) * x_on`` with
+  ``beta(x) = beta0 + b_theta(x)`` and ``b_theta`` a small, **penalized** network
+  — a treatment-effect head with its own bias–variance budget (issue #28).
 
 The intercept slot sums in coefficient space; the shift slot sums on the latent
 scale. "Joint vs additive" is just argument grouping — a multi-parent term such
 as ``CS("a","b")`` is one **joint** network over both parents (an interaction),
 whereas ``CS("a") + CS("b")`` are two **additive** terms.
+
+Each parent enters through exactly one *edge-owning* term (I/LS/CS parents, and
+a VC term's ``on``). VC **modifiers** are exempt: ``CS("x2")`` + ``VC("t", "x2")``
+is the intended pattern — ``x2`` acts prognostically through the shift *and*
+modifies the treatment effect.
 """
 
 from __future__ import annotations
@@ -27,20 +35,24 @@ from dataclasses import dataclass, field
 # checkpoint loader, so old saved models keep loading)
 _LEGACY = {"ls": "LS", "cs": "CS", "ci": "I"}
 
-EFFECTS = ("I", "LS", "CS")
+EFFECTS = ("I", "LS", "CS", "VC")
 
 
 @dataclass(frozen=True)
 class Term:
     """One additive term of a node's transformation.
 
-    ``effect`` ∈ {"I", "LS", "CS"}; ``slot`` is "intercept" for ``I`` and "shift"
-    for ``LS``/``CS``. ``parents`` is the (ordered) tuple of parent names the term
-    depends on — empty only for the bare simple-intercept ``I()``.
+    ``effect`` ∈ {"I", "LS", "CS", "VC"}; ``slot`` is "intercept" for ``I`` and
+    "shift" for ``LS``/``CS``/``VC``. ``parents`` is the (ordered) tuple of parent
+    names the term depends on — empty only for the bare simple-intercept ``I()``.
+    For a ``VC`` term ``parents[0]`` is the treatment (``on``) and the rest are
+    the effect modifiers; ``penalty`` is its L2 penalty weight (``None`` for
+    every other effect).
     """
     effect: str
     slot: str
     parents: tuple[str, ...]
+    penalty: float | None = None
 
 
 def I(*parents: str) -> Term:  # noqa: E743 - single-letter name is the intended notation
@@ -62,6 +74,32 @@ def CS(*parents: str) -> Term:
     return Term("CS", "shift", tuple(parents))
 
 
+def VC(on: str, *modifiers: str, penalty: float = 1.0) -> Term:
+    """Varying-coefficient shift ``beta(modifiers) * x_on`` — the treatment-effect
+    term of issue #28.
+
+    ``beta(x) = beta0 + b_theta(x)`` with ``b_theta`` a small MLP whose weights
+    carry the L2 ``penalty``: the fitting objective is the penalized NLL
+    ``sum_i nll_i + penalty * ||b_theta weights||^2`` (total-likelihood scale —
+    a fixed Gaussian prior whose shrinkage vanishes as n grows; ``beta0``
+    unpenalized). ``b_theta``'s output is zero-initialised and, after fitting,
+    mean-centered over the training data, so ``beta0`` is the interpretable main
+    effect (log-odds scale; the classical ``Colr``/``LS`` reading when ``beta``
+    is constant). ``penalty -> inf`` — or ``modifiers=()`` exactly — reduces the
+    term to ``LS(on)``, so VC-vs-LS is a nested question. Read the fitted effect
+    out with :meth:`CausalFlowDAG.varying_coef`.
+
+    ``on`` must be continuous or a binary (2-level) ordinal node; the term is
+    linear in ``x_on``. Unlike other effects, VC *modifiers* may also appear in
+    the node's prognostic terms (``CS``/``LS``/``I``) — only ``on`` owns its edge.
+    """
+    if on in modifiers:
+        raise ValueError(f"VC(): '{on}' cannot be both the treatment (on) and a modifier.")
+    if penalty < 0:
+        raise ValueError(f"VC(): penalty must be >= 0, got {penalty}.")
+    return Term("VC", "shift", (on, *modifiers), penalty=float(penalty))
+
+
 # explicit aliases (avoid confusion with the conditioner classes ComplexShift /
 # ComplexIntercept, and give a non-single-letter option for I)
 Intercept = I
@@ -69,17 +107,22 @@ LinShift = LS
 CShift = CS
 
 
-def term(effect: str, *parents: str) -> Term:
+def term(effect: str, *parents: str, penalty: float | None = None) -> Term:
     """Build a :class:`Term` from an effect *label* — useful when the effect type
     is data-driven (e.g. sweeping ``"ls"`` vs ``"cs"``). Accepts both the legacy
-    labels ``"ls"``/``"cs"``/``"ci"`` and the new ``"LS"``/``"CS"``/``"I"``."""
+    labels ``"ls"``/``"cs"``/``"ci"`` and the new ``"LS"``/``"CS"``/``"I"``/``"VC"``.
+    ``penalty`` applies to ``"VC"`` only (its default when omitted)."""
     e = _LEGACY.get(effect.lower(), effect.upper())
+    if penalty is not None and e != "VC":
+        raise ValueError(f"term(): penalty only applies to 'VC', not '{effect}'.")
     if e == "I":
         return I(*parents)
     if e == "LS":
         return LS(*parents)
     if e == "CS":
         return CS(*parents)
+    if e == "VC":
+        return VC(*parents) if penalty is None else VC(*parents, penalty=penalty)
     raise ValueError(f"unknown term effect '{effect}'.")
 
 
@@ -126,7 +169,12 @@ def node_parents(node: NodeSpec) -> list[str]:
 
 
 def validate_and_sort(spec: dict[str, NodeSpec]) -> list[str]:
-    """Validate the spec and return a topological ordering of the nodes."""
+    """Validate the spec and return a topological ordering of the nodes.
+
+    Edge ownership: every parent must enter through exactly one edge-owning term
+    (all parents of I/LS/CS terms; a VC term's ``on``). VC *modifiers* are exempt
+    — they may repeat across terms (a modifier typically also acts prognostically
+    through a CS/LS term)."""
     for name, node in spec.items():
         seen: set[str] = set()
         for term in node_terms(node):
@@ -137,10 +185,30 @@ def validate_and_sort(spec: dict[str, NodeSpec]) -> list[str]:
             for p in term.parents:
                 if p not in spec:
                     raise ValueError(f"Node '{name}': unknown parent '{p}'.")
+            if term.effect == "VC":
+                if not term.parents:
+                    raise ValueError(f"Node '{name}': VC term needs a treatment parent.")
+                on = term.parents[0]
+                if on in term.parents[1:]:
+                    raise ValueError(
+                        f"Node '{name}': VC treatment '{on}' cannot also be a modifier.")
+                if term.penalty is None or term.penalty < 0:
+                    raise ValueError(f"Node '{name}': VC penalty must be >= 0.")
+                on_node = spec[on]
+                if isinstance(on_node, OrdinalNode) and on_node.levels != 2:
+                    raise ValueError(
+                        f"Node '{name}': VC treatment '{on}' is ordinal with "
+                        f"{on_node.levels} levels; only binary (2-level) ordinal "
+                        "treatments are supported (multi-level is a follow-up).")
+                owners = (on,)
+            else:
+                owners = term.parents
+            for p in owners:
                 if p in seen:
                     raise ValueError(
                         f"Node '{name}': parent '{p}' appears in more than one term "
-                        "(each parent must enter through exactly one term).")
+                        "(each parent must enter through exactly one edge-owning "
+                        "term; only VC modifiers may repeat).")
                 seen.add(p)
         if isinstance(node, OrdinalNode) and node.levels < 2:
             raise ValueError(f"Node '{name}': ordinal levels must be >= 2.")
@@ -164,7 +232,8 @@ def spec_to_dict(spec: dict[str, NodeSpec]) -> dict:
     """JSON-serializable representation (for checkpoints)."""
     out = {}
     for name, node in spec.items():
-        terms = [{"effect": t.effect, "parents": list(t.parents)}
+        terms = [{"effect": t.effect, "parents": list(t.parents),
+                  **({"penalty": t.penalty} if t.effect == "VC" else {})}
                  for t in node_terms(node)]
         d = {"kind": node.kind, "terms": terms}
         if isinstance(node, ContinuousNode):
@@ -181,7 +250,8 @@ def _terms_from_dict(nd: dict) -> list[Term]:
     layout and the legacy ``parents`` dict (so old checkpoints still load)."""
     if "terms" in nd:
         ctor = {"I": I, "LS": LS, "CS": CS}
-        return [ctor[t["effect"]](*t["parents"]) for t in nd["terms"]]
+        return [VC(*t["parents"], penalty=t["penalty"]) if t["effect"] == "VC"
+                else ctor[t["effect"]](*t["parents"]) for t in nd["terms"]]
     # legacy checkpoint: {"parents": {parent: "ls"|"cs"|"ci"}}
     out: list[Term] = []
     for parent, label in nd.get("parents", {}).items():

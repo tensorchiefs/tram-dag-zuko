@@ -10,6 +10,7 @@ from .carefl import Carefl4
 from .magic_mrclean import MagicMrClean
 from .triangle import TriangleContinuous, TriangleMixed
 from .vaca import VacaTriangle
+from .vc_shift import VCLogisticShift
 
 REGISTRY = {
     "magic-mrclean": MagicMrClean,
@@ -17,7 +18,8 @@ REGISTRY = {
     "triangle-mixed": TriangleMixed,
     "vaca": VacaTriangle,
     "carefl": Carefl4,
+    "vc-shift": VCLogisticShift,
 }
 
 __all__ = ["MagicMrClean", "TriangleContinuous", "TriangleMixed",
-           "VacaTriangle", "Carefl4", "REGISTRY"]
+           "VacaTriangle", "Carefl4", "VCLogisticShift", "REGISTRY"]

@@ -78,6 +78,11 @@ flow.ls_coefficients()                     # interpret: per-edge log-odds-ratios
 flow.intercept_contributions("NIHSSa", df) # interpret: per-parent partial effects
                                            # of an additive complex intercept (centered)
 
+# heterogeneous treatment effects: a small, penalized effect head beta(x)*T
+# (VC term) with a first-class read-out — see docs/varying-coefficients.md
+# e.g. terms=[CS("Age", "NIHSSa"), VC("T", "Age")] ->
+# flow.varying_coef("mRS_3m", df)          # beta(x): deterministic, y-free
+
 flow.save("flow.pt"); flow = CausalFlowDAG.load("flow.pt")
 
 td.simulations.REGISTRY                    # synthetic DGPs with known ground truth
@@ -167,12 +172,13 @@ See the [`tests/README.md`](tests/README.md) file for more details.
 
 ```
 src/tramdag/            spec.py transforms.py conditioners.py flow.py
-                        simulations/   (magic_mrclean, triangle, vaca, carefl + CLIs)
+                        simulations/   (magic_mrclean, triangle, vaca, carefl,
+                                        vc_shift + CLIs)
 data/                   frozen synthetic CSVs + truth.json — a test contract
 experiments/            stroke pipeline, paper replications, training benchmark
 notebooks/              intro (didactic) + Colab demo   (jupytext .py — see README there)
-tests/                  66 tests: unit, known-truth recovery, R regression
-docs/                   training-speed.md, stroke-case-study.md
+tests/                  unit, known-truth recovery, R regression
+docs/                   training-speed.md, stroke-case-study.md, varying-coefficients.md
 ```
 
 Implementation conventions (latent-scale signs, raw/one-hot parent encoding,
