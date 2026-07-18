@@ -17,11 +17,12 @@ Conventional import alias::
 from . import simulations
 from .env import machine_info
 from .flow import CausalFlowDAG
-from .spec import (CS, LS, CShift, ContinuousNode, I, Intercept, LinShift,
+from .spec import (CS, LS, VC, CShift, ContinuousNode, I, Intercept, LinShift,
                    OrdinalNode, Term, term)
 
 __all__ = ["CausalFlowDAG", "ContinuousNode", "OrdinalNode", "machine_info",
            "simulations",
            # term-formula notation
-           "Term", "I", "LS", "CS", "term", "Intercept", "LinShift", "CShift"]
+           "Term", "I", "LS", "CS", "VC", "term", "Intercept", "LinShift",
+           "CShift"]
 __version__ = "0.3.0"

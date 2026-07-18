@@ -4,6 +4,25 @@
 
 ### Added
 
+- **`VC(on, *modifiers, penalty=)` — varying-coefficient shift term** (issue #28):
+  a treatment-effect head `beta(x) = beta0 + b_theta(x)` with a small (16-unit),
+  **penalized**, zero-initialised network that only multiplies `x_on`, plus the
+  first-class read-out `flow.varying_coef(node, data)` (closed-form,
+  deterministic, y-free; equals the abduct-difference for binary treatments).
+  The objective is the penalized likelihood `Σ NLL + penalty·‖w‖²` (total-NLL
+  scale, `beta0` unpenalized); `penalty → ∞` — or `modifiers=()` exactly —
+  nests `LS(on)`, and `fit(vc_warm_start=True)` (default) starts `beta0` at the
+  classical all-`ls` solution. VC modifiers may also appear in prognostic terms
+  (only `on` owns its edge). Motivation, measured: the `CS(on, x…)` reduced form
+  is *expressive but unestimated* — corr ≈ 0.5 against the true effect function
+  even in-class (tramdag-simu#18/PR #21) because nothing in the NLL rewards a
+  smooth arm-difference; the regularized head reaches ≈ 0.99 on the same task
+  class. New validation DGP `simulations/vc_shift.py` (`VCLogisticShift`,
+  frozen `data/vc-shift/`, registry `"vc-shift"`) with known
+  `beta_true = −1 + 0.8·X2 − 0.6·X3`; acceptance tests in `tests/test_vc_term.py`
+  (recovery bar corr ≥ 0.9 at n = 5000, measured min-over-seeds 0.986). Docs:
+  `docs/varying-coefficients.md`.
+
 - **`flow.intercept_contributions(node, data)`** (issue #20, Option A) — post-hoc,
   mean-centered decomposition of an **additive complex intercept**
   (`terms=[I("x1"), I("x2")]`). The per-term networks are summed in unconstrained

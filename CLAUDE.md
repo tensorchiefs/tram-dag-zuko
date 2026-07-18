@@ -33,11 +33,16 @@ Experiments default to the synthetic data (`magic-mrclean/nl`). The `magic` sour
   declares `terms=[...]` (term-formula notation, since 0.3.0; the legacy
   `parents={parent: term}` dict was removed). Term constructors: `LS(parent)`
   (linear shift), `CS(*parents)` (complex shift MLP), `I(*parents)` (complex
-  intercept — transform params from parents). A **multi-parent** term is one
+  intercept — transform params from parents), `VC(on, *modifiers, penalty=)`
+  (varying-coefficient effect head `beta(modifiers)·x_on`, small penalized
+  zero-init net; read out with `flow.varying_coef` — see
+  docs/varying-coefficients.md). A **multi-parent** term is one
   *joint* network over the group (`CS("a","b")`, `I("a","b")`); **separate** terms
   are *additive* (`CS("a")+CS("b")`; `I("a")+I("b")` = per-parent intercept nets
   summed in unconstrained coeff space). `term(effect, *parents)` builds a term from
-  a data-driven label. No intercept term → `SimpleIntercept` baseline.
+  a data-driven label. No intercept term → `SimpleIntercept` baseline. Every
+  parent enters through exactly one edge-owning term (VC modifiers exempt — they
+  may also appear prognostically).
 - `transforms.py` — monotone 1-D transforms wrapping zuko (`BernsteinUT`, `SplineUT`,
   `AffineUT`; pre-scaled from train 5%/95% quantiles to [-5,5], expanding-bracket
   bisection inverse) + the ordinal ordered-logit transform

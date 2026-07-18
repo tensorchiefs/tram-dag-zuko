@@ -24,8 +24,9 @@ import pandas as pd
 import torch
 from torch import Tensor, nn
 
-from .conditioners import ComplexIntercept, ComplexShift, LinearShift, SimpleIntercept
-from .spec import (ContinuousNode, NodeSpec, OrdinalNode, node_parents,
+from .conditioners import (ComplexIntercept, ComplexShift, LinearShift,
+                           SimpleIntercept, VaryingCoef)
+from .spec import (LS, ContinuousNode, NodeSpec, OrdinalNode, node_parents,
                    node_terms, spec_from_dict, spec_to_dict, validate_and_sort)
 from .transforms import (StandardLogistic, make_univariate_transform,
                          ordinal_abduct, ordinal_log_prob, ordinal_pmf,
@@ -78,10 +79,19 @@ class _Node(nn.Module):
         # shift terms: one network per term, over the term's (possibly joint)
         # parents. Single-parent terms key the ModuleDict by the parent name (so
         # ls_coefficients/introspection keep working); a joint CS over several
-        # parents keys by "a+b" and runs over their concatenated features.
+        # parents keys by "a+b" and runs over their concatenated features. A VC
+        # term keys by its treatment (on) name — validation guarantees `on` owns
+        # that edge — and carries (on, modifiers, on-is-ordinal) in _vc_groups.
         self.shifts = nn.ModuleDict()
         self._shift_groups: list[tuple[str, tuple[str, ...]]] = []
+        self._vc_groups: list[tuple[str, tuple[str, ...], bool]] = []
         for term in terms:
+            if term.effect == "VC":
+                on, mods = term.parents[0], tuple(term.parents[1:])
+                self.shifts[on] = VaryingCoef(sum(width(p) for p in mods),
+                                              penalty=term.penalty)
+                self._vc_groups.append((on, mods, isinstance(spec[on], OrdinalNode)))
+                continue
             if term.effect not in ("LS", "CS"):
                 continue
             ps = tuple(term.parents)
@@ -104,6 +114,12 @@ class _Node(nn.Module):
         for key, ps in self._shift_groups:
             feat = feats[ps[0]] if len(ps) == 1 else torch.cat([feats[p] for p in ps], dim=1)
             shift = shift + self.shifts[key](feat)
+        for on, mods, on_is_ord in self._vc_groups:
+            # treatment column raw: one-hot level-1 indicator for a binary
+            # ordinal on; the (n, 1) value itself for a continuous on
+            t = feats[on][:, -1:] if on_is_ord else feats[on]
+            mod_feat = torch.cat([feats[p] for p in mods], dim=1) if mods else None
+            shift = shift + self.shifts[on](t, mod_feat)
         return theta, shift
 
 
@@ -224,7 +240,8 @@ class CausalFlowDAG(nn.Module):
             verbose: int = 50, seed: int | None = None,
             restore_best: bool = False, schedule: str | None = None,
             plateau_patience: int = 15, freeze_patience: int | None = None,
-            min_delta: float = 1e-4, marginal_init: bool = False) -> "CausalFlowDAG":
+            min_delta: float = 1e-4, marginal_init: bool = False,
+            vc_warm_start: bool = True) -> "CausalFlowDAG":
         """Jointly fit all nodes by maximum likelihood.
 
         By default training keeps the **final** (converged) weights, so an
@@ -267,6 +284,21 @@ class CausalFlowDAG(nn.Module):
                 converged MLE is unchanged — applied once (first fit only).
                 Opt-in; default off. Affects only ``SimpleIntercept`` nodes
                 (conditional ci intercepts are left untouched).
+            vc_warm_start: if True (default), each ``VC`` term's ``beta0`` is
+                initialised from the classical all-``ls`` solution of its node's
+                conditional (deterministic L-BFGS on a throwaway proxy) before
+                training, so the penalized head starts at the classical answer
+                and only learns deviations. Applied once per term (a buffer that
+                survives ``save``/``load`` guards re-runs). No-op without VC terms.
+
+        For ``VC`` terms the objective is the **penalized** NLL on the
+        total-likelihood scale — each term adds ``penalty * ||b_theta weights||^2``
+        to the summed NLL, i.e. ``penalty * ||w||^2 / n_train`` to the mean loss
+        (a fixed Gaussian prior: the shrinkage vanishes as n grows, the classical
+        penalized-likelihood convention; ``beta0`` unpenalized). The recorded
+        ``history`` NLLs stay pure likelihoods. After training, each ``b_theta``
+        is re-centered to mean zero over the training data (function-preserving;
+        the constant moves into ``beta0``).
 
         Calling ``fit`` again continues training (e.g. a second phase with a
         lower learning rate); freezing state does not carry across calls.
@@ -276,6 +308,13 @@ class CausalFlowDAG(nn.Module):
         if seed is not None:
             torch.manual_seed(seed)
         self._set_ranges(train_df, marginal_init=marginal_init)
+        if vc_warm_start:
+            self._vc_warm_start(train_df)
+        # VC effect heads whose L2 penalty joins the loss, per owning node
+        vc_penalized = {name: [self.nodes[name].shifts[on]
+                               for on, mods, _ in self.nodes[name]._vc_groups
+                               if mods and self.nodes[name].shifts[on].penalty > 0]
+                        for name in self.order}
 
         train_vals = self._tensorize(train_df)
         val_vals = self._tensorize(val_df) if val_df is not None else train_vals
@@ -317,6 +356,9 @@ class CausalFlowDAG(nn.Module):
                 per_node = self.node_log_prob(batch, nodes=active)
                 node_nlls = {k: -v.mean() for k, v in per_node.items()}
                 loss = torch.stack(list(node_nlls.values())).sum()
+                for name in active:            # VC penalty (excluded from history)
+                    for m in vc_penalized[name]:
+                        loss = loss + m.penalty * m.l2() / n
                 opt.zero_grad()
                 loss.backward()
                 opt.step()
@@ -386,8 +428,116 @@ class CausalFlowDAG(nn.Module):
             for name, (_, state) in best.items():
                 if state is not None:
                     self.nodes[name].load_state_dict(state)
+        self._recenter_vc(train_vals)
         self.eval()
         return self
+
+    # ------------------------------------------------- varying-coefficient (VC)
+    def _vc_warm_start(self, train_df: pd.DataFrame) -> None:
+        """Initialise each VC term's ``beta0`` from the classical all-``ls``
+        solution of its node's conditional (issue #28's recommended warm start).
+
+        A throwaway proxy of the node (same kind/transform, every parent an LS
+        term, parent marginals irrelevant to the conditional because the joint
+        NLL decomposes per node) is fitted with the deterministic
+        :meth:`fit_classical`, and the ``on`` coefficient copied into ``beta0``
+        (for a binary ordinal treatment, the identified one-hot difference
+        ``w[1] - w[0]``). ``b_theta`` already starts at the zero function
+        (zero-initialised output layer). Runs once per term — the
+        ``warm_started`` buffer survives ``save``/``load``."""
+        for name in self.order:
+            nd = self.nodes[name]
+            todo = [g for g in nd._vc_groups
+                    if not bool(nd.shifts[g[0]].warm_started)]
+            if not todo:
+                continue
+            node_spec = self.spec[name]
+            proxy_spec: dict[str, NodeSpec] = {}
+            for p in nd.parents:
+                pn = self.spec[p]
+                proxy_spec[p] = (OrdinalNode(levels=pn.levels)
+                                 if isinstance(pn, OrdinalNode)
+                                 else ContinuousNode(transform="affine"))
+            ls_terms = [LS(p) for p in nd.parents]
+            if isinstance(node_spec, OrdinalNode):
+                proxy_spec[name] = OrdinalNode(levels=node_spec.levels, terms=ls_terms)
+            else:
+                proxy_spec[name] = ContinuousNode(
+                    transform=node_spec.transform,
+                    transform_kwargs=dict(node_spec.transform_kwargs),
+                    terms=ls_terms)
+            proxy = CausalFlowDAG(proxy_spec, device=str(self.device))
+            proxy.fit_classical(train_df[list(nd.parents) + [name]], verbose=False)
+            for on, mods, on_is_ord in todo:
+                w = proxy.nodes[name].shifts[on].weight.detach()
+                b0 = float(w[-1] - w[0]) if on_is_ord else float(w[0])
+                m = nd.shifts[on]
+                with torch.no_grad():
+                    m.beta0.fill_(b0)
+                m.warm_started.fill_(True)
+
+    @torch.no_grad()
+    def _recenter_vc(self, values: dict[str, Tensor]) -> None:
+        """Re-split every VC term so ``b_theta`` is sum-to-zero over the training
+        rows (function-preserving; the constant moves into ``beta0``)."""
+        feats: dict[str, Tensor] | None = None
+        for name in self.order:
+            nd = self.nodes[name]
+            for on, mods, _ in nd._vc_groups:
+                if not mods:
+                    continue
+                if feats is None:
+                    feats = self._features(values)
+                nd.shifts[on].recenter(torch.cat([feats[p] for p in mods], dim=1))
+
+    @torch.no_grad()
+    def varying_coef(self, node: str, data: pd.DataFrame,
+                     on: str | None = None) -> np.ndarray:
+        """Fitted effect function ``beta(x)`` of a ``VC`` term, evaluated at the
+        rows of ``data`` — the first-class read-out of issue #28.
+
+        Closed-form from the fitted term (``beta0 + b_theta(modifiers)``):
+        deterministic, y-free (only the modifier columns of ``data`` are read),
+        no abduction. For a binary treatment it equals the abduct-difference
+        ``u(x, t=1, y) - u(x, t=0, y)`` identically. The value lives on the
+        node's latent (log-odds) scale — additive for a continuous node,
+        subtracted from the cutpoints for an ordinal node.
+
+        Args:
+            node: name of the node carrying the VC term.
+            on: the VC term's treatment name; optional when the node has exactly
+                one VC term.
+
+        Returns an ``(n,)`` array of ``beta`` values (constant when the term has
+        no modifiers).
+        """
+        if node not in self.nodes:
+            raise KeyError(f"unknown node {node!r}")
+        nd = self.nodes[node]
+        vcs = {o: mods for o, mods, _ in nd._vc_groups}
+        if not vcs:
+            raise ValueError(f"node {node!r} has no VC term.")
+        if on is None:
+            if len(vcs) > 1:
+                raise ValueError(
+                    f"node {node!r} has several VC terms ({sorted(vcs)}); "
+                    "pass on=<treatment name>.")
+            on = next(iter(vcs))
+        if on not in vcs:
+            raise KeyError(f"node {node!r} has no VC term on {on!r} "
+                           f"(has {sorted(vcs)}).")
+        mods = vcs[on]
+        missing = [p for p in mods if p not in data.columns]
+        if missing:
+            raise KeyError(f"data is missing modifier column(s): {missing}")
+        mod_feat = None
+        if mods:
+            np_dtype = np.float64 if self._dtype == torch.float64 else np.float32
+            vals = {p: torch.as_tensor(data[p].to_numpy(dtype=np_dtype),
+                                       device=self.device) for p in mods}
+            feats = self._features(vals)
+            mod_feat = torch.cat([feats[p] for p in mods], dim=1)
+        return nd.shifts[on].beta(mod_feat, len(data)).cpu().numpy()
 
     # --------------------------------------------------------- classical fit
     def _is_all_ls(self) -> bool:
@@ -413,11 +563,17 @@ class CausalFlowDAG(nn.Module):
         m = pd.DataFrame("", index=list(self.order), columns=list(self.order))
         for child in self.order:
             for term in node_terms(self.spec[child]):
-                tag = labels[term.effect]
-                if len(term.parents) > 1:
-                    tag = f"{tag}{list(term.parents)}"
-                for p in term.parents:
-                    m.loc[p, child] = tag
+                if term.effect == "VC":   # treatment cell "VC", modifiers "VCm"
+                    cells = [(term.parents[0], "VC")] + [
+                        (p, "VCm") for p in term.parents[1:]]
+                else:
+                    tag = labels[term.effect]
+                    if len(term.parents) > 1:
+                        tag = f"{tag}{list(term.parents)}"
+                    cells = [(p, tag) for p in term.parents]
+                for p, tag in cells:      # a VC modifier may share its cell with
+                    cur = m.loc[p, child]  # a prognostic term -> join with "+"
+                    m.loc[p, child] = f"{cur}+{tag}" if cur else tag
         return m
 
     @torch.no_grad()
@@ -536,7 +692,7 @@ class CausalFlowDAG(nn.Module):
         if not self._is_all_ls():
             raise ValueError(
                 "fit_classical requires an all-`ls` spec (every edge term 'ls'); "
-                "this spec has cs/ci terms. Use fit() for flexible models.")
+                "this spec has cs/ci/vc terms. Use fit() for flexible models.")
         self._set_ranges(train_df)
 
         self.double()  # parameters + buffers (xmin/xmax) -> float64, one call
