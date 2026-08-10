@@ -1,5 +1,7 @@
-"""Machine / environment provenance — captured with saved models so cached
-timing and benchmark numbers are interpretable across machines.
+"""Record which machine produced a result.
+
+``save`` stores this snapshot with the model. Timing and benchmark numbers
+are then comparable across machines.
 """
 
 from __future__ import annotations
@@ -14,9 +16,17 @@ __all__ = ["machine_info"]
 
 
 def machine_info() -> dict:
-    """A best-effort snapshot of the machine and software environment:
-    host, OS, CPU/GPU, cores, RAM, and the python/torch/zuko/tramdag versions.
-    Fails open — any field that can't be read is ``None`` rather than raising.
+    """Describe the machine and the software environment.
+
+    The snapshot holds the host name, the operating system, the CPU and GPU,
+    the core count, the RAM size, and the versions of python, torch, zuko and
+    tramdag.
+
+    Returns
+    -------
+    dict
+        One key per property. A property that cannot be read is ``None``.
+        This function never raises.
     """
     info: dict = {
         "hostname": socket.gethostname().split(".")[0],
