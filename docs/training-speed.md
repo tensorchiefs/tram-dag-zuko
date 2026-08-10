@@ -33,8 +33,8 @@ step size would still make progress. Freezing state is per-`fit()`-call: a secon
 unchanged by this PR, so
 
 ```python
-flow.fit(train_df, epochs=4000, learning_rate=1e-2)   # constant lr, no freezing
-flow.fit(train_df, epochs=2000, learning_rate=1e-3)   # classic two-phase recipe
+flow.fit(train_df, epochs=4000, learning_rate=1e-2)  # constant lr, no freezing
+flow.fit(train_df, epochs=2000, learning_rate=1e-3)  # classic two-phase recipe
 ```
 
 is still the exact-MLE path used by `experiments/validate_ls.py`. (Independent of
@@ -49,10 +49,16 @@ only makes sense for small, parametric (all-`ls`) models. Recipe (also in
 
 ```python
 flow = CausalFlowDAG(build_spec("ls"))
-flow._set_ranges(train_df)                  # transform ranges from train quantiles
+flow._set_ranges(train_df)  # transform ranges from train quantiles
 vals = flow._tensorize(train_df)
-opt = torch.optim.LBFGS(flow.parameters(), lr=1.0, max_iter=40,
-                        history_size=30, line_search_fn="strong_wolfe")
+opt = torch.optim.LBFGS(
+    flow.parameters(),
+    lr=1.0,
+    max_iter=40,
+    history_size=30,
+    line_search_fn="strong_wolfe",
+)
+
 
 def closure():
     opt.zero_grad()
@@ -60,8 +66,9 @@ def closure():
     loss.backward()
     return loss
 
+
 for _ in range(10):
-    loss = opt.step(closure)                # full-batch quasi-Newton steps
+    loss = opt.step(closure)  # full-batch quasi-Newton steps
 ```
 
 Fast (< 2 s to coefficient-level accuracy) but not robust across seeds (see
@@ -142,8 +149,16 @@ the last decade (that's exactly why the two-phase recipe existed).
 For everyday fits:
 
 ```python
-flow.fit(train, val, epochs=4000, learning_rate=1e-2, batch_size=512,
-         schedule="plateau", plateau_patience=30, freeze_patience=120)
+flow.fit(
+    train,
+    val,
+    epochs=4000,
+    learning_rate=1e-2,
+    batch_size=512,
+    schedule="plateau",
+    plateau_patience=30,
+    freeze_patience=120,
+)
 ```
 
 (generous `epochs` as a ceiling — the fit stops itself). For exact classical

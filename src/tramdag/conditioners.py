@@ -40,8 +40,10 @@ class ComplexIntercept(nn.Module):
     def __init__(self, n_features: int, n_params: int):
         super().__init__()
         self.net = nn.Sequential(
-            nn.Linear(n_features, 8), nn.ReLU(),
-            nn.Linear(8, 8), nn.ReLU(),
+            nn.Linear(n_features, 8),
+            nn.ReLU(),
+            nn.Linear(8, 8),
+            nn.ReLU(),
             nn.Linear(8, n_params, bias=False),
         )
 
@@ -66,9 +68,12 @@ class ComplexShift(nn.Module):
     def __init__(self, n_features: int):
         super().__init__()
         self.net = nn.Sequential(
-            nn.Linear(n_features, 64), nn.ReLU(),
-            nn.Linear(64, 128), nn.ReLU(),
-            nn.Linear(128, 64), nn.ReLU(),
+            nn.Linear(n_features, 64),
+            nn.ReLU(),
+            nn.Linear(64, 128),
+            nn.ReLU(),
+            nn.Linear(128, 64),
+            nn.ReLU(),
             nn.Linear(64, 1, bias=False),
         )
 
@@ -105,7 +110,7 @@ class VaryingCoef(nn.Module):
         self.register_buffer("warm_started", torch.tensor(False))
         if n_features > 0:
             out = nn.Linear(hidden, 1, bias=False)
-            nn.init.zeros_(out.weight)          # beta(x) == beta0 at init
+            nn.init.zeros_(out.weight)  # beta(x) == beta0 at init
             self.net = nn.Sequential(nn.Linear(n_features, hidden), nn.ReLU(), out)
         else:
             self.net = None

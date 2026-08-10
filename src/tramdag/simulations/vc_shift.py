@@ -40,8 +40,8 @@ import pandas as pd
 
 COLUMNS = ["X1", "X2", "X3", "T", "Y"]
 
-B0, B2, B3 = -1.0, 0.8, -0.6           # beta(x) = B0 + B2*X2 + B3*X3
-H_SCALE = 2.0                          # h(y) = H_SCALE * y
+B0, B2, B3 = -1.0, 0.8, -0.6  # beta(x) = B0 + B2*X2 + B3*X3
+H_SCALE = 2.0  # h(y) = H_SCALE * y
 
 
 def _logistic(rng: np.random.Generator, size: int) -> np.ndarray:
@@ -66,14 +66,23 @@ class VCLogisticShift:
     def draw_latents(self, n: int, rng: np.random.Generator) -> dict[str, np.ndarray]:
         """All noise of the SCM: Gaussian primitives for the sources, logistic
         latents for T (assignment) and Y (the TRAM latent)."""
-        return {"X1": rng.normal(size=n), "X2": rng.normal(size=n),
-                "X3": rng.normal(size=n), "T": _logistic(rng, n),
-                "Y": _logistic(rng, n)}
+        return {
+            "X1": rng.normal(size=n),
+            "X2": rng.normal(size=n),
+            "X3": rng.normal(size=n),
+            "T": _logistic(rng, n),
+            "Y": _logistic(rng, n),
+        }
 
     # --------------------------------------------------------------------- SCM
-    def simulate(self, n: int | None = None, *, rng: np.random.Generator | None = None,
-                 do: dict[str, float] | None = None,
-                 latents: dict[str, np.ndarray] | None = None) -> pd.DataFrame:
+    def simulate(
+        self,
+        n: int | None = None,
+        *,
+        rng: np.random.Generator | None = None,
+        do: dict[str, float] | None = None,
+        latents: dict[str, np.ndarray] | None = None,
+    ) -> pd.DataFrame:
         """Forward-sample the SCM (``do`` clamps nodes; ``latents`` reuses noise)."""
         do = do or {}
         if latents is None:
@@ -85,21 +94,21 @@ class VCLogisticShift:
 
         x = {}
         for name in ("X1", "X2", "X3"):
-            x[name] = (np.full(n, float(do[name])) if name in do
-                       else latents[name])
+            x[name] = np.full(n, float(do[name])) if name in do else latents[name]
         if "T" in do:
             T = np.full(n, float(do["T"]))
         else:
             logit_T = 0.4 * x["X1"] + 0.4 * x["X2"]
-            T = (latents["T"] > -logit_T).astype(float)   # P(T=1) = sigmoid(logit_T)
+            T = (latents["T"] > -logit_T).astype(float)  # P(T=1) = sigmoid(logit_T)
         if "Y" in do:
             Y = np.full(n, float(do["Y"]))
         else:
             g = 0.5 * x["X1"] ** 2 + x["X2"] - 0.5 * x["X3"]
             beta = B0 + B2 * x["X2"] + B3 * x["X3"]
             Y = (latents["Y"] - g - beta * T) / H_SCALE
-        return pd.DataFrame({"X1": x["X1"], "X2": x["X2"], "X3": x["X3"],
-                             "T": T, "Y": Y})
+        return pd.DataFrame(
+            {"X1": x["X1"], "X2": x["X2"], "X3": x["X3"], "T": T, "Y": Y}
+        )
 
     # ----------------------------------------------------------------- datasets
     def observational(self, n: int, seed_offset: int = 0) -> pd.DataFrame:
@@ -112,11 +121,15 @@ class VCLogisticShift:
         scale — what a fitted VC term's :meth:`~tramdag.CausalFlowDAG.varying_coef`
         should recover. ``x`` is a DataFrame with X2/X3 columns (extra columns
         ignored)."""
-        return (B0 + B2 * np.asarray(x["X2"], dtype=float)
-                + B3 * np.asarray(x["X3"], dtype=float))
+        return (
+            B0
+            + B2 * np.asarray(x["X2"], dtype=float)
+            + B3 * np.asarray(x["X3"], dtype=float)
+        )
 
-    def counterfactual_pair(self, n: int, do: dict[str, float],
-                            seed_offset: int = 0) -> tuple[pd.DataFrame, pd.DataFrame]:
+    def counterfactual_pair(
+        self, n: int, do: dict[str, float], seed_offset: int = 0
+    ) -> tuple[pd.DataFrame, pd.DataFrame]:
         """Factual sample and its counterfactual under ``do`` sharing the same
         latents (true individual counterfactuals)."""
         rng = np.random.default_rng(self.seed + 2 + seed_offset)
@@ -138,15 +151,20 @@ def main(argv: list[str] | None = None) -> None:
     obs["T"] = obs["T"].astype(int)
     obs.to_csv(args.out / "obs.csv", index=False)
 
-    truth = {"source": "tramdag issue #28 (VC acceptance DGP)",
-             "seed": args.seed, "n_obs": args.n_obs,
-             "beta": {"b0": B0, "b2": B2, "b3": B3,
-                      "formula": f"{B0} + {B2}*X2 + {B3}*X3"},
-             "g": "0.5*X1^2 + X2 - 0.5*X3", "h": f"{H_SCALE}*y",
-             "propensity": "sigmoid(0.4*X1 + 0.4*X2)"}
+    truth = {
+        "source": "tramdag issue #28 (VC acceptance DGP)",
+        "seed": args.seed,
+        "n_obs": args.n_obs,
+        "beta": {"b0": B0, "b2": B2, "b3": B3, "formula": f"{B0} + {B2}*X2 + {B3}*X3"},
+        "g": "0.5*X1^2 + X2 - 0.5*X3",
+        "h": f"{H_SCALE}*y",
+        "propensity": "sigmoid(0.4*X1 + 0.4*X2)",
+    }
     (args.out / "truth.json").write_text(json.dumps(truth, indent=2) + "\n")
-    print(f"[vc-shift] n={len(obs)}  T-rate={obs['T'].mean():.3f}  "
-          f"sd(beta_true)={gen.true_beta(obs).std():.3f}  -> {args.out}")
+    print(
+        f"[vc-shift] n={len(obs)}  T-rate={obs['T'].mean():.3f}  "
+        f"sd(beta_true)={gen.true_beta(obs).std():.3f}  -> {args.out}"
+    )
 
 
 if __name__ == "__main__":

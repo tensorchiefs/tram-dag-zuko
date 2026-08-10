@@ -34,9 +34,17 @@ def save_json(path: Path, obj: dict) -> None:
     path.write_text(json.dumps(obj, indent=2, default=float) + "\n")
 
 
-def fit_chunked(spec: dict, train_df, val_df, *, record=None, chunk: int = 10,
-                epochs: int = PAPER_EPOCHS, lr: float = PAPER_LR,
-                seed: int = 7) -> tuple[CausalFlowDAG, list[dict]]:
+def fit_chunked(
+    spec: dict,
+    train_df,
+    val_df,
+    *,
+    record=None,
+    chunk: int = 10,
+    epochs: int = PAPER_EPOCHS,
+    lr: float = PAPER_LR,
+    seed: int = 7,
+) -> tuple[CausalFlowDAG, list[dict]]:
     """Fit in ``chunk``-epoch pieces, calling ``record(flow)`` after each chunk
     (for the paper's coefficient-vs-epoch trajectories, Fig. 14/15/19)."""
     torch.manual_seed(seed)
@@ -45,8 +53,9 @@ def fit_chunked(spec: dict, train_df, val_df, *, record=None, chunk: int = 10,
     done = 0
     while done < epochs:
         e = min(chunk, epochs - done)
-        flow.fit(train_df, val_df, epochs=e, learning_rate=lr,
-                 batch_size=BATCH, verbose=0)
+        flow.fit(
+            train_df, val_df, epochs=e, learning_rate=lr, batch_size=BATCH, verbose=0
+        )
         done += e
         if record is not None:
             traj.append({"epoch": done, **record(flow)})
@@ -57,15 +66,17 @@ def ls_weight(flow: CausalFlowDAG, node: str, parent: str) -> float:
     return float(flow.nodes[node].shifts[parent].weight.detach())
 
 
-def cs_curve(flow: CausalFlowDAG, node: str, parent: str,
-             grid: np.ndarray) -> np.ndarray:
+def cs_curve(
+    flow: CausalFlowDAG, node: str, parent: str, grid: np.ndarray
+) -> np.ndarray:
     x = torch.as_tensor(grid, dtype=torch.float32).view(-1, 1)
     with torch.no_grad():
         return flow.nodes[node].shifts[parent](x).detach().numpy()
 
 
-def plot_trajectories(traj: list[dict], truths: dict[str, float],
-                      path: Path, title: str) -> None:
+def plot_trajectories(
+    traj: list[dict], truths: dict[str, float], path: Path, title: str
+) -> None:
     """Coefficient-vs-epoch plot with dashed true values (paper Fig. 14/15/19)."""
     fig, ax = plt.subplots(figsize=(7, 4))
     epochs = [t["epoch"] for t in traj]
@@ -77,15 +88,24 @@ def plot_trajectories(traj: list[dict], truths: dict[str, float],
     fig.tight_layout(), fig.savefig(path, dpi=150), plt.close(fig)
 
 
-def plot_hist_grid(dgp_dfs: dict, flow_dfs: dict, columns: list[str], path: Path,
-                   title: str, ordinal: dict[str, int] | None = None) -> None:
+def plot_hist_grid(
+    dgp_dfs: dict,
+    flow_dfs: dict,
+    columns: list[str],
+    path: Path,
+    title: str,
+    ordinal: dict[str, int] | None = None,
+) -> None:
     """Rows = scenarios (e.g. Obs / do(x1=-1)), cols = variables; DGP filled,
     flow stepped (paper Fig. 16/17 right / 9 / 20)."""
     ordinal = ordinal or {}
     rows = list(dgp_dfs)
-    fig, axes = plt.subplots(len(rows), len(columns),
-                             figsize=(3.2 * len(columns), 2.6 * len(rows)),
-                             squeeze=False)
+    fig, axes = plt.subplots(
+        len(rows),
+        len(columns),
+        figsize=(3.2 * len(columns), 2.6 * len(rows)),
+        squeeze=False,
+    )
     for r, scen in enumerate(rows):
         for c, col in enumerate(columns):
             ax = axes[r][c]
@@ -95,17 +115,25 @@ def plot_hist_grid(dgp_dfs: dict, flow_dfs: dict, columns: list[str], path: Path
                 fd = d.value_counts(normalize=True).reindex(levels, fill_value=0)
                 fm = m.value_counts(normalize=True).reindex(levels, fill_value=0)
                 ax.bar(levels - 0.18, fd, width=0.36, alpha=0.6, label="DGP")
-                ax.bar(levels + 0.18, fm, width=0.36, alpha=0.8, color="C3",
-                       label="flow")
+                ax.bar(
+                    levels + 0.18, fm, width=0.36, alpha=0.8, color="C3", label="flow"
+                )
                 ax.set_xticks(levels)
             else:
                 lo, hi = np.quantile(d, [0.001, 0.999])
-                if hi - lo < 1e-9:          # do-clamped column: constant value
+                if hi - lo < 1e-9:  # do-clamped column: constant value
                     lo, hi = lo - 1.0, hi + 1.0
                 bins = np.linspace(lo, hi, 50)
                 ax.hist(d, bins=bins, density=True, alpha=0.45, label="DGP")
-                ax.hist(m, bins=bins, density=True, histtype="step", lw=1.8,
-                        color="C3", label="flow")
+                ax.hist(
+                    m,
+                    bins=bins,
+                    density=True,
+                    histtype="step",
+                    lw=1.8,
+                    color="C3",
+                    label="flow",
+                )
             if r == 0:
                 ax.set_title(col)
             if c == 0:

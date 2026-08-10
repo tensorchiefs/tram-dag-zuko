@@ -30,52 +30,64 @@ def _vc_spec(penalty: float = 1.0) -> dict:
         "X1": ContinuousNode(transform="affine"),
         "X2": ContinuousNode(transform="affine"),
         "X3": ContinuousNode(transform="affine"),
-        "T":  OrdinalNode(levels=2, terms=[LS("X1"), LS("X2")]),
-        "Y":  ContinuousNode(terms=[CS("X1", "X2", "X3"),
-                                    VC("T", "X2", "X3", penalty=penalty)]),
+        "T": OrdinalNode(levels=2, terms=[LS("X1"), LS("X2")]),
+        "Y": ContinuousNode(
+            terms=[CS("X1", "X2", "X3"), VC("T", "X2", "X3", penalty=penalty)]
+        ),
     }
 
 
 # ------------------------------------------------------------ spec / validation
 def test_vc_constructor_and_term_factory():
     t = VC("T", "X2", "X3", penalty=2.5)
-    assert (t.effect, t.slot, t.parents, t.penalty) == ("VC", "shift",
-                                                        ("T", "X2", "X3"), 2.5)
+    assert (t.effect, t.slot, t.parents, t.penalty) == (
+        "VC",
+        "shift",
+        ("T", "X2", "X3"),
+        2.5,
+    )
     t2 = term("vc", "T", "X2", penalty=2.5)
     assert t2 == VC("T", "X2", penalty=2.5)
-    assert term("VC", "T").penalty == VC("T").penalty        # shared default
+    assert term("VC", "T").penalty == VC("T").penalty  # shared default
     with pytest.raises(ValueError):
-        VC("T", "T")                    # on cannot be a modifier
+        VC("T", "T")  # on cannot be a modifier
     with pytest.raises(ValueError):
-        VC("T", penalty=-1.0)           # negative penalty
+        VC("T", penalty=-1.0)  # negative penalty
     with pytest.raises(ValueError):
-        term("ls", "T", penalty=1.0)    # penalty is VC-only
+        term("ls", "T", penalty=1.0)  # penalty is VC-only
 
 
 def test_vc_modifier_may_repeat_but_on_owns_its_edge():
     # modifier X2 also acts prognostically (the intended pattern) -> valid
-    ok = {"X2": ContinuousNode(), "T": OrdinalNode(levels=2),
-          "Y": ContinuousNode(terms=[CS("X2"), VC("T", "X2")])}
+    ok = {
+        "X2": ContinuousNode(),
+        "T": OrdinalNode(levels=2),
+        "Y": ContinuousNode(terms=[CS("X2"), VC("T", "X2")]),
+    }
     assert validate_and_sort(ok)[-1] == "Y"
     # a second edge-owning term for T -> invalid (beta0 vs main effect unidentified)
-    bad = {"X2": ContinuousNode(), "T": OrdinalNode(levels=2),
-           "Y": ContinuousNode(terms=[LS("T"), VC("T", "X2")])}
+    bad = {
+        "X2": ContinuousNode(),
+        "T": OrdinalNode(levels=2),
+        "Y": ContinuousNode(terms=[LS("T"), VC("T", "X2")]),
+    }
     with pytest.raises(ValueError, match="more than one"):
         validate_and_sort(bad)
 
 
 def test_vc_rejects_multilevel_ordinal_treatment():
-    spec = {"T": OrdinalNode(levels=4),
-            "Y": ContinuousNode(terms=[VC("T")])}
+    spec = {"T": OrdinalNode(levels=4), "Y": ContinuousNode(terms=[VC("T")])}
     with pytest.raises(ValueError, match="2-level"):
         validate_and_sort(spec)
 
 
 def test_vc_modifiers_are_real_dag_edges():
     """Modifiers must topologically precede the node (they are parents)."""
-    spec = {"T": OrdinalNode(levels=2),
-            "Y": ContinuousNode(terms=[VC("T", "M")]),
-            "M": ContinuousNode()}
+    spec = {
+        "T": OrdinalNode(levels=2),
+        "Y": ContinuousNode(terms=[VC("T", "M")]),
+        "M": ContinuousNode(),
+    }
     order = validate_and_sort(spec)
     assert order.index("M") < order.index("Y")
 
@@ -83,7 +95,7 @@ def test_vc_modifiers_are_real_dag_edges():
 def test_to_matrix_vc_labels():
     m = CausalFlowDAG(_vc_spec(), seed=0).to_matrix()
     assert m.loc["T", "Y"] == "VC"
-    assert m.loc["X2", "Y"] == "CS['X1', 'X2', 'X3']+VCm"   # prognostic + modifier
+    assert m.loc["X2", "Y"] == "CS['X1', 'X2', 'X3']+VCm"  # prognostic + modifier
     assert m.loc["X3", "Y"] == "CS['X1', 'X2', 'X3']+VCm"
 
 
@@ -120,8 +132,15 @@ def small_fitted():
     gen = VCLogisticShift(seed=42)
     df = gen.observational(1500, seed_offset=100)
     flow = CausalFlowDAG(_vc_spec(), seed=0)
-    flow.fit(df.iloc[:1300], df.iloc[1300:], epochs=60, learning_rate=1e-2,
-             batch_size=512, verbose=0, seed=0)
+    flow.fit(
+        df.iloc[:1300],
+        df.iloc[1300:],
+        epochs=60,
+        learning_rate=1e-2,
+        batch_size=512,
+        verbose=0,
+        seed=0,
+    )
     return flow, gen
 
 
@@ -141,8 +160,7 @@ def test_varying_coef_equals_abduct_difference(small_fitted):
     new = gen.observational(300, seed_offset=901)
     u1 = flow.abduct(new.assign(T=1.0), seed=0)["Y"].values
     u0 = flow.abduct(new.assign(T=0.0), seed=0)["Y"].values
-    np.testing.assert_allclose(flow.varying_coef("Y", new), u1 - u0,
-                               rtol=0, atol=1e-5)
+    np.testing.assert_allclose(flow.varying_coef("Y", new), u1 - u0, rtol=0, atol=1e-5)
 
 
 def test_beta_recentered_over_training_data(small_fitted):
@@ -161,9 +179,10 @@ def test_save_load_roundtrip_vc(tmp_path, small_fitted):
     flow.save(p)
     flow2 = CausalFlowDAG.load(p)
     assert flow2.spec["Y"].terms[1].penalty == 1.0
-    assert bool(flow2.nodes["Y"].shifts["T"].warm_started)   # buffer survives
-    np.testing.assert_allclose(flow2.varying_coef("Y", new),
-                               flow.varying_coef("Y", new), atol=1e-7)
+    assert bool(flow2.nodes["Y"].shifts["T"].warm_started)  # buffer survives
+    np.testing.assert_allclose(
+        flow2.varying_coef("Y", new), flow.varying_coef("Y", new), atol=1e-7
+    )
     assert torch.allclose(flow2.log_prob(new), flow.log_prob(new), atol=1e-6)
 
 
@@ -183,9 +202,11 @@ def test_warm_start_matches_classical_ls():
     flow._vc_warm_start(df)
     beta0 = float(flow.nodes["Y"].shifts["T"].beta0)
 
-    ls_spec = {**{k: ContinuousNode(transform="affine") for k in ("X1", "X2", "X3")},
-               "T": OrdinalNode(levels=2, terms=[LS("X1"), LS("X2")]),
-               "Y": ContinuousNode(terms=[LS("X1"), LS("X2"), LS("X3"), LS("T")])}
+    ls_spec = {
+        **{k: ContinuousNode(transform="affine") for k in ("X1", "X2", "X3")},
+        "T": OrdinalNode(levels=2, terms=[LS("X1"), LS("X2")]),
+        "Y": ContinuousNode(terms=[LS("X1"), LS("X2"), LS("X3"), LS("T")]),
+    }
     ref = CausalFlowDAG(ls_spec, seed=0)
     ref.fit_classical(df, verbose=False)
     w = ref.nodes["Y"].shifts["T"].weight.detach().numpy()
@@ -206,19 +227,32 @@ def test_nesting_large_penalty_matches_classical_ls():
     Warm start is disabled so the test is not trivially satisfied by it."""
     gen = VCLogisticShift(seed=42)
     df = gen.observational(4000, seed_offset=100)
-    spec = {**{k: ContinuousNode(transform="affine") for k in ("X1", "X2", "X3")},
-            "T": OrdinalNode(levels=2, terms=[LS("X1"), LS("X2")]),
-            "Y": ContinuousNode(terms=[LS("X1"), LS("X2"), LS("X3"),
-                                       VC("T", "X2", "X3", penalty=1e7)])}
+    spec = {
+        **{k: ContinuousNode(transform="affine") for k in ("X1", "X2", "X3")},
+        "T": OrdinalNode(levels=2, terms=[LS("X1"), LS("X2")]),
+        "Y": ContinuousNode(
+            terms=[LS("X1"), LS("X2"), LS("X3"), VC("T", "X2", "X3", penalty=1e7)]
+        ),
+    }
     flow = CausalFlowDAG(spec, seed=0)
     for ep, lr in [(1500, 1e-2), (500, 1e-3)]:
-        flow.fit(df, epochs=ep, learning_rate=lr, batch_size=1024, verbose=0,
-                 seed=0, restore_best=False, vc_warm_start=False)
+        flow.fit(
+            df,
+            epochs=ep,
+            learning_rate=lr,
+            batch_size=1024,
+            verbose=0,
+            seed=0,
+            restore_best=False,
+            vc_warm_start=False,
+        )
     # the head is dead: beta(x) constant
     assert flow.varying_coef("Y", df).std() < 1e-3
 
-    ls_spec = {**spec, "Y": ContinuousNode(terms=[LS("X1"), LS("X2"), LS("X3"),
-                                                  LS("T")])}
+    ls_spec = {
+        **spec,
+        "Y": ContinuousNode(terms=[LS("X1"), LS("X2"), LS("X3"), LS("T")]),
+    }
     ref = CausalFlowDAG(ls_spec, seed=0)
     ref.fit_classical(df, verbose=False)
     w = ref.nodes["Y"].shifts["T"].weight.detach().numpy()
@@ -239,8 +273,16 @@ def test_recovery_bar_on_vc_shift_dgp():
     test = gen.observational(2000, seed_offset=500)
 
     flow = CausalFlowDAG(_vc_spec(), seed=0)
-    flow.fit(train, val, epochs=300, learning_rate=1e-2, batch_size=512,
-             verbose=0, seed=0, restore_best=True)
+    flow.fit(
+        train,
+        val,
+        epochs=300,
+        learning_rate=1e-2,
+        batch_size=512,
+        verbose=0,
+        seed=0,
+        restore_best=True,
+    )
     beta_hat = flow.varying_coef("Y", test)
     corr = float(np.corrcoef(beta_hat, gen.true_beta(test))[0, 1])
     assert corr >= 0.9, f"recovery corr {corr:.3f} < 0.9"
@@ -258,9 +300,11 @@ def test_vc_continuous_treatment():
     d = rng.normal(size=n)
     y = 0.5 * m + (0.3 + 0.2 * m) * d + rng.logistic(size=n)
     df = pd.DataFrame({"M": m, "D": d, "Y": y})
-    spec = {"M": ContinuousNode(transform="affine"),
-            "D": ContinuousNode(transform="affine"),
-            "Y": ContinuousNode(terms=[CS("M"), VC("D", "M")])}
+    spec = {
+        "M": ContinuousNode(transform="affine"),
+        "D": ContinuousNode(transform="affine"),
+        "Y": ContinuousNode(terms=[CS("M"), VC("D", "M")]),
+    }
     flow = CausalFlowDAG(spec, seed=0)
     flow.fit(df, epochs=30, verbose=0, seed=0)
     assert torch.isfinite(flow.log_prob(df)).all()
@@ -276,11 +320,13 @@ def test_frozen_vc_shift_csv_contract():
     """data/vc-shift/obs.csv regenerates bit-identically from the stored seed
     (the same contract as the paper DGPs)."""
     import json
+
     vdir = DATA / "vc-shift"
     truth = json.loads((vdir / "truth.json").read_text())
     frozen = pd.read_csv(vdir / "obs.csv")
     regen = VCLogisticShift(seed=truth["seed"]).observational(truth["n_obs"])
     assert len(frozen) == truth["n_obs"]
     for c in frozen.columns:
-        np.testing.assert_allclose(frozen[c].to_numpy(dtype=float),
-                                   regen[c].to_numpy(dtype=float), atol=1e-9)
+        np.testing.assert_allclose(
+            frozen[c].to_numpy(dtype=float), regen[c].to_numpy(dtype=float), atol=1e-9
+        )

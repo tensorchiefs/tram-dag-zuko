@@ -75,8 +75,10 @@ def main(name: str = "all_ls"):
     # untreated patients: what if they had been treated (and vice versa)?
     for arm, label in [(0, "untreated -> do(T=1)"), (1, "treated -> do(T=0)")]:
         sub = out[out["T_factual"] == arm]
-        print(f"  {label}: factual P(good) {sub['good_factual'].mean():.3f}  "
-              f"counterfactual P(good) {sub['p_cf_good'].mean():.3f}  (N={len(sub)})")
+        print(
+            f"  {label}: factual P(good) {sub['good_factual'].mean():.3f}  "
+            f"counterfactual P(good) {sub['p_cf_good'].mean():.3f}  (N={len(sub)})"
+        )
 
     # --- plot: factual vs counterfactual outcome distribution per arm
     x = np.arange(7)
@@ -84,12 +86,21 @@ def main(name: str = "all_ls"):
     fig, axes = plt.subplots(1, 2, figsize=(14, 5), sharey=True)
     for ax, arm in zip(axes, [0, 1]):
         sub = out[out["T_factual"] == arm]
-        fact = sub["mRS_3m_factual"].value_counts(normalize=True).reindex(
-            range(7), fill_value=0).values
+        fact = (
+            sub["mRS_3m_factual"]
+            .value_counts(normalize=True)
+            .reindex(range(7), fill_value=0)
+            .values
+        )
         cf_mean = sub[[f"p_cf_mRS{k}" for k in range(7)]].mean().values
         ax.bar(x - width / 2, fact, width=width, label="factual", color="#e07b54")
-        ax.bar(x + width / 2, cf_mean, width=width,
-               label=f"counterfactual do(T={1 - arm})", color="steelblue")
+        ax.bar(
+            x + width / 2,
+            cf_mean,
+            width=width,
+            label=f"counterfactual do(T={1 - arm})",
+            color="steelblue",
+        )
         ax.set_title(f"factually T={arm} (N={len(sub)})")
         ax.set_xlabel("mRS_3m")
         ax.set_xticks(x)

@@ -24,24 +24,27 @@ def machine_info() -> dict:
         "cpu_count": os.cpu_count(),
         "python": platform.python_version(),
         "torch": torch.__version__,
-        "cuda": (torch.cuda.get_device_name(0)
-                 if torch.cuda.is_available() else None),
-        "mps": bool(getattr(torch.backends, "mps", None)
-                    and torch.backends.mps.is_available()),
+        "cuda": (torch.cuda.get_device_name(0) if torch.cuda.is_available() else None),
+        "mps": bool(
+            getattr(torch.backends, "mps", None) and torch.backends.mps.is_available()
+        ),
     }
     try:
         import zuko
+
         info["zuko"] = zuko.__version__
     except Exception:
         info["zuko"] = None
     try:
         from . import __version__
+
         info["tramdag"] = __version__
     except Exception:
         info["tramdag"] = None
     try:  # total RAM (POSIX)
         info["ram_gb"] = round(
-            os.sysconf("SC_PAGE_SIZE") * os.sysconf("SC_PHYS_PAGES") / 1e9, 1)
+            os.sysconf("SC_PAGE_SIZE") * os.sysconf("SC_PHYS_PAGES") / 1e9, 1
+        )
     except (ValueError, OSError, AttributeError):
         info["ram_gb"] = None
     return info

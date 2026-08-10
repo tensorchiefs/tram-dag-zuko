@@ -53,9 +53,15 @@ def test_generator_reproducible(subdir, factory):
     pd.testing.assert_frame_equal(a, b)
 
 
-@pytest.mark.parametrize("factory", [lambda: TriangleContinuous(f="atan"),
-                                     lambda: TriangleMixed(f="exp"),
-                                     lambda: VacaTriangle(), lambda: Carefl4()])
+@pytest.mark.parametrize(
+    "factory",
+    [
+        lambda: TriangleContinuous(f="atan"),
+        lambda: TriangleMixed(f="exp"),
+        lambda: VacaTriangle(),
+        lambda: Carefl4(),
+    ],
+)
 def test_do_clamps_and_propagates(factory):
     gen = factory()
     rng = np.random.default_rng(0)
@@ -119,8 +125,9 @@ def test_frozen_csv_contract(subdir, factory):
     regen = factory(truth["seed"]).observational(truth["n_obs"])
     assert len(frozen) == truth["n_obs"]
     for c in frozen.columns:
-        np.testing.assert_allclose(frozen[c].to_numpy(dtype=float),
-                                   regen[c].to_numpy(dtype=float), atol=1e-9)
+        np.testing.assert_allclose(
+            frozen[c].to_numpy(dtype=float), regen[c].to_numpy(dtype=float), atol=1e-9
+        )
 
 
 # ------------------------------------------------------------------ fit tests
@@ -156,9 +163,11 @@ def _cs_curve(flow, node, parent, grid) -> np.ndarray:
 def test_triangle_linear_ls_recovers_coefficients():
     """Paper Sec. 6.1 / Fig. 14: beta12=2, beta13=-0.2, beta23=+0.3."""
     df = TriangleContinuous(f="linear", seed=42).observational(N_FIT, seed_offset=100)
-    spec = {"x1": ContinuousNode(),
-            "x2": ContinuousNode(terms=[LS("x1")]),
-            "x3": ContinuousNode(terms=[LS("x1"), LS("x2")])}
+    spec = {
+        "x1": ContinuousNode(),
+        "x2": ContinuousNode(terms=[LS("x1")]),
+        "x3": ContinuousNode(terms=[LS("x1"), LS("x2")]),
+    }
     flow = _fit(spec, df)
     assert abs(_w(flow, "x2", "x1") - 2.0) < 0.1
     assert abs(_w(flow, "x3", "x1") - (-0.2)) < 0.1
@@ -170,9 +179,11 @@ def test_triangle_atan_cs_recovers_coefficients_and_curve():
     """Paper Sec. 6.1 / Fig. 7+15: LS coefficients + CS curve == -f + const."""
     gen = TriangleContinuous(f="atan", seed=42)
     df = gen.observational(N_FIT, seed_offset=100)
-    spec = {"x1": ContinuousNode(),
-            "x2": ContinuousNode(terms=[LS("x1")]),
-            "x3": ContinuousNode(terms=[LS("x1"), CS("x2")])}
+    spec = {
+        "x1": ContinuousNode(),
+        "x2": ContinuousNode(terms=[LS("x1")]),
+        "x3": ContinuousNode(terms=[LS("x1"), CS("x2")]),
+    }
     flow = _fit(spec, df)
     assert abs(_w(flow, "x2", "x1") - 2.0) < 0.1
     assert abs(_w(flow, "x3", "x1") - (-0.2)) < 0.1
@@ -190,9 +201,11 @@ def test_triangle_mixed_linear_ls_recovers_with_sign_flip():
     from tramdag.transforms import ordinal_cutpoints
 
     df = TriangleMixed(f="linear", seed=42).observational(N_FIT, seed_offset=100)
-    spec = {"x1": ContinuousNode(),
-            "x2": ContinuousNode(terms=[LS("x1")]),
-            "x3": OrdinalNode(levels=4, terms=[LS("x1"), LS("x2")])}
+    spec = {
+        "x1": ContinuousNode(),
+        "x2": ContinuousNode(terms=[LS("x1")]),
+        "x3": OrdinalNode(levels=4, terms=[LS("x1"), LS("x2")]),
+    }
     flow = _fit(spec, df)
     assert abs(_w(flow, "x3", "x1") - (-0.2)) < 0.1
     assert abs(_w(flow, "x3", "x2") - 0.3) < 0.1
@@ -207,9 +220,11 @@ def test_vaca_ci_flow_matches_interventional_moments():
     E/sd of x3 under do(x2=a) (analytic truth from App. C.1)."""
     truth = json.loads((DATA / "vaca" / "truth.json").read_text())
     df = VacaTriangle(seed=42).observational(N_FIT, seed_offset=100)
-    spec = {"x1": ContinuousNode(),
-            "x2": ContinuousNode(terms=[I("x1")]),
-            "x3": ContinuousNode(terms=[I("x1", "x2")])}
+    spec = {
+        "x1": ContinuousNode(),
+        "x2": ContinuousNode(terms=[I("x1")]),
+        "x3": ContinuousNode(terms=[I("x1", "x2")]),
+    }
     flow = _fit(spec, df, epochs=(400, 120))
     # L1: bimodality of x1 is captured (the paper's headline vs CNF) — both
     # modes present: density mass on each side of the saddle near -0.3
@@ -234,9 +249,12 @@ def test_carefl_ci_flow_recovers_counterfactuals():
     faithful single-point sweep lives in experiments/paper_carefl.py.)"""
     gen = Carefl4(seed=42)
     df = gen.observational(N_FIT, seed_offset=100)
-    spec = {"x1": ContinuousNode(), "x2": ContinuousNode(),
-            "x3": ContinuousNode(terms=[I("x1", "x2")]),
-            "x4": ContinuousNode(terms=[I("x1", "x2")])}
+    spec = {
+        "x1": ContinuousNode(),
+        "x2": ContinuousNode(),
+        "x3": ContinuousNode(terms=[I("x1", "x2")]),
+        "x4": ContinuousNode(terms=[I("x1", "x2")]),
+    }
     flow = _fit(spec, df, epochs=(300, 100))
     rows = gen.observational(300, seed_offset=999)
     u = flow.abduct(rows)

@@ -63,8 +63,9 @@ class StandardLogistic:
         return torch.log(u) - torch.log1p(-u)
 
 
-def _expanding_bisection(f, z: Tensor, lo: Tensor, hi: Tensor,
-                         max_expand: int = 60, iters: int = 80) -> Tensor:
+def _expanding_bisection(
+    f, z: Tensor, lo: Tensor, hi: Tensor, max_expand: int = 60, iters: int = 80
+) -> Tensor:
     """Solve f(t) = z element-wise for monotone increasing f.
 
     Starts from the bracket [lo, hi] and doubles it outward until the root is
@@ -123,8 +124,9 @@ class _ScaledUT(torch.nn.Module):
     def _log_dt_dx(self) -> Tensor:
         # derive dtype from the range buffers so float64 stays pure (no float32
         # literal promotion) inside fit_classical
-        two_b = torch.as_tensor(2.0 * self.bound, dtype=self.xmin.dtype,
-                                device=self.xmin.device)
+        two_b = torch.as_tensor(
+            2.0 * self.bound, dtype=self.xmin.dtype, device=self.xmin.device
+        )
         return torch.log(two_b) - torch.log(self.xmax - self.xmin)
 
     def forward(self, theta: Tensor, x: Tensor) -> tuple[Tensor, Tensor]:
@@ -139,7 +141,9 @@ class _ScaledUT(torch.nn.Module):
         T = self._build(theta)
         B = torch.tensor(self.bound, dtype=z0.dtype, device=z0.device)
         with torch.no_grad():
-            t = _expanding_bisection(T, z0, -B.expand_as(z0).clone(), B.expand_as(z0).clone())
+            t = _expanding_bisection(
+                T, z0, -B.expand_as(z0).clone(), B.expand_as(z0).clone()
+            )
         return self._unscale(t)
 
 
@@ -170,14 +174,19 @@ class BernsteinUT(_ScaledUT):
         the converged MLE is unchanged. See the inversion of
         ``BernsteinTransform._constrain_theta`` (cumsum of softplus diffs)."""
         import math
+
         n = self._n
-        a = math.log(q) - math.log(1.0 - q)        # logit(q), e.g. -2.9444 at q=.05
-        span = -2.0 * a                            # logit(1-q) - logit(q)
-        order = n + 1                              # constrained control points: n+2
-        b = span / order                           # per-step increment (constant)
-        shift = math.log(2.0) * n / 2.0            # zuko's centering offset
-        theta = torch.full((n,), math.log(math.expm1(b)),
-                           dtype=self.xmin.dtype, device=self.xmin.device)
+        a = math.log(q) - math.log(1.0 - q)  # logit(q), e.g. -2.9444 at q=.05
+        span = -2.0 * a  # logit(1-q) - logit(q)
+        order = n + 1  # constrained control points: n+2
+        b = span / order  # per-step increment (constant)
+        shift = math.log(2.0) * n / 2.0  # zuko's centering offset
+        theta = torch.full(
+            (n,),
+            math.log(math.expm1(b)),
+            dtype=self.xmin.dtype,
+            device=self.xmin.device,
+        )
         theta[0] = a + shift
         return theta
 
@@ -195,7 +204,11 @@ class SplineUT(_ScaledUT):
 
     def _build(self, theta: Tensor):
         K = self.bins
-        widths, heights, derivs = theta[..., :K], theta[..., K:2 * K], theta[..., 2 * K:]
+        widths, heights, derivs = (
+            theta[..., :K],
+            theta[..., K : 2 * K],
+            theta[..., 2 * K :],
+        )
         return MonotonicRQSTransform(widths, heights, derivs, bound=self.bound)
 
 
@@ -217,13 +230,16 @@ def make_univariate_transform(name: str, **kwargs) -> _ScaledUT:
     try:
         cls = _TRANSFORMS[name]
     except KeyError:
-        raise ValueError(f"Unknown transform '{name}'. Choose from {sorted(_TRANSFORMS)}.")
+        raise ValueError(
+            f"Unknown transform '{name}'. Choose from {sorted(_TRANSFORMS)}."
+        )
     return cls(**kwargs)
 
 
 # ---------------------------------------------------------------------------
 # Ordinal ("ordered logit") transform — exact port of the original parametrization
 # ---------------------------------------------------------------------------
+
 
 def ordinal_cutpoints(theta_tilde: Tensor) -> Tensor:
     """(n, K-1) unconstrained -> (n, K+1) increasing cutpoints with ±inf ends.
@@ -232,8 +248,12 @@ def ordinal_cutpoints(theta_tilde: Tensor) -> Tensor:
     ``[-inf, t0, t0 + cumsum(exp(t1:)), +inf]``.
     """
     n = theta_tilde.shape[0]
-    neg_inf = torch.full((n, 1), -torch.inf, device=theta_tilde.device, dtype=theta_tilde.dtype)
-    pos_inf = torch.full((n, 1), torch.inf, device=theta_tilde.device, dtype=theta_tilde.dtype)
+    neg_inf = torch.full(
+        (n, 1), -torch.inf, device=theta_tilde.device, dtype=theta_tilde.dtype
+    )
+    pos_inf = torch.full(
+        (n, 1), torch.inf, device=theta_tilde.device, dtype=theta_tilde.dtype
+    )
     first = theta_tilde[:, :1]
     if theta_tilde.shape[1] > 1:
         rest = first + torch.cumsum(torch.exp(theta_tilde[:, 1:]), dim=1)
@@ -252,11 +272,12 @@ def ordinal_marginal_init_theta(counts, eps: float = 1e-3) -> Tensor:
     marginal-init, a pure init: the converged MLE is unchanged. ``counts`` is the
     per-class count vector (length K)."""
     import numpy as np
+
     counts = np.asarray(counts, dtype=np.float64)
     p = counts / counts.sum()
-    F = np.clip(np.cumsum(p)[:-1], eps, 1 - eps)        # P(Y<=k), k=0..K-2
-    c = np.log(F) - np.log1p(-F)                         # logit -> increasing
-    c = np.maximum.accumulate(c)                         # guard ties (empty classes)
+    F = np.clip(np.cumsum(p)[:-1], eps, 1 - eps)  # P(Y<=k), k=0..K-2
+    c = np.log(F) - np.log1p(-F)  # logit -> increasing
+    c = np.maximum.accumulate(c)  # guard ties (empty classes)
     diffs = np.maximum(np.diff(c), eps)
     tt = np.empty_like(c)
     tt[0] = c[0]
@@ -277,7 +298,9 @@ def _log1mexp(x: Tensor) -> Tensor:
     # mask each branch's input so the unused branch cannot produce inf/NaN grads
     x_hi = x.clamp(min=-math.log(2.0))
     x_lo = x.clamp(max=-math.log(2.0))
-    return torch.where(branch, torch.log(-torch.expm1(x_hi)), torch.log1p(-torch.exp(x_lo)))
+    return torch.where(
+        branch, torch.log(-torch.expm1(x_hi)), torch.log1p(-torch.exp(x_lo))
+    )
 
 
 def ordinal_log_prob(theta_tilde: Tensor, shift: Tensor, y: Tensor) -> Tensor:
@@ -310,8 +333,12 @@ def ordinal_sample(theta_tilde: Tensor, shift: Tensor, z: Tensor) -> Tensor:
     return (z.view(-1, 1) > finite).sum(dim=1).float()
 
 
-def ordinal_abduct(theta_tilde: Tensor, shift: Tensor, y: Tensor,
-                   generator: torch.Generator | None = None) -> Tensor:
+def ordinal_abduct(
+    theta_tilde: Tensor,
+    shift: Tensor,
+    y: Tensor,
+    generator: torch.Generator | None = None,
+) -> Tensor:
     """Pearl abduction for an ordinal node: sample the latent z from the standard
     logistic truncated to the interval consistent with the observed level y."""
     lower, upper = _bounds(theta_tilde, shift, y)

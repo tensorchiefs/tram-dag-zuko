@@ -16,17 +16,23 @@ by-product:
 import tramdag as td
 
 spec = {
-    "X1": td.ContinuousNode(), "X2": td.ContinuousNode(), "X3": td.ContinuousNode(),
-    "T":  td.OrdinalNode(levels=2, terms=[td.LS("X1"), td.LS("X2")]),
-    "Y":  td.ContinuousNode(terms=[
-        td.CS("X1", "X2", "X3"),            # prognostic part g(x): as flexible as you like
-        td.VC("T", "X2", "X3", penalty=1.0) # effect part beta(X2, X3) * T: small + penalized
-    ]),
+    "X1": td.ContinuousNode(),
+    "X2": td.ContinuousNode(),
+    "X3": td.ContinuousNode(),
+    "T": td.OrdinalNode(levels=2, terms=[td.LS("X1"), td.LS("X2")]),
+    "Y": td.ContinuousNode(
+        terms=[
+            td.CS("X1", "X2", "X3"),  # prognostic part g(x): as flexible as you like
+            td.VC(
+                "T", "X2", "X3", penalty=1.0
+            ),  # effect part beta(X2, X3) * T: small + penalized
+        ]
+    ),
 }
 flow = td.CausalFlowDAG(spec, seed=0).fit(train, val, restore_best=True)
 
-beta = flow.varying_coef("Y", df_new)       # (n,) array beta(x) — deterministic, y-free
-beta0 = float(flow.nodes["Y"].shifts["T"].beta0)   # interpretable main effect
+beta = flow.varying_coef("Y", df_new)  # (n,) array beta(x) — deterministic, y-free
+beta0 = float(flow.nodes["Y"].shifts["T"].beta0)  # interpretable main effect
 ```
 
 Note that `X2`/`X3` appear **twice**: prognostically through `CS` and as effect

@@ -19,7 +19,7 @@ al. 2024). Before fitting anything expensive: fit the **cheap all-`LS` model**
 
 ```python
 flow = td.CausalFlowDAG(all_ls_spec, seed=0)
-flow.fit_classical(df)                       # seconds, exact MLE
+flow.fit_classical(df)  # seconds, exact MLE
 
 scan = flow.effect_modifier_scan(df, node="Y", on="T")
 #         stat   p_value  crit_5pct   flag
@@ -36,8 +36,9 @@ the covariate makes the ordered scores drift — flagged covariates are the
 measured shortlist of `VC` modifiers (`docs/varying-coefficients.md`):
 
 ```python
-spec["Y"] = td.ContinuousNode(terms=[td.CS("X1", "X2", "X3"),
-                                     td.VC("T", "X2", "X3")])   # scan-informed
+spec["Y"] = td.ContinuousNode(
+    terms=[td.CS("X1", "X2", "X3"), td.VC("T", "X2", "X3")]
+)  # scan-informed
 ```
 
 Notes: `on` resolves to the identified level-1-vs-0 contrast for a binary

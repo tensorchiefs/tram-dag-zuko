@@ -20,10 +20,15 @@ from common import run_experiment
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-        description=__doc__,
-        formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("variant", nargs="?", default="nl", choices=("ls", "nl"),
-                        help="magic-mrclean variant (default: nl)")
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
+    parser.add_argument(
+        "variant",
+        nargs="?",
+        default="nl",
+        choices=("ls", "nl"),
+        help="magic-mrclean variant (default: nl)",
+    )
     variant = parser.parse_args().variant
     source = f"magic-mrclean/{variant}"
     print(f"\n################ all-ls flow on {source} ################")

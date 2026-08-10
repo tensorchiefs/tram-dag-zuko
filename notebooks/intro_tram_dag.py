@@ -187,7 +187,7 @@ plt.rcParams["figure.dpi"] = 110
 #   $\vartheta_k$ (an *ordered logit*). The flip makes a positive $\beta$ push $Y$
 #   towards *higher* categories.
 #
-# $X_2$ enters $X_3$ through a **complex shift** quadratic shift $g(x_2)=\tfrac12 x_2^2$ 
+# $X_2$ enters $X_3$ through a **complex shift** quadratic shift $g(x_2)=\tfrac12 x_2^2$
 # that a linear shift cannot represent. We will come to that later.
 
 # %%
@@ -223,7 +223,7 @@ def simulate(n, rng, x1=None, z=None):
 
 
 rng = np.random.default_rng(1)
-df, z_obs = simulate(6000, rng)            # keep the latents -> true counterfactuals
+df, z_obs = simulate(6000, rng)  # keep the latents -> true counterfactuals
 train_df, val_df = df.iloc[:5000], df.iloc[5000:]
 df.describe().round(2)
 
@@ -244,8 +244,8 @@ plt.show()
 # continuous node automatically gets its monotone baseline transformation
 # (default: Bernstein polynomial with 20 coefficients, the TRAM-faithful choice);
 # the edges declare how each parent enters.
-# 
-# 
+#
+#
 # Fitting maximises the joint likelihood. Because the flow is triangular, the
 # negative log-likelihood **decomposes per node**
 # ($\log p(x) = \sum_i \log p(x_i \mid \mathrm{pa}(x_i))$), and one Adam optimizer
@@ -257,11 +257,15 @@ spec = {
     "X1": ContinuousNode(transform="bernstein"),
     "X2": ContinuousNode(terms=[LS("X1")]),
     "X3": ContinuousNode(terms=[LS("X1"), CS("X2")]),
-    "Y":  OrdinalNode(levels=4, terms=[LS("X3")]),
+    "Y": OrdinalNode(levels=4, terms=[LS("X3")]),
 }
 
-flow = CausalFlowDAG(spec, seed=1)  # seed here too, for the Bernsteins' initial uniform knots
-flow.fit(train_df, val_df, epochs=800, learning_rate=1e-2, batch_size=20000, verbose=200)
+flow = CausalFlowDAG(
+    spec, seed=1
+)  # seed here too, for the Bernsteins' initial uniform knots
+flow.fit(
+    train_df, val_df, epochs=800, learning_rate=1e-2, batch_size=20000, verbose=200
+)
 flow.fit(train_df, val_df, epochs=300, learning_rate=1e-3, verbose=300)  # polish
 flow.nll(val_df)
 
@@ -309,24 +313,30 @@ def decompose_row(flow, name, row_df):
     vals = flow._tensorize(row_df)
     feats = flow._features(vals)
     theta, shift = node.theta_shift(feats, len(row_df))
-    parts = {p: node.shifts[p](feats[p]) for p in node.shifts}   # per-parent shift
+    parts = {p: node.shifts[p](feats[p]) for p in node.shifts}  # per-parent shift
     print(f"{name} = {float(vals[name][0]):+.3f}  ({node.kind})")
     if node.kind == "continuous":
         z0, ladj = node.ut.forward(theta, vals[name])
-        terms = "  +  ".join([f"f_theta(x)={float(z0[0]):+.3f}"]
-                             + [f"{p}={float(v[0]):+.3f}" for p, v in parts.items()])
+        terms = "  +  ".join(
+            [f"f_theta(x)={float(z0[0]):+.3f}"]
+            + [f"{p}={float(v[0]):+.3f}" for p, v in parts.items()]
+        )
         z = z0 + shift
         print(f"  z = {terms}  =  {float(z[0]):+.3f}   (standard-logistic latent)")
         lp = StandardLogistic.log_prob(z) + ladj
-    else:   # ordinal: cutpoints minus a subtracted shift
+    else:  # ordinal: cutpoints minus a subtracted shift
         cuts = ordinal_cutpoints(theta)[0, 1:-1].detach().numpy().round(3)
         terms = "  +  ".join(f"{p}={float(v[0]):+.3f}" for p, v in parts.items()) or "0"
         print(f"  cutpoints theta_k = {cuts}")
-        print(f"  shift (SUBTRACTED) = {terms}   ->   P(Y<=k) = sigmoid(theta_k - shift)")
+        print(
+            f"  shift (SUBTRACTED) = {terms}   ->   P(Y<=k) = sigmoid(theta_k - shift)"
+        )
         lp = ordinal_log_prob(theta, shift, vals[name])
     check = flow.node_log_prob(vals)[name]
-    print(f"  log p(row) rebuilt = {float(lp[0]):+.4f}   node_log_prob = "
-          f"{float(check[0]):+.4f}   match={bool(torch.allclose(lp, check))}\n")
+    print(
+        f"  log p(row) rebuilt = {float(lp[0]):+.4f}   node_log_prob = "
+        f"{float(check[0]):+.4f}   match={bool(torch.allclose(lp, check))}\n"
+    )
 
 
 for nm in ["X2", "X3", "Y"]:
@@ -349,15 +359,33 @@ fig, axes = plt.subplots(1, 4, figsize=(13, 3))
 for ax, col in zip(axes[:3], ["X1", "X2", "X3"]):
     bins = np.linspace(df[col].min(), df[col].max(), 60)
     ax.hist(df[col], bins=bins, density=True, alpha=0.45, label="data")
-    ax.hist(samp[col], bins=bins, density=True, histtype="step", lw=1.8,
-            color="C3", label="flow")
+    ax.hist(
+        samp[col],
+        bins=bins,
+        density=True,
+        histtype="step",
+        lw=1.8,
+        color="C3",
+        label="flow",
+    )
     ax.set_title(col)
 levels = np.arange(4)
 w = 0.35
-axes[3].bar(levels - w / 2, df["Y"].value_counts(normalize=True).sort_index(),
-            width=w, alpha=0.6, label="data")
-axes[3].bar(levels + w / 2, samp["Y"].value_counts(normalize=True).sort_index(),
-            width=w, color="C3", alpha=0.8, label="flow")
+axes[3].bar(
+    levels - w / 2,
+    df["Y"].value_counts(normalize=True).sort_index(),
+    width=w,
+    alpha=0.6,
+    label="data",
+)
+axes[3].bar(
+    levels + w / 2,
+    samp["Y"].value_counts(normalize=True).sort_index(),
+    width=w,
+    color="C3",
+    alpha=0.8,
+    label="flow",
+)
 axes[3].set_title("Y"), axes[3].set_xticks(levels)
 axes[0].legend()
 fig.suptitle("L1: observational marginals, data vs. flow samples")
@@ -398,6 +426,7 @@ print(f"cutpoints theta_Y:   true {TRUE['theta_Y']}   fitted {theta_hat.round(3)
 # $\tfrac12 x_2^2$ — each **up to an additive constant**, because a constant can
 # move freely between the intercept and a complex shift (only their sum is
 # identified). We therefore center both curves before comparing.
+
 
 # %%
 def fitted_baseline(flow, name, grid):
@@ -449,18 +478,22 @@ plt.show()
 spec_ls = {
     "X1": ContinuousNode(transform="bernstein"),
     "X2": ContinuousNode(terms=[LS("X1")]),
-    "X3": ContinuousNode(terms=[LS("X1"), LS("X2")]),   # <- cs replaced by ls
-    "Y":  OrdinalNode(levels=4, terms=[LS("X3")]),
+    "X3": ContinuousNode(terms=[LS("X1"), LS("X2")]),  # <- cs replaced by ls
+    "Y": OrdinalNode(levels=4, terms=[LS("X3")]),
 }
 torch.manual_seed(7)
 flow_ls = CausalFlowDAG(spec_ls)
 flow_ls.fit(train_df, val_df, epochs=800, learning_rate=1e-2, batch_size=512, verbose=0)
 flow_ls.fit(train_df, val_df, epochs=300, learning_rate=1e-3, verbose=0)
 
-print(f"misspecified beta_32 (X2 -> X3): "
-      f"{float(flow_ls.nodes['X3'].shifts['X2'].weight.detach()):+.3f}")
-print(f"val NLL of node X3:  cs model {flow.nll(val_df)['X3']:.4f}"
-      f"   ls model {flow_ls.nll(val_df)['X3']:.4f}")
+print(
+    f"misspecified beta_32 (X2 -> X3): "
+    f"{float(flow_ls.nodes['X3'].shifts['X2'].weight.detach()):+.3f}"
+)
+print(
+    f"val NLL of node X3:  cs model {flow.nll(val_df)['X3']:.4f}"
+    f"   ls model {flow_ls.nll(val_df)['X3']:.4f}"
+)
 
 # %% [markdown]
 # ## 7. Rung 2 — interventions: the do-operator
@@ -480,13 +513,30 @@ for ax, a in zip(axes, [-1.0, 1.0]):
     fls = flow_ls.sample(20000, do={"X1": a}, seed=5)
     bins = np.linspace(truth["X3"].min(), truth["X3"].max(), 60)
     ax.hist(truth["X3"], bins=bins, density=True, alpha=0.4, label="DGP truth")
-    ax.hist(fl["X3"], bins=bins, density=True, histtype="step", lw=2,
-            color="C3", label="flow (cs)")
-    ax.hist(fls["X3"], bins=bins, density=True, histtype="step", lw=1.5,
-            color="C7", ls=":", label="flow (all-ls)")
+    ax.hist(
+        fl["X3"],
+        bins=bins,
+        density=True,
+        histtype="step",
+        lw=2,
+        color="C3",
+        label="flow (cs)",
+    )
+    ax.hist(
+        fls["X3"],
+        bins=bins,
+        density=True,
+        histtype="step",
+        lw=1.5,
+        color="C7",
+        ls=":",
+        label="flow (all-ls)",
+    )
     ax.set_title(f"$p(x_3 \\mid do(X_1 = {a:+.0f}))$"), ax.set_xlabel("$x_3$")
-    print(f"E[X3 | do(X1={a:+.0f})]:  truth {truth['X3'].mean():+.3f}   "
-          f"flow(cs) {fl['X3'].mean():+.3f}   flow(all-ls) {fls['X3'].mean():+.3f}")
+    print(
+        f"E[X3 | do(X1={a:+.0f})]:  truth {truth['X3'].mean():+.3f}   "
+        f"flow(cs) {fl['X3'].mean():+.3f}   flow(all-ls) {fls['X3'].mean():+.3f}"
+    )
 axes[0].legend()
 fig.suptitle("L2: interventional distributions")
 fig.tight_layout()
@@ -527,8 +577,7 @@ print("  true:", pmf_true.round(4), "\n  flow:", pmf_flow.round(4))
 # %%
 u = flow.abduct(val_df, seed=11)
 recon = flow.sample(u=u)
-err = (recon[["X1", "X2", "X3"]].to_numpy()
-       - val_df[["X1", "X2", "X3"]].to_numpy())
+err = recon[["X1", "X2", "X3"]].to_numpy() - val_df[["X1", "X2", "X3"]].to_numpy()
 print(f"max |reconstruction error| (continuous): {np.abs(err).max():.2e}")
 print(f"Y level-exact: {(recon['Y'].to_numpy() == val_df['Y'].to_numpy()).mean():.1%}")
 

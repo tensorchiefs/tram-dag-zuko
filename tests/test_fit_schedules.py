@@ -27,8 +27,7 @@ def _toy_df(n=800, seed=0):
 
 
 def _toy_spec():
-    return {"x1": ContinuousNode(),
-            "x2": ContinuousNode(terms=[LS("x1")])}
+    return {"x1": ContinuousNode(), "x2": ContinuousNode(terms=[LS("x1")])}
 
 
 @pytest.mark.parametrize("schedule", [None, "onecycle", "cosine", "plateau"])
@@ -53,8 +52,15 @@ def test_freeze_stops_early_and_records():
     df = _toy_df()
     torch.manual_seed(0)
     flow = CausalFlowDAG(_toy_spec())
-    flow.fit(df, epochs=3000, learning_rate=1e-2, batch_size=256, verbose=0,
-             schedule="plateau", freeze_patience=25)
+    flow.fit(
+        df,
+        epochs=3000,
+        learning_rate=1e-2,
+        batch_size=256,
+        verbose=0,
+        schedule="plateau",
+        freeze_patience=25,
+    )
     n_epochs = len(flow.history["val"])
     assert n_epochs < 3000, "expected early exit once all nodes froze"
     assert set(flow.history["frozen"]) == {"x1", "x2"}
@@ -67,16 +73,24 @@ def test_frozen_node_parameters_stop_moving():
     torch.manual_seed(0)
     flow = CausalFlowDAG(_toy_spec())
     # freeze aggressively so x1 (a fast source node) freezes mid-run
-    flow.fit(df, epochs=1500, learning_rate=1e-2, batch_size=256, verbose=0,
-             freeze_patience=10)
+    flow.fit(
+        df,
+        epochs=1500,
+        learning_rate=1e-2,
+        batch_size=256,
+        verbose=0,
+        freeze_patience=10,
+    )
     if len(flow.history.get("frozen", {})) == 0:
         pytest.skip("nothing froze within the budget (unexpected but not a bug)")
     name = next(iter(flow.history["frozen"]))
     snap = {k: v.clone() for k, v in flow.nodes[name].state_dict().items()}
-    flow.fit(df, epochs=5, learning_rate=1e-2, batch_size=256,
-             verbose=0)  # fresh call, no freeze
-    moved = any(not torch.equal(snap[k], v)
-                for k, v in flow.nodes[name].state_dict().items())
+    flow.fit(
+        df, epochs=5, learning_rate=1e-2, batch_size=256, verbose=0
+    )  # fresh call, no freeze
+    moved = any(
+        not torch.equal(snap[k], v) for k, v in flow.nodes[name].state_dict().items()
+    )
     assert moved, "sanity: a fresh fit call must unfreeze (state is per-call)"
 
 
@@ -91,14 +105,23 @@ def test_plateau_freeze_preserves_exact_mle():
         "Age": ContinuousNode(),
         "mRS_pre": OrdinalNode(levels=6, terms=[LS("Age")]),
         "NIHSSa": ContinuousNode(terms=[LS("Age"), LS("mRS_pre")]),
-        "T": OrdinalNode(levels=2,
-                         terms=[LS("Age"), LS("mRS_pre"), LS("NIHSSa")]),
-        "mRS_3m": OrdinalNode(levels=7, terms=[LS("Age"), LS("mRS_pre"), LS("NIHSSa"), LS("T")]),
+        "T": OrdinalNode(levels=2, terms=[LS("Age"), LS("mRS_pre"), LS("NIHSSa")]),
+        "mRS_3m": OrdinalNode(
+            levels=7, terms=[LS("Age"), LS("mRS_pre"), LS("NIHSSa"), LS("T")]
+        ),
     }
     torch.manual_seed(3)
     flow = CausalFlowDAG(spec)
-    flow.fit(obs, epochs=4000, learning_rate=1e-2, batch_size=512, verbose=0,
-             schedule="plateau", plateau_patience=40, freeze_patience=200)
+    flow.fit(
+        obs,
+        epochs=4000,
+        learning_rate=1e-2,
+        batch_size=512,
+        verbose=0,
+        schedule="plateau",
+        plateau_patience=40,
+        freeze_patience=200,
+    )
     # same comparisons/tolerances as test_simulations::test_flow_matches_r_reference
     w_age = float(flow.nodes["mRS_3m"].shifts["Age"].weight.detach())
     w_nih = float(flow.nodes["mRS_3m"].shifts["NIHSSa"].weight.detach())

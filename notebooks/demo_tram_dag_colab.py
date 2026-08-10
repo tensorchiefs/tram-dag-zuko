@@ -73,7 +73,7 @@ print(f"torch {torch.__version__}  device: {DEVICE}")
 # \end{aligned}
 # $$
 #
-# The DAG is $x_1 \to x_2$, $x_1 \to x_3$, $x_2 \to x_3$. 
+# The DAG is $x_1 \to x_2$, $x_1 \to x_3$, $x_2 \to x_3$.
 
 # %%
 gen = VacaTriangle(seed=42)
@@ -100,7 +100,7 @@ plt.show()
 
 # %%
 spec = {
-    "x1": ContinuousNode(),                                 # source
+    "x1": ContinuousNode(),  # source
     "x2": ContinuousNode(terms=[I("x1")]),
     "x3": ContinuousNode(terms=[I("x1", "x2")]),
 }
@@ -108,11 +108,23 @@ spec = {
 torch.manual_seed(0)
 flow = CausalFlowDAG(spec, device=DEVICE)
 t0 = time.perf_counter()
-flow.fit(train, val, epochs=400, learning_rate=1e-1, batch_size=4096,
-         verbose=50, schedule="plateau", plateau_patience=10, freeze_patience=30, marginal_init=True)
+flow.fit(
+    train,
+    val,
+    epochs=400,
+    learning_rate=1e-1,
+    batch_size=4096,
+    verbose=50,
+    schedule="plateau",
+    plateau_patience=10,
+    freeze_patience=30,
+    marginal_init=True,
+)
 t_fit = time.perf_counter() - t0
-print(f"\nfitted on {DEVICE} in {t_fit:.1f}s "
-      f"({len(flow.history['val'])} epochs, then froze itself)")
+print(
+    f"\nfitted on {DEVICE} in {t_fit:.1f}s "
+    f"({len(flow.history['val'])} epochs, then froze itself)"
+)
 
 # %% [markdown]
 # Training diagnostics come for free — `fit` records per-node train/val NLL,
@@ -127,12 +139,19 @@ tot_va = np.array([sum(d.values()) for d in hist["val"]])
 fig, ax = plt.subplots(figsize=(7.5, 3.6))
 ax.plot(ep, tot_tr, label="train NLL (total)")
 ax.plot(ep, tot_va, label="val NLL (total)")
-for i, (name, e) in enumerate(sorted(hist.get("frozen", {}).items(),
-                                     key=lambda kv: kv[1])):
+for i, (name, e) in enumerate(
+    sorted(hist.get("frozen", {}).items(), key=lambda kv: kv[1])
+):
     ax.axvline(e, ls="--", lw=1, color="gray")
-    ax.annotate(f" {name} frozen", (e, ax.get_ylim()[1]),
-                rotation=90, va="top", fontsize=8, color="gray")
-ax.set_ylim(tot_va.min() - 0.02, tot_va.min() + 0.6)   # zoom past the initial drop
+    ax.annotate(
+        f" {name} frozen",
+        (e, ax.get_ylim()[1]),
+        rotation=90,
+        va="top",
+        fontsize=8,
+        color="gray",
+    )
+ax.set_ylim(tot_va.min() - 0.02, tot_va.min() + 0.6)  # zoom past the initial drop
 ax.set_xlabel("epoch"), ax.set_ylabel("NLL"), ax.legend()
 ax.set_title("training curve — per-node plateau decay, then self-freezing")
 fig.tight_layout()
@@ -190,8 +209,9 @@ for ax, a in zip(axes, (-3.0, -1.0, 0.0)):
     x_eval = np.linspace(bins[0], bins[-1], 300)
     ax.plot(x_eval, kde(x_eval), color="C3", lw=1.8, label="TRAM-DAG density")
     ax.set_title(f"$p(x_3 \\mid do(x_2={a:+.0f}))$")
-    print(f"   a = {a:+.0f}:          {-0.25 + 0.25 * a:+.3f}      "
-          f"{fl['x3'].mean():+.3f}")
+    print(
+        f"   a = {a:+.0f}:          {-0.25 + 0.25 * a:+.3f}      {fl['x3'].mean():+.3f}"
+    )
 axes[0].legend()
 fig.tight_layout()
 plt.show()
@@ -228,7 +248,9 @@ for ax, c in zip(axes, ["x2", "x3"]):
     lims = [cf_true[c].min(), cf_true[c].max()]
     ax.plot(lims, lims, "k--", lw=1)
     r = np.corrcoef(cf_true[c], cf_flow[c])[0, 1]
-    ax.set_title(f"counterfactual ${c[0]}_{c[1]}$ under $do(x_1{{=}}0)$   (r = {r:.4f})")
+    ax.set_title(
+        f"counterfactual ${c[0]}_{c[1]}$ under $do(x_1{{=}}0)$   (r = {r:.4f})"
+    )
     ax.set_xlabel("true (DGP, shared noise)"), ax.set_ylabel("TRAM-DAG")
 fig.suptitle("L3: individual counterfactuals, scored unit by unit")
 fig.tight_layout()
@@ -244,19 +266,31 @@ plt.show()
 # (location–scale only → every node-conditional is forced to be a logistic —
 # essentially a classical GLM). Same DAG, same training, three model families:
 
+
 # %%
 def make_spec(transform):
-    return {"x1": ContinuousNode(transform=transform),
-            "x2": ContinuousNode(transform=transform, terms=[I("x1")]),
-            "x3": ContinuousNode(transform=transform, terms=[I("x1", "x2")])}
+    return {
+        "x1": ContinuousNode(transform=transform),
+        "x2": ContinuousNode(transform=transform, terms=[I("x1")]),
+        "x3": ContinuousNode(transform=transform, terms=[I("x1", "x2")]),
+    }
 
 
-fits = {"bernstein": flow}                       # already trained above
+fits = {"bernstein": flow}  # already trained above
 for tr in ["spline", "affine"]:
     torch.manual_seed(0)
     f = CausalFlowDAG(make_spec(tr), device=DEVICE)
-    f.fit(train, val, epochs=400, learning_rate=1e-2, batch_size=4096, verbose=0,
-          schedule="plateau", plateau_patience=10, freeze_patience=30)
+    f.fit(
+        train,
+        val,
+        epochs=400,
+        learning_rate=1e-2,
+        batch_size=4096,
+        verbose=0,
+        schedule="plateau",
+        plateau_patience=10,
+        freeze_patience=30,
+    )
     fits[tr] = f
 print("held-out NLL (lower is better):")
 for tr, f in fits.items():
@@ -267,8 +301,15 @@ bins = np.linspace(df["x1"].quantile(0.001), df["x1"].quantile(0.999), 70)
 fig, ax = plt.subplots(figsize=(7, 3.4))
 ax.hist(df["x1"], bins=bins, density=True, alpha=0.4, color="gray", label="data")
 for tr, color in [("bernstein", "C3"), ("spline", "C0"), ("affine", "C2")]:
-    ax.hist(fits[tr].sample(len(df), seed=3)["x1"], bins=bins, density=True,
-            histtype="step", lw=1.8, color=color, label=tr)
+    ax.hist(
+        fits[tr].sample(len(df), seed=3)["x1"],
+        bins=bins,
+        density=True,
+        histtype="step",
+        lw=1.8,
+        color=color,
+        label=tr,
+    )
 ax.set_title("the affine (GLM-like) transform cannot bend into two modes")
 ax.set_xlabel("$x_1$"), ax.legend()
 fig.tight_layout()
@@ -291,13 +332,18 @@ plt.show()
 # The whole flow is plain PyTorch, so it runs anywhere. Same 60-epoch fit, both
 # devices (on a CPU-only runtime this just reports CPU):
 
+
 # %%
 def timed_fit(device, epochs=60):
     torch.manual_seed(0)
-    f = CausalFlowDAG({"x1": ContinuousNode(),
-                       "x2": ContinuousNode(terms=[I("x1")]),
-                       "x3": ContinuousNode(terms=[I("x1", "x2")])},
-                      device=device)
+    f = CausalFlowDAG(
+        {
+            "x1": ContinuousNode(),
+            "x2": ContinuousNode(terms=[I("x1")]),
+            "x3": ContinuousNode(terms=[I("x1", "x2")]),
+        },
+        device=device,
+    )
     t0 = time.perf_counter()
     f.fit(train, val, epochs=epochs, learning_rate=1e-2, batch_size=4096, verbose=0)
     return time.perf_counter() - t0

@@ -23,7 +23,9 @@ def _stroke_ls_spec() -> dict:
         "mRS_pre": OrdinalNode(levels=6, terms=[LS("Age")]),
         "NIHSSa": ContinuousNode(terms=[LS("Age"), LS("mRS_pre")]),
         "T": OrdinalNode(levels=2, terms=[LS("Age"), LS("mRS_pre"), LS("NIHSSa")]),
-        "mRS_3m": OrdinalNode(levels=7, terms=[LS("Age"), LS("mRS_pre"), LS("NIHSSa"), LS("T")]),
+        "mRS_3m": OrdinalNode(
+            levels=7, terms=[LS("Age"), LS("mRS_pre"), LS("NIHSSa"), LS("T")]
+        ),
     }
 
 
@@ -33,8 +35,7 @@ def _obs() -> pd.DataFrame:
 
 # ------------------------------------------------------------------ fast
 def test_rejects_non_all_ls():
-    spec = {"x1": ContinuousNode(),
-            "x2": ContinuousNode(terms=[CS("x1")])}
+    spec = {"x1": ContinuousNode(), "x2": ContinuousNode(terms=[CS("x1")])}
     flow = CausalFlowDAG(spec)
     df = pd.DataFrame({"x1": np.random.randn(50), "x2": np.random.randn(50)})
     with pytest.raises(ValueError, match="all-`ls`"):
@@ -42,11 +43,11 @@ def test_rejects_non_all_ls():
 
 
 def test_rejects_ci_too():
-    spec = {"x1": ContinuousNode(),
-            "x2": ContinuousNode(terms=[I("x1")])}
+    spec = {"x1": ContinuousNode(), "x2": ContinuousNode(terms=[I("x1")])}
     with pytest.raises(ValueError):
         CausalFlowDAG(spec).fit_classical(
-            pd.DataFrame({"x1": np.random.randn(50), "x2": np.random.randn(50)}))
+            pd.DataFrame({"x1": np.random.randn(50), "x2": np.random.randn(50)})
+        )
 
 
 def test_same_seed_is_bit_identical():
@@ -79,9 +80,11 @@ def test_dtype_round_trip_and_usable():
 def test_continuous_only_all_ls_runs():
     """All-continuous all-ls spec (vaca-style) is accepted and fits."""
     df = pd.read_csv(DATA / "vaca" / "obs.csv")
-    spec = {"x1": ContinuousNode(),
-            "x2": ContinuousNode(terms=[LS("x1")]),
-            "x3": ContinuousNode(terms=[LS("x1"), LS("x2")])}
+    spec = {
+        "x1": ContinuousNode(),
+        "x2": ContinuousNode(terms=[LS("x1")]),
+        "x3": ContinuousNode(terms=[LS("x1"), LS("x2")]),
+    }
     torch.manual_seed(0)
     flow = CausalFlowDAG(spec)
     rep = flow.fit_classical(df, max_iter=100, verbose=False)
@@ -108,7 +111,8 @@ def test_matches_statsmodels_mle():
     X["T"] = obs["T"].values
     X = X.drop(columns=["mRS_pre_0"])
     res = OrderedModel(obs["mRS_3m"].astype(int), X, distr="logit").fit(
-        method="bfgs", disp=False)
+        method="bfgs", disp=False
+    )
 
     torch.manual_seed(7)
     flow = CausalFlowDAG(_stroke_ls_spec())
@@ -129,13 +133,18 @@ def test_agrees_with_adam_mle():
     torch.manual_seed(0)
     fa = CausalFlowDAG(_stroke_ls_spec())
     for ep, lr in [(3000, 1e-2), (1500, 1e-3)]:
-        fa.fit(obs, epochs=ep, learning_rate=lr, batch_size=256, verbose=0,
-               restore_best=False)
+        fa.fit(
+            obs,
+            epochs=ep,
+            learning_rate=lr,
+            batch_size=256,
+            verbose=0,
+            restore_best=False,
+        )
     torch.manual_seed(0)
     fc = CausalFlowDAG(_stroke_ls_spec())
     fc.fit_classical(obs, verbose=False)
-    for name, parent in [("mRS_3m", "Age"), ("mRS_3m", "NIHSSa"),
-                         ("NIHSSa", "Age")]:
+    for name, parent in [("mRS_3m", "Age"), ("mRS_3m", "NIHSSa"), ("NIHSSa", "Age")]:
         a = float(fa.nodes[name].shifts[parent].weight.detach())
         c = float(fc.nodes[name].shifts[parent].weight.detach())
         assert a == pytest.approx(c, abs=0.02), f"{name}<-{parent}: {a} vs {c}"

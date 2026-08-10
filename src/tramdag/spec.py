@@ -49,6 +49,7 @@ class Term:
     the effect modifiers; ``penalty`` is its L2 penalty weight (``None`` for
     every other effect).
     """
+
     effect: str
     slot: str
     parents: tuple[str, ...]
@@ -76,8 +77,13 @@ def CS(*parents: str) -> Term:
     return Term("CS", "shift", tuple(parents))
 
 
-def VC(on: str, *modifiers: str, penalty: float = 1.0,
-       center: bool | str = False, center_folds: int = 5) -> Term:
+def VC(
+    on: str,
+    *modifiers: str,
+    penalty: float = 1.0,
+    center: bool | str = False,
+    center_folds: int = 5,
+) -> Term:
     """Varying-coefficient shift ``beta(modifiers) * x_on`` — the treatment-effect
     term of issue #28.
 
@@ -112,13 +118,21 @@ def VC(on: str, *modifiers: str, penalty: float = 1.0,
     term only.
     """
     if on in modifiers:
-        raise ValueError(f"VC(): '{on}' cannot be both the treatment (on) and a modifier.")
+        raise ValueError(
+            f"VC(): '{on}' cannot be both the treatment (on) and a modifier."
+        )
     if penalty < 0:
         raise ValueError(f"VC(): penalty must be >= 0, got {penalty}.")
     if center_folds < 2:
         raise ValueError(f"VC(): center_folds must be >= 2, got {center_folds}.")
-    return Term("VC", "shift", (on, *modifiers), penalty=float(penalty),
-                center=center, center_folds=int(center_folds))
+    return Term(
+        "VC",
+        "shift",
+        (on, *modifiers),
+        penalty=float(penalty),
+        center=center,
+        center_folds=int(center_folds),
+    )
 
 
 # explicit aliases (avoid confusion with the conditioner classes ComplexShift /
@@ -157,6 +171,7 @@ class ContinuousNode:
         transform: "bernstein" (TRAM-faithful), "spline" or "affine".
         transform_kwargs: forwarded to the transform.
     """
+
     terms: list[Term] | None = None
     transform: str = "bernstein"
     transform_kwargs: dict = field(default_factory=dict)
@@ -167,6 +182,7 @@ class ContinuousNode:
 class OrdinalNode:
     """Ordinal variable with ``levels`` ordered classes (0 .. levels-1),
     modelled by increasing cutpoints (ordered logit) + shifts."""
+
     levels: int
     terms: list[Term] | None = None
     kind: str = field(default="ordinal", init=False)
@@ -202,17 +218,22 @@ def validate_and_sort(spec: dict[str, NodeSpec]) -> list[str]:
             if term.effect not in EFFECTS:
                 raise ValueError(f"Node '{name}': unknown term effect '{term.effect}'.")
             if term.effect == "LS" and len(term.parents) != 1:
-                raise ValueError(f"Node '{name}': LS term must have exactly one parent.")
+                raise ValueError(
+                    f"Node '{name}': LS term must have exactly one parent."
+                )
             for p in term.parents:
                 if p not in spec:
                     raise ValueError(f"Node '{name}': unknown parent '{p}'.")
             if term.effect == "VC":
                 if not term.parents:
-                    raise ValueError(f"Node '{name}': VC term needs a treatment parent.")
+                    raise ValueError(
+                        f"Node '{name}': VC term needs a treatment parent."
+                    )
                 on = term.parents[0]
                 if on in term.parents[1:]:
                     raise ValueError(
-                        f"Node '{name}': VC treatment '{on}' cannot also be a modifier.")
+                        f"Node '{name}': VC treatment '{on}' cannot also be a modifier."
+                    )
                 if term.penalty is None or term.penalty < 0:
                     raise ValueError(f"Node '{name}': VC penalty must be >= 0.")
                 on_node = spec[on]
@@ -220,12 +241,14 @@ def validate_and_sort(spec: dict[str, NodeSpec]) -> list[str]:
                     raise ValueError(
                         f"Node '{name}': VC treatment '{on}' is ordinal with "
                         f"{on_node.levels} levels; only binary (2-level) ordinal "
-                        "treatments are supported (multi-level is a follow-up).")
+                        "treatments are supported (multi-level is a follow-up)."
+                    )
                 if term.center and not isinstance(on_node, OrdinalNode):
                     raise ValueError(
                         f"Node '{name}': VC(center=...) needs a binary ordinal "
                         f"treatment ('{on}' is continuous — E[T|x] centering is "
-                        "a follow-up).")
+                        "a follow-up)."
+                    )
                 owners = (on,)
             else:
                 owners = term.parents
@@ -234,7 +257,8 @@ def validate_and_sort(spec: dict[str, NodeSpec]) -> list[str]:
                     raise ValueError(
                         f"Node '{name}': parent '{p}' appears in more than one term "
                         "(each parent must enter through exactly one edge-owning "
-                        "term; only VC modifiers may repeat).")
+                        "term; only VC modifiers may repeat)."
+                    )
                 seen.add(p)
         if isinstance(node, OrdinalNode) and node.levels < 2:
             raise ValueError(f"Node '{name}': ordinal levels must be >= 2.")
@@ -258,10 +282,22 @@ def spec_to_dict(spec: dict[str, NodeSpec]) -> dict:
     """JSON-serializable representation (for checkpoints)."""
     out = {}
     for name, node in spec.items():
-        terms = [{"effect": t.effect, "parents": list(t.parents),
-                  **({"penalty": t.penalty, "center": t.center,
-                      "center_folds": t.center_folds} if t.effect == "VC" else {})}
-                 for t in node_terms(node)]
+        terms = [
+            {
+                "effect": t.effect,
+                "parents": list(t.parents),
+                **(
+                    {
+                        "penalty": t.penalty,
+                        "center": t.center,
+                        "center_folds": t.center_folds,
+                    }
+                    if t.effect == "VC"
+                    else {}
+                ),
+            }
+            for t in node_terms(node)
+        ]
         d = {"kind": node.kind, "terms": terms}
         if isinstance(node, ContinuousNode):
             d["transform"] = node.transform
@@ -277,17 +313,26 @@ def _terms_from_dict(nd: dict) -> list[Term]:
     layout and the legacy ``parents`` dict (so old checkpoints still load)."""
     if "terms" in nd:
         ctor = {"I": I, "LS": LS, "CS": CS}
-        return [VC(*t["parents"], penalty=t["penalty"],
-                   center=t.get("center", False),
-                   center_folds=t.get("center_folds", 5))
-                if t["effect"] == "VC"
-                else ctor[t["effect"]](*t["parents"]) for t in nd["terms"]]
+        return [
+            VC(
+                *t["parents"],
+                penalty=t["penalty"],
+                center=t.get("center", False),
+                center_folds=t.get("center_folds", 5),
+            )
+            if t["effect"] == "VC"
+            else ctor[t["effect"]](*t["parents"])
+            for t in nd["terms"]
+        ]
     # legacy checkpoint: {"parents": {parent: "ls"|"cs"|"ci"}}
     out: list[Term] = []
     for parent, label in nd.get("parents", {}).items():
         effect = _LEGACY[label]
-        out.append(I(parent) if effect == "I" else
-                   (LS(parent) if effect == "LS" else CS(parent)))
+        out.append(
+            I(parent)
+            if effect == "I"
+            else (LS(parent) if effect == "LS" else CS(parent))
+        )
     return out
 
 
@@ -296,9 +341,11 @@ def spec_from_dict(d: dict) -> dict[str, NodeSpec]:
     for name, nd in d.items():
         terms = _terms_from_dict(nd)
         if nd["kind"] == "continuous":
-            spec[name] = ContinuousNode(terms=terms,
-                                        transform=nd["transform"],
-                                        transform_kwargs=dict(nd["transform_kwargs"]))
+            spec[name] = ContinuousNode(
+                terms=terms,
+                transform=nd["transform"],
+                transform_kwargs=dict(nd["transform_kwargs"]),
+            )
         else:
             spec[name] = OrdinalNode(levels=int(nd["levels"]), terms=terms)
     return spec

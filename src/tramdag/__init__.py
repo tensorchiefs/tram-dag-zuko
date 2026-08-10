@@ -20,22 +20,34 @@ from . import simulations
 from .env import machine_info
 from .flow import CausalFlowDAG
 from .spec import (
-                   CS,
-                   LS,
-                   VC,
-                   ContinuousNode,
-                   CShift,
-                   I,
-                   Intercept,
-                   LinShift,
-                   OrdinalNode,
-                   Term,
-                   term,
+    CS,
+    LS,
+    VC,
+    ContinuousNode,
+    CShift,
+    I,
+    Intercept,
+    LinShift,
+    OrdinalNode,
+    Term,
+    term,
 )
 
-__all__ = ["CausalFlowDAG", "ContinuousNode", "OrdinalNode", "machine_info",
-           "simulations",
-           # term-formula notation
-           "Term", "I", "LS", "CS", "VC", "term", "Intercept", "LinShift",
-           "CShift"]
+__all__ = [
+    "CausalFlowDAG",
+    "ContinuousNode",
+    "OrdinalNode",
+    "machine_info",
+    "simulations",
+    # term-formula notation
+    "Term",
+    "I",
+    "LS",
+    "CS",
+    "VC",
+    "term",
+    "Intercept",
+    "LinShift",
+    "CShift",
+]
 __version__ = version("tramdag")

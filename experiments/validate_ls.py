@@ -44,10 +44,13 @@ def all_ls_spec() -> dict:
     return {
         "Age": ContinuousNode(transform="bernstein"),
         "mRS_pre": OrdinalNode(levels=6, terms=[LS("Age")]),
-        "NIHSSa": ContinuousNode(transform="bernstein",
-                                 terms=[LS("Age"), LS("mRS_pre")]),
+        "NIHSSa": ContinuousNode(
+            transform="bernstein", terms=[LS("Age"), LS("mRS_pre")]
+        ),
         "T": OrdinalNode(levels=2, terms=[LS("Age"), LS("mRS_pre"), LS("NIHSSa")]),
-        "mRS_3m": OrdinalNode(levels=7, terms=[LS("Age"), LS("mRS_pre"), LS("NIHSSa"), LS("T")]),
+        "mRS_3m": OrdinalNode(
+            levels=7, terms=[LS("Age"), LS("mRS_pre"), LS("NIHSSa"), LS("T")]
+        ),
     }
 
 
@@ -57,8 +60,9 @@ def main(source: str = "magic-mrclean/ls", classical: bool = False):
     print(f"=== spot-on all-ls comparison on '{source}' (N={len(obs)}) — {fitter} ===")
 
     # --- classical MLE (statsmodels), full data ---
-    res = OrderedModel(obs["mRS_3m"].astype(int), design(obs),
-                       distr="logit").fit(method="bfgs", disp=False)
+    res = OrderedModel(obs["mRS_3m"].astype(int), design(obs), distr="logit").fit(
+        method="bfgs", disp=False
+    )
 
     # --- flow: full data, no early stopping, train to the MLE ---
     torch.manual_seed(0)
@@ -67,8 +71,15 @@ def main(source: str = "magic-mrclean/ls", classical: bool = False):
         flow.fit_classical(obs)
     else:
         for ep, lr in PHASES:
-            flow.fit(obs, epochs=ep, learning_rate=lr, batch_size=256, verbose=0,
-                     seed=0 if lr == 1e-2 else None, restore_best=False)
+            flow.fit(
+                obs,
+                epochs=ep,
+                learning_rate=lr,
+                batch_size=256,
+                verbose=0,
+                seed=0 if lr == 1e-2 else None,
+                restore_best=False,
+            )
 
     node = flow.nodes["mRS_3m"]
     w_age = float(node.shifts["Age"].weight.detach())
@@ -76,11 +87,15 @@ def main(source: str = "magic-mrclean/ls", classical: bool = False):
     w_pre = node.shifts["mRS_pre"].weight.detach().numpy().ravel()
     w_t = node.shifts["T"].weight.detach().numpy().ravel()
 
-    rows = [("Age", w_age, res.params["Age"]),
-            ("NIHSSa", w_nih, res.params["NIHSSa"]),
-            ("T (=1 vs 0)", w_t[1] - w_t[0], res.params["T"])]
+    rows = [
+        ("Age", w_age, res.params["Age"]),
+        ("NIHSSa", w_nih, res.params["NIHSSa"]),
+        ("T (=1 vs 0)", w_t[1] - w_t[0], res.params["T"]),
+    ]
     for k in range(1, 6):
-        rows.append((f"mRS_pre_{k} (vs 0)", w_pre[k] - w_pre[0], res.params[f"mRS_pre_{k}"]))
+        rows.append(
+            (f"mRS_pre_{k} (vs 0)", w_pre[k] - w_pre[0], res.params[f"mRS_pre_{k}"])
+        )
 
     print(f"\n{'coefficient':<20}{'flow':>10}{'statsmodels':>13}{'|diff|':>9}")
     maxdiff = 0.0
@@ -94,23 +109,30 @@ def main(source: str = "magic-mrclean/ls", classical: bool = False):
     if rref is not None and (rref / "coefficients.csv").exists():
         ry = pd.read_csv(rref / "coefficients.csv")
         ry = ry[ry["node"] == "mRS_3m"].set_index("term")["estimate"]
-        print(f"\nR polr reference (mRS_3m): Age={ry['Age']:+.4f}  "
-              f"NIHSSa={ry['NIHSSa']:+.4f}  T={ry['T']:+.4f}")
+        print(
+            f"\nR polr reference (mRS_3m): Age={ry['Age']:+.4f}  "
+            f"NIHSSa={ry['NIHSSa']:+.4f}  T={ry['T']:+.4f}"
+        )
 
     # --- ATE on the RCT covariates ---
-    p0 = res.model.predict(res.params, exog=design(rct.assign(T=0)).values, which="prob")
-    p1 = res.model.predict(res.params, exog=design(rct.assign(T=1)).values, which="prob")
+    p0 = res.model.predict(
+        res.params, exog=design(rct.assign(T=0)).values, which="prob"
+    )
+    p1 = res.model.predict(
+        res.params, exog=design(rct.assign(T=1)).values, which="prob"
+    )
     ate_mle = float((p1[:, :3].sum(axis=1) - p0[:, :3].sum(axis=1)).mean())
     pf0 = flow.pmf(rct, node="mRS_3m", do={"T": 0})
     pf1 = flow.pmf(rct, node="mRS_3m", do={"T": 1})
     ate_flow = float((pf1[:, :3].sum(axis=1) - pf0[:, :3].sum(axis=1)).mean())
-    print(f"\nATE on RCT covariates:  flow {ate_flow:+.4f}   statsmodels {ate_mle:+.4f}"
-          f"   |diff| {abs(ate_flow - ate_mle):.4f}")
+    print(
+        f"\nATE on RCT covariates:  flow {ate_flow:+.4f}   statsmodels {ate_mle:+.4f}"
+        f"   |diff| {abs(ate_flow - ate_mle):.4f}"
+    )
     if truth is not None:
         print(f"  (known true ATE for this DGP: {truth['true_ate']:+.4f})")
 
 
 if __name__ == "__main__":
     args = [a for a in sys.argv[1:] if a != "--classical"]
-    main(args[0] if args else "magic-mrclean/ls",
-         classical="--classical" in sys.argv)
+    main(args[0] if args else "magic-mrclean/ls", classical="--classical" in sys.argv)

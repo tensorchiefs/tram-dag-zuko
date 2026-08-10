@@ -56,7 +56,8 @@ def intro_dgp(n: int, seed: int = 1) -> pd.DataFrame:
 
 WORKLOADS = {
     "intro": dict(
-        n=5_000, batch=512,
+        n=5_000,
+        batch=512,
         data=lambda: intro_dgp(5_000),
         spec=lambda: {
             "X1": ContinuousNode(),
@@ -66,7 +67,8 @@ WORKLOADS = {
         },
     ),
     "large": dict(
-        n=50_000, batch=4096,
+        n=50_000,
+        batch=4096,
         data=lambda: td.simulations.VacaTriangle(seed=42).observational(50_000),
         spec=lambda: {
             "x1": ContinuousNode(),
@@ -83,13 +85,20 @@ def code_version() -> dict:
     v = {"tramdag": td.__version__, "git_commit": None, "git_dirty": None}
     try:
         import subprocess
+
         here = str(Path(__file__).resolve().parent)
         v["git_commit"] = subprocess.check_output(
             ["git", "-C", here, "rev-parse", "--short", "HEAD"],
-            text=True, stderr=subprocess.DEVNULL).strip()
-        v["git_dirty"] = bool(subprocess.check_output(
-            ["git", "-C", here, "status", "--porcelain"],
-            text=True, stderr=subprocess.DEVNULL).strip())
+            text=True,
+            stderr=subprocess.DEVNULL,
+        ).strip()
+        v["git_dirty"] = bool(
+            subprocess.check_output(
+                ["git", "-C", here, "status", "--porcelain"],
+                text=True,
+                stderr=subprocess.DEVNULL,
+            ).strip()
+        )
     except Exception:
         pass  # pip-installed / curl'd outside a repo: package version only
     return v
@@ -114,11 +123,11 @@ def run_workload(name: str, device: str) -> dict:
     torch.manual_seed(0)
     flow = CausalFlowDAG(w["spec"](), device=device)
     # warm-up: kernel compilation / first-touch allocations, excluded from timing
-    flow.fit(train, val, epochs=3, learning_rate=1e-2, batch_size=w["batch"],
-             verbose=0)
+    flow.fit(train, val, epochs=3, learning_rate=1e-2, batch_size=w["batch"], verbose=0)
     t0 = time.perf_counter()
-    flow.fit(train, val, epochs=EPOCHS, learning_rate=1e-2, batch_size=w["batch"],
-             verbose=0)
+    flow.fit(
+        train, val, epochs=EPOCHS, learning_rate=1e-2, batch_size=w["batch"], verbose=0
+    )
     fit_s = time.perf_counter() - t0
 
     t0 = time.perf_counter()
@@ -129,10 +138,15 @@ def run_workload(name: str, device: str) -> dict:
     abduct_s = time.perf_counter() - t0
 
     return {
-        "workload": name, "device": device, "n": w["n"], "batch": w["batch"],
-        "epochs": EPOCHS, "fit_s": round(fit_s, 2),
+        "workload": name,
+        "device": device,
+        "n": w["n"],
+        "batch": w["batch"],
+        "epochs": EPOCHS,
+        "fit_s": round(fit_s, 2),
         "epochs_per_s": round(EPOCHS / fit_s, 2),
-        "sample_100k_s": round(sample_s, 2), "abduct_10k_s": round(abduct_s, 2),
+        "sample_100k_s": round(sample_s, 2),
+        "abduct_10k_s": round(abduct_s, 2),
         # cross-machine sanity check: same seed + data -> NLL must be ~equal
         "final_val_nll": round(sum(flow.history["val"][-1].values()), 4),
         "_sample_mean_x_last": round(float(samp.iloc[:, -1].mean()), 4),
@@ -150,14 +164,26 @@ def report(directory: str) -> None:
         for r in d["results"]:
             if "error" in r:
                 continue
-            rows.append({"host": d["machine"]["hostname"],
-                         "chip": d["machine"]["processor"],
-                         "gpu": d["machine"]["cuda"] or
-                                ("mps" if d["machine"]["mps"] else "-"),
-                         "code": commit or d.get("code", {}).get("tramdag", "?"),
-                         **{k: r[k] for k in ["workload", "device", "fit_s",
-                                              "epochs_per_s", "sample_100k_s",
-                                              "final_val_nll"]}})
+            rows.append(
+                {
+                    "host": d["machine"]["hostname"],
+                    "chip": d["machine"]["processor"],
+                    "gpu": d["machine"]["cuda"]
+                    or ("mps" if d["machine"]["mps"] else "-"),
+                    "code": commit or d.get("code", {}).get("tramdag", "?"),
+                    **{
+                        k: r[k]
+                        for k in [
+                            "workload",
+                            "device",
+                            "fit_s",
+                            "epochs_per_s",
+                            "sample_100k_s",
+                            "final_val_nll",
+                        ]
+                    },
+                }
+            )
     if not rows:
         print(f"no benchmark JSONs found in {directory}")
         return
@@ -165,16 +191,18 @@ def report(directory: str) -> None:
     print(t.to_string(index=False))
     # markdown table without extra dependencies (tabulate not required)
     cols = list(t.columns)
-    lines = ["| " + " | ".join(cols) + " |",
-             "|" + "|".join("---" for _ in cols) + "|"]
-    lines += ["| " + " | ".join(str(v) for v in row) + " |"
-              for row in t.itertuples(index=False)]
+    lines = ["| " + " | ".join(cols) + " |", "|" + "|".join("---" for _ in cols) + "|"]
+    lines += [
+        "| " + " | ".join(str(v) for v in row) + " |"
+        for row in t.itertuples(index=False)
+    ]
     md = Path(directory) / "REPORT.md"
     md.write_text(
         "# tramdag cross-machine benchmark\n\n"
         f"Fixed {EPOCHS}-epoch workloads (see `experiments/perf_machine.py`); "
         "`final_val_nll` must agree across machines (same seed & data).\n\n"
-        + "\n".join(lines) + "\n\n"
+        + "\n".join(lines)
+        + "\n\n"
         "## Add your machine\n\n"
         "```bash\n"
         "# on the new machine (no repo clone needed; GPU optional)\n"
@@ -190,19 +218,31 @@ def report(directory: str) -> None:
         "```\n\n"
         "Sanity check before committing: the new row's `final_val_nll` should\n"
         "match the existing rows to ~1e-3 — same seed and data everywhere.\n"
-        "*(This file is auto-generated by `--report`; don't edit it by hand.)*\n")
+        "*(This file is auto-generated by `--report`; don't edit it by hand.)*\n"
+    )
     print(f"-> {md}")
 
 
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    ap.add_argument("--devices", nargs="+", default=None,
-                    help="subset of {cpu, cuda, mps}; default: all available")
-    ap.add_argument("--out", metavar="DIR", default=None,
-                    help="output directory (default: docs/perf inside a clone, "
-                         "else current directory)")
-    ap.add_argument("--report", metavar="DIR",
-                    help="merge perf_*.json from DIR into a table and exit")
+    ap.add_argument(
+        "--devices",
+        nargs="+",
+        default=None,
+        help="subset of {cpu, cuda, mps}; default: all available",
+    )
+    ap.add_argument(
+        "--out",
+        metavar="DIR",
+        default=None,
+        help="output directory (default: docs/perf inside a clone, "
+        "else current directory)",
+    )
+    ap.add_argument(
+        "--report",
+        metavar="DIR",
+        help="merge perf_*.json from DIR into a table and exit",
+    )
     args = ap.parse_args()
     if args.report:
         report(args.report)
@@ -210,9 +250,11 @@ def main() -> None:
 
     info = td.machine_info()
     devices = args.devices or available_devices()
-    print(f"tramdag {info['tramdag']} | torch {info['torch']} | "
-          f"{info['hostname']} ({info['processor']}, {info['cpu_count']} cores, "
-          f"{info['ram_gb']} GB) | devices: {devices}\n")
+    print(
+        f"tramdag {info['tramdag']} | torch {info['torch']} | "
+        f"{info['hostname']} ({info['processor']}, {info['cpu_count']} cores, "
+        f"{info['ram_gb']} GB) | devices: {devices}\n"
+    )
 
     results = []
     for wl in WORKLOADS:
@@ -221,29 +263,44 @@ def main() -> None:
             try:
                 r = run_workload(wl, dev)
                 results.append(r)
-                print(f"{r['fit_s']:7.1f}s  ({r['epochs_per_s']:.1f} ep/s)  "
-                      f"sample {r['sample_100k_s']:.1f}s  "
-                      f"NLL {r['final_val_nll']}")
+                print(
+                    f"{r['fit_s']:7.1f}s  ({r['epochs_per_s']:.1f} ep/s)  "
+                    f"sample {r['sample_100k_s']:.1f}s  "
+                    f"NLL {r['final_val_nll']}"
+                )
             except Exception as e:  # e.g. an op unsupported on mps
-                results.append({"workload": wl, "device": dev,
-                                "error": f"{type(e).__name__}: {e}"})
+                results.append(
+                    {"workload": wl, "device": dev, "error": f"{type(e).__name__}: {e}"}
+                )
                 print(f"FAILED — {type(e).__name__}: {e}")
 
     # default output: docs/perf/ when running inside a repo clone, else cwd
     repo_root = Path(__file__).resolve().parents[1]
-    default_out = (repo_root / "docs" / "perf"
-                   if (repo_root / ".git").exists() else Path.cwd())
+    default_out = (
+        repo_root / "docs" / "perf" if (repo_root / ".git").exists() else Path.cwd()
+    )
     out_dir = Path(args.out) if args.out else default_out
     out_dir.mkdir(parents=True, exist_ok=True)
     stamp = f"{datetime.now(timezone.utc):%Y-%m-%d-%H%M}"
     out = out_dir / f"{stamp}_{info['hostname']}.json"
-    out.write_text(json.dumps(
-        {"machine": info, "code": code_version(), "epochs": EPOCHS,
-         "timestamp": datetime.now(timezone.utc).isoformat(timespec="seconds"),
-         "results": results}, indent=2) + "\n")
+    out.write_text(
+        json.dumps(
+            {
+                "machine": info,
+                "code": code_version(),
+                "epochs": EPOCHS,
+                "timestamp": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+                "results": results,
+            },
+            indent=2,
+        )
+        + "\n"
+    )
     print(f"\n-> {out.resolve()}")
-    print("collect the JSONs from all machines in docs/perf/, then:"
-          "  python perf_machine.py --report docs/perf")
+    print(
+        "collect the JSONs from all machines in docs/perf/, then:"
+        "  python perf_machine.py --report docs/perf"
+    )
 
 
 if __name__ == "__main__":

@@ -45,8 +45,8 @@ COLUMNS = ["Age", "mRS_pre", "NIHSSa", "T", "mRS_3m"]
 # Ordered-logit cutpoints, P(Y <= k) = sigmoid(theta_k - shift); chosen so the
 # observational marginals roughly match the real cohort (mRS_pre skewed to 0,
 # mRS_3m spread across all 7 levels). See data/magic-mrclean/README.md.
-CUTS_PRE = np.array([0.20, 1.15, 2.05, 3.20, 5.20])              # 6 levels (0..5)
-CUTS_Y = np.array([-1.85, -0.75, 0.05, 0.80, 1.55, 2.35])       # 7 levels (0..6)
+CUTS_PRE = np.array([0.20, 1.15, 2.05, 3.20, 5.20])  # 6 levels (0..5)
+CUTS_Y = np.array([-1.85, -0.75, 0.05, 0.80, 1.55, 2.35])  # 7 levels (0..6)
 
 
 def _logistic(rng: np.random.Generator, size: int) -> np.ndarray:
@@ -86,10 +86,16 @@ class MagicMrClean:
         return {k: _logistic(rng, n) for k in COLUMNS}
 
     # --------------------------------------------------------------------- SCM
-    def simulate(self, n: int | None = None, *, rng: np.random.Generator | None = None,
-                 randomize_T: bool = False, population: str = "obs",
-                 do: dict[str, float] | None = None,
-                 latents: dict[str, np.ndarray] | None = None) -> pd.DataFrame:
+    def simulate(
+        self,
+        n: int | None = None,
+        *,
+        rng: np.random.Generator | None = None,
+        randomize_T: bool = False,
+        population: str = "obs",
+        do: dict[str, float] | None = None,
+        latents: dict[str, np.ndarray] | None = None,
+    ) -> pd.DataFrame:
         """Forward-sample the SCM.
 
         Args:
@@ -125,14 +131,14 @@ class MagicMrClean:
             Age = np.full(n, float(do["Age"]))
         else:
             Age = np.clip(age_loc + 7.6 * latents["Age"], 20.0, 103.0)
-        a = (Age - 73.0) / 10.0                       # standardized age
+        a = (Age - 73.0) / 10.0  # standardized age
         relu_a = np.maximum(a, 0.0)
 
         # --- mRS_pre: pre-stroke disability, worse (and ★ accelerating) with age
         if "mRS_pre" in do:
             mRS_pre = np.full(n, float(do["mRS_pre"]))
         else:
-            eta_pre = 0.55 * a + nl * (0.18 * relu_a ** 2)
+            eta_pre = 0.55 * a + nl * (0.18 * relu_a**2)
             mRS_pre = _ordinal(eta_pre, CUTS_PRE, latents["mRS_pre"]).astype(float)
 
         # --- NIHSSa: stroke severity; linear shift on parents, ★ age^2 in nl.
@@ -140,20 +146,24 @@ class MagicMrClean:
         if "NIHSSa" in do:
             NIHSSa = np.full(n, float(do["NIHSSa"]))
         else:
-            shift_nih = 0.45 * a + 0.25 * mRS_pre + nl * (0.20 * relu_a ** 2)
+            shift_nih = 0.45 * a + 0.25 * mRS_pre + nl * (0.20 * relu_a**2)
             lat_nih = shift_nih + 0.85 * latents["NIHSSa"]
             NIHSSa = np.clip(6.0 + 36.0 * _sigmoid((lat_nih - 1.75) / 1.5), 6.0, 42.0)
-        s = (NIHSSa - 15.0) / 6.0                     # standardized severity
+        s = (NIHSSa - 15.0) / 6.0  # standardized severity
 
         # --- T: thrombectomy assignment. Observational mechanism is confounded by
         #     age and severity; ★ in nl it is smoothly withheld from the very old.
         if "T" in do:
             T = np.full(n, float(do["T"]))
         elif randomize_T:
-            T = (latents["T"] > 0.0).astype(float)    # Bernoulli(0.5), latent-driven
+            T = (latents["T"] > 0.0).astype(float)  # Bernoulli(0.5), latent-driven
         else:
-            logit_T = (1.9 - 0.45 * np.maximum(a + 0.5, 0.0) - 0.30 * np.maximum(s - 1.0, 0.0)
-                       + nl * (-1.3 * _sigmoid((Age - 82.0) / 4.0)))
+            logit_T = (
+                1.9
+                - 0.45 * np.maximum(a + 0.5, 0.0)
+                - 0.30 * np.maximum(s - 1.0, 0.0)
+                + nl * (-1.3 * _sigmoid((Age - 82.0) / 4.0))
+            )
             T = (latents["T"] > -logit_T).astype(float)  # P(T=1) = sigmoid(logit_T)
 
         # --- mRS_3m: 3-month outcome. Treatment lowers the latent (better outcome);
@@ -165,8 +175,9 @@ class MagicMrClean:
             zeta = 0.85 * s + 0.55 * a + 0.45 * mRS_pre + tau * T
             mRS_3m = _ordinal(zeta, CUTS_Y, latents["mRS_3m"]).astype(float)
 
-        return pd.DataFrame({"Age": Age, "mRS_pre": mRS_pre, "NIHSSa": NIHSSa,
-                             "T": T, "mRS_3m": mRS_3m})
+        return pd.DataFrame(
+            {"Age": Age, "mRS_pre": mRS_pre, "NIHSSa": NIHSSa, "T": T, "mRS_3m": mRS_3m}
+        )
 
     # ----------------------------------------------------------------- datasets
     def observational(self, n: int, seed_offset: int = 0) -> pd.DataFrame:
@@ -194,13 +205,21 @@ class MagicMrClean:
         good1 = float((d1["mRS_3m"] <= 2).mean())
         # naive (observational, confounded) contrast for contrast with the truth
         obs = self.observational(n, seed_offset=777)
-        naive = (float((obs.loc[obs["T"] == 1, "mRS_3m"] <= 2).mean())
-                 - float((obs.loc[obs["T"] == 0, "mRS_3m"] <= 2).mean()))
-        return {"p_good_do_T0": good0, "p_good_do_T1": good1, "ate_population": on,
-                "true_ate": good1 - good0, "naive_obs_diff": naive, "mc_n": n}
+        naive = float((obs.loc[obs["T"] == 1, "mRS_3m"] <= 2).mean()) - float(
+            (obs.loc[obs["T"] == 0, "mRS_3m"] <= 2).mean()
+        )
+        return {
+            "p_good_do_T0": good0,
+            "p_good_do_T1": good1,
+            "ate_population": on,
+            "true_ate": good1 - good0,
+            "naive_obs_diff": naive,
+            "mc_n": n,
+        }
 
-    def counterfactual_pair(self, n: int, do: dict[str, float],
-                            seed_offset: int = 0) -> tuple[pd.DataFrame, pd.DataFrame]:
+    def counterfactual_pair(
+        self, n: int, do: dict[str, float], seed_offset: int = 0
+    ) -> tuple[pd.DataFrame, pd.DataFrame]:
         """Factual sample and its counterfactual under ``do`` sharing the *same*
         latents — yields true individual counterfactuals (impossible from real
         data) to score the flow's abduction against."""
@@ -212,8 +231,9 @@ class MagicMrClean:
 
 
 # --------------------------------------------------------------------------- CLI
-def _write_variant(out_dir: Path, variant: str, seed: int,
-                   n_obs: int, n_rct: int, mc_n: int) -> dict:
+def _write_variant(
+    out_dir: Path, variant: str, seed: int, n_obs: int, n_rct: int, mc_n: int
+) -> dict:
     gen = MagicMrClean(variant=variant, seed=seed)
     vdir = out_dir / variant
     vdir.mkdir(parents=True, exist_ok=True)
@@ -229,18 +249,27 @@ def _write_variant(out_dir: Path, variant: str, seed: int,
     obs.to_csv(vdir / "obs.csv", index=False)
     rct.to_csv(vdir / "rct.csv", index=False)
 
-    truth = {"variant": variant, "seed": seed, "n_obs": n_obs, "n_rct": n_rct,
-             **gen.true_ate(mc_n)}
+    truth = {
+        "variant": variant,
+        "seed": seed,
+        "n_obs": n_obs,
+        "n_rct": n_rct,
+        **gen.true_ate(mc_n),
+    }
     (vdir / "truth.json").write_text(json.dumps(truth, indent=2) + "\n")
 
-    print(f"[{variant}] obs={len(obs)} rct={len(rct)}  "
-          f"true ATE={truth['true_ate']:+.4f}  naive={truth['naive_obs_diff']:+.4f}  "
-          f"P(good)={ (obs['mRS_3m']<=2).mean():.3f}  T-rate={obs['T'].mean():.3f}")
+    print(
+        f"[{variant}] obs={len(obs)} rct={len(rct)}  "
+        f"true ATE={truth['true_ate']:+.4f}  naive={truth['naive_obs_diff']:+.4f}  "
+        f"P(good)={(obs['mRS_3m'] <= 2).mean():.3f}  T-rate={obs['T'].mean():.3f}"
+    )
     return truth
 
 
 def main(argv: list[str] | None = None) -> None:
-    p = argparse.ArgumentParser(description="Generate the magic-mrclean synthetic cohort.")
+    p = argparse.ArgumentParser(
+        description="Generate the magic-mrclean synthetic cohort."
+    )
     p.add_argument("--out", type=Path, default=Path("data/magic-mrclean"))
     p.add_argument("--seed", type=int, default=7)
     p.add_argument("--n-obs", type=int, default=1275)
