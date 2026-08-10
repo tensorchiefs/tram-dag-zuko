@@ -81,11 +81,6 @@ def load_data(source: str = DEFAULT_SOURCE):
     return obs, rct, truth
 
 
-# backward-compatible alias
-def load_rct() -> pd.DataFrame:
-    return load_magic_rct()
-
-
 def DATA_R_REF(source: str) -> Path | None:
     """Path to the committed R reference (ref_ls/) for a synthetic source, or None."""
     if source == "magic":
