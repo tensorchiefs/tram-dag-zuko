@@ -20,8 +20,9 @@ with the latent-scale derivative in closed form —
   ``d l / d s = (sig'(l) - sig'(u)) / (sig(u) - sig(l))`` with ``l``/``u`` the
   observed level's shifted cutpoint bounds.
 
-Public entry points are the ``CausalFlowDAG`` methods :meth:`~tramdag.CausalFlowDAG.scores`
-and :meth:`~tramdag.CausalFlowDAG.effect_modifier_scan`, which delegate here.
+The public entry points are the ``CausalFlowDAG`` methods
+:meth:`~tramdag.CausalFlowDAG.scores` and
+:meth:`~tramdag.CausalFlowDAG.effect_modifier_scan`. Both delegate here.
 """
 
 from __future__ import annotations
@@ -46,8 +47,10 @@ CRIT_1PCT = 1.6276
 def _dl_ds(
     nd, feats: dict, x: torch.Tensor, n: int, vc_ehat: dict | None = None
 ) -> torch.Tensor:
-    """D l_i / d s_i (n,) — derivative of the per-row log-likelihood w.r.t. the
-    node's total shift, in closed form.
+    """Give ``d l_i / d s_i``, shape ``(n,)``.
+
+    This is the closed-form derivative of the per-row log-likelihood with
+    respect to the total shift of the node.
     """
     theta, shift = nd.theta_shift(feats, n, vc_ehat=vc_ehat)
     if nd.kind == "continuous":
@@ -59,15 +62,18 @@ def _dl_ds(
 
 
 def node_scores(flow, df: pd.DataFrame, node: str) -> pd.DataFrame:
-    """Per-observation scores (n, k) of a node's interpretable shift
-    coefficients: every ``LS`` weight and every ``VC`` term's ``beta0``.
+    """Compute the per-observation scores of the interpretable coefficients.
 
-    Columns: a continuous ``LS`` parent gives one column named after the
-    parent; an ordinal ``LS`` parent gives one column per one-hot level,
-    ``"{parent}[{k}]"``; a ``VC`` term gives one column named after its
-    treatment (the ``beta0`` score — for a binary ordinal treatment this is the
-    score of the identified level-1-vs-0 contrast). ``CS`` terms carry no
-    interpretable coefficient and are skipped.
+    The result has shape ``(n, k)`` and covers every ``LS`` weight and the
+    ``beta0`` of every ``VC`` term.
+
+    One column comes from each coefficient. A continuous ``LS`` parent gives one
+    column, named after the parent. An ordinal ``LS`` parent gives one column
+    per one-hot level, named ``"{parent}[{k}]"``. A ``VC`` term gives one column
+    named after its treatment, which holds the ``beta0`` score. For a binary
+    ordinal treatment that score belongs to the identified contrast of level 1
+    against level 0. ``CS`` terms carry no interpretable coefficient, so this
+    function skips them.
     """
     if node not in flow.nodes:
         raise KeyError(f"unknown node {node!r}")

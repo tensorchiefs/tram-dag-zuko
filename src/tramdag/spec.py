@@ -84,8 +84,9 @@ def VC(
     center: bool | str = False,
     center_folds: int = 5,
 ) -> Term:
-    """Varying-coefficient shift ``beta(modifiers) * x_on`` — the treatment-effect
-    term of issue #28.
+    """Build a varying-coefficient shift ``beta(modifiers) * x_on``.
+
+    This is the treatment-effect term of issue #28.
 
     ``beta(x) = beta0 + b_theta(x)`` with ``b_theta`` a small MLP whose weights
     carry the L2 ``penalty``: the fitting objective is the penalized NLL
@@ -143,10 +144,13 @@ CShift = CS
 
 
 def term(effect: str, *parents: str, penalty: float | None = None) -> Term:
-    """Build a :class:`Term` from an effect *label* — useful when the effect type
-    is data-driven (e.g. sweeping ``"ls"`` vs ``"cs"``). Accepts both the legacy
-    labels ``"ls"``/``"cs"``/``"ci"`` and the new ``"LS"``/``"CS"``/``"I"``/``"VC"``.
-    ``penalty`` applies to ``"VC"`` only (its default when omitted).
+    """Build a :class:`Term` from an effect label.
+
+    Use this when the effect type comes from data, for example when a study
+    sweeps ``"ls"`` against ``"cs"``. The function accepts both the legacy
+    labels ``"ls"``, ``"cs"`` and ``"ci"``, and the current labels ``"LS"``,
+    ``"CS"``, ``"I"`` and ``"VC"``. ``penalty`` applies to ``"VC"`` only, and
+    ``VC`` uses its own default when you omit it.
     """
     e = _LEGACY.get(effect.lower(), effect.upper())
     if penalty is not None and e != "VC":
@@ -181,8 +185,9 @@ class ContinuousNode:
 
 @dataclass
 class OrdinalNode:
-    """Ordinal variable with ``levels`` ordered classes (0 .. levels-1),
-    modelled by increasing cutpoints (ordered logit) + shifts.
+    """Ordinal variable with ``levels`` ordered classes, stored 0 to levels-1.
+
+    An ordered logit models it: increasing cutpoints plus the shift terms.
     """
 
     levels: int
@@ -312,8 +317,10 @@ def spec_to_dict(spec: dict[str, NodeSpec]) -> dict:
 
 
 def _terms_from_dict(nd: dict) -> list[Term]:
-    """Rebuild a term list from serialized form, accepting both the new ``terms``
-    layout and the legacy ``parents`` dict (so old checkpoints still load).
+    """Rebuild a term list from its serialized form.
+
+    Both layouts are accepted: the current ``terms`` list and the legacy
+    ``parents`` dict, so an old checkpoint still loads.
     """
     if "terms" in nd:
         ctor = {"I": I, "LS": LS, "CS": CS}
@@ -341,6 +348,18 @@ def _terms_from_dict(nd: dict) -> list[Term]:
 
 
 def spec_from_dict(d: dict) -> dict[str, NodeSpec]:
+    """Rebuild a spec from its serialized form.
+
+    Parameters
+    ----------
+    d : dict
+        The serialized spec, as produced by :func:`spec_to_dict`.
+
+    Returns
+    -------
+    dict[str, NodeSpec]
+        The node specification, keyed by node name.
+    """
     spec: dict[str, NodeSpec] = {}
     for name, nd in d.items():
         terms = _terms_from_dict(nd)
