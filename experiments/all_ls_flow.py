@@ -11,11 +11,8 @@ to switch, e.g. the private clinical data:
     uv run python all_ls_flow.py magic            # private clinical cohort
 """
 
-import sys
-
-from common import DEFAULT_SOURCE, run_experiment
+from common import run_experiment, run_name, source_arg
 
 if __name__ == "__main__":
-    source = sys.argv[1] if len(sys.argv) > 1 else DEFAULT_SOURCE
-    name = "all_ls" if source == "magic" else f"all_ls_{source.split('/')[-1]}"
-    run_experiment(name, style="ls", source=source)
+    source = source_arg(__doc__)
+    run_experiment(run_name("all_ls", source), style="ls", source=source)

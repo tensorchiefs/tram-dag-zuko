@@ -7,6 +7,7 @@ random_state=42; evaluation on the MR CLEAN RCT cohort (data/exp_data.csv).
 
 from __future__ import annotations
 
+import argparse
 import json
 from pathlib import Path
 
@@ -89,6 +90,48 @@ def split(df: pd.DataFrame):
     train_df, temp_df = train_test_split(df, test_size=0.2, random_state=42)
     val_df, test_df = train_test_split(temp_df, test_size=0.5, random_state=42)
     return train_df, val_df, test_df
+
+
+def source_arg(description: str | None = None) -> str:
+    """Parse the optional data-source argument shared by the runner scripts.
+
+    Parameters
+    ----------
+    description : str | None, optional
+        Help text for ``--help``, by default ``None`` (the caller's docstring
+        is the usual argument).
+
+    Returns
+    -------
+    str
+        The requested source, ``DEFAULT_SOURCE`` when none was given.
+    """
+    parser = argparse.ArgumentParser(
+        description=description,
+        formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument(
+        "source", nargs="?", default=DEFAULT_SOURCE,
+        help=f"data source, e.g. 'magic-mrclean/ls' or 'magic' "
+             f"(default: {DEFAULT_SOURCE})")
+    return parser.parse_args().source
+
+
+def run_name(base: str, source: str) -> str:
+    """Result-folder name: bare for the clinical cohort, suffixed otherwise.
+
+    Parameters
+    ----------
+    base : str
+        Experiment name, e.g. ``"all_ls"``.
+    source : str
+        The data source as given to :func:`run_experiment`.
+
+    Returns
+    -------
+    str
+        ``base`` for the ``"magic"`` cohort, else ``f"{base}_{variant}"``.
+    """
+    return base if source == "magic" else f"{base}_{source.split('/')[-1]}"
 
 
 # ------------------------------------------------------------------- specs
