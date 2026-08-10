@@ -104,11 +104,12 @@ td.simulations.REGISTRY  # synthetic DGPs with known ground truth
 Per node, the transformation is additive on the latent (log-odds) scale —
 `u = h(x; θ) + Σ β·x_pa + Σ g(x_pa)` — and each parent edge declares how it enters:
 
-| edge term | meaning | interpretability |
+| term | meaning | interpretability |
 |---|---|---|
-| `ls` | linear shift `β·x_pa` | `exp(β)` is an odds ratio — one number per edge |
-| `cs` | complex shift `g(x_pa)` (MLP), still additive | plot `g` |
-| `ci` | complex intercept: the transform's parameters depend on the parents (several `ci` parents feed one joint network) | maximal flexibility, interactions not interpretable |
+| `LS(pa)` | linear shift `β·x_pa` | `exp(β)` is an odds ratio — one number per edge |
+| `CS(pa)` | complex shift `g(x_pa)` (MLP), still additive | plot `g` |
+| `I(pa)` | complex intercept: the transform's parameters depend on the parents (several parents in one `I(...)` feed one joint network) | maximal flexibility, interactions not interpretable |
+| `VC(on, *mods)` | varying-coefficient shift `β(mods)·x_on` | read out with `flow.varying_coef` |
 
 Continuous nodes carry a monotone 1-D transform (`bernstein` — TRAM-faithful
 default, `spline`, `affine`; `ContinuousNode(transform=..., transform_kwargs=...)`);
@@ -120,8 +121,9 @@ There are two ways to fit the model: a stochastic deep learning optimizer (`fit`
 
 ## Validation (all pinned by tests)
 
-- **Paper replication** — every experiment of the CLeaR paper [TODO: double-check this, reformualte] is tested against the registry
-  family (numpy-only SCM + frozen CSVs + replication script):
+- **Paper replication** — each of the paper's four DGP families has a generator in
+  the registry (numpy-only SCM + frozen CSVs + replication script) and is pinned
+  by tests:
 
   | family | paper | demonstrates |
   |---|---|---|
