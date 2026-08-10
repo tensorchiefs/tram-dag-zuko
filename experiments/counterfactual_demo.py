@@ -92,7 +92,9 @@ def main(name: str = "all_ls"):
         ax.bar(x + width / 2, cf_mean, width=width,
                label=f"counterfactual do(T={1 - arm})", color="steelblue")
         ax.set_title(f"factually T={arm} (N={len(sub)})")
-        ax.set_xlabel("mRS_3m"); ax.set_xticks(x); ax.legend()
+        ax.set_xlabel("mRS_3m")
+        ax.set_xticks(x)
+        ax.legend()
         ax.spines[["top", "right"]].set_visible(False)
     axes[0].set_ylabel("probability")
     plt.tight_layout()

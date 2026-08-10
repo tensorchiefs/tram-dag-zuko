@@ -179,7 +179,9 @@ def plot_loss_history(flow: CausalFlowDAG, save):
             continue
         total = [sum(e.values()) for e in hist]
         ax.plot(total, style, label=f"{which} (total)")
-    ax.set_xlabel("epoch"); ax.set_ylabel("NLL"); ax.legend()
+    ax.set_xlabel("epoch")
+    ax.set_ylabel("NLL")
+    ax.legend()
     ax.set_title("Joint flow training (sum of per-node NLLs)")
     save("loss_history.png")
 
@@ -194,10 +196,12 @@ def plot_training_speed(flow: CausalFlowDAG, save):
     for which, style in [("train", "-"), ("val", "--")]:
         total = [sum(e.values()) for e in flow.history[which]]
         ax.plot(t, total, style, label=f"{which} NLL")
-    ax.set_xlabel("wall-clock time [s]"); ax.set_ylabel("total NLL")
+    ax.set_xlabel("wall-clock time [s]")
+    ax.set_ylabel("total NLL")
     ax2 = ax.twinx()
     ax2.step(t, lr, where="post", color="grey", alpha=0.6, lw=1.2, label="lr")
-    ax2.set_yscale("log"); ax2.set_ylabel("learning rate", color="grey")
+    ax2.set_yscale("log")
+    ax2.set_ylabel("learning rate", color="grey")
     ax2.tick_params(axis="y", colors="grey")
     h1, l1 = ax.get_legend_handles_labels()
     h2, l2 = ax2.get_legend_handles_labels()
@@ -244,7 +248,8 @@ def plot_interventional(flow: CausalFlowDAG, save, n=10_000):
         ax.bar(x, counts.values, color="steelblue", edgecolor="white")
         good = (s["mRS_3m"] <= 2).mean()
         ax.set_title(f"{name}\nP(mRS<=2) = {good:.3f}")
-        ax.set_xlabel("mRS_3m"); ax.set_xticks(x)
+        ax.set_xlabel("mRS_3m")
+        ax.set_xticks(x)
         ax.spines[["top", "right"]].set_visible(False)
     axes[0].set_ylabel("probability")
     plt.tight_layout()
@@ -307,9 +312,12 @@ def evaluate_rct(flow: CausalFlowDAG, results_dir: Path, save,
         pred = (pmf_t1 if arm else pmf_t0).mean(axis=0)
         axes[1].bar(x + (arm - 0.5) * width, pred * 100, width=width,
                     label=f"predicted do(T={arm})", color=color)
-    axes[0].set_title("MR CLEAN observed"); axes[1].set_title("Flow predicted (RCT covariates)")
+    axes[0].set_title("MR CLEAN observed")
+    axes[1].set_title("Flow predicted (RCT covariates)")
     for ax in axes:
-        ax.set_xlabel("mRS_3m"); ax.set_xticks(x); ax.legend()
+        ax.set_xlabel("mRS_3m")
+        ax.set_xticks(x)
+        ax.legend()
         ax.spines[["top", "right"]].set_visible(False)
     axes[0].set_ylabel("percent")
     plt.tight_layout()
@@ -328,7 +336,9 @@ def evaluate_rct(flow: CausalFlowDAG, results_dir: Path, save,
     ax.bar(x - w / 2, pred_cal, width=w, label="predicted (do T=0)", color="steelblue")
     ax.bar(x + w / 2, obs_cal, width=w, label="observed", color="#e07b54")
     ax.errorbar(x + w / 2, obs_cal, yerr=yerr, fmt="none", ecolor="black", capsize=3, lw=1)
-    ax.set_xticks(x); ax.set_xlabel("mRS at 3 months"); ax.set_ylabel("probability")
+    ax.set_xticks(x)
+    ax.set_xlabel("mRS at 3 months")
+    ax.set_ylabel("probability")
     ax.set_title(f"T=0 arm calibration (N={n0}); "
                  f"P(good): pred {pred_cal[:3].sum():.3f} vs obs {obs_cal[:3].sum():.3f}")
     ax.legend()
@@ -342,7 +352,8 @@ def evaluate_rct(flow: CausalFlowDAG, results_dir: Path, save,
     ax.axvline(0, color="grey", ls=":", lw=1)
     ax.axvline(ate, color="red", ls="--", lw=2, label=f"ATE = {ate:+.3f}")
     ax.set_xlabel("ITE = P(good | do(T=1)) - P(good | do(T=0))")
-    ax.set_ylabel("patients"); ax.legend()
+    ax.set_ylabel("patients")
+    ax.legend()
     ax.set_title(f"Per-patient thrombectomy effect (N={len(ite)}, benefit>0: "
                  f"{100 * (ite > 0).mean():.0f}%)")
     plt.tight_layout()
