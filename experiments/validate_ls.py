@@ -16,7 +16,6 @@ Usage: uv run python validate_ls.py [source] [--classical]
 """
 
 import sys
-from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -25,8 +24,7 @@ from statsmodels.miscmodels.ordinal_model import OrderedModel
 
 from common import DATA_R_REF, load_data
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
-from tramdag import CausalFlowDAG, ContinuousNode, LS, OrdinalNode  # noqa: E402
+from tramdag import CausalFlowDAG, ContinuousNode, LS, OrdinalNode
 
 PHASES = [(4000, 1e-2), (2000, 1e-3), (1000, 1e-4)]  # to tight convergence
 

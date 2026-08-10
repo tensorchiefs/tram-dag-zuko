@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import json
 import os
-import sys
 from pathlib import Path
 
 import matplotlib
@@ -23,9 +22,7 @@ import torch
 from sklearn.model_selection import train_test_split
 from statsmodels.stats.proportion import proportion_confint
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
-
-from tramdag import CausalFlowDAG, ContinuousNode, OrdinalNode, term  # noqa: E402
+from tramdag import CausalFlowDAG, ContinuousNode, OrdinalNode, term
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 RESULTS_ROOT = Path(__file__).resolve().parents[1] / "results"

@@ -15,7 +15,6 @@ Usage: uv run python counterfactual_demo.py [all_ls|nihss6]
 """
 
 import sys
-from pathlib import Path
 
 import matplotlib
 
@@ -26,8 +25,7 @@ import pandas as pd
 
 from common import RESULTS_ROOT, load_magic, saver, split
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
-from tramdag import CausalFlowDAG  # noqa: E402
+from tramdag import CausalFlowDAG
 
 N_DRAWS = 200  # truncated-logistic abduction draws per patient
 
