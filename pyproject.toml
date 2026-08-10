@@ -75,6 +75,10 @@ select = ["I", "E", "F", "D", "UP"]
 convention = "numpy"
 
 [tool.pytest.ini_options]
+addopts = ["-v", "--tb=short"]
+testpaths = ["tests"]
+# no -n auto: torch already saturates the cores (the fast subset spends
+# 32 min CPU in 2 min wall), so xdist workers only oversubscribe
 markers = [
     "slow: long fit/training tests — excluded from PR CI, run in the nightly full suite",
 ]
