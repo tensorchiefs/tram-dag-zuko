@@ -188,9 +188,9 @@ class _Node(nn.Module):
             if g.center:
                 if vc_ehat is None or g.on not in vc_ehat:
                     raise RuntimeError(
-                        f"centered VC term on {g.on!r} needs e_hat; internal "
-                        "callers must supply vc_ehat (never evaluate a centered "
-                        "term without its propensity)."
+                        f"centered VC term on {g.on!r} needs e_hat. Internal "
+                        "callers must supply vc_ehat. Never evaluate a centered "
+                        "term without its propensity."
                     )
                 t = t - vc_ehat[g.on].view(-1, 1)  # regressor t - e_hat(x)
             mod_feat = torch.cat([feats[p] for p in g.mods], dim=1) if g.mods else None
@@ -783,8 +783,8 @@ class CausalFlowDAG(nn.Module):
         on_nd = self.nodes[on]
         if any(g.center for g in on_nd._vc_groups):
             raise NotImplementedError(
-                f"treatment node {on!r} itself has a centered VC term; "
-                "chained centering is not supported."
+                f"treatment node {on!r} itself has a centered VC term. "
+                "Chained centering is not supported."
             )
         node_spec = self.spec[on]
         proxy_spec: dict[str, NodeSpec] = {}
@@ -876,8 +876,8 @@ class CausalFlowDAG(nn.Module):
         if on is None:
             if len(vcs) > 1:
                 raise ValueError(
-                    f"node {node!r} has several VC terms ({sorted(vcs)}); "
-                    "pass on=<treatment name>."
+                    f"node {node!r} has several VC terms ({sorted(vcs)}). "
+                    "Pass on=<treatment name>."
                 )
             on = next(iter(vcs))
         if on not in vcs:
@@ -1005,8 +1005,8 @@ class CausalFlowDAG(nn.Module):
         groups = nd._intercept_groups
         if not groups:
             raise ValueError(
-                f"node {node!r} has no complex-intercept (I) terms with parents; "
-                "there is nothing to decompose (its intercept is unconditional)."
+                f"node {node!r} has no complex-intercept (I) terms with parents. "
+                "Its intercept is unconditional, so there is nothing to decompose."
             )
         missing = [p for p in nd.ci_parents if p not in data.columns]
         if missing:
@@ -1083,8 +1083,9 @@ class CausalFlowDAG(nn.Module):
         """
         if not self._is_all_ls():
             raise ValueError(
-                "fit_classical requires an all-`ls` spec (every edge term 'ls'); "
-                "this spec has cs/ci/vc terms. Use fit() for flexible models."
+                "fit_classical requires an all-`ls` spec, that is every edge "
+                "term 'ls'. This spec has cs, ci or vc terms. Use fit() for "
+                "flexible models."
             )
         self._set_ranges(train_df)
 

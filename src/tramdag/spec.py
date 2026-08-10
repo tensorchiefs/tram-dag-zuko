@@ -248,14 +248,15 @@ def validate_and_sort(spec: dict[str, NodeSpec]) -> list[str]:
                 if isinstance(on_node, OrdinalNode) and on_node.levels != 2:
                     raise ValueError(
                         f"Node '{name}': VC treatment '{on}' is ordinal with "
-                        f"{on_node.levels} levels; only binary (2-level) ordinal "
-                        "treatments are supported (multi-level is a follow-up)."
+                        f"{on_node.levels} levels. Only a 2-level (binary) "
+                        "ordinal treatment is supported. Multi-level is a "
+                        "follow-up."
                     )
                 if term.center and not isinstance(on_node, OrdinalNode):
                     raise ValueError(
                         f"Node '{name}': VC(center=...) needs a binary ordinal "
-                        f"treatment ('{on}' is continuous — E[T|x] centering is "
-                        "a follow-up)."
+                        f"treatment, and '{on}' is continuous. E[T|x] centering "
+                        "is a follow-up."
                     )
                 owners = (on,)
             else:
@@ -263,9 +264,9 @@ def validate_and_sort(spec: dict[str, NodeSpec]) -> list[str]:
             for p in owners:
                 if p in seen:
                     raise ValueError(
-                        f"Node '{name}': parent '{p}' appears in more than one term "
-                        "(each parent must enter through exactly one edge-owning "
-                        "term; only VC modifiers may repeat)."
+                        f"Node '{name}': parent '{p}' appears in more than one "
+                        "term. Each parent must enter through exactly one "
+                        "edge-owning term. Only VC modifiers may repeat."
                     )
                 seen.add(p)
         if isinstance(node, OrdinalNode) and node.levels < 2:

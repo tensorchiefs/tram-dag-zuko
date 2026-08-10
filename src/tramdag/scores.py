@@ -85,7 +85,7 @@ def node_scores(flow, df: pd.DataFrame, node: str) -> pd.DataFrame:
     ]
     if not ls_groups and not nd._vc_groups:
         raise ValueError(
-            f"node {node!r} has no LS or VC terms; params='shift' scores need "
+            f"node {node!r} has no LS or VC terms. params='shift' scores need "
             "at least one interpretable shift coefficient."
         )
 
@@ -177,7 +177,7 @@ def effect_modifier_scan(
     n = len(psi)
     sd = psi.std()
     if sd == 0:
-        raise ValueError(f"score column {col!r} is constant; nothing to scan.")
+        raise ValueError(f"score column {col!r} is constant. There is nothing to scan.")
 
     if candidates is None:
         candidates = [c for c in df.columns if c not in (node, on)]
