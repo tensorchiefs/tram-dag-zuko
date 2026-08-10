@@ -14,6 +14,8 @@ Conventional import alias::
     td.simulations.REGISTRY          # synthetic DGPs with known ground truth
 """
 
+from importlib.metadata import version
+
 from . import simulations
 from .env import machine_info
 from .flow import CausalFlowDAG
@@ -25,4 +27,4 @@ __all__ = ["CausalFlowDAG", "ContinuousNode", "OrdinalNode", "machine_info",
            # term-formula notation
            "Term", "I", "LS", "CS", "VC", "term", "Intercept", "LinShift",
            "CShift"]
-__version__ = "0.3.0"
+__version__ = version("tramdag")
