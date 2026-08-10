@@ -10,7 +10,7 @@
 
 **TRAM-DAGs** model each variable of a structural causal model with a
 (transformation-model) flow: one triangular normalizing flow from iid
-standard-logistic latents to the observed variables. The structure is of the triangular 
+standard-logistic latents to the observed variables. The structure is of the triangular
 Adjacency Matrix is exactly your causal DAG. Fit it **once** on observational data and answer all
 three rungs of Pearl's causal hierarchy — observational (L1), interventional
 (L2, the do-operator), and counterfactual (L3, Pearl abduction) — while keeping
