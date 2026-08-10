@@ -6,7 +6,7 @@ import pandas as pd
 import torch
 
 import tramdag as td
-from tramdag import CausalFlowDAG, ContinuousNode, LS, OrdinalNode
+from tramdag import LS, CausalFlowDAG, ContinuousNode, OrdinalNode
 
 
 def _spec():

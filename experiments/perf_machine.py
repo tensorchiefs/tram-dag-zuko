@@ -36,7 +36,7 @@ import pandas as pd
 import torch
 
 import tramdag as td
-from tramdag import CS, CausalFlowDAG, ContinuousNode, I, LS, OrdinalNode
+from tramdag import CS, LS, CausalFlowDAG, ContinuousNode, I, OrdinalNode
 
 EPOCHS = 200  # fixed: every machine does identical work
 

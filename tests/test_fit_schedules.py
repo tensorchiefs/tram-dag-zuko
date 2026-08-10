@@ -12,7 +12,7 @@ import pandas as pd
 import pytest
 import torch
 
-from tramdag import CausalFlowDAG, ContinuousNode, LS, OrdinalNode
+from tramdag import LS, CausalFlowDAG, ContinuousNode, OrdinalNode
 
 DATA = Path(__file__).resolve().parents[1] / "data"
 

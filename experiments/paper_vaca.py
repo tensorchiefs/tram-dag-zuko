@@ -12,8 +12,8 @@ a in {-3, -1, 0} (Fig. 5), to ``results/paper-vaca/``.
 
 import matplotlib.pyplot as plt
 import numpy as np
-
 from paper_common import fit_chunked, results_dir, save_json
+
 from tramdag import ContinuousNode, I
 from tramdag.simulations import VacaTriangle
 from tramdag.simulations.vaca import DO_X2_VALUES

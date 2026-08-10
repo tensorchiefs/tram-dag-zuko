@@ -37,8 +37,8 @@ import matplotlib.pyplot as plt  # noqa: E402
 import numpy as np  # noqa: E402
 import pandas as pd  # noqa: E402
 import torch  # noqa: E402
-
 from common import build_spec  # noqa: E402  (stroke all-ls spec)
+
 from tramdag import CausalFlowDAG, ContinuousNode, I  # noqa: E402
 
 REPO = Path(__file__).resolve().parents[1]

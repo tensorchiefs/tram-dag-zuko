@@ -15,8 +15,8 @@ Writes to ``results/paper-carefl/``.
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-
 from paper_common import fit_chunked, results_dir, save_json
+
 from tramdag import ContinuousNode, I
 from tramdag.simulations import Carefl4
 from tramdag.simulations.carefl import ALPHA_GRID, X_OBS

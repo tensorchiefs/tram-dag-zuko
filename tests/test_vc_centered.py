@@ -16,8 +16,8 @@ import pytest
 import torch
 
 from tramdag import CS, LS, VC, CausalFlowDAG, ContinuousNode, OrdinalNode
-from tramdag.spec import spec_from_dict, spec_to_dict, validate_and_sort
 from tramdag.simulations import VCLogisticShift
+from tramdag.spec import spec_from_dict, spec_to_dict, validate_and_sort
 
 TAU = -1.0
 

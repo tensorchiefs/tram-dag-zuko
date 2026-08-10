@@ -19,11 +19,10 @@ import sys
 
 import pandas as pd
 import torch
+from common import DATA_R_REF, load_data
 from statsmodels.miscmodels.ordinal_model import OrderedModel
 
-from common import DATA_R_REF, load_data
-
-from tramdag import CausalFlowDAG, ContinuousNode, LS, OrdinalNode
+from tramdag import LS, CausalFlowDAG, ContinuousNode, OrdinalNode
 
 PHASES = [(4000, 1e-2), (2000, 1e-3), (1000, 1e-4)]  # to tight convergence
 

@@ -17,8 +17,8 @@ import pytest
 import torch
 
 from tramdag import CS, LS, VC, CausalFlowDAG, ContinuousNode, OrdinalNode, term
-from tramdag.spec import spec_from_dict, spec_to_dict, validate_and_sort
 from tramdag.simulations import VCLogisticShift
+from tramdag.spec import spec_from_dict, spec_to_dict, validate_and_sort
 
 DATA = Path(__file__).resolve().parents[1] / "data"
 

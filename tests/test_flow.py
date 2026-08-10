@@ -5,10 +5,16 @@ import pandas as pd
 import pytest
 import torch
 
-from tramdag import CS, CausalFlowDAG, ContinuousNode, LS, OrdinalNode
+from tramdag import CS, LS, CausalFlowDAG, ContinuousNode, OrdinalNode
 from tramdag.spec import validate_and_sort
-from tramdag.transforms import (BernsteinUT, SplineUT, AffineUT,
-                                 ordinal_cutpoints, ordinal_log_prob, ordinal_pmf)
+from tramdag.transforms import (
+    AffineUT,
+    BernsteinUT,
+    SplineUT,
+    ordinal_cutpoints,
+    ordinal_log_prob,
+    ordinal_pmf,
+)
 
 torch.manual_seed(0)
 

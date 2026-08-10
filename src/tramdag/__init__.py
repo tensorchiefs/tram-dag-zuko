@@ -19,8 +19,19 @@ from importlib.metadata import version
 from . import simulations
 from .env import machine_info
 from .flow import CausalFlowDAG
-from .spec import (CS, LS, VC, CShift, ContinuousNode, I, Intercept, LinShift,
-                   OrdinalNode, Term, term)
+from .spec import (
+                   CS,
+                   LS,
+                   VC,
+                   ContinuousNode,
+                   CShift,
+                   I,
+                   Intercept,
+                   LinShift,
+                   OrdinalNode,
+                   Term,
+                   term,
+)
 
 __all__ = ["CausalFlowDAG", "ContinuousNode", "OrdinalNode", "machine_info",
            "simulations",

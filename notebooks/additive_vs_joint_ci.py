@@ -38,10 +38,10 @@
 # space, and that is precisely what `intercept_contributions` surfaces.
 
 # %%
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import torch
-import matplotlib.pyplot as plt
 
 from tramdag import CausalFlowDAG, ContinuousNode, I
 

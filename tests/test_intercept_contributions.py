@@ -12,7 +12,7 @@ import pandas as pd
 import pytest
 import torch
 
-from tramdag import CausalFlowDAG, ContinuousNode, I, LS, OrdinalNode
+from tramdag import LS, CausalFlowDAG, ContinuousNode, I, OrdinalNode
 
 
 def _data(n=400, seed=0):

@@ -44,7 +44,7 @@ import numpy as np
 import pandas as pd
 import torch
 
-from tramdag import CausalFlowDAG, ContinuousNode, LS, OrdinalNode
+from tramdag import LS, CausalFlowDAG, ContinuousNode, OrdinalNode
 from tramdag.simulations import VacaTriangle
 
 warnings.filterwarnings("ignore")

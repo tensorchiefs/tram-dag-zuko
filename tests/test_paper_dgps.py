@@ -16,9 +16,14 @@ import pytest
 import torch
 from scipy import stats
 
-from tramdag import CS, CausalFlowDAG, ContinuousNode, I, LS, OrdinalNode
-from tramdag.simulations import (REGISTRY, Carefl4, TriangleContinuous,
-                                  TriangleMixed, VacaTriangle)
+from tramdag import CS, LS, CausalFlowDAG, ContinuousNode, I, OrdinalNode
+from tramdag.simulations import (
+    REGISTRY,
+    Carefl4,
+    TriangleContinuous,
+    TriangleMixed,
+    VacaTriangle,
+)
 from tramdag.simulations.carefl import X_OBS
 from tramdag.simulations.triangle import THETA_MIXED
 

@@ -19,10 +19,9 @@ import pandas as pd
 import pytest
 import torch
 
-from tramdag import CausalFlowDAG, ContinuousNode, I, LS, OrdinalNode
+from tramdag import LS, CausalFlowDAG, ContinuousNode, I, OrdinalNode
 from tramdag.conditioners import ComplexIntercept, SimpleIntercept
-from tramdag.transforms import (BernsteinUT, ordinal_marginal_init_theta,
-                                ordinal_pmf)
+from tramdag.transforms import BernsteinUT, ordinal_marginal_init_theta, ordinal_pmf
 
 DATA = Path(__file__).resolve().parents[1] / "data"
 

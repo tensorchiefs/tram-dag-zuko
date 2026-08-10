@@ -21,7 +21,6 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
-
 from common import RESULTS_ROOT, load_magic, saver, split
 
 from tramdag import CausalFlowDAG

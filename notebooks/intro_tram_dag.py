@@ -277,7 +277,11 @@ flow.nll(val_df)
 # and the ordinal `Y` (shift **subtracted**).
 
 # %%
-from tramdag.transforms import StandardLogistic, ordinal_cutpoints, ordinal_log_prob  # noqa: E402
+from tramdag.transforms import (  # noqa: E402
+    StandardLogistic,
+    ordinal_cutpoints,
+    ordinal_log_prob,
+)
 
 
 def describe_node(flow, name):

@@ -16,11 +16,18 @@ import sys
 
 import matplotlib.pyplot as plt
 import numpy as np
+from paper_common import (
+    PAPER_N,
+    cs_curve,
+    fit_chunked,
+    ls_weight,
+    plot_hist_grid,
+    plot_trajectories,
+    results_dir,
+    save_json,
+)
 
-from paper_common import (PAPER_N, cs_curve, fit_chunked, ls_weight,
-                          plot_hist_grid, plot_trajectories, results_dir,
-                          save_json)
-from tramdag import ContinuousNode, LS, OrdinalNode, term
+from tramdag import LS, ContinuousNode, OrdinalNode, term
 from tramdag.simulations import TriangleMixed
 
 f_name = sys.argv[1] if len(sys.argv) > 1 else "linear"

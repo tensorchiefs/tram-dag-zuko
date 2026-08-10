@@ -38,7 +38,7 @@ import numpy as np
 import pandas as pd
 import torch
 
-from tramdag import CS, CausalFlowDAG, ContinuousNode, LS, OrdinalNode
+from tramdag import CS, LS, CausalFlowDAG, ContinuousNode, OrdinalNode
 
 plt.rcParams["figure.dpi"] = 110
 
