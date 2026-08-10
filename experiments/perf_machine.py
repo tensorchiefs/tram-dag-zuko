@@ -27,9 +27,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import os
-import platform
-import socket
 import time
 from datetime import datetime, timezone
 from pathlib import Path
@@ -96,28 +93,6 @@ def code_version() -> dict:
     except Exception:
         pass  # pip-installed / curl'd outside a repo: package version only
     return v
-
-
-def machine_info() -> dict:
-    info = {
-        "hostname": socket.gethostname().split(".")[0],
-        "os": f"{platform.system()} {platform.release()}",
-        "machine": platform.machine(),
-        "processor": platform.processor() or platform.machine(),
-        "cpu_count": os.cpu_count(),
-        "python": platform.python_version(),
-        "torch": torch.__version__,
-        "tramdag": td.__version__,
-        "cuda": torch.cuda.get_device_name(0) if torch.cuda.is_available() else None,
-        "mps": bool(getattr(torch.backends, "mps", None)
-                    and torch.backends.mps.is_available()),
-    }
-    try:  # best effort (POSIX)
-        info["ram_gb"] = round(
-            os.sysconf("SC_PAGE_SIZE") * os.sysconf("SC_PHYS_PAGES") / 1e9, 1)
-    except (ValueError, OSError, AttributeError):
-        info["ram_gb"] = None
-    return info
 
 
 def available_devices() -> list[str]:
@@ -233,7 +208,7 @@ def main() -> None:
         report(args.report)
         return
 
-    info = machine_info()
+    info = td.machine_info()
     devices = args.devices or available_devices()
     print(f"tramdag {info['tramdag']} | torch {info['torch']} | "
           f"{info['hostname']} ({info['processor']}, {info['cpu_count']} cores, "
