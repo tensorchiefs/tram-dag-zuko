@@ -171,8 +171,11 @@ def reference_nll(workload: str) -> float:
 
 # --------------------------------------------------------------------- LBFGS
 def run_lbfgs(seed: int, warm_epochs: int = 0) -> dict:
-    """Full-batch LBFGS on the stroke all-ls workload, optionally warm-started
-    with a few Adam epochs (escapes the early plateau, then LBFGS polishes)."""
+    """Run full-batch LBFGS on the stroke all-ls workload.
+
+    A few Adam epochs can warm-start the fit. Adam escapes the early plateau
+    and LBFGS then polishes the result.
+    """
     train, _ = stroke_data()
     torch.manual_seed(seed)
     flow = CausalFlowDAG(build_spec("ls"))

@@ -1,6 +1,8 @@
-"""Spot-on validation: the all-`ls` flow's outcome node IS a proportional-odds
-model, so trained to convergence without early stopping it must reproduce the
-classical MLE *exactly* (statsmodels OrderedModel, and the R polr reference).
+"""Spot-on validation of the all-`ls` flow against the classical MLE.
+
+The outcome node of an all-`ls` flow is a proportional-odds model. Trained to
+convergence without early stopping it must therefore reproduce the classical
+MLE exactly, both the statsmodels OrderedModel and the R polr reference.
 
 Fits both on the same full dataset (no held-out split), with the flow using
 ``restore_best=False`` so it sits at the training-data maximum likelihood — then
@@ -28,9 +30,12 @@ PHASES = [(4000, 1e-2), (2000, 1e-3), (1000, 1e-4)]  # to tight convergence
 
 
 def design(df: pd.DataFrame) -> pd.DataFrame:
-    """Same encoding as the flow: continuous raw, ordinal one-hot (drop level 0;
-    with cutpoints the full one-hot is unidentified, so only differences to
-    level 0 are comparable)."""
+    """Encode the parents exactly as the flow does.
+
+    A continuous parent stays raw. An ordinal parent is one-hot encoded with
+    level 0 dropped: with cutpoints the full one-hot is unidentified, so only
+    the differences against level 0 are comparable.
+    """
     X = pd.DataFrame(index=df.index)
     X["Age"] = df["Age"].values
     for k in range(6):

@@ -310,8 +310,10 @@ def evaluate_rct(
     rct: pd.DataFrame | None = None,
     truth: dict | None = None,
 ) -> pd.DataFrame:
-    """Per-patient interventional PMFs on the RCT covariates -> ATE/ITE,
-    calibration and RCT-vs-predicted distribution plots.
+    """Evaluate the flow against the trial: ATE, ITE, calibration and plots.
+
+    The evaluation computes per-patient interventional PMFs on the RCT
+    covariates.
 
     Mirrors the analytic evaluation in the original implementation's scripts
     (predict_ordinal_pmf in stroke_fully_connected.py / nihss6.py). ``truth``,
@@ -343,7 +345,8 @@ def evaluate_rct(
         err = ate - truth["true_ate"]
         print(
             f"  TRUE ATE (known) = {truth['true_ate']:+.4f}   "
-            f"flow error = {err:+.4f}   (naive obs. diff {truth['naive_obs_diff']:+.4f})"
+            f"flow error = {err:+.4f}   "
+            f"(naive obs. diff {truth['naive_obs_diff']:+.4f})"
         )
     else:
         print(

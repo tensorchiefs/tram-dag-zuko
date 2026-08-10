@@ -1,5 +1,8 @@
-"""Shared helpers for the TRAM-DAG paper replication experiments
-(arXiv:2503.16206; run from the ``experiments/`` directory)."""
+"""Shared helpers for the TRAM-DAG paper replication experiments.
+
+The paper is arXiv:2503.16206. Run these scripts from the ``experiments/``
+directory.
+"""
 
 from __future__ import annotations
 
@@ -45,8 +48,11 @@ def fit_chunked(
     lr: float = PAPER_LR,
     seed: int = 7,
 ) -> tuple[CausalFlowDAG, list[dict]]:
-    """Fit in ``chunk``-epoch pieces, calling ``record(flow)`` after each chunk
-    (for the paper's coefficient-vs-epoch trajectories, Fig. 14/15/19)."""
+    """Fit in pieces of ``chunk`` epochs and call ``record(flow)`` after each.
+
+    This produces the coefficient-against-epoch trajectories of paper
+    Fig. 14, 15 and 19.
+    """
     torch.manual_seed(seed)
     flow = CausalFlowDAG(spec)
     traj: list[dict] = []
@@ -96,8 +102,12 @@ def plot_hist_grid(
     title: str,
     ordinal: dict[str, int] | None = None,
 ) -> None:
-    """Rows = scenarios (e.g. Obs / do(x1=-1)), cols = variables; DGP filled,
-    flow stepped (paper Fig. 16/17 right / 9 / 20)."""
+    """Plot a grid of histograms, scenarios by variables.
+
+    Each row is a scenario, for example ``Obs`` or ``do(x1=-1)``. Each column is
+    a variable. The DGP histogram is filled and the flow histogram is stepped.
+    This produces paper Fig. 16 and 17 right, Fig. 9 and Fig. 20.
+    """
     ordinal = ordinal or {}
     rows = list(dgp_dfs)
     fig, axes = plt.subplots(

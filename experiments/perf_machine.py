@@ -43,7 +43,7 @@ EPOCHS = 200  # fixed: every machine does identical work
 
 # ----------------------------------------------------------- intro-NB workload
 def intro_dgp(n: int, seed: int = 1) -> pd.DataFrame:
-    """The SCM of notebooks/intro_tram_dag.py (logistic latents, known truth)."""
+    """Sample the SCM of notebooks/intro_tram_dag.py, with known truth."""
     rng = np.random.default_rng(seed)
     z = {k: rng.logistic(size=n) for k in "1234"}
     x1 = (z["1"] + 0.4) / 1.2
@@ -81,7 +81,7 @@ WORKLOADS = {
 
 # ------------------------------------------------------------------- machine
 def code_version() -> dict:
-    """tramdag version + exact git commit when running inside a repo clone."""
+    """Give the tramdag version, plus the git commit inside a repo clone."""
     v = {"tramdag": td.__version__, "git_commit": None, "git_dirty": None}
     try:
         import subprocess
@@ -209,7 +209,8 @@ def report(directory: str) -> None:
         "pip install tramdag\n"
         "curl -O https://raw.githubusercontent.com/tensorchiefs/tramdag/main/"
         "experiments/perf_machine.py\n"
-        "python perf_machine.py            # ~2-5 min -> <YYYY-MM-DD-HHMM>_<host>.json\n"
+        "python perf_machine.py            "
+        "# ~2-5 min -> <YYYY-MM-DD-HHMM>_<host>.json\n"
         "```\n\n"
         "Then copy the JSON into `docs/perf/` in the repo, commit it, and\n"
         "regenerate this file (or ask Claude to do it):\n\n"
