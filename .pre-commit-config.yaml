@@ -15,6 +15,7 @@ repos:
   - id: check-executables-have-shebangs
   - id: check-merge-conflict
   - id: check-shebang-scripts-are-executable
+    exclude: ^data/   # frozen test contract; not ours to chmod
   - id: check-toml
   - id: check-yaml
   - id: end-of-file-fixer
