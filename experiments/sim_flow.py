@@ -16,7 +16,7 @@ Usage: uv run python sim_flow.py [ls|nl]   (default nl)
 
 import sys
 
-from common import DEFAULT_SOURCE, run_experiment
+from common import run_experiment
 
 if __name__ == "__main__":
     variant = sys.argv[1] if len(sys.argv) > 1 else "nl"

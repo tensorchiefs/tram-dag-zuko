@@ -8,7 +8,6 @@ random_state=42; evaluation on the MR CLEAN RCT cohort (data/exp_data.csv).
 from __future__ import annotations
 
 import json
-import os
 from pathlib import Path
 
 import matplotlib

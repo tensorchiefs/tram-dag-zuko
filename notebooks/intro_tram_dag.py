@@ -142,14 +142,13 @@
 # interpretability price of letting the transformation's *shape* depend on the parent.
 
 # %%
-from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import torch
 
-from tramdag import CS, LS, CausalFlowDAG, ContinuousNode, I, OrdinalNode
+from tramdag import CS, LS, CausalFlowDAG, ContinuousNode, OrdinalNode
 
 plt.rcParams["figure.dpi"] = 110
 
@@ -380,7 +379,6 @@ b21_hat = float(flow.nodes["X2"].shifts["X1"].weight.detach())
 b31_hat = float(flow.nodes["X3"].shifts["X1"].weight.detach())
 bY_hat = float(flow.nodes["Y"].shifts["X3"].weight.detach())
 
-from tramdag.transforms import ordinal_cutpoints  # noqa: E402
 
 with torch.no_grad():
     theta_hat = ordinal_cutpoints(flow.nodes["Y"].intercept(1))[0, 1:-1].numpy()

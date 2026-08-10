@@ -17,7 +17,6 @@ Usage: uv run python validate_ls.py [source] [--classical]
 
 import sys
 
-import numpy as np
 import pandas as pd
 import torch
 from statsmodels.miscmodels.ordinal_model import OrderedModel

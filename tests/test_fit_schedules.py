@@ -5,7 +5,6 @@ exact-MLE property of all-`ls` models (the flow == statsmodels == R-polr match
 pinned in test_simulations.py).
 """
 
-import json
 from pathlib import Path
 
 import numpy as np

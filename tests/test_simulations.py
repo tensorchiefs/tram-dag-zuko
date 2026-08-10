@@ -1,7 +1,6 @@
 """Tests for the magic-mrclean synthetic cohort and the flow's recovery of its
 known ground truth, plus a regression check against the committed R reference."""
 
-import csv
 import json
 from pathlib import Path
 

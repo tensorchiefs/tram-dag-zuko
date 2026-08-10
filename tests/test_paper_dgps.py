@@ -20,7 +20,7 @@ from tramdag import CS, CausalFlowDAG, ContinuousNode, I, LS, OrdinalNode
 from tramdag.simulations import (REGISTRY, Carefl4, TriangleContinuous,
                                   TriangleMixed, VacaTriangle)
 from tramdag.simulations.carefl import X_OBS
-from tramdag.simulations.triangle import F_VARIANTS, THETA_MIXED
+from tramdag.simulations.triangle import THETA_MIXED
 
 DATA = Path(__file__).resolve().parents[1] / "data"
 

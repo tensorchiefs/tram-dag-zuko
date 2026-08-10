@@ -49,7 +49,6 @@ if importlib.util.find_spec("tramdag") is None:  # Colab: install from PyPI
 
 import matplotlib.pyplot as plt
 import numpy as np
-import pandas as pd
 import scipy.stats as st  # for KDE plots only (preinstalled on Colab)
 import torch
 
