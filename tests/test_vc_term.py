@@ -25,7 +25,8 @@ DATA = Path(__file__).resolve().parents[1] / "data"
 
 def _vc_spec(penalty: float = 1.0) -> dict:
     """The vc-shift DGP's in-class spec (affine sources: their marginals are
-    irrelevant to Y's conditional because the joint NLL decomposes per node)."""
+    irrelevant to Y's conditional because the joint NLL decomposes per node).
+    """
     return {
         "X1": ContinuousNode(transform="affine"),
         "X2": ContinuousNode(transform="affine"),
@@ -102,7 +103,8 @@ def test_to_matrix_vc_labels():
 # ------------------------------------------------------------- exact LS nesting
 def test_vc_without_modifiers_equals_ls_exactly():
     """VC(on) has no net — with beta0 set to the LS weight the two models give
-    bit-identical log-probs (the nesting is exact, not approximate)."""
+    bit-identical log-probs (the nesting is exact, not approximate).
+    """
     rng = np.random.default_rng(3)
     t = rng.integers(0, 2, 200).astype(float)
     y = 0.7 * t + rng.logistic(size=200)
@@ -128,7 +130,8 @@ def test_fit_classical_rejects_vc():
 @pytest.fixture(scope="module")
 def small_fitted():
     """A briefly-fitted VC flow on the vc-shift DGP (module-scoped: shared by
-    the identity/serialization tests; the accuracy bar has its own fit)."""
+    the identity/serialization tests; the accuracy bar has its own fit).
+    """
     gen = VCLogisticShift(seed=42)
     df = gen.observational(1500, seed_offset=100)
     flow = CausalFlowDAG(_vc_spec(), seed=0)
@@ -155,7 +158,8 @@ def test_varying_coef_deterministic_and_y_free(small_fitted):
 
 def test_varying_coef_equals_abduct_difference(small_fitted):
     """For a binary treatment, beta(x) must equal the abduct-difference
-    u(x, T=1, y) - u(x, T=0, y) identically (issue #28 identity check)."""
+    u(x, T=1, y) - u(x, T=0, y) identically (issue #28 identity check).
+    """
     flow, gen = small_fitted
     new = gen.observational(300, seed_offset=901)
     u1 = flow.abduct(new.assign(T=1.0), seed=0)["Y"].values
@@ -165,7 +169,8 @@ def test_varying_coef_equals_abduct_difference(small_fitted):
 
 def test_beta_recentered_over_training_data(small_fitted):
     """After fit, b_theta is sum-to-zero over the training rows: the mean of
-    varying_coef on the training data equals beta0."""
+    varying_coef on the training data equals beta0.
+    """
     flow, gen = small_fitted
     train = gen.observational(1500, seed_offset=100).iloc[:1300]
     beta0 = float(flow.nodes["Y"].shifts["T"].beta0)
@@ -195,7 +200,8 @@ def test_serialization_roundtrip_spec():
 # ------------------------------------------------------------------- warm start
 def test_warm_start_matches_classical_ls():
     """beta0 after warm start equals the classical (L-BFGS) all-`ls` coefficient
-    of the node's conditional; b_theta stays the zero function."""
+    of the node's conditional; b_theta stays the zero function.
+    """
     gen = VCLogisticShift(seed=42)
     df = gen.observational(2000, seed_offset=100)
     flow = CausalFlowDAG(_vc_spec(), seed=0)
@@ -224,7 +230,8 @@ def test_warm_start_matches_classical_ls():
 def test_nesting_large_penalty_matches_classical_ls():
     """Acceptance (issue #28): with `penalty` large the head is shrunk to the
     zero function and the fitted beta0 matches the fit_classical LS coefficient.
-    Warm start is disabled so the test is not trivially satisfied by it."""
+    Warm start is disabled so the test is not trivially satisfied by it.
+    """
     gen = VCLogisticShift(seed=42)
     df = gen.observational(4000, seed_offset=100)
     spec = {
@@ -266,7 +273,8 @@ def test_recovery_bar_on_vc_shift_dgp():
     n = 5000 on the vc-shift DGP, default penalty. The unregularized
     CS(on, x...) workaround measures ~0.5 on this task class — this test is the
     regression guard against 'expressive but unestimated'. Measured on this
-    protocol: corr ~ 0.99 (min over seeds 0/1/2: 0.986)."""
+    protocol: corr ~ 0.99 (min over seeds 0/1/2: 0.986).
+    """
     gen = VCLogisticShift(seed=42)
     df = gen.observational(5000, seed_offset=100)
     train, val = df.iloc[:4500], df.iloc[4500:]
@@ -293,7 +301,8 @@ def test_recovery_bar_on_vc_shift_dgp():
 # ------------------------------------------------------- continuous treatment
 def test_vc_continuous_treatment():
     """VC is linear in a continuous x_on: shift = beta(m) * d, so
-    u(d=2) - u(d=0) = 2 * beta(m) (evaluated via abduct, y fixed)."""
+    u(d=2) - u(d=0) = 2 * beta(m) (evaluated via abduct, y fixed).
+    """
     rng = np.random.default_rng(5)
     n = 400
     m = rng.normal(size=n)
@@ -318,7 +327,8 @@ def test_vc_continuous_treatment():
 # ------------------------------------------------------------- frozen contract
 def test_frozen_vc_shift_csv_contract():
     """data/vc-shift/obs.csv regenerates bit-identically from the stored seed
-    (the same contract as the paper DGPs)."""
+    (the same contract as the paper DGPs).
+    """
     import json
 
     vdir = DATA / "vc-shift"

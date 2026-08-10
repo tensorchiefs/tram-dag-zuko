@@ -117,19 +117,22 @@ class VaryingCoef(nn.Module):
 
     def beta(self, mod_feats: Tensor | None, n: int) -> Tensor:
         """Effect values beta(x), shape (n,). ``mod_feats`` is ``None`` iff the
-        term has no modifiers."""
+        term has no modifiers.
+        """
         if self.net is None:
             return (self.beta0 - self.center).expand(n)
         return self.beta0 + self.net(mod_feats).squeeze(-1) - self.center
 
     def forward(self, t: Tensor, mod_feats: Tensor | None) -> Tensor:
         """Shift contribution beta(mod_feats) * t, shape (n,). ``t`` is the raw
-        treatment column (n, 1)."""
+        treatment column (n, 1).
+        """
         return self.beta(mod_feats, t.shape[0]) * t.squeeze(-1)
 
     def l2(self) -> Tensor:
         """Sum of squared ``b_theta`` weights (the penalized quantity; 0 without
-        modifiers, ``beta0`` never included)."""
+        modifiers, ``beta0`` never included).
+        """
         if self.net is None:
             return torch.zeros((), device=self.beta0.device, dtype=self.beta0.dtype)
         return sum(p.pow(2).sum() for p in self.net.parameters())
@@ -137,7 +140,8 @@ class VaryingCoef(nn.Module):
     @torch.no_grad()
     def recenter(self, mod_feats: Tensor | None) -> None:
         """Re-split beta0 + b_theta so b_theta is mean-zero over ``mod_feats``
-        (function-preserving: the removed constant moves into ``beta0``)."""
+        (function-preserving: the removed constant moves into ``beta0``).
+        """
         if self.net is None:
             return
         delta = (self.net(mod_feats).squeeze(-1) - self.center).mean()

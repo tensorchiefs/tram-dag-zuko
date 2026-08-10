@@ -20,7 +20,8 @@ def _hetero_df(n: int, seed: int = 11) -> pd.DataFrame:
     """Randomized-treatment SCM with an (X2, X3)-modified effect, inert X1:
     Y = (u - (0.8 X1 + X2 - 0.5 X3) - (-1 + 0.8 X2 - 0.6 X3) T) / 2, u logistic.
     The all-`ls` outcome model is correctly specified except for the effect
-    heterogeneity — exactly the scan's target."""
+    heterogeneity — exactly the scan's target.
+    """
     rng = np.random.default_rng(seed)
     x1, x2, x3 = rng.normal(size=(3, n))
     t = (rng.uniform(size=n) < 0.5).astype(float)
@@ -80,7 +81,8 @@ def test_score_sums_vanish_at_mle_ordinal_outcome():
 def test_scores_match_finite_differences():
     """Analytic scores equal float64 central differences at an arbitrary
     (non-MLE) parameter point, for LS on continuous and ordinal parents, on
-    continuous and ordinal outcomes, and for VC's beta0."""
+    continuous and ordinal outcomes, and for VC's beta0.
+    """
     df = _hetero_df(200, seed=5)
     spec = {
         "X1": ContinuousNode(transform="affine"),
@@ -129,7 +131,8 @@ def test_scores_match_finite_differences():
 # --------------------------------------------- acceptance 3: end-to-end CUSUM
 def test_effect_modifier_scan_flags_true_modifiers(mle_flow):
     """The point of the feature: on the heterogeneous SCM the scan must flag
-    the true modifiers X2 and X3 and NOT the inert X1 (issue #29)."""
+    the true modifiers X2 and X3 and NOT the inert X1 (issue #29).
+    """
     flow, df = mle_flow
     scan = flow.effect_modifier_scan(df, node="Y", on="T")
     assert set(scan.index) == {"X1", "X2", "X3"}, scan.to_string()  # default cands
@@ -163,7 +166,8 @@ def test_scan_null_is_quiet():
 
 def test_scores_on_vc_model_and_scan_column_resolution():
     """A VC treatment resolves to its own score column (`on` itself), and the
-    scan runs on a VC model too."""
+    scan runs on a VC model too.
+    """
     df = _hetero_df(1500, seed=8)
     spec = {
         **_ls_spec(),

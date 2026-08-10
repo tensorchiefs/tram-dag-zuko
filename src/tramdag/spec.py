@@ -146,7 +146,8 @@ def term(effect: str, *parents: str, penalty: float | None = None) -> Term:
     """Build a :class:`Term` from an effect *label* — useful when the effect type
     is data-driven (e.g. sweeping ``"ls"`` vs ``"cs"``). Accepts both the legacy
     labels ``"ls"``/``"cs"``/``"ci"`` and the new ``"LS"``/``"CS"``/``"I"``/``"VC"``.
-    ``penalty`` applies to ``"VC"`` only (its default when omitted)."""
+    ``penalty`` applies to ``"VC"`` only (its default when omitted).
+    """
     e = _LEGACY.get(effect.lower(), effect.upper())
     if penalty is not None and e != "VC":
         raise ValueError(f"term(): penalty only applies to 'VC', not '{effect}'.")
@@ -181,7 +182,8 @@ class ContinuousNode:
 @dataclass
 class OrdinalNode:
     """Ordinal variable with ``levels`` ordered classes (0 .. levels-1),
-    modelled by increasing cutpoints (ordered logit) + shifts."""
+    modelled by increasing cutpoints (ordered logit) + shifts.
+    """
 
     levels: int
     terms: list[Term] | None = None
@@ -211,7 +213,8 @@ def validate_and_sort(spec: dict[str, NodeSpec]) -> list[str]:
     Edge ownership: every parent must enter through exactly one edge-owning term
     (all parents of I/LS/CS terms; a VC term's ``on``). VC *modifiers* are exempt
     — they may repeat across terms (a modifier typically also acts prognostically
-    through a CS/LS term)."""
+    through a CS/LS term).
+    """
     for name, node in spec.items():
         seen: set[str] = set()
         for term in node_terms(node):
@@ -310,7 +313,8 @@ def spec_to_dict(spec: dict[str, NodeSpec]) -> dict:
 
 def _terms_from_dict(nd: dict) -> list[Term]:
     """Rebuild a term list from serialized form, accepting both the new ``terms``
-    layout and the legacy ``parents`` dict (so old checkpoints still load)."""
+    layout and the legacy ``parents`` dict (so old checkpoints still load).
+    """
     if "terms" in nd:
         ctor = {"I": I, "LS": LS, "CS": CS}
         return [

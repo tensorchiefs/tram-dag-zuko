@@ -1,5 +1,6 @@
 """Tests for the API papercuts in issue #12: constructor seeding, history +
-machine-info persistence through save/load, and the machine_info() helper."""
+machine-info persistence through save/load, and the machine_info() helper.
+"""
 
 import numpy as np
 import pandas as pd

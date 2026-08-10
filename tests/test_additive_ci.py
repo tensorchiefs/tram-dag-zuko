@@ -4,7 +4,8 @@ Separate `I` terms reshape the transform *additively* (one network per parent,
 summed in unconstrained coefficient space) — distinct from a single joint
 `I("a","b")`. Because a complex intercept changes the *shape* (e.g. scale) of the
 conditional, it captures heteroscedasticity that a complex *shift* (location
-only) cannot."""
+only) cannot.
+"""
 
 import numpy as np
 import pandas as pd
@@ -57,7 +58,8 @@ def test_additive_ci_runs_and_finite():
 def _scale_df(n, seed=0):
     """x3 = sigma(x1,x2) * u3 with log-sigma = 0.5*(x1+x2): the *spread* of x3
     varies with the parents (additively), the mean does not. A shift can't model
-    this; a complex intercept can."""
+    this; a complex intercept can.
+    """
     rng = np.random.default_rng(seed)
     x1, x2 = rng.normal(size=n), rng.normal(size=n)
     u = rng.uniform(1e-6, 1 - 1e-6, size=n)

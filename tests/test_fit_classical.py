@@ -99,7 +99,8 @@ def test_continuous_only_all_ls_runs():
 def test_matches_statsmodels_mle():
     """fit_classical reaches the classical proportional-odds MLE: well-identified
     outcome coefficients match statsmodels OrderedModel; the weakly-identified T
-    matches within the same band used by test_flow_matches_r_reference."""
+    matches within the same band used by test_flow_matches_r_reference.
+    """
     from statsmodels.miscmodels.ordinal_model import OrderedModel
 
     obs = _obs()

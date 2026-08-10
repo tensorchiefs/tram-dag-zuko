@@ -97,7 +97,8 @@ class VacaTriangle:
 
         Under do(x2=a): x3 = x1 + 0.25 a + N(0,1), so E = E[x1] + 0.25 a and
         Var = Var[x1] + 1 — exact, but MC values are stored too (same estimator
-        a test would use)."""
+        a test would use).
+        """
         mu1 = 0.5 * (-2.0) + 0.5 * 1.5
         var1 = 0.5 * (1.5 + (-2.0 - mu1) ** 2) + 0.5 * (1.0 + (1.5 - mu1) ** 2)
         obs = self.observational(mc_n, seed_offset=777)

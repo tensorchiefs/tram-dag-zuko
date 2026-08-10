@@ -1,5 +1,6 @@
 """Tests for the magic-mrclean synthetic cohort and the flow's recovery of its
-known ground truth, plus a regression check against the committed R reference."""
+known ground truth, plus a regression check against the committed R reference.
+"""
 
 import json
 from pathlib import Path
@@ -183,7 +184,8 @@ def test_nl_storyline_all_ls_underestimates_flexible_recovers():
     """The headline simulation result: on the heterogeneous-effect `nl` cohort the
     all-`ls` model (which cannot extrapolate tau(Age) from the older observational
     cohort to the younger trial) undershoots the true ATE, while the flexible
-    ci/cs flow recovers it. Both massively de-confound the naive contrast."""
+    ci/cs flow recovers it. Both massively de-confound the naive contrast.
+    """
     obs, rct, truth = _load("nl")
     _, ate_ls = _fit_and_ate("ls", obs, rct)  # constrained -> no early stop
     _, ate_flex = _fit_and_ate(
@@ -204,7 +206,8 @@ def test_all_ls_flow_is_exact_mle():
     (and, where present, the R polr reference) to within SGD tolerance.
 
     This is *only* achievable because fit() no longer early-stops by default --
-    best-validation restoration would otherwise pin the fit off the train optimum."""
+    best-validation restoration would otherwise pin the fit off the train optimum.
+    """
     from statsmodels.miscmodels.ordinal_model import OrderedModel
 
     obs, _, _ = _load("ls")
@@ -240,7 +243,8 @@ def test_all_ls_flow_is_exact_mle():
 @pytest.mark.slow
 def test_restore_best_changes_the_fit():
     """Guard the new default: restore_best=True (early stopping on a held-out
-    split) lands at a different point than the converged MLE-style fit."""
+    split) lands at a different point than the converged MLE-style fit.
+    """
     obs, _, _ = _load("ls")
     tr, va = obs.iloc[:1000], obs.iloc[1000:]
     fits = {}
@@ -266,7 +270,8 @@ def test_restore_best_changes_the_fit():
 @pytest.mark.parametrize("variant", ["ls", "nl"])
 def test_flow_matches_r_reference(variant):
     """The all-ls flow must agree with the committed classical R fit (fit_ls.R)
-    on the outcome-node coefficients and the ATE. Skips if R outputs are absent."""
+    on the outcome-node coefficients and the ATE. Skips if R outputs are absent.
+    """
     ref = DATA / variant / "ref_ls"
     if not (ref / "ate.csv").exists():
         pytest.skip(f"R reference not generated yet (run Rscript fit_ls.R {variant})")

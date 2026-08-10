@@ -48,7 +48,8 @@ def test_ordinal_log_prob_matches_pmf():
 def test_ordinal_log_prob_gradient_survives_saturation():
     """Regression: with raw sigmoid differences a saturated node (|shift| > ~17
     in float32) has exactly-zero gradients and can never recover. The log-space
-    form must keep finite, non-zero gradients."""
+    form must keep finite, non-zero gradients.
+    """
     theta = torch.zeros(8, 1, requires_grad=True)  # binary node
     shift = torch.full((8,), -60.0, requires_grad=True)  # heavily saturated
     y = torch.ones(8)  # observed level has p ~ 0
@@ -177,7 +178,8 @@ def test_save_load_roundtrip(tmp_path, fitted_flow):
 # ----------------------------------------------- ls == ordered logit (MLE)
 def test_ls_node_equals_proportional_odds():
     """An all-ls ordinal node is exactly a proportional-odds model: the SGD fit
-    must agree with the statsmodels MLE (same data) in coefficients and PMFs."""
+    must agree with the statsmodels MLE (same data) in coefficients and PMFs.
+    """
     from statsmodels.miscmodels.ordinal_model import OrderedModel
 
     rng = np.random.default_rng(42)

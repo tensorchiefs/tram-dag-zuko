@@ -62,7 +62,8 @@ def _logistic(rng: np.random.Generator, size: int) -> np.ndarray:
 
 def _clamp(value, n: int) -> np.ndarray:
     """Broadcast a ``do`` value (scalar or per-row array, e.g. the paper's C.4
-    soft intervention x1 -> x1 + 1) to shape (n,)."""
+    soft intervention x1 -> x1 + 1) to shape (n,).
+    """
     return np.broadcast_to(np.asarray(value, dtype=float), (n,)).copy()
 
 
@@ -146,7 +147,8 @@ class _TriangleBase:
         """(factual, counterfactual) sharing the same latents — true individual
         counterfactuals (exact for the continuous family; for the mixed family the
         ordinal x3 is still well-defined *within* the DGP because the latent is
-        shared, even though no model could identify it from data)."""
+        shared, even though no model could identify it from data).
+        """
         rng = np.random.default_rng(self.seed + 2 + seed_offset)
         latents = self.draw_latents(n, rng)
         return self.simulate(latents=latents), self.simulate(latents=latents, do=do)
@@ -154,7 +156,8 @@ class _TriangleBase:
     # -------------------------------------------------------------- ground truth
     def true_shift_curve(self, x2_grid: np.ndarray) -> np.ndarray:
         """What a fitted ``cs`` module on the x2 -> x3 edge converges to, up to an
-        additive constant: ``-f(x2)`` (both families, see module docstring)."""
+        additive constant: ``-f(x2)`` (both families, see module docstring).
+        """
         return -self.f_callable(np.asarray(x2_grid, dtype=float))
 
     def zuko_expectations(self) -> dict:
@@ -189,7 +192,8 @@ class TriangleContinuous(_TriangleBase):
 
 class TriangleMixed(_TriangleBase):
     """Paper Sec. 6.2: x3 ordinal (4 levels, stored 0..3),
-    level = #{k : u3 > theta_k + 0.2 x1 + f(x2)}, theta = (-2, 0.42, 1.02)."""
+    level = #{k : u3 > theta_k + 0.2 x1 + f(x2)}, theta = (-2, 0.42, 1.02).
+    """
 
     family = "mixed"
     theta = THETA_MIXED

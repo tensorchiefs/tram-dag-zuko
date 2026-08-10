@@ -26,7 +26,8 @@ def _confounded_df(n: int, seed: int) -> pd.DataFrame:
     """Strongly confounded DGP with a nonlinear prognostic part:
     e(x) = sigmoid(2x), Y = (u - 1.2 x^2 - TAU t) / 2, u standard logistic.
     Fitted with a *linear* prognostic term, the x^2 misfit correlates with the
-    propensity — the configuration where in-arm effect estimates break."""
+    propensity — the configuration where in-arm effect estimates break.
+    """
     rng = np.random.default_rng(seed)
     x = rng.normal(size=n)
     t = (rng.logistic(size=n) > -2.0 * x).astype(float)
@@ -85,7 +86,8 @@ def test_center_serialization_roundtrip():
 # ---------------------------------------- acceptance: center=False regression
 def test_center_false_is_bit_identical_to_plain_vc():
     """The default must preserve #28's behavior exactly: a VC term written
-    without the kwarg and one with center=False produce bit-identical fits."""
+    without the kwarg and one with center=False produce bit-identical fits.
+    """
     gen = VCLogisticShift(seed=42)
     df = gen.observational(1200, seed_offset=100)
 
@@ -114,7 +116,8 @@ def test_center_false_is_bit_identical_to_plain_vc():
 def test_gradient_isolation():
     """With center=True the treatment node's parameters receive ZERO gradient
     from the outcome-node loss — on the live (inference) e_hat path and, a
-    fortiori, on the frozen-OOF training path."""
+    fortiori, on the frozen-OOF training path.
+    """
     df = _confounded_df(800, seed=1)
     flow = CausalFlowDAG(_misspecified_spec(True), seed=0)
     flow.fit(df, epochs=3, verbose=0, seed=0)  # stage 1 + a few steps
@@ -135,7 +138,8 @@ def test_training_ehat_is_out_of_fold():
     """The training propensities are genuine OOF quantities: fold bookkeeping
     exists, each fold's values reproduce a proxy fitted WITHOUT that fold
     (recomputed independently here), and they differ from the in-sample
-    full-data fit — a later 'simplification' to in-sample e_hat fails this."""
+    full-data fit — a later 'simplification' to in-sample e_hat fails this.
+    """
     df = _confounded_df(1200, seed=2)
     flow = CausalFlowDAG(_misspecified_spec(True), seed=0)
     flow.fit(df, epochs=2, verbose=0, seed=0)
@@ -182,7 +186,8 @@ def test_do_recomputes_centered_regressor():
     from the current values: abduct at T=1 minus T=0 equals beta(x) exactly
     (e_hat(x) cancels only if the same live e_hat enters both), the e_hat term
     verifiably enters the latent, and counterfactual sampling under do
-    round-trips through it."""
+    round-trips through it.
+    """
     df = _confounded_df(2000, seed=4)
     flow = CausalFlowDAG(_misspecified_spec(True), seed=0)
     flow.fit(df, epochs=40, verbose=0, seed=0)
@@ -227,7 +232,8 @@ def test_dandl_centering_reduces_bias():
     centered VC must show materially lower bias in beta_hat than the uncentered
     one. Measured on this protocol (seeds 0/1/2): uncentered mean|beta_hat-tau|
     = 1.10-1.24 (the confounded misfit swallows the effect, mean beta_hat
-    ~ -0.2 vs tau = -1), centered = 0.11-0.27 — a 5-10x reduction."""
+    ~ -0.2 vs tau = -1), centered = 0.11-0.27 — a 5-10x reduction.
+    """
     df = _confounded_df(6000, seed=0)
     test = _confounded_df(3000, seed=1000)
     flow_u = _fit(_misspecified_spec(False), df)

@@ -46,8 +46,9 @@ CRIT_1PCT = 1.6276
 def _dl_ds(
     nd, feats: dict, x: torch.Tensor, n: int, vc_ehat: dict | None = None
 ) -> torch.Tensor:
-    """d l_i / d s_i (n,) — derivative of the per-row log-likelihood w.r.t. the
-    node's total shift, in closed form."""
+    """D l_i / d s_i (n,) — derivative of the per-row log-likelihood w.r.t. the
+    node's total shift, in closed form.
+    """
     theta, shift = nd.theta_shift(feats, n, vc_ehat=vc_ehat)
     if nd.kind == "continuous":
         z0, _ = nd.ut.forward(theta, x)

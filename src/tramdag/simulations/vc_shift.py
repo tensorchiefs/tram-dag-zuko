@@ -65,7 +65,8 @@ class VCLogisticShift:
     # ------------------------------------------------------------------ latents
     def draw_latents(self, n: int, rng: np.random.Generator) -> dict[str, np.ndarray]:
         """All noise of the SCM: Gaussian primitives for the sources, logistic
-        latents for T (assignment) and Y (the TRAM latent)."""
+        latents for T (assignment) and Y (the TRAM latent).
+        """
         return {
             "X1": rng.normal(size=n),
             "X2": rng.normal(size=n),
@@ -120,7 +121,8 @@ class VCLogisticShift:
         """Pointwise true effect function beta(x) on the latent (log-odds)
         scale — what a fitted VC term's :meth:`~tramdag.CausalFlowDAG.varying_coef`
         should recover. ``x`` is a DataFrame with X2/X3 columns (extra columns
-        ignored)."""
+        ignored).
+        """
         return (
             B0
             + B2 * np.asarray(x["X2"], dtype=float)
@@ -131,7 +133,8 @@ class VCLogisticShift:
         self, n: int, do: dict[str, float], seed_offset: int = 0
     ) -> tuple[pd.DataFrame, pd.DataFrame]:
         """Factual sample and its counterfactual under ``do`` sharing the same
-        latents (true individual counterfactuals)."""
+        latents (true individual counterfactuals).
+        """
         rng = np.random.default_rng(self.seed + 2 + seed_offset)
         latents = self.draw_latents(n, rng)
         return self.simulate(latents=latents), self.simulate(latents=latents, do=do)

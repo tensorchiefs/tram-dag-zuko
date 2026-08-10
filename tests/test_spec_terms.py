@@ -1,6 +1,7 @@
 """Tests for the term-formula notation (I/LS/CS) — construction, validation,
 serialization, and the meta-adjacency view. (The legacy ``parents={...}`` dict
-API was removed in 0.3.0; only old *checkpoints* are still read.)"""
+API was removed in 0.3.0; only old *checkpoints* are still read.)
+"""
 
 import warnings
 
@@ -95,7 +96,8 @@ def test_serialization_roundtrip_terms():
 
 def test_legacy_parents_checkpoint_still_loads():
     """A checkpoint serialized in the old ``parents``-dict layout must still
-    rebuild (no deprecation warning, since we translate to terms directly)."""
+    rebuild (no deprecation warning, since we translate to terms directly).
+    """
     legacy = {
         "X1": {
             "kind": "continuous",

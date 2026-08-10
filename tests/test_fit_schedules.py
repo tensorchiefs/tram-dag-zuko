@@ -96,7 +96,8 @@ def test_frozen_node_parameters_stop_moving():
 
 def test_plateau_freeze_preserves_exact_mle():
     """The headline guard: all-`ls` + plateau + freezing must still land on the
-    classical MLE (outcome-node coefficients vs the committed R reference)."""
+    classical MLE (outcome-node coefficients vs the committed R reference).
+    """
     obs = pd.read_csv(DATA / "magic-mrclean" / "ls" / "obs.csv")
     ref = pd.read_csv(DATA / "magic-mrclean" / "ls" / "ref_ls" / "coefficients.csv")
     ref_y = ref[ref["node"] == "mRS_3m"].set_index("term")["estimate"]

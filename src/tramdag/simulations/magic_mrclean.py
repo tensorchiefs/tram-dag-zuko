@@ -56,7 +56,8 @@ def _logistic(rng: np.random.Generator, size: int) -> np.ndarray:
 
 def _ordinal(shift: np.ndarray, cuts: np.ndarray, u: np.ndarray) -> np.ndarray:
     """Sample an ordered-logit level from latent ``u`` (same rule as the flow's
-    ``ordinal_sample``): Y = #{ j : cuts_j - shift < u }."""
+    ``ordinal_sample``): Y = #{ j : cuts_j - shift < u }.
+    """
     return (u[:, None] > (cuts[None, :] - shift[:, None])).sum(axis=1)
 
 
@@ -196,7 +197,8 @@ class MagicMrClean:
         ``on`` selects the covariate population the ATE is averaged over:
         ``"rct"`` (default) mirrors the **younger trial** population that
         :meth:`rct` enrols and that ``evaluate_rct`` scores on; ``"obs"`` the
-        observational cohort."""
+        observational cohort.
+        """
         rng = np.random.default_rng(self.seed + 9001)
         latents = self.draw_latents(n, rng)
         d0 = self.simulate(latents=latents, population=on, do={"T": 0})
@@ -222,7 +224,8 @@ class MagicMrClean:
     ) -> tuple[pd.DataFrame, pd.DataFrame]:
         """Factual sample and its counterfactual under ``do`` sharing the *same*
         latents — yields true individual counterfactuals (impossible from real
-        data) to score the flow's abduction against."""
+        data) to score the flow's abduction against.
+        """
         rng = np.random.default_rng(self.seed + 2 + seed_offset)
         latents = self.draw_latents(n, rng)
         factual = self.simulate(latents=latents)

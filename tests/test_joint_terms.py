@@ -1,7 +1,8 @@
 """R3 validation: joint (multi-parent) terms capture interactions that the
 additive decomposition cannot. We build a DGP whose latent shift is a *pure
 interaction* x1*x2 (no main effects); a joint CS(x1,x2) can fit it, an additive
-CS(x1)+CS(x2) cannot, and the joint model must reach a clearly lower NLL."""
+CS(x1)+CS(x2) cannot, and the joint model must reach a clearly lower NLL.
+"""
 
 import numpy as np
 import pandas as pd
@@ -13,7 +14,8 @@ from tramdag import CS, CausalFlowDAG, ContinuousNode
 
 def _interaction_df(n, seed=0):
     """x3 = u3 - x1*x2 with u3 standard-logistic — so the latent of x3 is
-    h(x3) + shift with shift = x1*x2, a pure (mean-zero, non-additive) product."""
+    h(x3) + shift with shift = x1*x2, a pure (mean-zero, non-additive) product.
+    """
     rng = np.random.default_rng(seed)
     x1 = rng.normal(size=n)
     x2 = rng.normal(size=n)

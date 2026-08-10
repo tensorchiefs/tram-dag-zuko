@@ -48,7 +48,8 @@ def test_ordinal_marginal_init_reproduces_class_frequencies():
 
 def _mixed_flow_and_df():
     """Flow with a Bernstein root, an ordinal root, and a continuous node whose
-    parent enters as `ci` (so its intercept is a ComplexIntercept, not a root)."""
+    parent enters as `ci` (so its intercept is a ComplexIntercept, not a root).
+    """
     spec = {
         "x1": ContinuousNode(),  # Bernstein root
         "y": OrdinalNode(levels=4),  # ordinal root
@@ -108,7 +109,8 @@ def test_marginal_init_off_by_default_leaves_roots_at_zero():
 @pytest.mark.slow
 def test_marginal_init_is_pure_init_same_optimum():
     """A marginal-init fit and a default fit converge to the same NLL — proving
-    it only moves the starting point, not the optimum."""
+    it only moves the starting point, not the optimum.
+    """
     obs = pd.read_csv(DATA / "vaca" / "obs.csv")[["x1", "x2"]]
     spec = {"x1": ContinuousNode(), "x2": ContinuousNode(terms=[LS("x1")])}
 

@@ -130,7 +130,7 @@ class _ScaledUT(torch.nn.Module):
         return torch.log(two_b) - torch.log(self.xmax - self.xmin)
 
     def forward(self, theta: Tensor, x: Tensor) -> tuple[Tensor, Tensor]:
-        """x (n,) original units, theta (n, P) -> (z0, log|dz0/dx|), both (n,)."""
+        """X (n,) original units, theta (n, P) -> (z0, log|dz0/dx|), both (n,)."""
         t = self._scale(x)
         T = self._build(theta)
         z0, ladj = T.call_and_ladj(t)
@@ -172,7 +172,8 @@ class BernsteinUT(_ScaledUT):
         default (zero) theta instead maps -+B onto ~-+log(2)*B/... (here -6.93/+7.63),
         ~2.5x too steep, so early training is spent rescaling. This is a pure init:
         the converged MLE is unchanged. See the inversion of
-        ``BernsteinTransform._constrain_theta`` (cumsum of softplus diffs)."""
+        ``BernsteinTransform._constrain_theta`` (cumsum of softplus diffs).
+        """
         import math
 
         n = self._n
@@ -270,7 +271,8 @@ def ordinal_marginal_init_theta(counts, eps: float = 1e-3) -> Tensor:
     ``c_k = logit(F(k))`` (empirical CDF, clamped off 0/1), recover
     ``tt[0] = c_0`` and ``tt[i] = log(c_i - c_{i-1})``. Like the Bernstein
     marginal-init, a pure init: the converged MLE is unchanged. ``counts`` is the
-    per-class count vector (length K)."""
+    per-class count vector (length K).
+    """
     import numpy as np
 
     counts = np.asarray(counts, dtype=np.float64)
@@ -304,7 +306,7 @@ def _log1mexp(x: Tensor) -> Tensor:
 
 
 def ordinal_log_prob(theta_tilde: Tensor, shift: Tensor, y: Tensor) -> Tensor:
-    """log P(Y = y | cutpoints, shift) under P(Y <= k) = sigmoid(theta_k - shift).
+    """Log P(Y = y | cutpoints, shift) under P(Y <= k) = sigmoid(theta_k - shift).
 
     Computed in log-space via
         log(sigmoid(u) - sigmoid(l)) = logsigmoid(u)  + log1mexp(logsigmoid(l)  - logsigmoid(u))
@@ -340,7 +342,8 @@ def ordinal_abduct(
     generator: torch.Generator | None = None,
 ) -> Tensor:
     """Pearl abduction for an ordinal node: sample the latent z from the standard
-    logistic truncated to the interval consistent with the observed level y."""
+    logistic truncated to the interval consistent with the observed level y.
+    """
     lower, upper = _bounds(theta_tilde, shift, y)
     u_lo, u_hi = torch.sigmoid(lower), torch.sigmoid(upper)
     u = u_lo + (u_hi - u_lo) * torch.rand(

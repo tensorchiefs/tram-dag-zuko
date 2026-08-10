@@ -207,7 +207,8 @@ def g_cs(x2):
 
 def simulate(n, rng, x1=None, z=None):
     """Sample from the SCM. `x1` overrides the source node (= do(X1)),
-    `z` reuses given latents (= counterfactuals)."""
+    `z` reuses given latents (= counterfactuals).
+    """
     if z is None:
         z = {k: rlogis(rng, n) for k in ["z1", "z2", "z3", "z4"]}
     if x1 is None:
@@ -308,7 +309,8 @@ def describe_node(flow, name):
 
 def decompose_row(flow, name, row_df):
     """Numeric view: print z = intercept + sum(shifts) for one row and check it
-    reproduces flow.node_log_prob exactly."""
+    reproduces flow.node_log_prob exactly.
+    """
     node = flow.nodes[name]
     vals = flow._tensorize(row_df)
     feats = flow._features(vals)

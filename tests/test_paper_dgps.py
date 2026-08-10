@@ -197,7 +197,8 @@ def test_triangle_atan_cs_recovers_coefficients_and_curve():
 @pytest.mark.slow
 def test_triangle_mixed_linear_ls_recovers_with_sign_flip():
     """Paper Sec. 6.2 / Fig. 19, in flow convention (ordinal shift subtracted):
-    fitted weights -> -0.2 (x1) and +0.3 (x2); cutpoints -> (-2, 0.42, 1.02)."""
+    fitted weights -> -0.2 (x1) and +0.3 (x2); cutpoints -> (-2, 0.42, 1.02).
+    """
     from tramdag.transforms import ordinal_cutpoints
 
     df = TriangleMixed(f="linear", seed=42).observational(N_FIT, seed_offset=100)
@@ -217,7 +218,8 @@ def test_triangle_mixed_linear_ls_recovers_with_sign_flip():
 @pytest.mark.slow
 def test_vaca_ci_flow_matches_interventional_moments():
     """Paper Sec. 5.1-5.2: an all-ci flow fits the bimodal DGP and reproduces
-    E/sd of x3 under do(x2=a) (analytic truth from App. C.1)."""
+    E/sd of x3 under do(x2=a) (analytic truth from App. C.1).
+    """
     truth = json.loads((DATA / "vaca" / "truth.json").read_text())
     df = VacaTriangle(seed=42).observational(N_FIT, seed_offset=100)
     spec = {
@@ -246,7 +248,8 @@ def test_carefl_ci_flow_recovers_counterfactuals():
     counterfactuals of held-out rows vs. the analytic DGP truth. (The paper's
     single x_obs has a ~4-sigma abducted noise eps3, so a one-point test would
     hinge on sub-1% tail-CDF accuracy and be fragile across data draws — the
-    faithful single-point sweep lives in experiments/paper_carefl.py.)"""
+    faithful single-point sweep lives in experiments/paper_carefl.py.)
+    """
     gen = Carefl4(seed=42)
     df = gen.observational(N_FIT, seed_offset=100)
     spec = {
