@@ -43,6 +43,20 @@ class Carefl4:
     seed: int = 42
 
     def draw_latents(self, n: int, rng: np.random.Generator) -> dict[str, np.ndarray]:
+        """Draw the latent noise of every variable.
+
+        Parameters
+        ----------
+        n : int
+            Number of rows to draw.
+        rng : np.random.Generator
+            Random source.
+
+        Returns
+        -------
+        dict[str, np.ndarray]
+            One array of length ``n`` per variable.
+        """
         return {
             k: rng.laplace(loc=0.0, scale=_SCALE, size=n)
             for k in ["x1", "x2", "x3", "x4"]
@@ -56,6 +70,24 @@ class Carefl4:
         do: dict[str, float] | None = None,
         latents: dict[str, np.ndarray] | None = None,
     ) -> pd.DataFrame:
+        """Simulate the SCM, with optional interventions and reused latents.
+
+        Parameters
+        ----------
+        n : int | None, optional
+            Number of rows, by default ``None``. Then ``latents`` sets the count.
+        rng : np.random.Generator | None, optional
+            Random source, by default ``None``.
+        do : dict[str, float] | None, optional
+            Variables to hold at a fixed value, by default ``None``.
+        latents : dict[str, np.ndarray] | None, optional
+            Latent values to reuse, by default ``None``. Then they are drawn fresh.
+
+        Returns
+        -------
+        pd.DataFrame
+            One column per variable.
+        """
         do = do or {}
         if latents is None:
             if n is None:
@@ -75,6 +107,20 @@ class Carefl4:
 
     # ----------------------------------------------------------------- datasets
     def observational(self, n: int, seed_offset: int = 0) -> pd.DataFrame:
+        """Draw an observational sample.
+
+        Parameters
+        ----------
+        n : int
+            Number of rows.
+        seed_offset : int, optional
+            Added to the generator seed, by default ``0``.
+
+        Returns
+        -------
+        pd.DataFrame
+            The sample.
+        """
         rng = np.random.default_rng(self.seed + 1 + seed_offset)
         return self.simulate(n, rng=rng)
 
@@ -102,7 +148,14 @@ class Carefl4:
     def true_cf_curves(
         self, obs: dict[str, float] = X_OBS, alphas: np.ndarray = ALPHA_GRID
     ) -> dict:
-        """The paper's two Fig.-6 curves, analytic."""
+        """Compute the two analytic counterfactual curves of paper Fig. 6.
+
+        Returns
+        -------
+        dict
+            The observation, the intervention grid, and the counterfactual
+            values of x3 under do(x2) and of x4 under do(x1).
+        """
         x3_cf = [self.true_counterfactual(obs, {"x2": a})["x3"] for a in alphas]
         x4_cf = [self.true_counterfactual(obs, {"x1": a})["x4"] for a in alphas]
         return {
@@ -115,6 +168,17 @@ class Carefl4:
 
 # --------------------------------------------------------------------------- CLI
 def main(argv: list[str] | None = None) -> None:
+    """Regenerate the frozen CSV files of this data-generating process.
+
+    Parameters
+    ----------
+    argv : list[str] | None, optional
+        Command-line arguments, by default ``None`` (``sys.argv``).
+
+    Returns
+    -------
+    None
+    """
     p = argparse.ArgumentParser(description="Generate the CAREFL benchmark data.")
     p.add_argument("--out", type=Path, default=Path("data/carefl"))
     p.add_argument("--seed", type=int, default=42)

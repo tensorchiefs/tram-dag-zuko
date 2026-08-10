@@ -50,13 +50,15 @@ CUTS_Y = np.array([-1.85, -0.75, 0.05, 0.80, 1.55, 2.35])  # 7 levels (0..6)
 
 
 def _logistic(rng: np.random.Generator, size: int) -> np.ndarray:
-    """Standard logistic latent (the TRAM base distribution)."""
+    """Draw the standard logistic latent, the TRAM base distribution."""
     return rng.logistic(loc=0.0, size=size)
 
 
 def _ordinal(shift: np.ndarray, cuts: np.ndarray, u: np.ndarray) -> np.ndarray:
-    """Sample an ordered-logit level from latent ``u`` (same rule as the flow's
-    ``ordinal_sample``): Y = #{ j : cuts_j - shift < u }.
+    """Sample an ordered-logit level from the latent ``u``.
+
+    The rule is ``Y = #{ j : cuts_j - shift < u }``, the same rule that the
+    flow's ``ordinal_sample`` applies.
     """
     return (u[:, None] > (cuts[None, :] - shift[:, None])).sum(axis=1)
 
@@ -78,12 +80,37 @@ class MagicMrClean:
     seed: int = 7
 
     def __post_init__(self):
+        """Validate the variant and set the switch for the non-linear terms.
+
+        Returns
+        -------
+        None
+
+        Raises
+        ------
+        ValueError
+            If ``variant`` is neither ``"ls"`` nor ``"nl"``.
+        """
         if self.variant not in ("ls", "nl"):
             raise ValueError(f"variant must be 'ls' or 'nl', got {self.variant!r}")
         self.nl = float(self.variant == "nl")  # 0.0 disables the ★ terms
 
     # ------------------------------------------------------------------ latents
     def draw_latents(self, n: int, rng: np.random.Generator) -> dict[str, np.ndarray]:
+        """Draw the latent noise of every variable.
+
+        Parameters
+        ----------
+        n : int
+            Number of rows to draw.
+        rng : np.random.Generator
+            Random source.
+
+        Returns
+        -------
+        dict[str, np.ndarray]
+            One array of length ``n`` per variable.
+        """
         return {k: _logistic(rng, n) for k in COLUMNS}
 
     # --------------------------------------------------------------------- SCM
@@ -182,17 +209,50 @@ class MagicMrClean:
 
     # ----------------------------------------------------------------- datasets
     def observational(self, n: int, seed_offset: int = 0) -> pd.DataFrame:
+        """Draw an observational sample.
+
+        Parameters
+        ----------
+        n : int
+            Number of rows.
+        seed_offset : int, optional
+            Added to the generator seed, by default ``0``.
+
+        Returns
+        -------
+        pd.DataFrame
+            The sample.
+        """
         rng = np.random.default_rng(self.seed + 1 + seed_offset)
         return self.simulate(n, rng=rng)
 
     def rct(self, n: int, seed_offset: int = 0) -> pd.DataFrame:
+        """Draw a randomized-trial sample.
+
+        Treatment is randomized and the covariates follow the trial population, so
+        the contrast this yields is unconfounded.
+
+        Parameters
+        ----------
+        n : int
+            Number of rows.
+        seed_offset : int, optional
+            Added to the generator seed, by default ``0``.
+
+        Returns
+        -------
+        pd.DataFrame
+            The sample.
+        """
         rng = np.random.default_rng(self.seed + 1001 + seed_offset)
         return self.simulate(n, rng=rng, randomize_T=True, population="rct")
 
     # -------------------------------------------------------------- ground truth
     def true_ate(self, n: int = 500_000, on: str = "rct") -> dict:
-        """Monte-Carlo true ATE of T on P(mRS_3m <= 2), by intervening on the same
-        latent draw (so it is the do-effect, free of the confounding in T).
+        """Estimate the true ATE of T on ``P(mRS_3m <= 2)`` by Monte Carlo.
+
+        Both arms use the same latent draw, so the result is the do-effect and
+        carries none of the confounding in T.
 
         ``on`` selects the covariate population the ATE is averaged over:
         ``"rct"`` (default) mirrors the **younger trial** population that
@@ -222,9 +282,11 @@ class MagicMrClean:
     def counterfactual_pair(
         self, n: int, do: dict[str, float], seed_offset: int = 0
     ) -> tuple[pd.DataFrame, pd.DataFrame]:
-        """Factual sample and its counterfactual under ``do`` sharing the *same*
-        latents — yields true individual counterfactuals (impossible from real
-        data) to score the flow's abduction against.
+        """Draw a factual sample and its counterfactual under ``do``.
+
+        Both share the same latents, so the pair gives true individual
+        counterfactuals. Real data cannot supply these. Use them to score the
+        abduction of the flow.
         """
         rng = np.random.default_rng(self.seed + 2 + seed_offset)
         latents = self.draw_latents(n, rng)
@@ -270,6 +332,17 @@ def _write_variant(
 
 
 def main(argv: list[str] | None = None) -> None:
+    """Regenerate the frozen CSV files of this data-generating process.
+
+    Parameters
+    ----------
+    argv : list[str] | None, optional
+        Command-line arguments, by default ``None`` (``sys.argv``).
+
+    Returns
+    -------
+    None
+    """
     p = argparse.ArgumentParser(
         description="Generate the magic-mrclean synthetic cohort."
     )

@@ -64,8 +64,10 @@ class VCLogisticShift:
 
     # ------------------------------------------------------------------ latents
     def draw_latents(self, n: int, rng: np.random.Generator) -> dict[str, np.ndarray]:
-        """All noise of the SCM: Gaussian primitives for the sources, logistic
-        latents for T (assignment) and Y (the TRAM latent).
+        """Draw all noise of the SCM.
+
+        The sources get Gaussian primitives. T gets a logistic assignment
+        latent and Y gets the logistic TRAM latent.
         """
         return {
             "X1": rng.normal(size=n),
@@ -113,15 +115,30 @@ class VCLogisticShift:
 
     # ----------------------------------------------------------------- datasets
     def observational(self, n: int, seed_offset: int = 0) -> pd.DataFrame:
+        """Draw an observational sample.
+
+        Parameters
+        ----------
+        n : int
+            Number of rows.
+        seed_offset : int, optional
+            Added to the generator seed, by default ``0``.
+
+        Returns
+        -------
+        pd.DataFrame
+            The sample.
+        """
         rng = np.random.default_rng(self.seed + 1 + seed_offset)
         return self.simulate(n, rng=rng)
 
     # -------------------------------------------------------------- ground truth
     def true_beta(self, x) -> np.ndarray:
-        """Pointwise true effect function beta(x) on the latent (log-odds)
-        scale — what a fitted VC term's :meth:`~tramdag.CausalFlowDAG.varying_coef`
-        should recover. ``x`` is a DataFrame with X2/X3 columns (extra columns
-        ignored).
+        """Give the true effect function ``beta(x)`` on the latent scale.
+
+        The scale is log-odds. A fitted VC term must recover this function
+        through :meth:`~tramdag.CausalFlowDAG.varying_coef`. ``x`` is a
+        DataFrame with X2 and X3 columns. Other columns are ignored.
         """
         return (
             B0
@@ -132,8 +149,10 @@ class VCLogisticShift:
     def counterfactual_pair(
         self, n: int, do: dict[str, float], seed_offset: int = 0
     ) -> tuple[pd.DataFrame, pd.DataFrame]:
-        """Factual sample and its counterfactual under ``do`` sharing the same
-        latents (true individual counterfactuals).
+        """Draw a factual sample and its counterfactual under ``do``.
+
+        Both share the same latents, so the pair gives true individual
+        counterfactuals.
         """
         rng = np.random.default_rng(self.seed + 2 + seed_offset)
         latents = self.draw_latents(n, rng)
@@ -142,6 +161,17 @@ class VCLogisticShift:
 
 # --------------------------------------------------------------------------- CLI
 def main(argv: list[str] | None = None) -> None:
+    """Regenerate the frozen CSV files of this data-generating process.
+
+    Parameters
+    ----------
+    argv : list[str] | None, optional
+        Command-line arguments, by default ``None`` (``sys.argv``).
+
+    Returns
+    -------
+    None
+    """
     p = argparse.ArgumentParser(description="Generate the VC validation cohort.")
     p.add_argument("--out", type=Path, default=Path("data/vc-shift"))
     p.add_argument("--seed", type=int, default=42)
