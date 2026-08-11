@@ -22,7 +22,7 @@ def _spec(style: str) -> dict:
     else:
         t = {"Age": "ci", "mRS_pre": "ls", "NIHSSa": "cs", "T": "ls"}
     return {
-        "Age": ContinuousNode(transform="bernstein"),
+        "Age": ContinuousNode(),
         "mRS_pre": OrdinalNode(6, [term(t["Age"], "Age")]),
         "NIHSSa": ContinuousNode(
             [term(t["Age"], "Age"), term(t["mRS_pre"], "mRS_pre")],

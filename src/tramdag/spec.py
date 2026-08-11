@@ -50,8 +50,9 @@ a VC term's ``on``). VC **modifiers** are exempt: ``CS("x2")`` + ``VC("t", "x2")
 is the intended pattern — ``x2`` acts prognostically through the shift *and*
 modifies the treatment effect.
 
-``terms=`` and ``ContinuousNode(transform=...)`` from 0.3.x keep working; the
-``terms`` keyword is deprecated and goes away in the next breaking release.
+The 0.3 spellings are gone: ``terms=`` became the positional argument, and
+the node-level ``transform=`` moved onto the intercept term. Checkpoints
+saved by 0.3 still load.
 """
 
 from __future__ import annotations
