@@ -44,26 +44,26 @@
 #
 # $$
 # \begin{align*}
-# z_1 &= h(x_1) \\
-# z_2 &= h(x_2 \mid x_1)\\
-# z_3 &= h(x_3 \mid x_1, x_2) \\
+# u_1 &= h(x_1) \\
+# u_2 &= h(x_2 \mid x_1)\\
+# u_3 &= h(x_3 \mid x_1, x_2) \\
 # \dots &\\
-# z_p &= h(x_p \mid x_1, x_2, \dots, x_{p-1})
+# u_p &= h(x_p \mid x_1, x_2, \dots, x_{p-1})
 # \end{align*}
 # $$
 #
 # This **observed → latent** map is the convention of the paper (Eq. 2,
 # $F_{X\mid\mathrm{pa}}(x)=F_U\!\big(h(x\mid\mathrm{pa})\big)$) and of the code
-# (`z = h(x) + shift`). It is also the **training direction**: $h$ is evaluated
+# (in code: `z = h(x) + shift`). It is also the **training direction**: $h$ is evaluated
 # *directly* to score the likelihood (cheap). **Sampling** runs the inverse
-# $x_i = h^{-1}(z_i \mid \mathrm{pa})$, which has no closed form and is solved by
+# $x_i = h^{-1}(u_i \mid \mathrm{pa})$, which has no closed form and is solved by
 # bracketed bisection — the costlier direction.
 #
 # Together the $h$'s form one **triangular** flow; each variable may depend only on
 # a *subset* of its predecessors — its causal parents $\mathrm{pa}(x_i)$ — so the
 # Jacobian sparsity of the flow *is* the DAG.
 #
-# For the latents $z_1,\dots,z_p$ we assume a **standard logistic** distribution.
+# For the latents $u_1,\dots,u_p$ we assume a **standard logistic** distribution.
 # That choice is what makes the fitted parameters interpretable: shifts on the
 # latent scale are **log-odds ratios** (Section 6).
 #
@@ -73,7 +73,7 @@
 # the latent scale**. Each node's $h$ (observed → latent, as above) is
 #
 # $$
-# z_i \;=\; h(x_i \mid \mathrm{pa}(x_i)) \;=\;
+# u_i \;=\; h(x_i \mid \mathrm{pa}(x_i)) \;=\;
 # \underbrace{f_\theta(x_i)}_{\text{intercept}}
 # \;+\; \underbrace{\textstyle\sum_j \beta_{ij}\, x_j}_{\text{linear shifts (LS)}}
 # \;+\; \underbrace{\textstyle\sum_k g_{ik}(x_k)}_{\text{complex shifts (CS)}} ,
@@ -97,7 +97,7 @@
 # the shifts move to the other side:
 #
 # $$
-# x_5 = h^{-1}(z_5 \mid x_1, x_2, x_4) = f_\theta^{-1}\!\Big(z_5
+# x_5 = h^{-1}(u_5 \mid x_1, x_2, x_4) = f_\theta^{-1}\!\Big(u_5
 # - \underbrace{\beta_{51} x_1 + \beta_{52} x_2}_{\text{LS}}
 # - \underbrace{g(x_4)}_{\text{CS}}\Big).
 # $$
@@ -120,7 +120,7 @@
 # in **exactly one** term — the intercept (the *shape*) or one shift — and the
 # table shows the resulting decomposition for a single continuous target $X_3$:
 #
-# | `terms=` | $z_3 = h(x_3 \mid \mathrm{pa})$ | what carries each parent |
+# | `terms=` | $u_3 = h(x_3 \mid \mathrm{pa})$ | what carries each parent |
 # |---|---|---|
 # | `[]` (source) | $h_\theta(x_3)$ | `SimpleIntercept` — $\theta$ a free vector |
 # | `[LS("X1")]` | $h_\theta(x_3) + \beta\,x_1$ | `LinearShift` — **one number** $\beta$ |
@@ -164,16 +164,16 @@ plt.rcParams["figure.dpi"] = 110
 #
 # $$
 # \begin{aligned}
-# z_1 &= h_1(x_1) = 1.2\,x_1 - 0.4
-#   &&\Rightarrow\; x_1 = (z_1 + 0.4)/1.2 \\[2pt]
-# z_2 &= h_2(x_2) + \beta_{21} x_1, \quad h_2(x) = 2x + 1,\; \beta_{21} = 1.5
-#   &&\Rightarrow\; x_2 = (z_2 - 1.5\,x_1 - 1)/2 \\[2pt]
-# z_3 &= h_3(x_3) + \beta_{31} x_1 + g(x_2), \quad h_3(x) = \sinh(x),\;
+# u_1 &= h_1(x_1) = 1.2\,x_1 - 0.4
+#   &&\Rightarrow\; x_1 = (u_1 + 0.4)/1.2 \\[2pt]
+# u_2 &= h_2(x_2) + \beta_{21} x_1, \quad h_2(x) = 2x + 1,\; \beta_{21} = 1.5
+#   &&\Rightarrow\; x_2 = (u_2 - 1.5\,x_1 - 1)/2 \\[2pt]
+# u_3 &= h_3(x_3) + \beta_{31} x_1 + g(x_2), \quad h_3(x) = \sinh(x),\;
 #       \beta_{31} = 0.8,\; g(x) = \tfrac12 x^2
-#   &&\Rightarrow\; x_3 = \operatorname{asinh}\!\big(z_3 - 0.8\,x_1 - \tfrac12 x_2^2\big) \\[2pt]
+#   &&\Rightarrow\; x_3 = \operatorname{asinh}\!\big(u_3 - 0.8\,x_1 - \tfrac12 x_2^2\big) \\[2pt]
 # P(Y \le k) &= \sigma(\vartheta_k - \beta_{Y} x_3), \quad
 #       \vartheta = (-2, 0, 1.5),\; \beta_{Y} = 1
-#   &&\Rightarrow\; y = \#\{k : z_4 > \vartheta_k - \beta_Y x_3\}
+#   &&\Rightarrow\; y = \#\{k : u_4 > \vartheta_k - \beta_Y x_3\}
 # \end{aligned}
 # $$
 #
@@ -181,7 +181,7 @@ plt.rcParams["figure.dpi"] = 110
 # them):
 #
 # * continuous nodes: the shift is **added** on the latent scale,
-#   $z = h(x) + \text{shift}$;
+#   $u = h(x) + \text{shift}$;
 # * ordinal nodes: the shift is **subtracted** inside the sigmoid,
 #   $P(Y \le k) = \sigma(\vartheta_k - \text{shift})$, with increasing cutpoints
 #   $\vartheta_k$ (an *ordered logit*). The flip makes a positive $\beta$ push $Y$
@@ -254,26 +254,26 @@ def g_cs(x2):
     return 0.5 * x2**2
 
 
-def simulate(n, rng, x1=None, z=None):
+def simulate(n, rng, x1=None, u=None):
     """Sample from the SCM. `x1` overrides the source node (= do(X1)),
-    `z` reuses given latents (= counterfactuals).
+    `u` reuses given latents (= counterfactuals).
     """
-    if z is None:
-        z = {k: rlogis(rng, n) for k in ["z1", "z2", "z3", "z4"]}
+    if u is None:
+        u = {k: rlogis(rng, n) for k in ["u1", "u2", "u3", "u4"]}
     if x1 is None:
-        x1 = (z["z1"] + 0.4) / 1.2
+        x1 = (u["u1"] + 0.4) / 1.2
     else:
         x1 = np.full(n, float(x1))
-    x2 = (z["z2"] - TRUE["b21"] * x1 - 1.0) / 2.0
-    x3 = np.arcsinh(z["z3"] - TRUE["b31"] * x1 - g_cs(x2))
+    x2 = (u["u2"] - TRUE["b21"] * x1 - 1.0) / 2.0
+    x3 = np.arcsinh(u["u3"] - TRUE["b31"] * x1 - g_cs(x2))
     cut = TRUE["theta_Y"][None, :] - TRUE["bY"] * x3[:, None]
-    y = (z["z4"][:, None] > cut).sum(axis=1)
+    y = (u["u4"][:, None] > cut).sum(axis=1)
     df = pd.DataFrame({"X1": x1, "X2": x2, "X3": x3, "Y": y.astype(float)})
-    return df, z
+    return df, u
 
 
 rng = np.random.default_rng(1)
-df, z_obs = simulate(6000, rng)  # keep the latents -> true counterfactuals
+df, u_obs = simulate(6000, rng)  # keep the latents -> true counterfactuals
 train_df, val_df = df.iloc[:5000], df.iloc[5000:]
 df.describe().round(2)
 
@@ -326,7 +326,7 @@ flow.nll(val_df)
 # **fitted** flow. Two small helpers do the job: `describe_node` reports which
 # network carries each parent (the structural view), and `decompose_row` prints the
 # actual numbers for one observation and verifies they rebuild the per-node
-# log-likelihood **exactly** — $z = h_\theta(x) + \sum \text{shifts}$ is an
+# log-likelihood **exactly** — $u = h_\theta(x) + \sum \text{shifts}$ is an
 # identity, not a picture. We run both on `X2` (an `ls` edge), `X3` (`ls` + `cs`),
 # and the ordinal `Y` (shift **subtracted**).
 
@@ -357,7 +357,7 @@ def describe_node(flow, name):
 
 
 def decompose_row(flow, name, row_df):
-    """Numeric view: print z = intercept + sum(shifts) for one row and check it
+    """Numeric view: print u = intercept + sum(shifts) for one row and check it
     reproduces flow.node_log_prob exactly.
     """
     node = flow.nodes[name]
@@ -367,14 +367,14 @@ def decompose_row(flow, name, row_df):
     parts = {p: node.shifts[p](feats[p]) for p in node.shifts}  # per-parent shift
     print(f"{name} = {float(vals[name][0]):+.3f}  ({node.kind})")
     if node.kind == "continuous":
-        z0, ladj = node.ut.forward(theta, vals[name])
+        h0, ladj = node.ut.forward(theta, vals[name])
         terms = "  +  ".join(
-            [f"h_theta(x)={float(z0[0]):+.3f}"]
+            [f"h_theta(x)={float(h0[0]):+.3f}"]
             + [f"{p}={float(v[0]):+.3f}" for p, v in parts.items()]
         )
-        z = z0 + shift
-        print(f"  z = {terms}  =  {float(z[0]):+.3f}   (standard-logistic latent)")
-        lp = StandardLogistic.log_prob(z) + ladj
+        u = h0 + shift
+        print(f"  u = {terms}  =  {float(u[0]):+.3f}   (standard-logistic latent)")
+        lp = StandardLogistic.log_prob(u) + ladj
     else:  # ordinal: cutpoints minus a subtracted shift
         cuts = ordinal_cutpoints(theta)[0, 1:-1].detach().numpy().round(3)
         terms = "  +  ".join(f"{p}={float(v[0]):+.3f}" for p, v in parts.items()) or "0"
@@ -447,7 +447,7 @@ plt.show()
 # ## 6. Single-number interpretable statistics
 #
 # Because the latents are standard logistic, every linear-shift weight is a
-# **log-odds ratio**. For a continuous node ($z = h(x) + \beta\, x_{\text{pa}}$),
+# **log-odds ratio**. For a continuous node ($u = h(x) + \beta\, x_{\text{pa}}$),
 # a unit increase of the parent multiplies the odds of $\{X \le x\}$ by $e^\beta$
 # — uniformly in $x$ (a proportional-odds / Colr-type effect). For the ordinal
 # node the sign convention flips ($\sigma(\vartheta_k - \text{shift})$), so a
@@ -485,8 +485,8 @@ def fitted_baseline(flow, name, grid):
     node = flow.nodes[name]
     x = torch.as_tensor(grid, dtype=torch.float32)
     with torch.no_grad():
-        z0, _ = node.ut.forward(node.intercept(len(grid)), x)
-    return z0.detach().numpy()
+        h0, _ = node.ut.forward(node.intercept(len(grid)), x)
+    return h0.detach().numpy()
 
 
 def fitted_cs(flow, name, parent, grid):
@@ -634,14 +634,14 @@ print(f"Y level-exact: {(recon['Y'].to_numpy() == val_df['Y'].to_numpy()).mean()
 
 # %% [markdown]
 # Now the counterfactual *"what would $X_2, X_3$ have been for **this** unit, had
-# $X_1$ been 0?"*. The DGP kept every unit's true latents `z_obs`, so we can
+# $X_1$ been 0?"*. The DGP kept every unit's true latents `u_obs`, so we can
 # compute the **true individual counterfactuals** and compare unit by unit — the
 # strongest test on the ladder.
 
 # %%
 cf_flow = flow.sample(do={"X1": 0.0}, u=u)
-z_val = {k: v[5000:] for k, v in z_obs.items()}
-cf_true, _ = simulate(len(val_df), rng, x1=0.0, z=z_val)
+u_val = {k: v[5000:] for k, v in u_obs.items()}
+cf_true, _ = simulate(len(val_df), rng, x1=0.0, u=u_val)
 
 fig, axes = plt.subplots(1, 2, figsize=(9, 3.4))
 for ax, col in zip(axes, ["X2", "X3"]):
