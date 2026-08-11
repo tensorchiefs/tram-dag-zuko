@@ -16,7 +16,32 @@
     <nav class="pdoc">
         <label id="navtoggle" for="togglestate" class="pdoc-button"><svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 30 30'><path stroke-linecap='round' stroke="currentColor" stroke-miterlimit='10' stroke-width='2' d='M4 7h22M4 15h22M4 23h22'/></svg></label>
         <input id="togglestate" type="checkbox" aria-hidden="true" tabindex="-1">
-        <div>
+        <div>            <a class="pdoc-button module-list-button" href="index.html">
+<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-box-arrow-in-left" viewBox="0 0 16 16">
+  <path fill-rule="evenodd" d="M10 3.5a.5.5 0 0 0-.5-.5h-8a.5.5 0 0 0-.5.5v9a.5.5 0 0 0 .5.5h8a.5.5 0 0 0 .5-.5v-2a.5.5 0 0 1 1 0v2A1.5 1.5 0 0 1 9.5 14h-8A1.5 1.5 0 0 1 0 12.5v-9A1.5 1.5 0 0 1 1.5 2h8A1.5 1.5 0 0 1 11 3.5v2a.5.5 0 0 1-1 0v-2z"/>
+  <path fill-rule="evenodd" d="M4.146 8.354a.5.5 0 0 1 0-.708l3-3a.5.5 0 1 1 .708.708L5.707 7.5H14.5a.5.5 0 0 1 0 1H5.707l2.147 2.146a.5.5 0 0 1-.708.708l-3-3z"/>
+</svg>                &nbsp;
+                Module Index
+            </a>
+
+
+<h2>Guides</h2>
+<ul class="memberlist">
+  <li><a href="guides/fitting.html">Fitting</a></li>
+  <li><a href="guides/training_speed.html">Training speed</a></li>
+  <li><a href="guides/scores.html">Scores &amp; modifier scan</a></li>
+  <li><a href="guides/varying_coefficients.html">Varying coefficients</a></li>
+  <li><a href="guides/stroke_case_study.html">Stroke case study</a></li>
+</ul>
+<h2>Notebooks</h2>
+<ul class="memberlist">
+  <li><a href="examples/demo_tram_dag_colab.html">5-minute demo</a></li>
+  <li><a href="examples/intro_tram_dag.html">Didactic intro</a></li>
+</ul>
+<h2>Download</h2>
+<ul class="memberlist">
+  <li><a href="tramdag-docs.pdf">Documentation as PDF</a></li>
+</ul>
 
             <input type="search" placeholder="Search..." role="searchbox" aria-label="search"
                    pattern=".+" required>
@@ -264,7 +289,7 @@ exactly as in classical proportional-odds models.</p>
 <p><strong>5-minute showcase</strong>: the <a href="https://colab.research.google.com/github/tensorchiefs/tramdag/blob/main/notebooks/demo_tram_dag_colab.ipynb">Colab badge above</a> fits the paper's bimodal benchmark
 live (GPU-ready) and walks L1 → L2 → L3, every answer checked against analytic
 ground truth. Further notebooks are available at <a href="notebooks/"><code>notebooks/</code></a> like the didactic walkthrough of the model:
-<a href="notebooks/intro_tram_dag.html"><code>notebooks/intro_tram_dag.py</code></a>.</p>
+<a href="examples/intro_tram_dag.html"><code>notebooks/intro_tram_dag.py</code></a>.</p>
 
 <h2 id="install">Install</h2>
 
@@ -382,7 +407,7 @@ ordinal nodes an ordered-logit head <code>P(x ≤ k) = σ(θ_k − shift)</code>
 for continuous nodes and truncated-logistic for ordinal ones, so
 <code>flow.sample(u=flow.abduct(df))</code> reproduces <code>df</code> exactly / level-exactly.</p>
 
-<p>There are two ways to fit the model: a stochastic deep learning optimizer (<code>fit</code>) and a 2nd order optimization like in the classical statistical models (<code>fit_classical</code>). The latter is more efficient for all-<code>ls</code> models (each node-conditional is then a classical transformation model). For more details, see the <a href="docs/fitting.html"><code>docs/fitting.md</code></a> file.</p>
+<p>There are two ways to fit the model: a stochastic deep learning optimizer (<code>fit</code>) and a 2nd order optimization like in the classical statistical models (<code>fit_classical</code>). The latter is more efficient for all-<code>ls</code> models (each node-conditional is then a classical transformation model). For more details, see the <a href="guides/fitting.html"><code>docs/fitting.md</code></a> file.</p>
 
 <h2 id="validation-all-pinned-by-tests">Validation (all pinned by tests)</h2>
 
@@ -436,12 +461,12 @@ the proportional-odds MLE: coefficients match <code>statsmodels</code> <strong>a
 <code>MASS::polr</code> to ~4 decimals (<code>experiments/validate_ls.py</code>, R reference committed
 under <code>data/magic-mrclean/*/ref_ls/</code>).</p></li>
 <li><p><strong>Training speed</strong> — schedules, per-node freezing, LBFGS and device benchmarks:
-<a href="docs/training-speed.html"><code>docs/training-speed.md</code></a>.</p></li>
+<a href="guides/training_speed.html"><code>docs/training-speed.md</code></a>.</p></li>
 </ul>
 
 <p>What the tests actually guarantee — the principles behind them (known identities,
 the datasets and software they compare against, and how the ground truth was
-obtained) — is documented in <a href="tests/README.md"><code>tests/README.md</code></a>.</p>
+obtained) — is documented in <a href="https://github.com/tensorchiefs/tramdag/blob/main/tests/README.md"><code>tests/README.md</code></a>.</p>
 
 <!-- ## Case study: individualized treatment effects in stroke
 
@@ -467,11 +492,11 @@ including an `nl` variant where an all-`ls` model is provably misspecified:
 | flexible (`ci`/`cs`) flow | +0.101 | **recovers the truth** | -->
 
 <p>Full storyline, clinical-data context, R cross-check and reading notes:
-<a href="docs/stroke-case-study.html"><code>docs/stroke-case-study.md</code></a>.</p>
+<a href="guides/stroke_case_study.html"><code>docs/stroke-case-study.md</code></a>.</p>
 
 <h2 id="testing-policy">Testing policy</h2>
 
-<p>See the <a href="tests/README.md"><code>tests/README.md</code></a> file for more details.</p>
+<p>See the <a href="https://github.com/tensorchiefs/tramdag/blob/main/tests/README.md"><code>tests/README.md</code></a> file for more details.</p>
 
 <h2 id="layout">Layout</h2>
 
@@ -488,7 +513,7 @@ docs/                   training-speed.md, stroke-case-study.md,
 
 <p>Implementation conventions (latent-scale signs, raw/one-hot parent encoding,
 log-space ordinal likelihood, seeding) are documented in
-<a href="CLAUDE.md"><code>CLAUDE.md</code></a> and pinned by tests.</p>
+<a href="https://github.com/tensorchiefs/tramdag/blob/main/CLAUDE.md"><code>CLAUDE.md</code></a> and pinned by tests.</p>
 
 <h2 id="citation">Citation</h2>
 
