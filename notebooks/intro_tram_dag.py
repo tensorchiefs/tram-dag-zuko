@@ -27,7 +27,7 @@
 # |---|---|---|
 # | L1 association | $p(x)$, sampling | `flow.log_prob(df)`, `flow.sample(n)` |
 # | L2 intervention | $p(x \mid do(x_j{=}a))$ | `flow.sample(n, do={...})`, `flow.pmf(df, node, do={...})` |
-# | L3 counterfactual | "what would $x_i$ have been, had $x_j$ been $a$?" | `flow.abduct(df)` + `flow.sample(do={...}, u=u)` |
+# | L3 counterfactual | "what would $x_i$ have been, had $x_j$ been $a$?" | `u=flow.abduct(df); flow.sample(do={...}, u=u)` |
 #
 # This notebook walks through the model exactly as written in the paper notation,
 # builds a small data-generating process (DGP) **inside the model family**, fits a
@@ -122,14 +122,14 @@
 #
 # | `terms=` | $z_3 = h(x_3 \mid \mathrm{pa})$ | what carries each parent |
 # |---|---|---|
-# | `[]` (source) | $f_\theta(x_3)$ | `SimpleIntercept` — $\theta$ a free vector |
-# | `[LS("X1")]` | $f_\theta(x_3) + \beta\,x_1$ | `LinearShift` — **one number** $\beta$ |
-# | `[CS("X1")]` | $f_\theta(x_3) + g(x_1)$ | `ComplexShift` — additive MLP $g$ |
-# | `[I("X1")]` | $f_{\theta(x_1)}(x_3)$ | `ComplexIntercept` — **no shift term**; $\theta$ (the whole shape) bends with $x_1$ |
-# | `[LS("X1"), CS("X2")]` | $f_\theta(x_3) + \beta x_1 + g(x_2)$ | one `LinearShift` + one `ComplexShift` (the model fitted below) |
-# | `[CS("X1", "X2")]` | $f_\theta(x_3) + g(x_1, x_2)$ | **one joint** `ComplexShift` — an interaction in the shift |
-# | `[I("X1"), I("X2")]` | $f_{\theta(x_1) + \theta(x_2)}(x_3)$ | **additive** CI — each parent reshapes the transform independently (two nets summed) |
-# | `[I("X1", "X2")]` | $f_{\theta(x_1,x_2)}(x_3)$ | **one joint** `ComplexIntercept` over both parents (they interact) |
+# | `[]` (source) | $h_\theta(x_3)$ | `SimpleIntercept` — $\theta$ a free vector |
+# | `[LS("X1")]` | $h_\theta(x_3) + \beta\,x_1$ | `LinearShift` — **one number** $\beta$ |
+# | `[CS("X1")]` | $h_\theta(x_3) + g(x_1)$ | `ComplexShift` — additive MLP $g$ |
+# | `[I("X1")]` | $h_{\theta(x_1)}(x_3)$ | `ComplexIntercept` — **no shift term**; $\theta$ (the whole shape) bends with $x_1$ |
+# | `[LS("X1"), CS("X2")]` | $h_\theta(x_3) + \beta x_1 + g(x_2)$ | one `LinearShift` + one `ComplexShift` (the model fitted below) |
+# | `[CS("X1", "X2")]` | $h_\theta(x_3) + g(x_1, x_2)$ | **one joint** `ComplexShift` — an interaction in the shift |
+# | `[I("X1"), I("X2")]` | $h_{\theta(x_1) + \theta(x_2)}(x_3)$ | **additive** CI — each parent reshapes the transform independently (two nets summed) |
+# | `[I("X1", "X2")]` | $h_{\theta(x_1,x_2)}(x_3)$ | **one joint** `ComplexIntercept` over both parents (they interact) |
 #
 # For an **ordinal** target the intercept is not a Bernstein curve but the vector of
 # ordered cutpoints $\vartheta_k(\mathrm{pa})$, and the shift is **subtracted**:
@@ -189,6 +189,55 @@ plt.rcParams["figure.dpi"] = 110
 #
 # $X_2$ enters $X_3$ through a **complex shift** quadratic shift $g(x_2)=\tfrac12 x_2^2$
 # that a linear shift cannot represent. We will come to that later.
+
+# %% [markdown]
+# The wiring at a glance — each edge is labelled with the term its parent
+# enters through:
+
+# %%
+fig, ax = plt.subplots(figsize=(7, 3.2))
+pos = {"X1": (0, 1.0), "X2": (0, 0.0), "X3": (1.4, 0.5), "Y": (2.6, 0.5)}
+edges = [
+    ("X1", "X2", r"LS: $\beta_{21}=1.5$", (-0.32, 0.5)),
+    ("X1", "X3", r"LS: $\beta_{31}=0.8$", (0.62, 0.93)),
+    ("X2", "X3", r"CS: $g(x)=\frac{1}{2}x^2$", (0.62, 0.07)),
+    ("X3", "Y", r"LS: $\beta_{Y}=1$", (2.0, 0.62)),
+]
+for src, dst, label, (lx, ly) in edges:
+    ax.annotate(
+        "",
+        xy=pos[dst],
+        xytext=pos[src],
+        arrowprops=dict(
+            arrowstyle="-|>", color="#333333", lw=1.4, shrinkA=16, shrinkB=16
+        ),
+    )
+    ax.text(lx, ly, label, fontsize=10, ha="center", va="center")
+for name, (x, y) in pos.items():
+    ordinal = name == "Y"
+    ax.scatter(
+        x,
+        y,
+        s=900,
+        facecolor="white" if not ordinal else "#dce8f4",
+        edgecolor="#333333",
+        zorder=3,
+    )
+    ax.text(
+        x,
+        y,
+        f"${name[0]}_{name[1]}$" if len(name) > 1 else f"${name}$",
+        ha="center",
+        va="center",
+        fontsize=13,
+        zorder=4,
+    )
+ax.text(2.6, 0.24, "ordinal (4 levels)", fontsize=9, ha="center", color="#555555")
+ax.set_xlim(-0.7, 3.1)
+ax.set_ylim(-0.35, 1.35)
+ax.axis("off")
+ax.set_title("The DGP's DAG", fontsize=11)
+plt.show()
 
 # %%
 TRUE = dict(b21=1.5, b31=0.8, bY=1.0, theta_Y=np.array([-2.0, 0.0, 1.5]))
@@ -277,7 +326,7 @@ flow.nll(val_df)
 # **fitted** flow. Two small helpers do the job: `describe_node` reports which
 # network carries each parent (the structural view), and `decompose_row` prints the
 # actual numbers for one observation and verifies they rebuild the per-node
-# log-likelihood **exactly** — $z = f_\theta(x) + \sum \text{shifts}$ is an
+# log-likelihood **exactly** — $z = h_\theta(x) + \sum \text{shifts}$ is an
 # identity, not a picture. We run both on `X2` (an `ls` edge), `X3` (`ls` + `cs`),
 # and the ordinal `Y` (shift **subtracted**).
 
@@ -320,7 +369,7 @@ def decompose_row(flow, name, row_df):
     if node.kind == "continuous":
         z0, ladj = node.ut.forward(theta, vals[name])
         terms = "  +  ".join(
-            [f"f_theta(x)={float(z0[0]):+.3f}"]
+            [f"h_theta(x)={float(z0[0]):+.3f}"]
             + [f"{p}={float(v[0]):+.3f}" for p, v in parts.items()]
         )
         z = z0 + shift
