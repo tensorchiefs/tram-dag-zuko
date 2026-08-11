@@ -3,14 +3,13 @@ name: docs
 # Each push rebuilds only its own ref's docs:
 #   main       -> /
 #   dev-<name> -> /dev-<name>/
-# The site therefore accumulates on the gh-pages branch. Set
-# Settings -> Pages -> Source to "Deploy from a branch": gh-pages, / (root).
+# The site accumulates on the gh-pages branch. Set Settings -> Pages ->
+# Source to "Deploy from a branch": gh-pages, / (root).
 #
-# A ref's site is: pdoc API reference (README.md as landing page),
-# the docs/*.md guides, and every notebook EXECUTED and rendered to HTML.
-# Executing the notebooks is the expensive part (they train real flows),
-# hence the long timeout -- and it doubles as a smoke test: a notebook
-# that no longer runs fails the docs build.
+# Everything is rendered THROUGH pdoc so the whole site shares one look:
+# the API reference directly, the docs/*.md guides and the executed
+# notebooks via generated stub modules whose docstring includes the
+# markdown. The sidebar links live in .github/pdoc-templates/.
 on:
   push:
     branches: [main, dev-*]
@@ -26,56 +25,130 @@ jobs:
     timeout-minutes: 120
     permissions:
       contents: write     # pushes gh-pages
+    env:
+      # the notebooks to execute and publish; add a name to add a notebook
+      # (and mirror it in .github/pdoc-templates/module.html.jinja2)
+      NOTEBOOKS: demo_tram_dag_colab intro_tram_dag
     steps:
     - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1
     - uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9   # v9.0.0
       with:
         enable-cache: true
 
-    # --with, not --group: this works against any ref, whether or not it
-    # declares a docs dependency group.
-    - name: build API reference
-      run: uv run --with pdoc pdoc -d numpy -o site tramdag
-
-    - name: render the docs/*.md guides
+    # The kernel runs in the OUTPUT file's directory, and the notebooks
+    # resolve data/ relative to that -- so the executed copy must land in
+    # notebooks/ (gitignored).
+    - name: execute the notebooks
       run: |
         set -euo pipefail
-        # not preinstalled on the runners (learned the hard way)
-        sudo apt-get install -y -qq pandoc
-        mkdir -p site/docs
-        for f in docs/*.md; do
-          pandoc -f gfm -s --metadata title="$(basename "$f" .md)" \
-            "$f" -o "site/docs/$(basename "$f" .md).html"
-        done
-        cp -r docs/img site/docs/ 2>/dev/null || true
-
-    - name: execute the notebooks and render to HTML
-      run: |
-        set -euo pipefail
-        mkdir -p site/notebooks
-        # Only the two showcase notebooks for now; the other three train
-        # long enough to dominate the run. Add them here when wanted.
-        #
-        # The executed .ipynb must land in notebooks/: the kernel runs in
-        # the OUTPUT file's directory, and the notebooks resolve data/
-        # relative to that (an output under /tmp made them look for /data).
-        for name in demo_tram_dag_colab intro_tram_dag; do
-          uv run --group dev --group notebooks --with nbconvert bash -c "
+        for name in $NOTEBOOKS; do
+          uv run --group dev --group notebooks --with nbconvert \
             jupytext --to notebook --execute \
-              --output notebooks/$name.exec.ipynb notebooks/$name.py &&
-            jupyter nbconvert --to html notebooks/$name.exec.ipynb \
-              --output=$name --output-dir site/notebooks"
+              --output notebooks/$name.exec.ipynb notebooks/$name.py
         done
 
-    - name: point the landing page's links at the rendered files
+    - name: convert executed notebooks to markdown
       run: |
         set -euo pipefail
-        # README links to docs/*.md and notebooks/*.py; the site serves
-        # the rendered .html versions of both.
-        sed -i -E \
-          -e 's|href="(docs/[a-z-]+)\.md"|href="\1.html"|g' \
-          -e 's|href="(notebooks/[a-z_]+)\.py"|href="\1.html"|g' \
-          site/tramdag.html
+        mkdir -p build/nbmd
+        for name in $NOTEBOOKS; do
+          uv run --with nbconvert jupyter nbconvert --to markdown \
+            notebooks/$name.exec.ipynb --output $name --output-dir build/nbmd
+        done
+
+    - name: generate the guide and notebook stub modules
+      run: |
+        uv run python - <<'EOF'
+        """One stub module per document; its docstring includes the markdown,
+        so pdoc renders guides and notebooks with the same chrome as the API.
+        """
+        import os
+        import pathlib
+
+        guides = pathlib.Path("build/stubs/guides")
+        examples = pathlib.Path("build/stubs/examples")
+        guides.mkdir(parents=True, exist_ok=True)
+        examples.mkdir(parents=True, exist_ok=True)
+        guides.joinpath("__init__.py").write_text(
+            '"""How-to guides: fitting, training speed, scores, '
+            'varying coefficients, and the stroke case study."""\n'
+        )
+        examples.joinpath("__init__.py").write_text(
+            '"""The notebooks, executed, with their outputs."""\n'
+        )
+        for md in sorted(pathlib.Path("docs").glob("*.md")):
+            mod = md.stem.replace("-", "_")
+            guides.joinpath(f"{mod}.py").write_text(
+                f'""".. include:: ../../../docs/{md.name}"""\n'
+            )
+        for name in os.environ["NOTEBOOKS"].split():
+            examples.joinpath(f"{name}.py").write_text(
+                f'""".. include:: ../../nbmd/{name}.md"""\n'
+            )
+        EOF
+
+    - name: build the site with pdoc
+      run: |
+        uv run --with pdoc env PYTHONPATH=build/stubs \
+          pdoc -d numpy --template-directory .github/pdoc-templates \
+            -o site tramdag guides examples
+
+    - name: rewrite repo-relative links
+      run: |
+        uv run python - <<'EOF'
+        """Known guide/notebook targets become site links; other repo files
+        become GitHub blob URLs.
+        """
+        import pathlib
+        import re
+
+        GH = "https://github.com/tensorchiefs/tramdag/blob/main"
+        site = pathlib.Path("site")
+        guides = {
+            p.stem: p.stem.replace("-", "_") for p in pathlib.Path("docs").glob("*.md")
+        }
+        notebooks = [p.stem for p in pathlib.Path("notebooks").glob("*.py")]
+        total = 0
+
+        def fix(page, basedir, prefix):
+            global total
+
+            def repl(m):
+                global total
+                target = m.group(1)
+                if target.startswith(("http://", "https://", "#")):
+                    return m.group(0)
+                full = str(pathlib.PurePosixPath(basedir) / target)
+                while full.startswith("../"):
+                    full = full[3:]
+                stem = pathlib.PurePosixPath(full).stem
+                total += 1
+                if full.startswith("docs/") and stem in guides:
+                    return f'href="{prefix}guides/{guides[stem]}.html"'
+                if full.startswith("notebooks/") and stem in notebooks:
+                    return f'href="{prefix}examples/{stem}.html"'
+                return f'href="{GH}/{full}"'
+
+            page.write_text(
+                re.sub(r'href="([^"]+\.(?:md|py|R))"', repl, page.read_text())
+            )
+
+        for page in site.rglob("*.html"):
+            rel = page.relative_to(site)
+            depth = len(rel.parts) - 1
+            basedir = "docs" if depth and rel.parts[0] == "guides" else ""
+            fix(page, basedir, "../" * depth)
+        print(f"rewrote {total} links")
+        EOF
+
+    - name: build the PDF (README + guides)
+      run: |
+        set -euo pipefail
+        # neither pandoc nor weasyprint's pango are preinstalled
+        sudo apt-get install -y -qq pandoc libpango-1.0-0 libpangocairo-1.0-0
+        uv run --with weasyprint pandoc -f gfm -s \
+          --resource-path=.:docs --metadata title="tramdag documentation" \
+          README.md docs/*.md -o site/tramdag-docs.pdf --pdf-engine=weasyprint
 
     - name: publish to gh-pages
       env:
@@ -98,6 +171,18 @@ jobs:
           rm -rf "../pages/$REF"
           mkdir -p "../pages/$REF"
           cp -a site/. "../pages/$REF/"
+        fi
+
+        # until main publishes, give the root a version listing instead of a 404
+        if [ ! -f ../pages/index.html ]; then
+          { echo "<!doctype html><meta charset=utf-8><title>tramdag docs</title>"
+            echo "<h1>tramdag documentation</h1>"
+            echo "<p>No release build yet. Available versions:</p><ul>"
+            for d in ../pages/dev-*/; do
+              v=$(basename "$d")
+              echo "<li><a href=\"$v/\">$v</a></li>"
+            done
+            echo "</ul>"; } > ../pages/index.html
         fi
         # generated site: keep GitHub's Jekyll pass away from it
         touch ../pages/.nojekyll
