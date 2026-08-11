@@ -32,13 +32,14 @@ Experiments default to the synthetic data (`magic-mrclean/nl`). The `magic` sour
 
 - `spec.py` — user-facing DAG spec: `{name: ContinuousNode|OrdinalNode}`, each node
   declares its transformation as the first positional argument — a list of terms
-  or a `+` sum (`I("a") + LS("b")`), since 0.4.0; `terms=` is a deprecated alias
-  (the legacy `parents={parent: term}` dict was removed in 0.3.0). Term constructors: `LS(parent)`
+  or a `+` sum (`I("a") + LS("b")`), since 0.4.0 (the 0.3 `terms=` keyword and
+  node-level `transform=` were removed; 0.3 checkpoints still load). Term constructors: `LS(parent)`
   (linear shift), `CS(*parents)` (complex shift MLP), `I(*parents)` (complex
-  intercept — transform params from parents), `VC(on, *modifiers, penalty=)`
-  (varying-coefficient effect head `beta(modifiers)·x_on`, small penalized
+  intercept — transform params from parents), `VC(*modifiers, t=, penalty=)`
+  (varying-coefficient effect head `beta(modifiers)·x_t`, small penalized
   zero-init net; read out with `flow.varying_coef` — see
-  docs/varying-coefficients.md). `I(..., transform=)` picks the monotone basis;
+  docs/varying-coefficients.md). `I(..., transform=)` picks the monotone basis,
+  `units=[...]` on I/CS/VC sizes the term's network;
   `I("a","b", allow_interaction=False)` == `I("a") + I("b")`. A **multi-parent** term is one
   *joint* network over the group (`CS("a","b")`, `I("a","b")`); **separate** terms
   are *additive* (`CS("a")+CS("b")`; `I("a")+I("b")` = per-parent intercept nets

@@ -16,11 +16,31 @@
   the serialized format are unchanged, and equivalence is pinned by
   state-dict-identical tests (`tests/test_transformation_syntax.py`).
 
-### Deprecated
+- **`units=` on `I`, `CS` and `VC`** sizes the term's network directly,
+  e.g. `units=[16]` for one hidden layer (defaults: I `[8, 8]`,
+  CS `[64, 128, 64]`, VC `[16]`); serialized per term. All conditioner
+  networks now build through one `_mlp()` helper whose module indices
+  match the historical Sequentials, so 0.3 checkpoints still load.
 
-- `terms=` still works on both node types but warns; it goes away in the
-  next breaking release. `node.terms` stays as a read-only alias of
-  `node.transformation`.
+### Changed (breaking)
+
+- **`VC(*modifiers, t=...)`**: the positional arguments are the
+  covariates that enter `b_theta`; the treatment `t` is a required
+  keyword. `VC("X2", "X3", t="T")` reads as
+  `(beta0 + b_theta(x2, x3)) * x_t`. (0.3 wrote `VC("T", "X2", "X3")`.)
+
+### Removed (breaking)
+
+- The `terms=` keyword (use the first positional argument), node-level
+  `ContinuousNode(transform=/transform_kwargs=)` (choose the basis on the
+  intercept term, `I(..., transform="spline")`), the unused
+  `Intercept`/`LinShift`/`CShift` aliases, and the pre-0.3
+  `parents={...}` checkpoint loader. 0.3 checkpoints (`terms` layout)
+  still load; their node-level basis is converted on load.
+- The unmaintained notebooks and experiment scripts moved to
+  `notebooks/stale/` and `experiments/stale/`; the maintained set is
+  the intro and Colab demo notebooks plus `sim_flow.py` and
+  `validate_ls.py`.
 
 ### Added (0.3.1)
 

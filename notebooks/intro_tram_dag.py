@@ -310,7 +310,7 @@ plt.show()
 
 # %%
 spec = {
-    "X1": ContinuousNode(transform="bernstein"),
+    "X1": ContinuousNode(),
     "X2": ContinuousNode(LS("X1")),
     "X3": ContinuousNode(LS("X1") + CS("X2")),
     "Y": OrdinalNode(4, LS("X3")),
@@ -533,7 +533,7 @@ plt.show()
 
 # %%
 spec_ls = {
-    "X1": ContinuousNode(transform="bernstein"),
+    "X1": ContinuousNode(),
     "X2": ContinuousNode(LS("X1")),
     "X3": ContinuousNode(LS("X1") + LS("X2")),  # <- cs replaced by ls
     "Y": OrdinalNode(4, LS("X3")),

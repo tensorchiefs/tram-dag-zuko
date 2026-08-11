@@ -270,7 +270,7 @@ plt.show()
 # %%
 def make_spec(transform):
     return {
-        "x1": ContinuousNode(transform=transform),
+        "x1": ContinuousNode([I(transform=transform)]),
         "x2": ContinuousNode(I("x1", transform=transform)),
         "x3": ContinuousNode(I("x1", "x2", transform=transform)),
     }
@@ -324,7 +324,7 @@ plt.show()
 # 8–32 bins, lr 0.01–0.1, up to 2000 epochs) — an honest empirical reason why
 # **Bernstein** (whose monotone softplus-cumsum parametrization is easier to
 # optimize) is the TRAM-faithful default. Swap per node any time via
-# `ContinuousNode(transform="spline", transform_kwargs={"bins": 16})`.
+# `I(..., transform="spline", transform_kwargs={"bins": 16})`.
 
 # %% [markdown]
 # ## 7. GPU vs CPU

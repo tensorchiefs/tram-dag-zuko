@@ -1,4 +1,4 @@
-# Varying-coefficient treatment effects: `VC(on, *modifiers, penalty=)`
+# Varying-coefficient treatment effects: `VC(*modifiers, t=, penalty=)`
 
 A `VC` term gives a node a **treatment-effect head with its own bias–variance
 budget** (issue #28): it contributes
@@ -22,7 +22,7 @@ spec = {
     "T": td.OrdinalNode(2, td.LS("X1") + td.LS("X2")),
     "Y": td.ContinuousNode(
         td.CS("X1", "X2", "X3")  # prognostic part g(x): as flexible as you like
-        + td.VC("T", "X2", "X3", penalty=1.0)  # effect beta(X2, X3) * T
+        + td.VC("X2", "X3", t="T", penalty=1.0)  # effect beta(X2, X3) * T
     ),
 }
 flow = td.CausalFlowDAG(spec, seed=0).fit(train, val, restore_best=True)
@@ -83,7 +83,7 @@ effect but that they **regularize** it (Nie & Wager 2021; Athey–Tibshirani–W
 ## Propensity-centered VC: `center=True` (R-learner orthogonalization)
 
 ```python
-td.VC("T", "X2", "X3", penalty=1.0, center=True, center_folds=5)
+td.VC("X2", "X3", t="T", penalty=1.0, center=True, center_folds=5)
 # contributes  beta(x) * (t - e_hat(x))  to the shift
 ```
 

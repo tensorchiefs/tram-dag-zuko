@@ -37,7 +37,7 @@ measured shortlist of `VC` modifiers (`docs/varying-coefficients.md`):
 
 ```python
 spec["Y"] = td.ContinuousNode(
-    td.CS("X1", "X2", "X3") + td.VC("T", "X2", "X3")
+    td.CS("X1", "X2", "X3") + td.VC("X2", "X3", t="T")
 )  # scan-informed
 ```
 

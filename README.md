@@ -84,7 +84,7 @@ flow.intercept_contributions("NIHSSa", df)  # interpret: per-parent partial effe
 
 # heterogeneous treatment effects: a small, penalized effect head beta(x)*T
 # (VC term) with a first-class read-out — see docs/varying-coefficients.md
-# e.g. CS("Age", "NIHSSa") + VC("T", "Age") ->
+# e.g. CS("Age", "NIHSSa") + VC("Age", t="T") ->
 # flow.varying_coef("mRS_3m", df)          # beta(x): deterministic, y-free
 
 flow.scores(df, node="mRS_3m")  # per-observation scores dl_i/dtheta
@@ -107,10 +107,11 @@ Per node, the transformation is additive on the latent (log-odds) scale —
 | `LS(pa)` | linear shift `β·x_pa` | `exp(β)` is an odds ratio — one number per edge |
 | `CS(pa)` | complex shift `g(x_pa)` (MLP), still additive | plot `g` |
 | `I(pa)` | complex intercept: the transform's parameters depend on the parents (several parents in one `I(...)` feed one joint network) | maximal flexibility, interactions not interpretable |
-| `VC(on, *mods)` | varying-coefficient shift `β(mods)·x_on` | read out with `flow.varying_coef` |
+| `VC(*mods, t=)` | varying-coefficient shift `β(mods)·x_t` | read out with `flow.varying_coef` |
 
 Continuous nodes carry a monotone 1-D transform (`bernstein` — TRAM-faithful
-default, `spline`, `affine`; `ContinuousNode(transform=..., transform_kwargs=...)`);
+default, `spline`, `affine`; chosen on the intercept term,
+`I(..., transform=..., transform_kwargs=...)`);
 ordinal nodes an ordered-logit head `P(x ≤ k) = σ(θ_k − shift)`. Abduction is exact
 for continuous nodes and truncated-logistic for ordinal ones, so
 `flow.sample(u=flow.abduct(df))` reproduces `df` exactly / level-exactly.
