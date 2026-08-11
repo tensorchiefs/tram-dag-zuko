@@ -32,10 +32,12 @@ jobs:
         enable-cache: true
     - name: build release docs
       working-directory: main
-      run: uv run --group docs pdoc -d numpy -o ../site tramdag
+      # --with, not --group: main does not declare a docs group and never has
+      # to. This works against any ref, including tags.
+      run: uv run --with pdoc pdoc -d numpy -o ../site tramdag
     - name: build dev docs
       working-directory: dev
-      run: uv run --group docs pdoc -d numpy -o ../site/dev tramdag
+      run: uv run --with pdoc pdoc -d numpy -o ../site/dev tramdag
     - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9   # v5.0.0
       with:
         path: site
