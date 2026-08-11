@@ -101,8 +101,8 @@ plt.show()
 # %%
 spec = {
     "x1": ContinuousNode(),  # source
-    "x2": ContinuousNode(terms=[I("x1")]),
-    "x3": ContinuousNode(terms=[I("x1", "x2")]),
+    "x2": ContinuousNode(I("x1")),
+    "x3": ContinuousNode(I("x1", "x2")),
 }
 
 torch.manual_seed(0)
@@ -271,8 +271,8 @@ plt.show()
 def make_spec(transform):
     return {
         "x1": ContinuousNode(transform=transform),
-        "x2": ContinuousNode(transform=transform, terms=[I("x1")]),
-        "x3": ContinuousNode(transform=transform, terms=[I("x1", "x2")]),
+        "x2": ContinuousNode(I("x1", transform=transform)),
+        "x3": ContinuousNode(I("x1", "x2", transform=transform)),
     }
 
 
@@ -339,8 +339,8 @@ def timed_fit(device, epochs=60):
     f = CausalFlowDAG(
         {
             "x1": ContinuousNode(),
-            "x2": ContinuousNode(terms=[I("x1")]),
-            "x3": ContinuousNode(terms=[I("x1", "x2")]),
+            "x2": ContinuousNode(I("x1")),
+            "x3": ContinuousNode(I("x1", "x2")),
         },
         device=device,
     )

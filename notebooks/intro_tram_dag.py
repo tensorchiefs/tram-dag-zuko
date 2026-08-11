@@ -74,7 +74,7 @@
 #
 # $$
 # u_i \;=\; h(x_i \mid \mathrm{pa}(x_i)) \;=\;
-# \underbrace{f_\theta(x_i)}_{\text{intercept}}
+# \underbrace{h_\theta(x_i)}_{\text{intercept}}
 # \;+\; \underbrace{\textstyle\sum_j \beta_{ij}\, x_j}_{\text{linear shifts (LS)}}
 # \;+\; \underbrace{\textstyle\sum_k g_{ik}(x_k)}_{\text{complex shifts (CS)}} ,
 # $$
@@ -82,10 +82,10 @@
 # with every causal parent assigned to exactly one term. Take $x_5$ with parents
 # $\mathrm{pa}(x_5) = \{x_1, x_2, x_4\}$ as the running example:
 #
-# * **Simple intercept (SI):** $f_\theta(x_5)$ has *constant* parameters $\theta$ —
+# * **Simple intercept (SI):** $h_\theta(x_5)$ has *constant* parameters $\theta$ —
 #   a flexible monotone baseline transformation (here: a Bernstein polynomial),
 #   the same for every observation.
-# * **Complex intercept (CI):** the parameters $\theta$ of $f_\theta(x_5)$ are
+# * **Complex intercept (CI):** the parameters $\theta$ of $h_\theta(x_5)$ are
 #   themselves a function of (a subset of) the parents — the whole transformation
 #   bends with the parent, allowing interactions beyond additive shifts.
 # * **Linear shift (LS):** $\beta_{51} x_1 + \beta_{52} x_2$ — one interpretable
@@ -97,39 +97,45 @@
 # the shifts move to the other side:
 #
 # $$
-# x_5 = h^{-1}(u_5 \mid x_1, x_2, x_4) = f_\theta^{-1}\!\Big(u_5
+# x_5 = h^{-1}(u_5 \mid x_1, x_2, x_4) = h_\theta^{-1}\!\Big(u_5
 # - \underbrace{\beta_{51} x_1 + \beta_{52} x_2}_{\text{LS}}
 # - \underbrace{g(x_4)}_{\text{CS}}\Big).
 # $$
 #
 # In `tramdag` each node declares its transformation as an **additive formula of
-# terms** — `terms=[...]` — built from the constructors `I` (intercept), `LS`
-# (linear shift) and `CS` (complex shift), each naming the parent(s) it depends on:
+# terms** — the node's first argument, written as a list `[...]` or as a `+` sum —
+# built from the constructors `I` (intercept), `LS` (linear shift) and `CS`
+# (complex shift), each naming the parent(s) it depends on:
 #
 # | paper component | `tramdag` |
 # |---|---|
-# | SI — baseline $f_\theta(x_i)$, constant $\theta$ | automatic: every node owns a monotone transform (`bernstein` / `spline` / `affine`); with no intercept term its $\theta$ is a free parameter vector |
+# | SI — baseline $h_\theta(x_i)$, constant $\theta$ | automatic: every node owns a monotone transform (`bernstein` / `spline` / `affine`); with no intercept term its $\theta$ is a free parameter vector |
 # | CI — $\theta$ depends on parents | `I("X1")` (several `I(...)` parents feed **one joint** network → interactions) |
 # | LS — $\beta_{ij} x_j$ | `LS("X1")` (a single weight, no bias) |
 # | CS — $g_{ik}(x_k)$ | `CS("X1")` (64-128-64 MLP, additive) |
 
 # %% [markdown]
-# ### Gallery: a `terms=[...]` spec *is* an additive decomposition
+# ### Gallery: a transformation *is* an additive decomposition
 #
 # Read every spec line as a recipe for $h(x_i \mid \mathrm{pa})$. Each parent lands
 # in **exactly one** term — the intercept (the *shape*) or one shift — and the
 # table shows the resulting decomposition for a single continuous target $X_3$:
 #
-# | `terms=` | $u_3 = h(x_3 \mid \mathrm{pa})$ | what carries each parent |
+# | `transformation` | $u_3 = h(x_3 \mid \mathrm{pa})$ | what carries each parent |
 # |---|---|---|
-# | `[]` (source) | $h_\theta(x_3)$ | `SimpleIntercept` — $\theta$ a free vector |
+# | `None` / `[I]` (source) | $h_\theta(x_3)$ | `SimpleIntercept` — $\theta$ a free vector |
 # | `[LS("X1")]` | $h_\theta(x_3) + \beta\,x_1$ | `LinearShift` — **one number** $\beta$ |
-# | `[CS("X1")]` | $h_\theta(x_3) + g(x_1)$ | `ComplexShift` — additive MLP $g$ |
+# | `[CS("X1")]` | $h_\theta(x_3) + g_1(x_1)$ | `ComplexShift` — additive MLP $g_1$ |
 # | `[I("X1")]` | $h_{\theta(x_1)}(x_3)$ | `ComplexIntercept` — **no shift term**; $\theta$ (the whole shape) bends with $x_1$ |
-# | `[LS("X1"), CS("X2")]` | $h_\theta(x_3) + \beta x_1 + g(x_2)$ | one `LinearShift` + one `ComplexShift` (the model fitted below) |
-# | `[CS("X1", "X2")]` | $h_\theta(x_3) + g(x_1, x_2)$ | **one joint** `ComplexShift` — an interaction in the shift |
-# | `[I("X1"), I("X2")]` | $h_{\theta(x_1) + \theta(x_2)}(x_3)$ | **additive** CI — each parent reshapes the transform independently (two nets summed) |
+# | `LS("X1") + CS("X2")` | $h_\theta(x_3) + \beta x_1 + g_2(x_2)$ | one `LinearShift` + one `ComplexShift` (the model fitted below) |
+# | `[CS("X1", "X2")]` | $h_\theta(x_3) + g_{1,2}(x_1, x_2)$ | **one joint** `ComplexShift` — an interaction in the shift |
+# | `CS("X1") + CS("X2")` | $h_\theta(x_3) + g_1(x_1) + g_2(x_2)$ | two **additive** `ComplexShift`s |
+# | `[I("X1", "X2", allow_interaction=False)]` | $h_{\theta(x_1) + \theta(x_2)}(x_3)$ | **additive** CI, same as `I("X1") + I("X2")` — each parent reshapes the transform independently |
 # | `[I("X1", "X2")]` | $h_{\theta(x_1,x_2)}(x_3)$ | **one joint** `ComplexIntercept` over both parents (they interact) |
+#
+# List and `+` sum are interchangeable: `[LS("X1"), CS("X2")]` ==
+# `LS("X1") + CS("X2")`. The basis of the monotone transform is chosen on the
+# intercept term: `I("X1", transform="spline")`.
 #
 # For an **ordinal** target the intercept is not a Bernstein curve but the vector of
 # ordered cutpoints $\vartheta_k(\mathrm{pa})$, and the shift is **subtracted**:
@@ -305,9 +311,9 @@ plt.show()
 # %%
 spec = {
     "X1": ContinuousNode(transform="bernstein"),
-    "X2": ContinuousNode(terms=[LS("X1")]),
-    "X3": ContinuousNode(terms=[LS("X1"), CS("X2")]),
-    "Y": OrdinalNode(levels=4, terms=[LS("X3")]),
+    "X2": ContinuousNode(LS("X1")),
+    "X3": ContinuousNode(LS("X1") + CS("X2")),
+    "Y": OrdinalNode(4, LS("X3")),
 }
 
 flow = CausalFlowDAG(
@@ -528,9 +534,9 @@ plt.show()
 # %%
 spec_ls = {
     "X1": ContinuousNode(transform="bernstein"),
-    "X2": ContinuousNode(terms=[LS("X1")]),
-    "X3": ContinuousNode(terms=[LS("X1"), LS("X2")]),  # <- cs replaced by ls
-    "Y": OrdinalNode(levels=4, terms=[LS("X3")]),
+    "X2": ContinuousNode(LS("X1")),
+    "X3": ContinuousNode(LS("X1") + LS("X2")),  # <- cs replaced by ls
+    "Y": OrdinalNode(4, LS("X3")),
 }
 torch.manual_seed(7)
 flow_ls = CausalFlowDAG(spec_ls)
@@ -661,7 +667,7 @@ plt.show()
 # ## 9. Where to go from here
 #
 # * **Complex intercepts (`I(...)`)** — the one component not exercised here: declare
-#   `terms=[I("Age")]` and the *parameters* of the Bernstein transform become
+#   `transformation=[I("Age")]` and the *parameters* of the Bernstein transform become
 #   a function of the parent (several `I(...)` parents feed one joint network, i.e.
 #   they may interact). The stroke experiments in `experiments/` use `I(...)` heavily;
 #   run `uv run python experiments/sim_flow.py nl` for the full storyline on the
