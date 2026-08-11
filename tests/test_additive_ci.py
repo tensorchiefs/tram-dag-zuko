@@ -19,7 +19,7 @@ from tramdag import CS, CausalFlowDAG, ContinuousNode, I
 def test_additive_vs_joint_intercept_structure():
     base = {"x1": ContinuousNode(), "x2": ContinuousNode()}
     additive = CausalFlowDAG(
-        {**base, "x3": ContinuousNode([I("x1"), I("x2")])}, seed=0
+        {**base, "x3": ContinuousNode([I("x1", "x2", allow_interaction=False)])}, seed=0
     ).nodes["x3"]
     joint = CausalFlowDAG(
         {**base, "x3": ContinuousNode([I("x1", "x2")])}, seed=0
@@ -46,7 +46,7 @@ def test_additive_ci_runs_and_finite():
         {
             "x1": ContinuousNode(),
             "x2": ContinuousNode(),
-            "x3": ContinuousNode([I("x1"), I("x2")]),
+            "x3": ContinuousNode([I("x1", "x2", allow_interaction=False)]),
         },
         seed=0,
     )
@@ -86,6 +86,8 @@ def _fit_x3_nll(terms, train, val):
 def test_additive_ci_beats_additive_shift_on_heteroscedastic():
     df = _scale_df(4000)
     train, val = df.iloc[:3500], df.iloc[3500:]
-    ci = _fit_x3_nll([I("x1"), I("x2")], train, val)  # reshape per parent
+    ci = _fit_x3_nll(
+        [I("x1", "x2", allow_interaction=False)], train, val
+    )  # reshape per parent
     shift = _fit_x3_nll([CS("x1"), CS("x2")], train, val)  # location only
     assert ci < shift - 0.05, (ci, shift)

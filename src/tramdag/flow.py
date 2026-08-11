@@ -79,9 +79,14 @@ class _Node(nn.Module):
         self.kind = node.kind
         terms = node_terms(node)
         self.parents = tuple(node_parents(node))  # ordered parent names
-        i_terms = [t for t in terms if t.effect == "I" and t.parents]
-        i_groups = [tuple(t.parents) for t in i_terms]
-        i_units = [t.units for t in i_terms]
+        i_term = next((t for t in terms if t.effect == "I" and t.parents), None)
+        if i_term is None:
+            i_groups, i_units = [], []
+        elif i_term.allow_interaction:
+            i_groups, i_units = [tuple(i_term.parents)], [i_term.units]
+        else:  # additive intercept: one net per parent, coefficients summed
+            i_groups = [(p,) for p in i_term.parents]
+            i_units = [i_term.units] * len(i_groups)
         self._intercept_groups = i_groups
         self.ci_parents = [
             p for grp in i_groups for p in grp

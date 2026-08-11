@@ -24,8 +24,10 @@ The intercept slot sums in coefficient space; the shift slot sums on the latent
 scale. "Joint vs additive" is argument grouping: a multi-parent term such as
 ``CS("a","b")`` is one **joint** network over both parents (an interaction),
 whereas ``CS("a") + CS("b")`` are two **additive** terms. For intercepts the
-grouping can be said explicitly: ``I("a", "b", allow_interaction=False)`` is
-exactly ``I("a") + I("b")``.
+grouping is said explicitly: ``I("a", "b", allow_interaction=False)`` is the
+additive intercept. Several ``I`` terms with parents on one node are an
+error — the flag is the only way to say it, so a term list is always purely
+additive on the latent scale.
 
 What ``h`` looks like per transformation, for a continuous ``x3``:
 
@@ -40,8 +42,8 @@ What ``h`` looks like per transformation, for a continuous ``x3``:
 ``[CS("X1", "X2")]``                     ``h_theta(x3) + g_12(x1, x2)``
 ``[CS("X1"), CS("X2")]``                 ``h_theta(x3) + g_1(x1) + g_2(x2)``
 ``[I("X1", "X2")]``                      ``h_theta(x1,x2)(x3)``  (joint)
-``[I("X1","X2", allow_interaction=       ``h_theta(x1)+theta(x2)(x3)``  (additive)
-False)]``
+``[I("X1","X2", allow_interaction=       ``h_theta(x1)+theta(x2)(x3)``  (additive:
+False)]``                                one net per parent, summed coefficients)
 ``[I, CS("X1"), VC("T", "X2")]``         ``h_theta(x3) + g_1(x1) + beta(x2)*t``
 ======================================== =======================================
 
@@ -91,6 +93,8 @@ class Term:
     transform: str | None = None
     transform_kwargs: tuple | None = None  # dict.items() tuple, keeps Term hashable
     units: tuple[int, ...] | None = None  # hidden layers of the term's network
+    # multi-parent I: one joint net (True) or one net per parent (False)
+    allow_interaction: bool = True
 
     def __add__(self, other: Term | Transformation) -> Transformation:
         """Combine two terms into a :class:`Transformation`."""
@@ -115,12 +119,14 @@ def I(  # noqa: E743 - single-letter name is the intended notation
     transform: str | None = None,
     transform_kwargs: dict | None = None,
     units: list[int] | tuple[int, ...] | None = None,
-) -> Term | Transformation:
+) -> Term:
     """Intercept term — the parent(s) reshape the transform. ``I()`` = SI base.
 
     With several parents the term is one **joint** network (an interaction).
-    ``allow_interaction=False`` makes it **additive** instead: it returns
-    ``I("a") + I("b")``, one network per parent, summed in coefficient space.
+    ``allow_interaction=False`` makes it **additive** instead: one network per
+    parent, their parameter vectors summed in coefficient space. A node takes
+    at most one intercept term with parents — additive intercepts are said
+    with this flag, not by listing several ``I`` terms.
 
     ``transform`` picks the basis of a continuous node's monotone transform:
     ``"bernstein"`` (default), ``"spline"`` or ``"affine"``; ``transform_kwargs``
@@ -131,25 +137,14 @@ def I(  # noqa: E743 - single-letter name is the intended notation
     ``units=[16]`` for one hidden layer of 16 neurons (default ``[8, 8]``).
     """
     kw = tuple(sorted(transform_kwargs.items())) if transform_kwargs else None
-    u = tuple(units) if units is not None else None
-    if not allow_interaction and len(parents) > 1:
-        first = Term(
-            "I",
-            "intercept",
-            (parents[0],),
-            transform=transform,
-            transform_kwargs=kw,
-            units=u,
-        )
-        rest = [Term("I", "intercept", (q,), units=u) for q in parents[1:]]
-        return Transformation([first, *rest])
     return Term(
         "I",
         "intercept",
         tuple(parents),
         transform=transform,
         transform_kwargs=kw,
-        units=u,
+        units=tuple(units) if units is not None else None,
+        allow_interaction=bool(allow_interaction) or len(parents) < 2,
     )
 
 
@@ -298,6 +293,22 @@ def _normalize_transformation(value, *, name: str = "transformation"):
     return out
 
 
+def _check_single_intercept(terms):
+    """Reject several intercept terms with parents.
+
+    Additive intercepts are said with ``allow_interaction=False`` on one
+    ``I`` term, not by listing several.
+    """
+    parented = [t for t in terms or [] if t.effect == "I" and t.parents]
+    if len(parented) > 1:
+        raise ValueError(
+            "a node takes at most one I term with parents. For an additive "
+            "intercept write I("
+            + ", ".join(repr(p) for t in parented for p in t.parents)
+            + ", allow_interaction=False)."
+        )
+
+
 def _hoist_transform(terms, *, ordinal: bool):
     """Read the basis choice off the I terms.
 
@@ -344,6 +355,7 @@ class ContinuousNode:
 
     def __init__(self, transformation=None):
         self.transformation = _normalize_transformation(transformation)
+        _check_single_intercept(self.transformation)
         self.transform, self.transform_kwargs = _hoist_transform(
             self.transformation, ordinal=False
         )
@@ -381,6 +393,7 @@ class OrdinalNode:
     def __init__(self, levels: int, transformation=None):
         self.levels = int(levels)
         self.transformation = _normalize_transformation(transformation)
+        _check_single_intercept(self.transformation)
         _hoist_transform(self.transformation, ordinal=True)
 
     def __repr__(self):
@@ -499,6 +512,7 @@ def spec_to_dict(spec: dict[str, NodeSpec]) -> dict:
                 "effect": t.effect,
                 "parents": list(t.parents),
                 **({"units": list(t.units)} if t.units else {}),
+                **({"allow_interaction": False} if not t.allow_interaction else {}),
                 **({"transform": t.transform} if t.transform else {}),
                 **(
                     {"transform_kwargs": dict(t.transform_kwargs)}
@@ -543,6 +557,7 @@ def _term_from_dict(t: dict) -> Term:
     if t["effect"] == "I":
         return I(
             *t["parents"],
+            allow_interaction=t.get("allow_interaction", True),
             transform=t.get("transform"),
             transform_kwargs=t.get("transform_kwargs"),
             units=units,
@@ -568,6 +583,15 @@ def spec_from_dict(d: dict) -> dict[str, NodeSpec]:
     spec: dict[str, NodeSpec] = {}
     for name, nd in d.items():
         terms = [_term_from_dict(t) for t in nd["terms"]]
+        # 0.3 wrote an additive intercept as several I terms; merge them
+        parented_i = [t for t in terms if t.effect == "I" and t.parents]
+        if len(parented_i) > 1:
+            merged = I(
+                *(p for t in parented_i for p in t.parents),
+                allow_interaction=False,
+            )
+            terms = [merged if t is parented_i[0] else t for t in terms]
+            terms = [t for t in terms if t not in parented_i[1:]]
         if nd["kind"] == "continuous":
             # 0.3 checkpoints store the basis on the node; carry it on a bare I
             stored = nd.get("transform", "bernstein")

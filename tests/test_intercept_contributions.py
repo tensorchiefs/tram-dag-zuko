@@ -28,7 +28,7 @@ def _additive_ci_flow():
     spec = {
         "x1": ContinuousNode(),
         "x2": ContinuousNode(),
-        "x3": ContinuousNode([I("x1"), I("x2")]),
+        "x3": ContinuousNode([I("x1", "x2", allow_interaction=False)]),
     }  # additive CI
     return CausalFlowDAG(spec, seed=1)
 
@@ -81,7 +81,7 @@ def test_ordinal_additive_ci():
     spec = {
         "x1": ContinuousNode(),
         "x2": ContinuousNode(),
-        "y": OrdinalNode(4, [I("x1"), I("x2")]),
+        "y": OrdinalNode(4, [I("x1", "x2", allow_interaction=False)]),
     }
     flow = CausalFlowDAG(spec, seed=2)
     df = _data()
@@ -100,7 +100,9 @@ def test_works_for_any_continuous_transform(transform, P):
     spec = {
         "x1": ContinuousNode(),
         "x2": ContinuousNode(),
-        "x3": ContinuousNode([I("x1", transform=transform), I("x2")]),
+        "x3": ContinuousNode(
+            [I("x1", "x2", allow_interaction=False, transform=transform)]
+        ),
     }
     flow = CausalFlowDAG(spec, seed=5)
     df = _data()

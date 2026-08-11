@@ -2,7 +2,8 @@
 
 Every spelling must produce the same normalized term list — and, at a
 fixed seed, the bit-identical model. The 0.3 keywords (``terms=``,
-node-level ``transform=``, VC's positional treatment) are gone and raise.
+node-level ``transform=``, VC's positional treatment) are gone and raise,
+and a node takes at most one intercept term with parents.
 """
 
 import pytest
@@ -48,10 +49,11 @@ def test_junk_entries_are_rejected():
 # ------------------------------------------------------- allow_interaction
 
 
-def test_allow_interaction_false_equals_additive_sum():
-    assert ContinuousNode([I("a", "b", allow_interaction=False)]) == ContinuousNode(
-        I("a") + I("b")
-    )
+def test_several_parented_i_terms_are_rejected():
+    with pytest.raises(ValueError, match="allow_interaction=False"):
+        ContinuousNode(I("a") + I("b"))
+    with pytest.raises(ValueError, match="allow_interaction=False"):
+        OrdinalNode(3, [I("a"), CS("c"), I("b")])
 
 
 def test_multi_parent_i_stays_joint_by_default():
@@ -72,8 +74,9 @@ def test_bare_i_can_carry_the_source_basis():
 
 
 def test_two_i_transforms_conflict():
+    # a bare carrier plus a parented I is legal -- two bases are not
     with pytest.raises(ValueError, match="only one I term"):
-        ContinuousNode(I("a", transform="spline") + I("b", transform="affine"))
+        ContinuousNode(I(transform="spline") + I("a", transform="affine"))
 
 
 def test_ordinal_rejects_i_transform():
@@ -128,19 +131,21 @@ def test_list_and_sum_build_the_identical_model():
     assert _state_dicts_equal(as_list, as_sum)
 
 
-def test_additive_flag_builds_the_same_model_as_two_terms():
-    def build(transformation):
-        torch.manual_seed(3)
-        spec = {
-            "a": ContinuousNode(),
-            "b": ContinuousNode(),
-            "y": ContinuousNode(transformation),
-        }
-        return CausalFlowDAG(spec).state_dict()
+def test_additive_flag_builds_one_net_per_parent():
+    spec = {
+        "a": ContinuousNode(),
+        "b": ContinuousNode(),
+        "y": ContinuousNode([I("a", "b", allow_interaction=False)]),
+    }
+    flow = CausalFlowDAG(spec)
+    node = flow.nodes["y"]
+    assert node.intercept is None
+    assert len(node.intercept_nets) == 2
+    assert node._intercept_groups == [("a",), ("b",)]
 
-    flagged = build([I("a", "b", allow_interaction=False)])
-    explicit = build(I("a") + I("b"))
-    assert _state_dicts_equal(flagged, explicit)
+    joint = CausalFlowDAG({**spec, "y": ContinuousNode([I("a", "b")])})
+    assert joint.nodes["y"].intercept_nets is None
+    assert joint.nodes["y"]._intercept_groups == [("a", "b")]
 
 
 # ------------------------------------------------------------ persistence
