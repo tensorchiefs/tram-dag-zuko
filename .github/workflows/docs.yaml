@@ -1,56 +1,63 @@
 name: docs
 
+# Each push rebuilds only its own ref's docs:
+#   main       -> /
+#   dev-<name> -> /dev-<name>/
+# The site therefore accumulates on the gh-pages branch. Set
+# Settings -> Pages -> Source to "Deploy from a branch": gh-pages, / (root).
 on:
   push:
-    branches: [main, dev-marcel]
+    branches: [main, dev-*]
   workflow_dispatch:
 
-concurrency:              # never let two deployments interleave
-  group: pages
+concurrency:              # every run pushes to the same branch
+  group: gh-pages
   cancel-in-progress: false
 
 jobs:
-  build:
+  docs:
     runs-on: ubuntu-latest
     permissions:
-      contents: read
+      contents: write     # pushes gh-pages
     steps:
-      # Pages replaces the whole site on every deployment, so both versions
-      # have to be built in one run: main at /, dev at /dev/.
-    - name: check out main
-      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1
-      with:
-        ref: main
-        path: main
-    - name: check out dev
-      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1
-      with:
-        ref: dev-marcel
-        path: dev
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1
     - uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9   # v9.0.0
       with:
         enable-cache: true
-    - name: build release docs
-      working-directory: main
-      # --with, not --group: main does not declare a docs group and never has
-      # to. This works against any ref, including tags.
-      run: uv run --with pdoc pdoc -d numpy -o ../site tramdag
-    - name: build dev docs
-      working-directory: dev
-      run: uv run --with pdoc pdoc -d numpy -o ../site/dev tramdag
-    - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9   # v5.0.0
-      with:
-        path: site
 
-  deploy:
-    needs: build
-    runs-on: ubuntu-latest
-    permissions:
-      pages: write
-      id-token: write
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    steps:
-    - id: deployment
-      uses: actions/deploy-pages@cd2ce8fcbc39b97be8ca5fce6e763baed58fa128   # v5.0.0
+    # --with, not --group: this works against any ref, whether or not it
+    # declares a docs dependency group.
+    - name: build docs for this ref
+      run: uv run --with pdoc pdoc -d numpy -o site tramdag
+
+    - name: publish to gh-pages
+      env:
+        REF: ${{ github.ref_name }}
+      run: |
+        set -euo pipefail
+        git config user.name "github-actions[bot]"
+        git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+        git fetch origin gh-pages:gh-pages 2>/dev/null || true
+        git worktree add ../pages gh-pages 2>/dev/null \
+          || git worktree add --orphan -b gh-pages ../pages
+
+        if [ "$REF" = main ]; then
+          # replace the root, keep every dev-* version directory
+          find ../pages -mindepth 1 -maxdepth 1 \
+            ! -name .git ! -name 'dev-*' -exec rm -rf {} +
+          cp -a site/. ../pages/
+        else
+          rm -rf "../pages/$REF"
+          mkdir -p "../pages/$REF"
+          cp -a site/. "../pages/$REF/"
+        fi
+
+        cd ../pages
+        git add -A
+        if git diff --cached --quiet; then
+          echo "docs unchanged, nothing to publish"
+          exit 0
+        fi
+        git commit -m "docs: $REF @ ${GITHUB_SHA:0:7}"
+        git push origin gh-pages
