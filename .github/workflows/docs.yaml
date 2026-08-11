@@ -40,9 +40,10 @@ jobs:
     - name: render the docs/*.md guides
       run: |
         set -euo pipefail
+        # not preinstalled on the runners (learned the hard way)
+        sudo apt-get install -y -qq pandoc
         mkdir -p site/docs
         for f in docs/*.md; do
-          # pandoc is preinstalled on the ubuntu runners
           pandoc -f gfm -s --metadata title="$(basename "$f" .md)" \
             "$f" -o "site/docs/$(basename "$f" .md).html"
         done
