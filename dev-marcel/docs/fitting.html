@@ -1,0 +1,448 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="" xml:lang="">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>fitting</title>
+  <style>
+    html {
+      color: #1a1a1a;
+      background-color: #fdfdfd;
+    }
+    body {
+      margin: 0 auto;
+      max-width: 36em;
+      padding-left: 50px;
+      padding-right: 50px;
+      padding-top: 50px;
+      padding-bottom: 50px;
+      hyphens: auto;
+      overflow-wrap: break-word;
+      text-rendering: optimizeLegibility;
+      font-kerning: normal;
+    }
+    @media (max-width: 600px) {
+      body {
+        font-size: 0.9em;
+        padding: 12px;
+      }
+      h1 {
+        font-size: 1.8em;
+      }
+    }
+    @media print {
+      html {
+        background-color: white;
+      }
+      body {
+        background-color: transparent;
+        color: black;
+        font-size: 12pt;
+      }
+      p, h2, h3 {
+        orphans: 3;
+        widows: 3;
+      }
+      h2, h3, h4 {
+        page-break-after: avoid;
+      }
+    }
+    p {
+      margin: 1em 0;
+    }
+    a {
+      color: #1a1a1a;
+    }
+    a:visited {
+      color: #1a1a1a;
+    }
+    img {
+      max-width: 100%;
+    }
+    h1, h2, h3, h4, h5, h6 {
+      margin-top: 1.4em;
+    }
+    h5, h6 {
+      font-size: 1em;
+      font-style: italic;
+    }
+    h6 {
+      font-weight: normal;
+    }
+    ol, ul {
+      padding-left: 1.7em;
+      margin-top: 1em;
+    }
+    li > ol, li > ul {
+      margin-top: 0;
+    }
+    blockquote {
+      margin: 1em 0 1em 1.7em;
+      padding-left: 1em;
+      border-left: 2px solid #e6e6e6;
+      color: #606060;
+    }
+    code {
+      font-family: Menlo, Monaco, Consolas, 'Lucida Console', monospace;
+      font-size: 85%;
+      margin: 0;
+      hyphens: manual;
+    }
+    pre {
+      margin: 1em 0;
+      overflow: auto;
+    }
+    pre code {
+      padding: 0;
+      overflow: visible;
+      overflow-wrap: normal;
+    }
+    .sourceCode {
+     background-color: transparent;
+     overflow: visible;
+    }
+    hr {
+      background-color: #1a1a1a;
+      border: none;
+      height: 1px;
+      margin: 1em 0;
+    }
+    table {
+      margin: 1em 0;
+      border-collapse: collapse;
+      width: 100%;
+      overflow-x: auto;
+      display: block;
+      font-variant-numeric: lining-nums tabular-nums;
+    }
+    table caption {
+      margin-bottom: 0.75em;
+    }
+    tbody {
+      margin-top: 0.5em;
+      border-top: 1px solid #1a1a1a;
+      border-bottom: 1px solid #1a1a1a;
+    }
+    th {
+      border-top: 1px solid #1a1a1a;
+      padding: 0.25em 0.5em 0.25em 0.5em;
+    }
+    td {
+      padding: 0.125em 0.5em 0.25em 0.5em;
+    }
+    header {
+      margin-bottom: 4em;
+      text-align: center;
+    }
+    #TOC li {
+      list-style: none;
+    }
+    #TOC ul {
+      padding-left: 1.3em;
+    }
+    #TOC > ul {
+      padding-left: 0;
+    }
+    #TOC a:not(:hover) {
+      text-decoration: none;
+    }
+    code{white-space: pre-wrap;}
+    span.smallcaps{font-variant: small-caps;}
+    div.columns{display: flex; gap: min(4vw, 1.5em);}
+    div.column{flex: auto; overflow-x: auto;}
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    /* The extra [class] is a hack that increases specificity enough to
+       override a similar rule in reveal.js */
+    ul.task-list[class]{list-style: none;}
+    ul.task-list li input[type="checkbox"] {
+      font-size: inherit;
+      width: 0.8em;
+      margin: 0 0.8em 0.2em -1.6em;
+      vertical-align: middle;
+    }
+    .display.math{display: block; text-align: center; margin: 0.5rem auto;}
+  </style>
+</head>
+<body>
+<header id="title-block-header">
+<h1 class="title">fitting</h1>
+</header>
+<h1 id="fitting-a-tram-dag-how-training-works">Fitting a TRAM-DAG: how
+training works</h1>
+<p>Technical reference for <a
+href="../src/tramdag/flow.py"><code>CausalFlowDAG</code></a>: how the
+flow is built, how the likelihood is computed, and the two fitting paths
+— the stochastic optimizer (<a
+href="../src/tramdag/flow.py"><code>fit</code></a>) and the classical
+one (<a href="../src/tramdag/flow.py"><code>fit_classical</code></a>) —
+plus per-node freezing, the memory model, and where optimizer choice
+could go next.</p>
+<h2 id="how-the-flow-is-built-one-module-one-sub-model-per-node">How the
+flow is built: one module, one sub-model per node</h2>
+<p>A <code>CausalFlowDAG</code> is a single
+<code>torch.nn.Module</code>, but it is <strong>not one monolithic
+network</strong>. At construction (<a
+href="../src/tramdag/flow.py"><code>CausalFlowDAG.__init__</code></a>)
+it topologically sorts the DAG and builds an <code>nn.ModuleDict</code>
+with <strong>one <a href="../src/tramdag/flow.py"><code>_Node</code></a>
+sub-module per variable</strong>. The nodes share <em>no
+parameters</em>; each owns the pieces for its own conditional
+<code>p(x_i | pa(x_i))</code>:</p>
+<ul>
+<li>an <strong>intercept</strong> producing the transform parameters
+<code>θ</code>: <a
+href="../src/tramdag/conditioners.py"><code>SimpleIntercept</code></a>
+(a free parameter vector, data-independent) — or, if the node has
+<code>ci</code> parents, <a
+href="../src/tramdag/conditioners.py"><code>ComplexIntercept</code></a>
+(a small MLP whose output <code>θ</code> depends on those parents);</li>
+<li>a <strong>monotone 1-D transform</strong> <code>h</code> (<a
+href="../src/tramdag/transforms.py"><code>BernsteinUT</code> /
+<code>SplineUT</code> / <code>AffineUT</code></a>) — note the transform
+itself carries <strong>no learnable weights</strong>, only the fitted
+range buffers <code>xmin</code>/<code>xmax</code>; its shape is set
+entirely by <code>θ</code> from the intercept;</li>
+<li>a <code>ModuleDict</code> of <strong>shift modules</strong>, one per
+parent edge: <a
+href="../src/tramdag/conditioners.py"><code>LinearShift</code></a>
+(<code>ls</code>, a single weight) or <a
+href="../src/tramdag/conditioners.py"><code>ComplexShift</code></a>
+(<code>cs</code>, an MLP).</li>
+</ul>
+<p>So "one network or several?" — <strong>one module, several
+independent per-node sub-models</strong> (each itself a small intercept
++ shifts assembly). They are bundled into one module and trained by one
+optimizer, but their parameters are disjoint. The DAG structure lives
+entirely in <em>which parents each node reads</em>; there is no edge
+weight matrix or shared trunk.</p>
+<p><code>_Node.theta_shift</code> assembles a node's <code>θ</code>
+(from the intercept) and total <code>shift</code> (sum of its shift
+modules over the parent features) for a batch; parent features are
+encoded by <code>_encode_parent</code> — continuous parents raw, ordinal
+parents one-hot.</p>
+<h2 id="how-the-likelihood-is-computed">How the likelihood is
+computed</h2>
+<p>A TRAM-DAG maps iid standard-logistic latents <code>U</code> to the
+observed <code>X</code> in causal order; because node <code>i</code>
+reads only its parents (earlier variables, as <em>data</em>), the
+Jacobian of <code>U → X</code> is <strong>triangular</strong>, so its
+log-determinant is the sum of the per-node 1-D terms. The joint
+log-likelihood therefore <strong>decomposes per node</strong>:</p>
+<pre><code>log p(x) = Σ_i log p(x_i | pa(x_i))</code></pre>
+<p><a
+href="../src/tramdag/flow.py"><code>CausalFlowDAG.node_log_prob</code></a>
+computes one term per node and <code>log_prob</code> sums them. For a
+node, given <code>θ, shift</code> from <code>theta_shift</code>:</p>
+<ul>
+<li><p><strong>continuous</strong> — change of variables through the
+monotone transform:</p>
+<pre><code>z = h(x; θ) + shift
+log p(x | pa) = log f_logistic(z) + log |dz/dx|</code></pre>
+<p>i.e. the standard-logistic density at the latent <code>z</code> (<a
+href="../src/tramdag/transforms.py"><code>StandardLogistic.log_prob</code></a>)
+plus the transform's log-derivative (<code>ladj</code>, returned by
+<code>ut.forward</code> — the 1-D Jacobian term that makes it a proper
+density, not just a score).</p></li>
+<li><p><strong>ordinal</strong> — an ordered-logit / proportional-odds
+head, <code>P(x ≤ k) = σ(θ_k − shift)</code>, evaluated as the log of
+the cutpoint-interval probability by <a
+href="../src/tramdag/transforms.py"><code>ordinal_log_prob</code></a>
+(done in log-space via <code>logsigmoid</code>/<code>log1mexp</code>,
+because the naive sigmoid difference underflows to exactly-zero
+gradients in float32).</p></li>
+</ul>
+<p>The training loss is the summed per-node <strong>mean</strong> NLL
+over the batch (<code>Σ_i mean_rows(−log p(x_i | pa))</code>);
+<code>log_prob</code> instead returns the per-row joint for scoring
+whole observations.</p>
+<p><strong>Consequence used by both optimizers:</strong> because parents
+enter as data, the per-node gradients are independent — optimizing the
+summed loss jointly is identical to optimizing each node separately.
+This is what licenses per-node learning rates, per-node freezing
+(below), and the all-<code>ls</code> classical fit.</p>
+<h2 id="path-a--stochastic-optimization-fit">Path A — stochastic
+optimization (<code>fit</code>)</h2>
+<p><a href="../src/tramdag/flow.py"><code>CausalFlowDAG.fit</code></a>
+is the general-purpose trainer (required for any
+<code>cs</code>/<code>ci</code> edge). Mechanics:</p>
+<ul>
+<li><strong>Adam</strong> with <strong>one parameter group per
+node</strong> — built from <code>self.nodes[name].parameters()</code>,
+so each node can carry its own learning rate.</li>
+<li><strong>Minibatches</strong>: a fresh <code>torch.randperm</code>
+shuffle each epoch; the loss is the summed per-node mean NLL on the
+batch.</li>
+<li><strong>Transform ranges</strong> are set once at the start from the
+train 5%/95% quantiles (<code>_set_ranges</code>), defining each
+Bernstein/spline domain.</li>
+<li><strong>Learning-rate schedules</strong> (<code>schedule=</code>):
+<code>None</code> (constant), <code>"onecycle"</code>,
+<code>"cosine"</code>, or <code>"plateau"</code> — the last decays each
+node's lr off <em>its own</em> validation NLL.</li>
+<li><strong>Per-node freezing</strong> (<code>freeze_patience=</code>,
+see below).</li>
+<li><strong><code>restore_best</code></strong>: optionally snapshots
+each node's best-validation weights and restores them at the end
+(early-stopping regularization). Default <code>False</code> so the fit
+sits at the training-data MLE.</li>
+</ul>
+<h3 id="how-per-node-freezing-works">How per-node freezing works</h3>
+<p>Set <code>freeze_patience=N</code> to let converged nodes drop out of
+training. Each epoch, <code>fit</code> tracks every node's own
+validation NLL and counts epochs since its last improvement (by more
+than <code>min_delta</code>). A node is <strong>frozen</strong> once
+that counter reaches <code>N</code> (under
+<code>schedule="plateau"</code>, only after its learning rate has
+already been decayed, so a node isn't frozen while a smaller step would
+still help).</p>
+<p>Freezing is not just "stop updating" — the frozen node is
+<strong>excluded from the computation entirely</strong>:
+<code>node_log_prob(values, nodes=active)</code> is called with only the
+still-active nodes, so a frozen node runs no forward and no backward
+pass. That is a real FLOP saving, and it is <em>correct</em> precisely
+because the per-node gradients are independent (above): removing a
+converged node's term from the loss does not change any other node's
+gradient. The slowest node sets the total training time; the rest stop
+costing anything once they have converged.</p>
+<p>When <strong>every</strong> node is frozen the fit returns early (the
+self-stopping behavior). Freeze epochs are recorded in
+<code>flow.history["frozen"]</code>; the freeze state is local to a
+single <code>fit</code> call (a later <code>fit</code> call trains all
+nodes again). This composes with <code>restore_best</code>, which still
+restores each node's best-validation snapshot at the end.</p>
+<h4
+id="freezing-vs-parallelism-why-one-helps-and-the-other-usually-doesnt">Freezing
+vs. parallelism (why one helps and the other usually doesn't)</h4>
+<p>It is tempting to reason "freezing a node speeds things up, so node
+computation costs time, so computing nodes <em>in parallel</em> should
+also speed things up." The premise is right but the conclusion doesn't
+follow, because the two act through different mechanisms:</p>
+<ul>
+<li><strong>Freezing removes work</strong> — the frozen node's
+forward/backward simply never runs again. Removing work is an
+<em>unconditional</em> win, and most of its payoff is structural: once
+<em>all</em> nodes freeze the fit stops, deleting whole epochs —
+something parallelism can never do (it can shrink time-per-epoch, not
+the number of epochs).</li>
+<li><strong>Parallelism only overlaps work</strong> — it runs the same
+computations concurrently, which helps <em>only if the hardware is
+sitting idle</em> during the sequential node loop. It usually isn't:
+parallelism is already extracted one level down, where each node's
+batched tensor ops run across all rows and the BLAS/GPU backend already
+uses all cores. While node A's matmul runs the cores are busy, so doing
+node B "at the same time" just time-slices the same cores — contention,
+often slightly slower.</li>
+</ul>
+<p>So freezing speeding things up does <strong>not</strong> imply spare
+capacity to parallelize across nodes. The exception is the regime where
+per-node ops <em>under-utilize</em> the hardware — small batches, tiny
+models, or many small nodes on a big GPU where each kernel leaves it
+mostly idle. There, overlapping nodes can help, but the right tool is
+<strong>fusion</strong> (batch same-shaped nodes into one larger tensor
+op, or CUDA streams), not threading the Python loop (which the GIL
+fights). That is the "vectorize/fuse the per-node loop" direction in <a
+href="#optimizer-choice--current-and-future">Optimizer choice</a> below
+— a conditional win in that regime, distinct from freezing's
+unconditional one.</p>
+<p>Benchmarks, schedule trade-offs, and the recommended self-stopping
+recipe are in <a href="training-speed.md">training-speed.md</a>; the
+worked walkthrough is <a
+href="../notebooks/intro_tram_dag.py"><code>notebooks/intro_tram_dag.py</code></a>.</p>
+<h2 id="path-b--classical-optimization-fit_classical">Path B — classical
+optimization (<code>fit_classical</code>)</h2>
+<p><a
+href="../src/tramdag/flow.py"><code>CausalFlowDAG.fit_classical</code></a>
+is the dedicated optimizer for <strong>all-<code>ls</code></strong>
+models, where every node-conditional is a classical transformation model
+(ordered-logit / Colr). It raises on any <code>cs</code>/<code>ci</code>
+edge.</p>
+<ul>
+<li><strong>Full-batch, float64, L-BFGS</strong> (strong-Wolfe line
+search) — no minibatches, no schedule, no early stopping ⇒
+<strong>deterministic</strong> (same init → bit-identical) and on the
+<strong>exact MLE</strong> (matches <code>statsmodels</code>/R to ~1e-3
+on well-identified coefficients).</li>
+<li><strong>float64 is a transient compute mode</strong>:
+<code>self.double()</code> upcasts parameters <em>and</em> the
+transforms' range buffers in one call; the fit runs in double; a
+<code>finally: self.float()</code> restores float32. The stored model —
+and <code>save</code>/<code>load</code> — stay float32. The data path
+(<code>_tensorize</code>, <code>sample</code>, <code>pmf</code>) reads
+the model dtype so it follows along.</li>
+<li><strong>Convergence</strong> is judged by NLL flatness and is
+<em>advisory</em>: a Bernstein intercept and weakly-identified
+directions (rare one-hot levels, a flat treatment-effect ridge) keep
+drifting along zero-curvature valleys after the likelihood is at the
+optimum. Correctness is verified against classical software
+(<code>experiments/validate_ls.py --classical</code>), not the
+flag.</li>
+<li>Read the fitted coefficients with
+<code>ls_coefficients()</code>.</li>
+</ul>
+<p>Walkthrough: <a
+href="../notebooks/classical_fit_tram_dag.py"><code>notebooks/classical_fit_tram_dag.py</code></a>.</p>
+<h2 id="memory-and-disk-during-fitting">Memory and disk during
+fitting</h2>
+<p><strong>Neither fitting path writes to disk.</strong> Everything
+during <code>fit</code>/<code>fit_classical</code> lives in RAM:</p>
+<ul>
+<li>model parameters and (for <code>fit</code>) the per-node Adam
+optimizer state;</li>
+<li>the <code>history</code> dict (per-epoch train/val NLL, lr,
+wall-clock) — an in-memory attribute, not a file;</li>
+<li><code>restore_best</code> snapshots — <code>copy.deepcopy</code> of
+node <code>state_dict</code>s held in memory (<code>flow.py</code>),
+never serialized.</li>
+</ul>
+<p>The <strong>only</strong> disk I/O in the module is the explicit,
+user-called <a href="../src/tramdag/flow.py"><code>save</code></a>
+(<code>torch.save</code> of spec + state_dict + history) and its
+counterpart <code>load</code>. So a fit produces no temp files, no
+checkpoints, no scratch directory; persistence is opt-in via
+<code>flow.save(path)</code>. (The <code>results/</code> and
+<code>docs/perf/</code> artifacts in this repo are written by the
+<em>experiment scripts</em>, not by the library's fitting code.)</p>
+<h2 id="optimizer-choice--current-and-future">Optimizer choice — current
+and future</h2>
+<p>Today: <strong>Adam</strong> for flexible models,
+<strong>L-BFGS</strong> (float64) for all-<code>ls</code>. The
+per-node-param-group structure already in <code>fit</code> makes several
+extensions cheap, and worth considering as the package matures:</p>
+<ul>
+<li><strong>IRLS / Fisher scoring for the all-<code>ls</code>
+path.</strong> The classical fitting algorithm for proportional-odds /
+GLM-type models is iteratively reweighted least squares (Newton with the
+expected information). For the <code>ls</code> case it would likely
+reach the MLE in <em>fewer, more stable</em> steps than L-BFGS — and the
+Fisher information it computes is exactly the ingredient for the planned
+<strong>standard-error table</strong> (currently flagged as next in the
+CHANGELOG). Strong candidate to back <code>fit_classical</code> in a
+future version.</li>
+<li><strong>Second-order / curvature-aware methods for flexible
+nodes.</strong> K-FAC or a Gauss-Newton approximation could help the
+<code>ci</code>/<code>cs</code> MLPs, though full-batch quasi-Newton is
+a poor fit for them (minibatch noise also regularizes — see why
+<code>fit_classical</code> refuses them).</li>
+<li><strong>Modern first-order variants.</strong> AdamW (decoupled
+weight decay), RAdam (warmup- free), or Lion/Sophia are drop-in
+alternatives to Adam; the benchmark harness (<a
+href="../experiments/bench_training.py"><code>experiments/bench_training.py</code></a>)
+is built to evaluate exactly such swaps on time-to-target.</li>
+<li><strong>Per-node optimizer selection.</strong> Because the loss
+decomposes and the optimizer already holds one group per node, different
+nodes could in principle use different optimizers (e.g. L-BFGS for the
+<code>ls</code> nodes, Adam for an MLP node in a mixed model) — an
+interesting direction for mixed-flexibility DAGs.</li>
+<li><strong>Warm-start handoffs.</strong>
+<code>fit_classical → fit</code> already works (the classical MLE as a
+fast, principled initialization); the reverse (Adam to escape, L-BFGS to
+polish) is a natural pattern to formalize.</li>
+</ul>
+<p>These are <em>directions</em>, not commitments. The autoresearch loop
+(<a
+href="research/MISSION_autoresearch.md"><code>docs/research/MISSION_autoresearch.md</code></a>)
+is a good venue to test the speed-oriented ones empirically before
+adopting any.</p>
+</body>
+</html>
