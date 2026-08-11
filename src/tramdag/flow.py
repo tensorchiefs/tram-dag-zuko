@@ -853,7 +853,7 @@ class CausalFlowDAG(nn.Module):
 
     @torch.no_grad()
     def varying_coef(
-        self, node: str, data: pd.DataFrame, on: str | None = None
+        self, node: str, data: pd.DataFrame, t: str | None = None
     ) -> np.ndarray:
         """Evaluate the fitted effect function ``beta(x)`` of a ``VC`` term.
 
@@ -887,18 +887,18 @@ class CausalFlowDAG(nn.Module):
         vcs = {g.on: g.mods for g in nd._vc_groups}
         if not vcs:
             raise ValueError(f"node {node!r} has no VC term.")
-        if on is None:
+        if t is None:
             if len(vcs) > 1:
                 raise ValueError(
                     f"node {node!r} has several VC terms ({sorted(vcs)}). "
                     "Pass on=<treatment name>."
                 )
-            on = next(iter(vcs))
-        if on not in vcs:
+            t = next(iter(vcs))
+        if t not in vcs:
             raise KeyError(
-                f"node {node!r} has no VC term on {on!r} (has {sorted(vcs)})."
+                f"node {node!r} has no VC term on {t!r} (has {sorted(vcs)})."
             )
-        mods = vcs[on]
+        mods = vcs[t]
         missing = [p for p in mods if p not in data.columns]
         if missing:
             raise KeyError(f"data is missing modifier column(s): {missing}")
@@ -911,7 +911,7 @@ class CausalFlowDAG(nn.Module):
             }
             feats = self._features(vals)
             mod_feat = torch.cat([feats[p] for p in mods], dim=1)
-        return nd.shifts[on].beta(mod_feat, len(data)).cpu().numpy()
+        return nd.shifts[t].beta(mod_feat, len(data)).cpu().numpy()
 
     # --------------------------------------------------------- classical fit
     def _is_all_ls(self) -> bool:
@@ -1337,12 +1337,12 @@ class CausalFlowDAG(nn.Module):
 
     @torch.no_grad()
     def effect_modifier_scan(
-        self, df: pd.DataFrame, node: str, on: str, candidates: list[str] | None = None
+        self, df: pd.DataFrame, node: str, t: str, candidates: list[str] | None = None
     ) -> pd.DataFrame:
         """Rank candidate effect modifiers with a Zeileis-Hornik fluctuation scan.
 
         Issue #29 describes the method. Each candidate covariate is ranked by how
-        strongly the scores of the ``on`` coefficient drift when the rows are
+        strongly the scores of the ``t`` coefficient drift when the rows are
         ordered by it. A cheap all-``ls`` fit is enough, so this gives a measured
         shortlist for ``VC`` modifiers.
 
@@ -1354,7 +1354,7 @@ class CausalFlowDAG(nn.Module):
         """
         from .scores import effect_modifier_scan
 
-        return effect_modifier_scan(self, df, node, on, candidates=candidates)
+        return effect_modifier_scan(self, df, node, t, candidates=candidates)
 
     # ------------------------------------------------------------------- io
     def save(self, path: str | Path) -> None:

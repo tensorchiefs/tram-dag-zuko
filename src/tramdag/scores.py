@@ -140,9 +140,9 @@ def sup_bb_pvalue(stat: float, terms: int = 100) -> float:
 
 
 def effect_modifier_scan(
-    flow, df: pd.DataFrame, node: str, on: str, candidates: list[str] | None = None
+    flow, df: pd.DataFrame, node: str, t: str, candidates: list[str] | None = None
 ) -> pd.DataFrame:
-    """Zeileis–Hornik fluctuation scan of the ``on``-coefficient scores.
+    """Zeileis–Hornik fluctuation scan of the ``t``-coefficient scores.
 
     For each candidate covariate ``c``: order the per-observation scores of the
     treatment coefficient by ``c`` and form the scaled cumulative-sum process
@@ -152,10 +152,10 @@ def effect_modifier_scan(
     the true effect varying with ``c`` — inflates it. Covariates flagged here
     are the measured candidates for ``VC`` modifiers.
 
-    ``on`` names the treatment: its scores column is ``on`` itself for a
-    continuous parent or a VC term, the identified level-1 column ``"{on}[1]"``
+    ``t`` names the treatment: its scores column is ``t`` itself for a
+    continuous parent or a VC term, the identified level-1 column ``"{t}[1]"``
     for a binary ordinal LS parent. ``candidates`` defaults to every column of
-    ``df`` except ``node`` and ``on``. For heavily tied (few-level) candidates
+    ``df`` except ``node`` and ``t``. For heavily tied (few-level) candidates
     the ordering is only partial — read the scan as a ranking diagnostic, not
     an exact-size test.
 
@@ -164,13 +164,13 @@ def effect_modifier_scan(
     (``stat > crit_5pct``).
     """
     psi_df = node_scores(flow, df, node)
-    if on in psi_df.columns:
-        col = on
-    elif f"{on}[1]" in psi_df.columns and f"{on}[2]" not in psi_df.columns:
-        col = f"{on}[1]"  # binary ordinal LS: the contrast
+    if t in psi_df.columns:
+        col = t
+    elif f"{t}[1]" in psi_df.columns and f"{t}[2]" not in psi_df.columns:
+        col = f"{t}[1]"  # binary ordinal LS: the contrast
     else:
         raise KeyError(
-            f"no score column for treatment {on!r} on node {node!r} "
+            f"no score column for treatment {t!r} on node {node!r} "
             f"(have {list(psi_df.columns)})."
         )
     psi = psi_df[col].to_numpy()
@@ -180,7 +180,7 @@ def effect_modifier_scan(
         raise ValueError(f"score column {col!r} is constant. There is nothing to scan.")
 
     if candidates is None:
-        candidates = [c for c in df.columns if c not in (node, on)]
+        candidates = [c for c in df.columns if c not in (node, t)]
     rows = {}
     for c in candidates:
         order = np.argsort(df[c].to_numpy(), kind="stable")
