@@ -97,24 +97,47 @@ flow = CausalFlowDAG.load("flow.pt")
 td.simulations.REGISTRY  # synthetic DGPs with known ground truth
 ```
 
-## The model in one table
+## The model in detail: spec → math → networks
 
-Per node, the transformation is additive on the latent (log-odds) scale —
-`u = h(x; θ) + Σ β·x_pa + Σ g(x_pa)` — and each parent edge declares how it enters:
+Per node, the transformation is additive on the latent (log-odds) scale — one
+intercept term `I` plus any number of shifts (notation:
+[`docs/notation.md`](docs/notation.md)):
 
-| term | meaning | interpretability |
-|---|---|---|
-| `LS(pa)` | linear shift `β·x_pa` | `exp(β)` is an odds ratio — one number per edge |
-| `CS(pa)` | complex shift `g(x_pa)` (MLP), still additive | plot `g` |
-| `I(pa)` | complex intercept: the transform's parameters depend on the parents (several parents in one `I(...)` feed one joint network) | maximal flexibility, interactions not interpretable |
-| `VC(*mods, t=)` | varying-coefficient shift `β(mods)·x_t` | read out with `flow.varying_coef` |
+`u = h_ϑ(x) + Σ β·x_pa + Σ g(x_pa) + (β₀ + b_Θ(x_mod))·x_t`
 
-Continuous nodes carry a monotone 1-D transform (`bernstein` — TRAM-faithful
-default, `spline`, `affine`; chosen on the intercept term,
-`I(..., transform=..., transform_kwargs=...)`);
-ordinal nodes an ordered-logit head `P(x ≤ k) = σ(θ_k − shift)`. Abduction is exact
-for continuous nodes and truncated-logistic for ordinal ones, so
-`flow.sample(u=flow.abduct(df))` reproduces `df` exactly / level-exactly.
+| term | math | what gets built | interpretability |
+|---|---|---|---|
+| `I()` / bare `I` / omitted | `h_ϑ(x)` — constant ϑ | `SimpleIntercept`: one free parameter vector, no network | the baseline transform |
+| `I("A")` | `h_ϑ(a)(x)` — ϑ bends with the parent | `ComplexIntercept`: MLP `[8, 8] → n_params` | the parent reshapes the whole distribution; no single coefficient |
+| `I("A","B")` (default `allow_interaction=True`) | `h_ϑ(a,b)(x)` | **one joint** MLP over both parents — they interact in ϑ | maximal flexibility |
+| `I("A","B", allow_interaction=False)` | `h_ϑ(a)+ϑ(b)(x)` | one MLP **per parent**, parameter vectors summed in coefficient space | per-parent partial effects via `flow.intercept_contributions` |
+| `LS("A")` | `β·a` | `Linear(width, 1)`, no bias — **one parameter** | `exp(β)` is an odds ratio |
+| `CS("A")` | `g(a)`, additive | `ComplexShift`: MLP `[64, 128, 64] → 1` | plot `g` |
+| `CS("A","B")` | `g(a,b)` — joint | one MLP over the concatenated features | interaction *in the shift* |
+| `CS("A") + CS("B")` | `g₁(a) + g₂(b)` | two MLPs, scalars added | GAM-style, each effect plottable |
+| `VC("A","B", t="T")` | `(β₀ + b_Θ(a,b))·x_t` | scalar `β₀` + zero-initialised penalized MLP `[16] → 1`; the treatment value multiplies, it never enters the net | `β₀` ≈ constant effect, `flow.varying_coef` reads `β(x)` |
+
+A node takes **at most one `I` term with parents** — a term list is therefore
+always purely additive on the latent scale, and interactions exist only
+*inside* a term. Lists and `+` sums are interchangeable:
+`[LS("A"), CS("B")]` ≡ `LS("A") + CS("B")`.
+
+Two knobs on the terms:
+
+- **`transform=` on `I`** picks the basis of `h_ϑ` for a continuous node —
+  `"bernstein"` (default, 20 coefficients, tails extrapolate with the boundary
+  slope), `"spline"` (monotone RQ spline, 23 params at `bins=8`, fixed tail
+  slope) or `"affine"` (2 params: the latent is exactly logistic). Ordinal
+  nodes have no basis: their intercept is the cutpoint vector,
+  `P(x ≤ k) = σ(ϑ_k − shift)`.
+- **`units=` on `I`/`CS`/`VC`** sizes the term's network, e.g. `units=[16]`
+  for one hidden layer of 16 neurons (defaults above match the original
+  Keras implementation, so fits stay comparable).
+
+Feature widths: a continuous parent enters raw (1 column), an ordinal parent
+one-hot (`levels` columns). Abduction is exact for continuous nodes and
+truncated-logistic for ordinal ones, so `flow.sample(u=flow.abduct(df))`
+reproduces `df` exactly / level-exactly.
 
 There are two ways to fit the model: a stochastic deep learning optimizer (`fit`) and a 2nd order optimization like in the classical statistical models (`fit_classical`). The latter is more efficient for all-`ls` models (each node-conditional is then a classical transformation model). For more details, see the [`docs/fitting.md`](docs/fitting.md) file.
 
