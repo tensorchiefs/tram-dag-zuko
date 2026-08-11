@@ -1,11 +1,9 @@
 """The 0.4 transformation syntax.
 
-Every new spelling must produce the same normalized term list — and, at a
-fixed seed, the bit-identical model — as the 0.3 ``terms=`` form. The alias
-keeps 0.3 specs working but warns.
+Every spelling must produce the same normalized term list — and, at a
+fixed seed, the bit-identical model. The 0.3 keywords (``terms=``,
+node-level ``transform=``, VC's positional treatment) are gone and raise.
 """
-
-import warnings
 
 import pytest
 import torch
@@ -24,7 +22,7 @@ def test_sum_list_and_mixed_forms_are_identical():
 
 
 def test_sum_chains_flatten_in_order():
-    node = ContinuousNode(I("a") + CS("b") + LS("c") + VC("t", "b"))
+    node = ContinuousNode(I("a") + CS("b") + LS("c") + VC("b", t="t"))
     assert [t.effect for t in node.transformation] == ["I", "CS", "LS", "VC"]
 
 
@@ -83,19 +81,22 @@ def test_ordinal_rejects_i_transform():
         OrdinalNode(3, [I("a", transform="spline")])
 
 
-# ------------------------------------------------------------- terms alias
+# -------------------------------------------------------- removed 0.3 API
 
 
-def test_terms_keyword_warns_and_is_equivalent():
-    with pytest.warns(DeprecationWarning, match="terms= is deprecated"):
-        old = ContinuousNode(terms=[I("x1")])
-    assert old == ContinuousNode([I("x1")])
-    assert old.terms == old.transformation
+def test_terms_keyword_is_gone():
+    with pytest.raises(TypeError):
+        ContinuousNode(terms=[I("x1")])
 
 
-def test_terms_and_transformation_together_raise():
-    with pytest.raises(TypeError, match="not both"):
-        ContinuousNode([I("x1")], terms=[I("x1")])
+def test_node_level_transform_is_gone():
+    with pytest.raises(TypeError):
+        ContinuousNode(transform="spline")
+
+
+def test_vc_treatment_is_keyword_only():
+    with pytest.raises(TypeError):
+        VC("T", "X2")  # 0.3 order: treatment positional
 
 
 # --------------------------------------------------- model-level identity
@@ -105,28 +106,26 @@ def _state_dicts_equal(a, b):
     return set(a) == set(b) and all(torch.equal(a[k], b[k]) for k in a)
 
 
-def test_new_syntax_builds_the_identical_model():
+def test_list_and_sum_build_the_identical_model():
     def build(spec):
         torch.manual_seed(7)
         return CausalFlowDAG(spec).state_dict()
 
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore", DeprecationWarning)
-        old = build(
-            {
-                "x1": ContinuousNode(),
-                "x2": ContinuousNode(terms=[CS("x1")]),
-                "y": OrdinalNode(3, terms=[I("x1"), LS("x2")]),
-            }
-        )
-    new = build(
+    as_list = build(
+        {
+            "x1": ContinuousNode(),
+            "x2": ContinuousNode([CS("x1")]),
+            "y": OrdinalNode(3, [I("x1"), LS("x2")]),
+        }
+    )
+    as_sum = build(
         {
             "x1": ContinuousNode(),
             "x2": ContinuousNode(CS("x1")),
             "y": OrdinalNode(3, I("x1") + LS("x2")),
         }
     )
-    assert _state_dicts_equal(old, new)
+    assert _state_dicts_equal(as_list, as_sum)
 
 
 def test_additive_flag_builds_the_same_model_as_two_terms():
@@ -169,3 +168,34 @@ def test_saved_checkpoint_of_new_syntax_loads(tmp_path):
     flow.save(tmp_path / "m.pt")
     loaded = CausalFlowDAG.load(tmp_path / "m.pt")
     assert loaded.spec["y"].transformation == [I("x")]
+
+
+# ------------------------------------------------------------------ units
+
+
+def test_units_reach_the_networks():
+    spec = {
+        "x1": ContinuousNode(),
+        "x2": ContinuousNode(CS("x1", units=[16])),
+        "y": ContinuousNode(I("x2", units=[4, 4]) + VC("x2", t="x1", units=[8])),
+    }
+    flow = CausalFlowDAG(spec)
+    assert flow.nodes["x2"].shifts["x1"].net[0].out_features == 16
+    assert flow.nodes["y"].intercept.net[0].out_features == 4
+    assert flow.nodes["y"].shifts["x1"].net[0].out_features == 8
+
+
+def test_units_survive_the_roundtrip():
+    spec = {
+        "a": ContinuousNode(),
+        "b": ContinuousNode(CS("a", units=[16])),
+    }
+    back = spec_from_dict(spec_to_dict(spec))
+    assert back["b"].transformation[0].units == (16,)
+
+
+def test_vc_modifiers_are_positional_t_is_keyword():
+    t = VC("X2", "X3", t="T")
+    assert t.parents == ("T", "X2", "X3")  # internal layout: treatment first
+    with pytest.raises(ValueError, match="cannot be both"):
+        VC("T", t="T")

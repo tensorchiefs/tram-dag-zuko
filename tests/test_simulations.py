@@ -23,22 +23,21 @@ def _spec(style: str) -> dict:
         t = {"Age": "ci", "mRS_pre": "ls", "NIHSSa": "cs", "T": "ls"}
     return {
         "Age": ContinuousNode(transform="bernstein"),
-        "mRS_pre": OrdinalNode(levels=6, terms=[term(t["Age"], "Age")]),
+        "mRS_pre": OrdinalNode(6, [term(t["Age"], "Age")]),
         "NIHSSa": ContinuousNode(
-            transform="bernstein",
-            terms=[term(t["Age"], "Age"), term(t["mRS_pre"], "mRS_pre")],
+            [term(t["Age"], "Age"), term(t["mRS_pre"], "mRS_pre")],
         ),
         "T": OrdinalNode(
-            levels=2,
-            terms=[
+            2,
+            [
                 term(t["Age"], "Age"),
                 term(t["mRS_pre"], "mRS_pre"),
                 term(t["NIHSSa"], "NIHSSa"),
             ],
         ),
         "mRS_3m": OrdinalNode(
-            levels=7,
-            terms=[
+            7,
+            [
                 term(t["Age"], "Age"),
                 term(t["mRS_pre"], "mRS_pre"),
                 term(t["NIHSSa"], "NIHSSa"),

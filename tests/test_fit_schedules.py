@@ -27,7 +27,7 @@ def _toy_df(n=800, seed=0):
 
 
 def _toy_spec():
-    return {"x1": ContinuousNode(), "x2": ContinuousNode(terms=[LS("x1")])}
+    return {"x1": ContinuousNode(), "x2": ContinuousNode([LS("x1")])}
 
 
 @pytest.mark.parametrize("schedule", [None, "onecycle", "cosine", "plateau"])
@@ -104,12 +104,10 @@ def test_plateau_freeze_preserves_exact_mle():
 
     spec = {
         "Age": ContinuousNode(),
-        "mRS_pre": OrdinalNode(levels=6, terms=[LS("Age")]),
-        "NIHSSa": ContinuousNode(terms=[LS("Age"), LS("mRS_pre")]),
-        "T": OrdinalNode(levels=2, terms=[LS("Age"), LS("mRS_pre"), LS("NIHSSa")]),
-        "mRS_3m": OrdinalNode(
-            levels=7, terms=[LS("Age"), LS("mRS_pre"), LS("NIHSSa"), LS("T")]
-        ),
+        "mRS_pre": OrdinalNode(6, [LS("Age")]),
+        "NIHSSa": ContinuousNode([LS("Age"), LS("mRS_pre")]),
+        "T": OrdinalNode(2, [LS("Age"), LS("mRS_pre"), LS("NIHSSa")]),
+        "mRS_3m": OrdinalNode(7, [LS("Age"), LS("mRS_pre"), LS("NIHSSa"), LS("T")]),
     }
     torch.manual_seed(3)
     flow = CausalFlowDAG(spec)

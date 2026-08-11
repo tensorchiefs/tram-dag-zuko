@@ -19,14 +19,14 @@ from tramdag import CS, CausalFlowDAG, ContinuousNode, I
 def test_additive_vs_joint_intercept_structure():
     base = {"x1": ContinuousNode(), "x2": ContinuousNode()}
     additive = CausalFlowDAG(
-        {**base, "x3": ContinuousNode(terms=[I("x1"), I("x2")])}, seed=0
+        {**base, "x3": ContinuousNode([I("x1"), I("x2")])}, seed=0
     ).nodes["x3"]
     joint = CausalFlowDAG(
-        {**base, "x3": ContinuousNode(terms=[I("x1", "x2")])}, seed=0
+        {**base, "x3": ContinuousNode([I("x1", "x2")])}, seed=0
     ).nodes["x3"]
-    single = CausalFlowDAG(
-        {**base, "x3": ContinuousNode(terms=[I("x1")])}, seed=0
-    ).nodes["x3"]
+    single = CausalFlowDAG({**base, "x3": ContinuousNode([I("x1")])}, seed=0).nodes[
+        "x3"
+    ]
 
     assert additive.intercept is None  # additive -> a ModuleList
     assert len(additive.intercept_nets) == 2
@@ -46,7 +46,7 @@ def test_additive_ci_runs_and_finite():
         {
             "x1": ContinuousNode(),
             "x2": ContinuousNode(),
-            "x3": ContinuousNode(terms=[I("x1"), I("x2")]),
+            "x3": ContinuousNode([I("x1"), I("x2")]),
         },
         seed=0,
     )
@@ -74,7 +74,7 @@ def _fit_x3_nll(terms, train, val):
         {
             "x1": ContinuousNode(),
             "x2": ContinuousNode(),
-            "x3": ContinuousNode(terms=terms),
+            "x3": ContinuousNode(terms),
         },
         seed=0,
     )

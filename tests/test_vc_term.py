@@ -16,7 +16,7 @@ import pandas as pd
 import pytest
 import torch
 
-from tramdag import CS, LS, VC, CausalFlowDAG, ContinuousNode, OrdinalNode, term
+from tramdag import CS, LS, VC, CausalFlowDAG, ContinuousNode, I, OrdinalNode, term
 from tramdag.simulations import VCLogisticShift
 from tramdag.spec import spec_from_dict, spec_to_dict, validate_and_sort
 
@@ -28,19 +28,19 @@ def _vc_spec(penalty: float = 1.0) -> dict:
     irrelevant to Y's conditional because the joint NLL decomposes per node).
     """
     return {
-        "X1": ContinuousNode(transform="affine"),
-        "X2": ContinuousNode(transform="affine"),
-        "X3": ContinuousNode(transform="affine"),
-        "T": OrdinalNode(levels=2, terms=[LS("X1"), LS("X2")]),
+        "X1": ContinuousNode([I(transform="affine")]),
+        "X2": ContinuousNode([I(transform="affine")]),
+        "X3": ContinuousNode([I(transform="affine")]),
+        "T": OrdinalNode(2, [LS("X1"), LS("X2")]),
         "Y": ContinuousNode(
-            terms=[CS("X1", "X2", "X3"), VC("T", "X2", "X3", penalty=penalty)]
+            [CS("X1", "X2", "X3"), VC("X2", "X3", penalty=penalty, t="T")]
         ),
     }
 
 
 # ------------------------------------------------------------ spec / validation
 def test_vc_constructor_and_term_factory():
-    t = VC("T", "X2", "X3", penalty=2.5)
+    t = VC("X2", "X3", penalty=2.5, t="T")
     assert (t.effect, t.slot, t.parents, t.penalty) == (
         "VC",
         "shift",
@@ -48,12 +48,12 @@ def test_vc_constructor_and_term_factory():
         2.5,
     )
     t2 = term("vc", "T", "X2", penalty=2.5)
-    assert t2 == VC("T", "X2", penalty=2.5)
-    assert term("VC", "T").penalty == VC("T").penalty  # shared default
+    assert t2 == VC("X2", penalty=2.5, t="T")
+    assert term("VC", "T").penalty == VC(t="T").penalty  # shared default
     with pytest.raises(ValueError):
-        VC("T", "T")  # on cannot be a modifier
+        VC("T", t="T")  # on cannot be a modifier
     with pytest.raises(ValueError):
-        VC("T", penalty=-1.0)  # negative penalty
+        VC(penalty=-1.0, t="T")  # negative penalty
     with pytest.raises(ValueError):
         term("ls", "T", penalty=1.0)  # penalty is VC-only
 
@@ -63,21 +63,21 @@ def test_vc_modifier_may_repeat_but_on_owns_its_edge():
     ok = {
         "X2": ContinuousNode(),
         "T": OrdinalNode(levels=2),
-        "Y": ContinuousNode(terms=[CS("X2"), VC("T", "X2")]),
+        "Y": ContinuousNode([CS("X2"), VC("X2", t="T")]),
     }
     assert validate_and_sort(ok)[-1] == "Y"
     # a second edge-owning term for T -> invalid (beta0 vs main effect unidentified)
     bad = {
         "X2": ContinuousNode(),
         "T": OrdinalNode(levels=2),
-        "Y": ContinuousNode(terms=[LS("T"), VC("T", "X2")]),
+        "Y": ContinuousNode([LS("T"), VC("X2", t="T")]),
     }
     with pytest.raises(ValueError, match="more than one"):
         validate_and_sort(bad)
 
 
 def test_vc_rejects_multilevel_ordinal_treatment():
-    spec = {"T": OrdinalNode(levels=4), "Y": ContinuousNode(terms=[VC("T")])}
+    spec = {"T": OrdinalNode(levels=4), "Y": ContinuousNode([VC(t="T")])}
     with pytest.raises(ValueError, match="2-level"):
         validate_and_sort(spec)
 
@@ -86,7 +86,7 @@ def test_vc_modifiers_are_real_dag_edges():
     """Modifiers must topologically precede the node (they are parents)."""
     spec = {
         "T": OrdinalNode(levels=2),
-        "Y": ContinuousNode(terms=[VC("T", "M")]),
+        "Y": ContinuousNode([VC("M", t="T")]),
         "M": ContinuousNode(),
     }
     order = validate_and_sort(spec)
@@ -109,8 +109,8 @@ def test_vc_without_modifiers_equals_ls_exactly():
     t = rng.integers(0, 2, 200).astype(float)
     y = 0.7 * t + rng.logistic(size=200)
     df = pd.DataFrame({"T": t, "Y": y})
-    spec_vc = {"T": OrdinalNode(levels=2), "Y": ContinuousNode(terms=[VC("T")])}
-    spec_ls = {"T": OrdinalNode(levels=2), "Y": ContinuousNode(terms=[LS("T")])}
+    spec_vc = {"T": OrdinalNode(levels=2), "Y": ContinuousNode([VC(t="T")])}
+    spec_ls = {"T": OrdinalNode(levels=2), "Y": ContinuousNode([LS("T")])}
     fv, fl = CausalFlowDAG(spec_vc, seed=0), CausalFlowDAG(spec_ls, seed=0)
     with torch.no_grad():
         # LS enters via the 2-column one-hot; only w[1]-w[0] is identified.
@@ -183,7 +183,7 @@ def test_save_load_roundtrip_vc(tmp_path, small_fitted):
     p = tmp_path / "vc.pt"
     flow.save(p)
     flow2 = CausalFlowDAG.load(p)
-    assert flow2.spec["Y"].terms[1].penalty == 1.0
+    assert flow2.spec["Y"].transformation[1].penalty == 1.0
     assert bool(flow2.nodes["Y"].shifts["T"].warm_started)  # buffer survives
     np.testing.assert_allclose(
         flow2.varying_coef("Y", new), flow.varying_coef("Y", new), atol=1e-7
@@ -193,8 +193,8 @@ def test_save_load_roundtrip_vc(tmp_path, small_fitted):
 
 def test_serialization_roundtrip_spec():
     spec2 = spec_from_dict(spec_to_dict(_vc_spec(penalty=3.0)))
-    t = spec2["Y"].terms[1]
-    assert t == VC("T", "X2", "X3", penalty=3.0)
+    t = spec2["Y"].transformation[1]
+    assert t == VC("X2", "X3", penalty=3.0, t="T")
 
 
 # ------------------------------------------------------------------- warm start
@@ -209,9 +209,9 @@ def test_warm_start_matches_classical_ls():
     beta0 = float(flow.nodes["Y"].shifts["T"].beta0)
 
     ls_spec = {
-        **{k: ContinuousNode(transform="affine") for k in ("X1", "X2", "X3")},
-        "T": OrdinalNode(levels=2, terms=[LS("X1"), LS("X2")]),
-        "Y": ContinuousNode(terms=[LS("X1"), LS("X2"), LS("X3"), LS("T")]),
+        **{k: ContinuousNode([I(transform="affine")]) for k in ("X1", "X2", "X3")},
+        "T": OrdinalNode(2, [LS("X1"), LS("X2")]),
+        "Y": ContinuousNode([LS("X1"), LS("X2"), LS("X3"), LS("T")]),
     }
     ref = CausalFlowDAG(ls_spec, seed=0)
     ref.fit_classical(df, verbose=False)
@@ -235,10 +235,10 @@ def test_nesting_large_penalty_matches_classical_ls():
     gen = VCLogisticShift(seed=42)
     df = gen.observational(4000, seed_offset=100)
     spec = {
-        **{k: ContinuousNode(transform="affine") for k in ("X1", "X2", "X3")},
-        "T": OrdinalNode(levels=2, terms=[LS("X1"), LS("X2")]),
+        **{k: ContinuousNode([I(transform="affine")]) for k in ("X1", "X2", "X3")},
+        "T": OrdinalNode(2, [LS("X1"), LS("X2")]),
         "Y": ContinuousNode(
-            terms=[LS("X1"), LS("X2"), LS("X3"), VC("T", "X2", "X3", penalty=1e7)]
+            [LS("X1"), LS("X2"), LS("X3"), VC("X2", "X3", penalty=1e7, t="T")]
         ),
     }
     flow = CausalFlowDAG(spec, seed=0)
@@ -258,7 +258,7 @@ def test_nesting_large_penalty_matches_classical_ls():
 
     ls_spec = {
         **spec,
-        "Y": ContinuousNode(terms=[LS("X1"), LS("X2"), LS("X3"), LS("T")]),
+        "Y": ContinuousNode([LS("X1"), LS("X2"), LS("X3"), LS("T")]),
     }
     ref = CausalFlowDAG(ls_spec, seed=0)
     ref.fit_classical(df, verbose=False)
@@ -310,9 +310,9 @@ def test_vc_continuous_treatment():
     y = 0.5 * m + (0.3 + 0.2 * m) * d + rng.logistic(size=n)
     df = pd.DataFrame({"M": m, "D": d, "Y": y})
     spec = {
-        "M": ContinuousNode(transform="affine"),
-        "D": ContinuousNode(transform="affine"),
-        "Y": ContinuousNode(terms=[CS("M"), VC("D", "M")]),
+        "M": ContinuousNode([I(transform="affine")]),
+        "D": ContinuousNode([I(transform="affine")]),
+        "Y": ContinuousNode([CS("M"), VC("M", t="D")]),
     }
     flow = CausalFlowDAG(spec, seed=0)
     flow.fit(df, epochs=30, verbose=0, seed=0)

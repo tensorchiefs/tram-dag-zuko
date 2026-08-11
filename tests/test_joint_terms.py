@@ -30,7 +30,7 @@ def _fit_x3_nll(shift_terms, df, train, val):
     spec = {
         "x1": ContinuousNode(),
         "x2": ContinuousNode(),
-        "x3": ContinuousNode(terms=shift_terms),
+        "x3": ContinuousNode(shift_terms),
     }
     flow = CausalFlowDAG(spec, seed=0)
     flow.fit(train, val, epochs=300, learning_rate=1e-2, batch_size=512, verbose=0)
@@ -53,7 +53,7 @@ def test_joint_cs_runs_and_decomposes():
     spec = {
         "x1": ContinuousNode(),
         "x2": ContinuousNode(),
-        "x3": ContinuousNode(terms=[CS("x1", "x2")]),
+        "x3": ContinuousNode([CS("x1", "x2")]),
     }
     flow = CausalFlowDAG(spec, seed=0)
     lp = flow.node_log_prob(flow._tensorize(df))["x3"]

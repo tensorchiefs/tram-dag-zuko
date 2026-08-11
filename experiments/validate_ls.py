@@ -47,15 +47,11 @@ def design(df: pd.DataFrame) -> pd.DataFrame:
 
 def all_ls_spec() -> dict:
     return {
-        "Age": ContinuousNode(transform="bernstein"),
-        "mRS_pre": OrdinalNode(levels=6, terms=[LS("Age")]),
-        "NIHSSa": ContinuousNode(
-            transform="bernstein", terms=[LS("Age"), LS("mRS_pre")]
-        ),
-        "T": OrdinalNode(levels=2, terms=[LS("Age"), LS("mRS_pre"), LS("NIHSSa")]),
-        "mRS_3m": OrdinalNode(
-            levels=7, terms=[LS("Age"), LS("mRS_pre"), LS("NIHSSa"), LS("T")]
-        ),
+        "Age": ContinuousNode(),
+        "mRS_pre": OrdinalNode(6, [LS("Age")]),
+        "NIHSSa": ContinuousNode([LS("Age"), LS("mRS_pre")]),
+        "T": OrdinalNode(2, [LS("Age"), LS("mRS_pre"), LS("NIHSSa")]),
+        "mRS_3m": OrdinalNode(7, [LS("Age"), LS("mRS_pre"), LS("NIHSSa"), LS("T")]),
     }
 
 

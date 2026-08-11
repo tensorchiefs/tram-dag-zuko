@@ -11,7 +11,7 @@ import pandas as pd
 import pytest
 import torch
 
-from tramdag import CS, LS, VC, CausalFlowDAG, ContinuousNode, OrdinalNode
+from tramdag import CS, LS, VC, CausalFlowDAG, ContinuousNode, I, OrdinalNode
 
 RNG = np.random.default_rng(11)
 
@@ -32,11 +32,11 @@ def _hetero_df(n: int, seed: int = 11) -> pd.DataFrame:
 
 def _ls_spec() -> dict:
     return {
-        "X1": ContinuousNode(transform="affine"),
-        "X2": ContinuousNode(transform="affine"),
-        "X3": ContinuousNode(transform="affine"),
+        "X1": ContinuousNode([I(transform="affine")]),
+        "X2": ContinuousNode([I(transform="affine")]),
+        "X3": ContinuousNode([I(transform="affine")]),
         "T": OrdinalNode(levels=2),
-        "Y": ContinuousNode(terms=[LS("X1"), LS("X2"), LS("X3"), LS("T")]),
+        "Y": ContinuousNode([LS("X1"), LS("X2"), LS("X3"), LS("T")]),
     }
 
 
@@ -68,8 +68,8 @@ def test_score_sums_vanish_at_mle_ordinal_outcome():
     y = np.digitize(lat, [-1.0, 0.8]).astype(float)
     df = pd.DataFrame({"X": x, "Y": y})
     spec = {
-        "X": ContinuousNode(transform="affine"),
-        "Y": OrdinalNode(levels=3, terms=[LS("X")]),
+        "X": ContinuousNode([I(transform="affine")]),
+        "Y": OrdinalNode(3, [LS("X")]),
     }
     flow = CausalFlowDAG(spec, seed=0)
     flow.fit_classical(df, verbose=False)
@@ -85,11 +85,11 @@ def test_scores_match_finite_differences():
     """
     df = _hetero_df(200, seed=5)
     spec = {
-        "X1": ContinuousNode(transform="affine"),
-        "X2": ContinuousNode(transform="affine"),
-        "X3": ContinuousNode(transform="affine"),
-        "T": OrdinalNode(levels=2, terms=[LS("X1")]),
-        "Y": ContinuousNode(terms=[LS("X1"), CS("X3"), VC("T", "X2", "X3")]),
+        "X1": ContinuousNode([I(transform="affine")]),
+        "X2": ContinuousNode([I(transform="affine")]),
+        "X3": ContinuousNode([I(transform="affine")]),
+        "T": OrdinalNode(2, [LS("X1")]),
+        "Y": ContinuousNode([LS("X1"), CS("X3"), VC("X2", "X3", t="T")]),
     }
     flow = CausalFlowDAG(spec, seed=1)
     flow.fit(df, epochs=5, verbose=0, seed=1)  # any point works; move off init
@@ -153,10 +153,10 @@ def test_scan_null_is_quiet():
     y = (rng.logistic(size=n) - (x1 - 0.5 * x2) + 0.9 * t) / 2.0
     df = pd.DataFrame({"X1": x1, "X2": x2, "T": t, "Y": y})
     spec = {
-        "X1": ContinuousNode(transform="affine"),
-        "X2": ContinuousNode(transform="affine"),
+        "X1": ContinuousNode([I(transform="affine")]),
+        "X2": ContinuousNode([I(transform="affine")]),
         "T": OrdinalNode(levels=2),
-        "Y": ContinuousNode(terms=[LS("X1"), LS("X2"), LS("T")]),
+        "Y": ContinuousNode([LS("X1"), LS("X2"), LS("T")]),
     }
     flow = CausalFlowDAG(spec, seed=0)
     flow.fit_classical(df, verbose=False)
@@ -171,7 +171,7 @@ def test_scores_on_vc_model_and_scan_column_resolution():
     df = _hetero_df(1500, seed=8)
     spec = {
         **_ls_spec(),
-        "Y": ContinuousNode(terms=[LS("X1"), LS("X2"), LS("X3"), VC("T", "X2")]),
+        "Y": ContinuousNode([LS("X1"), LS("X2"), LS("X3"), VC("X2", t="T")]),
     }
     flow = CausalFlowDAG(spec, seed=0)
     flow.fit(df, epochs=40, verbose=0, seed=0)

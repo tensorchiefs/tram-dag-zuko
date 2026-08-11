@@ -15,7 +15,7 @@ import pandas as pd
 import pytest
 import torch
 
-from tramdag import CS, LS, VC, CausalFlowDAG, ContinuousNode, OrdinalNode
+from tramdag import CS, LS, VC, CausalFlowDAG, ContinuousNode, I, OrdinalNode
 from tramdag.simulations import VCLogisticShift
 from tramdag.spec import spec_from_dict, spec_to_dict, validate_and_sort
 
@@ -37,10 +37,10 @@ def _confounded_df(n: int, seed: int) -> pd.DataFrame:
 
 def _misspecified_spec(center) -> dict:
     return {
-        "X": ContinuousNode(transform="affine"),
-        "T": OrdinalNode(levels=2, terms=[LS("X")]),
+        "X": ContinuousNode([I(transform="affine")]),
+        "T": OrdinalNode(2, [LS("X")]),
         # prognostic part deliberately under-specified (linear vs true x^2)
-        "Y": ContinuousNode(terms=[LS("X"), VC("T", "X", center=center)]),
+        "Y": ContinuousNode([LS("X"), VC("X", center=center, t="T")]),
     }
 
 
@@ -62,8 +62,8 @@ def _fit(spec, df, epochs=250):
 # ------------------------------------------------------- validation / spec
 def test_center_validation():
     with pytest.raises(ValueError, match="center_folds"):
-        VC("T", "X", center=True, center_folds=1)
-    spec = {"D": ContinuousNode(), "Y": ContinuousNode(terms=[VC("D", center=True)])}
+        VC("X", center=True, center_folds=1, t="T")
+    spec = {"D": ContinuousNode(), "Y": ContinuousNode([VC(center=True, t="D")])}
     with pytest.raises(ValueError, match="binary ordinal"):
         validate_and_sort(spec)  # continuous treatment cannot center
 
@@ -71,15 +71,15 @@ def test_center_validation():
 def test_center_serialization_roundtrip():
     spec = {
         "X": ContinuousNode(),
-        "T": OrdinalNode(levels=2, terms=[LS("X")]),
-        "Y": ContinuousNode(terms=[VC("T", "X", center=True, center_folds=3)]),
+        "T": OrdinalNode(2, [LS("X")]),
+        "Y": ContinuousNode([VC("X", center=True, center_folds=3, t="T")]),
     }
-    t = spec_from_dict(spec_to_dict(spec))["Y"].terms[0]
+    t = spec_from_dict(spec_to_dict(spec))["Y"].transformation[0]
     assert (t.center, t.center_folds) == (True, 3)
     # pre-#30 checkpoints (no center key) load as uncentered
     d = spec_to_dict(spec)
     del d["Y"]["terms"][0]["center"], d["Y"]["terms"][0]["center_folds"]
-    t2 = spec_from_dict(d)["Y"].terms[0]
+    t2 = spec_from_dict(d)["Y"].transformation[0]
     assert (t2.center, t2.center_folds) == (False, 5)
 
 
@@ -93,19 +93,19 @@ def test_center_false_is_bit_identical_to_plain_vc():
 
     def fit_with(term):
         spec = {
-            "X1": ContinuousNode(transform="affine"),
-            "X2": ContinuousNode(transform="affine"),
-            "X3": ContinuousNode(transform="affine"),
-            "T": OrdinalNode(levels=2, terms=[LS("X1"), LS("X2")]),
-            "Y": ContinuousNode(terms=[CS("X1", "X2", "X3"), term]),
+            "X1": ContinuousNode([I(transform="affine")]),
+            "X2": ContinuousNode([I(transform="affine")]),
+            "X3": ContinuousNode([I(transform="affine")]),
+            "T": OrdinalNode(2, [LS("X1"), LS("X2")]),
+            "Y": ContinuousNode([CS("X1", "X2", "X3"), term]),
         }
         flow = CausalFlowDAG(spec, seed=3)
         flow.fit(df.iloc[:1000], df.iloc[1000:], epochs=15, verbose=0, seed=3)
         return flow
 
-    a = fit_with(VC("T", "X2", "X3"))
-    b = fit_with(VC("T", "X2", "X3", center=False))
-    assert VC("T", "X2") == VC("T", "X2", center=False)  # Term equality
+    a = fit_with(VC("X2", "X3", t="T"))
+    b = fit_with(VC("X2", "X3", center=False, t="T"))
+    assert VC("X2", t="T") == VC("X2", center=False, t="T")  # Term equality
     for (ka, pa), (kb, pb) in zip(a.state_dict().items(), b.state_dict().items()):
         assert ka == kb
         assert torch.equal(pa, pb), ka
@@ -150,8 +150,8 @@ def test_training_ehat_is_out_of_fold():
 
     # (a) fold-0 values equal an independent refit WITHOUT fold 0 (deterministic)
     proxy_spec = {
-        "X": ContinuousNode(transform="affine"),
-        "T": OrdinalNode(levels=2, terms=[LS("X")]),
+        "X": ContinuousNode([I(transform="affine")]),
+        "T": OrdinalNode(2, [LS("X")]),
     }
     proxy = CausalFlowDAG(proxy_spec, seed=0)
     proxy.fit_classical(df.iloc[fold_id != 0][["X", "T"]], verbose=False)
@@ -262,7 +262,7 @@ def test_centered_roundtrip_after_load(tmp_path):
     p = tmp_path / "c.pt"
     flow.save(p)
     flow2 = CausalFlowDAG.load(p)
-    t = flow2.spec["Y"].terms[1]
+    t = flow2.spec["Y"].transformation[1]
     assert t.center is True
     with torch.no_grad():
         np.testing.assert_allclose(

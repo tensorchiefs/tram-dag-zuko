@@ -13,8 +13,8 @@ from tramdag import LS, CausalFlowDAG, ContinuousNode, OrdinalNode
 def _spec():
     return {
         "x1": ContinuousNode(),
-        "x2": ContinuousNode(terms=[LS("x1")]),
-        "y": OrdinalNode(levels=3, terms=[LS("x1")]),
+        "x2": ContinuousNode([LS("x1")]),
+        "y": OrdinalNode(3, [LS("x1")]),
     }
 
 

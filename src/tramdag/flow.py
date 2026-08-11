@@ -910,8 +910,10 @@ class CausalFlowDAG(nn.Module):
 
     # --------------------------------------------------------- classical fit
     def _is_all_ls(self) -> bool:
+        # a parentless I() is the simple-intercept baseline made explicit
+        # (e.g. as the carrier of transform=) -- classical fitting covers it
         return all(
-            term.effect == "LS"
+            term.effect == "LS" or (term.effect == "I" and not term.parents)
             for node in self.spec.values()
             for term in node_terms(node)
         )

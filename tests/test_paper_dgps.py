@@ -165,8 +165,8 @@ def test_triangle_linear_ls_recovers_coefficients():
     df = TriangleContinuous(f="linear", seed=42).observational(N_FIT, seed_offset=100)
     spec = {
         "x1": ContinuousNode(),
-        "x2": ContinuousNode(terms=[LS("x1")]),
-        "x3": ContinuousNode(terms=[LS("x1"), LS("x2")]),
+        "x2": ContinuousNode([LS("x1")]),
+        "x3": ContinuousNode([LS("x1"), LS("x2")]),
     }
     flow = _fit(spec, df)
     assert abs(_w(flow, "x2", "x1") - 2.0) < 0.1
@@ -181,8 +181,8 @@ def test_triangle_atan_cs_recovers_coefficients_and_curve():
     df = gen.observational(N_FIT, seed_offset=100)
     spec = {
         "x1": ContinuousNode(),
-        "x2": ContinuousNode(terms=[LS("x1")]),
-        "x3": ContinuousNode(terms=[LS("x1"), CS("x2")]),
+        "x2": ContinuousNode([LS("x1")]),
+        "x3": ContinuousNode([LS("x1"), CS("x2")]),
     }
     flow = _fit(spec, df)
     assert abs(_w(flow, "x2", "x1") - 2.0) < 0.1
@@ -204,8 +204,8 @@ def test_triangle_mixed_linear_ls_recovers_with_sign_flip():
     df = TriangleMixed(f="linear", seed=42).observational(N_FIT, seed_offset=100)
     spec = {
         "x1": ContinuousNode(),
-        "x2": ContinuousNode(terms=[LS("x1")]),
-        "x3": OrdinalNode(levels=4, terms=[LS("x1"), LS("x2")]),
+        "x2": ContinuousNode([LS("x1")]),
+        "x3": OrdinalNode(4, [LS("x1"), LS("x2")]),
     }
     flow = _fit(spec, df)
     assert abs(_w(flow, "x3", "x1") - (-0.2)) < 0.1
@@ -224,8 +224,8 @@ def test_vaca_ci_flow_matches_interventional_moments():
     df = VacaTriangle(seed=42).observational(N_FIT, seed_offset=100)
     spec = {
         "x1": ContinuousNode(),
-        "x2": ContinuousNode(terms=[I("x1")]),
-        "x3": ContinuousNode(terms=[I("x1", "x2")]),
+        "x2": ContinuousNode([I("x1")]),
+        "x3": ContinuousNode([I("x1", "x2")]),
     }
     flow = _fit(spec, df, epochs=(400, 120))
     # L1: bimodality of x1 is captured (the paper's headline vs CNF) — both
@@ -255,8 +255,8 @@ def test_carefl_ci_flow_recovers_counterfactuals():
     spec = {
         "x1": ContinuousNode(),
         "x2": ContinuousNode(),
-        "x3": ContinuousNode(terms=[I("x1", "x2")]),
-        "x4": ContinuousNode(terms=[I("x1", "x2")]),
+        "x3": ContinuousNode([I("x1", "x2")]),
+        "x4": ContinuousNode([I("x1", "x2")]),
     }
     flow = _fit(spec, df, epochs=(300, 100))
     rows = gen.observational(300, seed_offset=999)

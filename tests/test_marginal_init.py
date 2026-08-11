@@ -53,7 +53,7 @@ def _mixed_flow_and_df():
     spec = {
         "x1": ContinuousNode(),  # Bernstein root
         "y": OrdinalNode(levels=4),  # ordinal root
-        "x2": ContinuousNode(terms=[I("x1")]),  # ci -> ComplexIntercept
+        "x2": ContinuousNode([I("x1")]),  # ci -> ComplexIntercept
     }
     torch.manual_seed(0)
     flow = CausalFlowDAG(spec)
@@ -112,7 +112,7 @@ def test_marginal_init_is_pure_init_same_optimum():
     it only moves the starting point, not the optimum.
     """
     obs = pd.read_csv(DATA / "vaca" / "obs.csv")[["x1", "x2"]]
-    spec = {"x1": ContinuousNode(), "x2": ContinuousNode(terms=[LS("x1")])}
+    spec = {"x1": ContinuousNode(), "x2": ContinuousNode([LS("x1")])}
 
     def converged_nll(marginal_init):
         torch.manual_seed(0)

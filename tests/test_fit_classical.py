@@ -20,12 +20,10 @@ DATA = Path(__file__).resolve().parents[1] / "data"
 def _stroke_ls_spec() -> dict:
     return {
         "Age": ContinuousNode(),
-        "mRS_pre": OrdinalNode(levels=6, terms=[LS("Age")]),
-        "NIHSSa": ContinuousNode(terms=[LS("Age"), LS("mRS_pre")]),
-        "T": OrdinalNode(levels=2, terms=[LS("Age"), LS("mRS_pre"), LS("NIHSSa")]),
-        "mRS_3m": OrdinalNode(
-            levels=7, terms=[LS("Age"), LS("mRS_pre"), LS("NIHSSa"), LS("T")]
-        ),
+        "mRS_pre": OrdinalNode(6, [LS("Age")]),
+        "NIHSSa": ContinuousNode([LS("Age"), LS("mRS_pre")]),
+        "T": OrdinalNode(2, [LS("Age"), LS("mRS_pre"), LS("NIHSSa")]),
+        "mRS_3m": OrdinalNode(7, [LS("Age"), LS("mRS_pre"), LS("NIHSSa"), LS("T")]),
     }
 
 
@@ -35,7 +33,7 @@ def _obs() -> pd.DataFrame:
 
 # ------------------------------------------------------------------ fast
 def test_rejects_non_all_ls():
-    spec = {"x1": ContinuousNode(), "x2": ContinuousNode(terms=[CS("x1")])}
+    spec = {"x1": ContinuousNode(), "x2": ContinuousNode([CS("x1")])}
     flow = CausalFlowDAG(spec)
     df = pd.DataFrame({"x1": np.random.randn(50), "x2": np.random.randn(50)})
     with pytest.raises(ValueError, match="all-`ls`"):
@@ -43,7 +41,7 @@ def test_rejects_non_all_ls():
 
 
 def test_rejects_ci_too():
-    spec = {"x1": ContinuousNode(), "x2": ContinuousNode(terms=[I("x1")])}
+    spec = {"x1": ContinuousNode(), "x2": ContinuousNode([I("x1")])}
     with pytest.raises(ValueError):
         CausalFlowDAG(spec).fit_classical(
             pd.DataFrame({"x1": np.random.randn(50), "x2": np.random.randn(50)})
@@ -82,8 +80,8 @@ def test_continuous_only_all_ls_runs():
     df = pd.read_csv(DATA / "vaca" / "obs.csv")
     spec = {
         "x1": ContinuousNode(),
-        "x2": ContinuousNode(terms=[LS("x1")]),
-        "x3": ContinuousNode(terms=[LS("x1"), LS("x2")]),
+        "x2": ContinuousNode([LS("x1")]),
+        "x3": ContinuousNode([LS("x1"), LS("x2")]),
     }
     torch.manual_seed(0)
     flow = CausalFlowDAG(spec)

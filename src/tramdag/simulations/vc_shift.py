@@ -12,7 +12,7 @@ model with a heterogeneous treatment effect on the latent scale::
 
 so ``Y = (U_Y - g(x) - beta(x) T) / 2``. The DGP is exactly in-class for::
 
-    "Y": ContinuousNode([CS("X1", "X2", "X3"), VC("T", "X2", "X3")])
+    "Y": ContinuousNode([CS("X1", "X2", "X3"), VC("X2", "X3", t="T")])
 
 ``X2`` is deliberately both a confounder (enters the propensity) *and* an
 effect modifier — the configuration where the unregularized ``CS(on, x...)``
