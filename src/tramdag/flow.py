@@ -673,12 +673,12 @@ class CausalFlowDAG(nn.Module):
                 )
             ls_terms = [LS(p) for p in nd.parents]
             if isinstance(node_spec, OrdinalNode):
-                proxy_spec[name] = OrdinalNode(levels=node_spec.levels, terms=ls_terms)
+                proxy_spec[name] = OrdinalNode(node_spec.levels, ls_terms)
             else:
                 proxy_spec[name] = ContinuousNode(
+                    ls_terms,
                     transform=node_spec.transform,
                     transform_kwargs=dict(node_spec.transform_kwargs),
-                    terms=ls_terms,
                 )
             proxy = CausalFlowDAG(proxy_spec, device=str(self.device))
             proxy.fit_classical(train_df[list(nd.parents) + [name]], verbose=False)
@@ -796,7 +796,7 @@ class CausalFlowDAG(nn.Module):
                 else ContinuousNode(transform="affine")
             )
         terms = list(node_spec.terms) if node_spec.terms else None
-        proxy_spec[on] = OrdinalNode(levels=2, terms=terms)
+        proxy_spec[on] = OrdinalNode(2, terms)
         all_ls = all(t.effect == "LS" for t in (terms or []))
         cols = list(on_nd.parents) + [on]
 

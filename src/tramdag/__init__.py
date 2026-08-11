@@ -19,6 +19,7 @@ from .spec import (
     LinShift,
     OrdinalNode,
     Term,
+    Transformation,
     term,
 )
 
@@ -30,6 +31,7 @@ __all__ = [
     "simulations",
     # term-formula notation
     "Term",
+    "Transformation",
     "I",
     "LS",
     "CS",

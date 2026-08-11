@@ -1,15 +1,19 @@
 """User-facing DAG specification.
 
 A model is one dict ``{node_name: NodeSpec}``. Each node declares its
-transformation as an **additive formula of terms** (the native form), e.g.::
+transformation ``h`` as an **additive formula of terms** — the first
+positional argument, written as a list or as a ``+`` sum::
 
-    "X3": ContinuousNode(terms=[I("X1"), CS("X2")])     # h = baseline + I(x1) + CS(x2)
+    "X3": ContinuousNode([I("X1"), CS("X2")])       # h = h_theta(x1) + g(x2)
+    "X3": ContinuousNode(I("X1") + CS("X2"))        # the same, formula style
 
 Term constructors name the parent(s) a term depends on:
 
 - :func:`I`  — *intercept* term: the parent(s) reshape the monotone transform
-  (its Bernstein coefficients / ordinal cutpoints). ``I()`` with no parent is the
-  implicit simple-intercept baseline (always present, optional to write).
+  (its Bernstein coefficients / ordinal cutpoints). ``I()`` with no parent — or
+  the bare name ``I`` — is the simple-intercept baseline (always present,
+  optional to write). ``I(..., transform="spline")`` picks the basis of the
+  monotone transform for a continuous node.
 - :func:`LS` — *linear shift*: ``beta * x`` (one interpretable weight), one parent.
 - :func:`CS` — *complex shift*: an additive MLP ``g(x)`` on the latent scale.
 - :func:`VC` — *varying-coefficient shift*: ``beta(modifiers) * x_on`` with
@@ -17,19 +21,43 @@ Term constructors name the parent(s) a term depends on:
   — a treatment-effect head with its own bias–variance budget (issue #28).
 
 The intercept slot sums in coefficient space; the shift slot sums on the latent
-scale. "Joint vs additive" is just argument grouping — a multi-parent term such
-as ``CS("a","b")`` is one **joint** network over both parents (an interaction),
-whereas ``CS("a") + CS("b")`` are two **additive** terms.
+scale. "Joint vs additive" is argument grouping: a multi-parent term such as
+``CS("a","b")`` is one **joint** network over both parents (an interaction),
+whereas ``CS("a") + CS("b")`` are two **additive** terms. For intercepts the
+grouping can be said explicitly: ``I("a", "b", allow_interaction=False)`` is
+exactly ``I("a") + I("b")``.
+
+What ``h`` looks like per transformation, for a continuous ``x3``:
+
+======================================== =======================================
+``transformation=``                      ``u_3 = h(x_3 | pa)``
+======================================== =======================================
+``None`` / ``[I]``                       ``h_theta(x3)``
+``[LS("X1")]``                           ``h_theta(x3) + beta*x1``
+``[I("X1")]``                            ``h_theta(x1)(x3)``
+``[CS("X1")]``                           ``h_theta(x3) + g_1(x1)``
+``[LS("X1"), CS("X2")]``                 ``h_theta(x3) + beta*x1 + g_2(x2)``
+``[CS("X1", "X2")]``                     ``h_theta(x3) + g_12(x1, x2)``
+``[CS("X1"), CS("X2")]``                 ``h_theta(x3) + g_1(x1) + g_2(x2)``
+``[I("X1", "X2")]``                      ``h_theta(x1,x2)(x3)``  (joint)
+``[I("X1","X2", allow_interaction=       ``h_theta(x1)+theta(x2)(x3)``  (additive)
+False)]``
+``[I, CS("X1"), VC("T", "X2")]``         ``h_theta(x3) + g_1(x1) + beta(x2)*t``
+======================================== =======================================
 
 Each parent enters through exactly one *edge-owning* term (I/LS/CS parents, and
 a VC term's ``on``). VC **modifiers** are exempt: ``CS("x2")`` + ``VC("t", "x2")``
 is the intended pattern — ``x2`` acts prognostically through the shift *and*
 modifies the treatment effect.
+
+``terms=`` and ``ContinuousNode(transform=...)`` from 0.3.x keep working; the
+``terms`` keyword is deprecated and goes away in the next breaking release.
 """
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+import warnings
+from dataclasses import dataclass
 
 # legacy dict term labels -> term effect (still accepted by ``term()`` and by the
 # checkpoint loader, so old saved models keep loading)
@@ -47,7 +75,11 @@ class Term:
     names the term depends on — empty only for the bare simple-intercept ``I()``.
     For a ``VC`` term ``parents[0]`` is the treatment (``on``) and the rest are
     the effect modifiers; ``penalty`` is its L2 penalty weight (``None`` for
-    every other effect).
+    every other effect). An ``I`` term may carry the basis of the node's
+    monotone transform in ``transform``/``transform_kwargs``.
+
+    Terms add: ``I("a") + CS("b")`` is the same transformation as
+    ``[I("a"), CS("b")]``.
     """
 
     effect: str
@@ -56,11 +88,53 @@ class Term:
     penalty: float | None = None
     center: bool | str = False
     center_folds: int = 5
+    transform: str | None = None
+    transform_kwargs: tuple | None = None  # dict.items() tuple, keeps Term hashable
+
+    def __add__(self, other: Term | Transformation) -> Transformation:
+        """Combine two terms into a :class:`Transformation`."""
+        return Transformation([self]) + other
 
 
-def I(*parents: str) -> Term:  # noqa: E743 - single-letter name is the intended notation
-    """Intercept term — the parent(s) reshape the transform. ``I()`` = SI base."""
-    return Term("I", "intercept", tuple(parents))
+class Transformation(list):
+    """A ``+`` sum of terms — an additive formula for one node's ``h``."""
+
+    def __add__(self, other: Term | Transformation) -> Transformation:
+        """Append a term or concatenate another sum."""
+        if isinstance(other, Term):
+            return Transformation([*self, other])
+        if isinstance(other, Transformation):
+            return Transformation([*self, *other])
+        return NotImplemented
+
+
+def I(  # noqa: E743 - single-letter name is the intended notation
+    *parents: str,
+    allow_interaction: bool = True,
+    transform: str | None = None,
+    transform_kwargs: dict | None = None,
+) -> Term | Transformation:
+    """Intercept term — the parent(s) reshape the transform. ``I()`` = SI base.
+
+    With several parents the term is one **joint** network (an interaction).
+    ``allow_interaction=False`` makes it **additive** instead: it returns
+    ``I("a") + I("b")``, one network per parent, summed in coefficient space.
+
+    ``transform`` picks the basis of a continuous node's monotone transform:
+    ``"bernstein"`` (default), ``"spline"`` or ``"affine"``; ``transform_kwargs``
+    are forwarded to it. At most one ``I`` term per node may set it, and an
+    ordinal node accepts none (its intercept is the cutpoint vector).
+    """
+    kw = tuple(sorted(transform_kwargs.items())) if transform_kwargs else None
+    if not allow_interaction and len(parents) > 1:
+        first = Term(
+            "I", "intercept", (parents[0],), transform=transform, transform_kwargs=kw
+        )
+        rest = [Term("I", "intercept", (q,)) for q in parents[1:]]
+        return Transformation([first, *rest])
+    return Term(
+        "I", "intercept", tuple(parents), transform=transform, transform_kwargs=kw
+    )
 
 
 def LS(*parents: str) -> Term:
@@ -166,33 +240,178 @@ def term(effect: str, *parents: str, penalty: float | None = None) -> Term:
     raise ValueError(f"unknown term effect '{effect}'.")
 
 
-@dataclass
+def _normalize_transformation(value, *, name: str = "transformation"):
+    """Flatten a transformation into a plain term list.
+
+    Accepted: ``None``, a single :class:`Term`, a ``+`` sum, the bare name
+    ``I``, or a list/tuple that mixes all of these.
+    """
+    if value is None:
+        return None
+    if value is I:
+        value = [I()]
+    elif isinstance(value, Term):
+        value = [value]
+    if not isinstance(value, (list, tuple)):
+        raise TypeError(
+            f"{name} must be a Term, a sum of terms, the bare I, or a list "
+            f"of these — got {type(value).__name__}."
+        )
+    out: list[Term] = []
+    for element in value:
+        if element is I:
+            element = I()
+        if isinstance(element, Transformation):
+            out.extend(element)
+        elif isinstance(element, Term):
+            out.append(element)
+        else:
+            raise TypeError(
+                f"{name} entries must be terms (I/LS/CS/VC) — got "
+                f"{type(element).__name__}. A '+' between list entries "
+                "does not combine them; write either a list or a sum."
+            )
+    return out
+
+
+def _resolve_terms_alias(transformation, terms):
+    """Merge the deprecated ``terms=`` keyword into ``transformation``."""
+    if terms is None:
+        return transformation
+    if transformation is not None:
+        raise TypeError("pass either transformation or terms, not both.")
+    warnings.warn(
+        "terms= is deprecated, use the first positional argument "
+        "(transformation=) instead.",
+        DeprecationWarning,
+        stacklevel=3,
+    )
+    return terms
+
+
+def _hoist_transform(terms, transform, transform_kwargs, *, ordinal: bool):
+    """Move an I term's basis choice onto the node.
+
+    Returns
+    -------
+    tuple[str, dict]
+        The effective ``(transform, transform_kwargs)`` of the node.
+
+    Raises
+    ------
+    ValueError
+        If several ``I`` terms set a basis, or an ordinal node gets one.
+    """
+    carriers = [t for t in terms or [] if t.effect == "I" and t.transform]
+    if len(carriers) > 1:
+        raise ValueError(
+            "only one I term per node may set transform=, got "
+            f"{[t.transform for t in carriers]}."
+        )
+    if carriers and ordinal:
+        raise ValueError(
+            "I(transform=...) is for continuous nodes. An ordinal node's "
+            "intercept is the cutpoint vector, it has no basis to choose."
+        )
+    if carriers:
+        t = carriers[0]
+        return t.transform, dict(t.transform_kwargs or ())
+    return transform, dict(transform_kwargs or {})
+
+
 class ContinuousNode:
     """Continuous variable, modelled by a monotone 1-D transform + shifts.
 
-    Args:
-        terms: additive formula, a list of :func:`I`/:func:`LS`/:func:`CS` terms
-            (``None`` / omitted = a source node).
-        transform: "bernstein" (TRAM-faithful), "spline" or "affine".
-        transform_kwargs: forwarded to the transform.
+    Parameters
+    ----------
+    transformation : Term | Transformation | list | None, optional
+        The additive formula for ``h``: a list of terms, a ``+`` sum, a single
+        term, or the bare ``I``. ``None`` (default) is a source node.
+    transform : str, optional
+        Basis of the monotone transform: ``"bernstein"`` (TRAM-faithful),
+        ``"spline"`` or ``"affine"``, by default ``"bernstein"``. Prefer
+        setting it on the I term: ``I(..., transform="spline")``.
+    transform_kwargs : dict | None, optional
+        Forwarded to the transform, by default ``None``.
+    terms : list | None, optional
+        Deprecated alias for ``transformation``.
     """
 
-    terms: list[Term] | None = None
-    transform: str = "bernstein"
-    transform_kwargs: dict = field(default_factory=dict)
-    kind: str = field(default="continuous", init=False)
+    kind = "continuous"
+
+    def __init__(
+        self,
+        transformation=None,
+        transform: str = "bernstein",
+        transform_kwargs: dict | None = None,
+        *,
+        terms=None,
+    ):
+        transformation = _resolve_terms_alias(transformation, terms)
+        self.transformation = _normalize_transformation(transformation)
+        self.transform, self.transform_kwargs = _hoist_transform(
+            self.transformation, transform, transform_kwargs, ordinal=False
+        )
+
+    @property
+    def terms(self):
+        """list[Term] | None: alias of ``transformation`` (read-only)."""
+        return self.transformation
+
+    def __repr__(self):
+        """Show the transformation and the basis."""
+        return f"ContinuousNode({self.transformation!r}, transform={self.transform!r})"
+
+    def __eq__(self, other):
+        """Compare transformation, basis and basis kwargs."""
+        return (
+            isinstance(other, ContinuousNode)
+            and self.transformation == other.transformation
+            and self.transform == other.transform
+            and self.transform_kwargs == other.transform_kwargs
+        )
 
 
-@dataclass
 class OrdinalNode:
     """Ordinal variable with ``levels`` ordered classes, stored 0 to levels-1.
 
     An ordered logit models it: increasing cutpoints plus the shift terms.
+
+    Parameters
+    ----------
+    levels : int
+        Number of ordered classes.
+    transformation : Term | Transformation | list | None, optional
+        The additive formula, as for :class:`ContinuousNode`, by default
+        ``None``.
+    terms : list | None, optional
+        Deprecated alias for ``transformation``.
     """
 
-    levels: int
-    terms: list[Term] | None = None
-    kind: str = field(default="ordinal", init=False)
+    kind = "ordinal"
+
+    def __init__(self, levels: int, transformation=None, *, terms=None):
+        transformation = _resolve_terms_alias(transformation, terms)
+        self.levels = int(levels)
+        self.transformation = _normalize_transformation(transformation)
+        _hoist_transform(self.transformation, None, None, ordinal=True)
+
+    @property
+    def terms(self):
+        """list[Term] | None: alias of ``transformation`` (read-only)."""
+        return self.transformation
+
+    def __repr__(self):
+        """Show the levels and the transformation."""
+        return f"OrdinalNode({self.levels}, {self.transformation!r})"
+
+    def __eq__(self, other):
+        """Compare levels and transformation."""
+        return (
+            isinstance(other, OrdinalNode)
+            and self.levels == other.levels
+            and self.transformation == other.transformation
+        )
 
 
 NodeSpec = ContinuousNode | OrdinalNode
@@ -366,10 +585,10 @@ def spec_from_dict(d: dict) -> dict[str, NodeSpec]:
         terms = _terms_from_dict(nd)
         if nd["kind"] == "continuous":
             spec[name] = ContinuousNode(
-                terms=terms,
+                terms,
                 transform=nd["transform"],
                 transform_kwargs=dict(nd["transform_kwargs"]),
             )
         else:
-            spec[name] = OrdinalNode(levels=int(nd["levels"]), terms=terms)
+            spec[name] = OrdinalNode(int(nd["levels"]), terms)
     return spec
