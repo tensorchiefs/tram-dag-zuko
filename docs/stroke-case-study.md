@@ -18,10 +18,10 @@ analytically from the outcome node's interventional PMF, no Monte Carlo.
 ```bash
 cd experiments
 uv run python sim_flow.py nl                  # headline storyline (synthetic, default)
-uv run python all_ls_flow.py                  # all-edges-ls flow
-uv run python nihss6_flow.py                  # flexible nihss6 config
+uv run python sim_flow.py nl                  # all-ls vs flexible, known truth
+# the single-config runners (all_ls_flow, nihss6_flow) are parked in stale/
 uv run python validate_ls.py                  # all-ls flow vs statsmodels MLE
-uv run python counterfactual_demo.py all_ls   # Pearl abduction showcase
+# counterfactual_demo.py is parked in stale/
 uv run python all_ls_long.py                  # 4x-longer convergence check
 ```
 
@@ -71,8 +71,8 @@ flow ≡ R fit (outcome-node coefficients and ATE) without an R installation.
 | model | ATE on P(good) | source |
 |---|---|---|
 | MR CLEAN RCT (ground truth) | **+0.135** [+0.057, +0.213] | Berkhemer et al. 2015 |
-| this flow, nihss6 config | **+0.063** | `experiments/nihss6_flow.py` |
-| this flow, all-ls | **+0.057** | `experiments/all_ls_flow.py` |
+| this flow, nihss6 config | **+0.063** | `experiments/stale/nihss6_flow.py` (parked) |
+| this flow, all-ls | **+0.057** | `experiments/stale/all_ls_flow.py` (parked) |
 | classical proportional-odds MLE, same 80% split | +0.055 | `experiments/validate_ls.py` |
 | original TRAM-DAG `md_dag_ls` (all-ls) | +0.054 | paper monorepo |
 | original TRAM-DAG `nihss6` | +0.108 (seed 2: +0.092) | paper monorepo |

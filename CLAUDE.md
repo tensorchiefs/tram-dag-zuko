@@ -21,7 +21,8 @@ uv run pytest tests/ -q          # full suite; -m "not slow" is ~2 min
 cd experiments
 uv run python sim_flow.py nl     # headline storyline (all-ls vs flexible vs known truth)
 uv run python validate_ls.py     # spot-on flow == statsmodels == R polr check
-uv run python paper_triangle.py atan cs   # TRAM-DAG paper replications (paper_*.py)
+# paper replications are pinned by tests/test_paper_dgps.py; the old
+# scripts are parked in experiments/stale/
 ```
 
 Experiments default to the synthetic data (`magic-mrclean/nl`). The `magic` source
@@ -80,7 +81,7 @@ Experiments default to the synthetic data (`magic-mrclean/nl`). The `magic` sour
   outside [-5,5] regardless of θ, so the ~10% of data beyond the 5%/95% pre-scaling
   range is misweighted whenever the true tail slope differs — the structural reason
   `spline` consistently trails `bernstein` (whose linear extrapolation follows the
-  boundary derivative). Demonstrated in `notebooks/transforms_tram_dag.py`.
+  boundary derivative). Demonstrated in `notebooks/stale/transforms_tram_dag.py` (parked).
 - **`fit(restore_best=False)` is the default** (keeps final converged weights = exact
   MLE; an all-`ls` model then matches statsmodels/R-polr to ~1e-3). `restore_best=True`
   = per-node best-validation restoration (early stopping). Key empirical finding:

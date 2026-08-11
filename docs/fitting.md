@@ -175,7 +175,7 @@ transformation model (ordered-logit / Colr). It raises on any `cs`/`ci` edge.
   (`experiments/validate_ls.py --classical`), not the flag.
 - Read the fitted coefficients with `ls_coefficients()`.
 
-Walkthrough: [`notebooks/classical_fit_tram_dag.py`](../notebooks/classical_fit_tram_dag.py).
+Walkthrough: [`notebooks/stale/classical_fit_tram_dag.py`](../notebooks/stale/classical_fit_tram_dag.py) (parked).
 
 ## Memory and disk during fitting
 

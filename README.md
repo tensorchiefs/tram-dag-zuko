@@ -67,7 +67,7 @@ flow.fit(
 )
 
 # all-`ls` model? fit it classically instead: deterministic float64 L-BFGS,
-# exact MLE matching statsmodels/R (see notebooks/classical_fit_tram_dag.py)
+# exact MLE matching statsmodels/R (see docs/fitting.md)
 flow.fit_classical(train_df)  # raises on cs/ci specs
 
 flow.log_prob(df)  # L1: joint log-likelihood per row
@@ -129,10 +129,6 @@ There are two ways to fit the model: a stochastic deep learning optimizer (`fit`
   | `triangle-mixed` (`linear`,`exp`) | §6.2 | mixed data L1/L2 + the C.4 odds-ratio check (OR ≈ 7.4) |
   | `vaca` | §5.1–5.2 | the bimodal L1 case a default CNF misses; L2 `p(x₃ \| do(x₂))` |
   | `carefl` | §5.3 | L3 counterfactual curves vs **analytic** truth |
-
-  ```bash
-  cd experiments && uv run python paper_triangle.py atan cs   # etc., see paper_*.py
-  ```
 
   Sign note: ordinal shifts are *subtracted* here but *added* in the paper, so
   fitted ordinal weights are the paper's with flipped sign (`truth.json` records

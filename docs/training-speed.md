@@ -2,11 +2,11 @@
 
 Benchmark of learning-rate schedules, per-node freezing, batch sizes, devices and
 LBFGS — June 2026, Apple-silicon Mac mini, torch 2.12 (CPU unless noted).
-Reproduce with `cd experiments && uv run python bench_training.py`
+Reproduce with `experiments/stale/bench_training.py` (parked; migrate it to the current API first)
 (grid ≈ 35 min; raw numbers in `results/bench-training/results.csv`).
 For a quick **cross-machine** comparison (fixed 200-epoch workloads, all
 available devices, machine fingerprint to JSON) use the self-contained
-`experiments/perf_machine.py` — runs on any box after `pip install tramdag`.
+`experiments/stale/perf_machine.py` (parked) — runs on any box after `pip install tramdag`.
 
 ## The options, and how to use them
 
@@ -45,7 +45,7 @@ within the usual tolerances.
 
 **LBFGS** is *not* a `fit()` option — it's a classical full-batch optimizer that
 only makes sense for small, parametric (all-`ls`) models. Recipe (also in
-`experiments/bench_training.py::run_lbfgs`):
+`experiments/stale/bench_training.py::run_lbfgs`):
 
 ```python
 flow = CausalFlowDAG(build_spec("ls"))

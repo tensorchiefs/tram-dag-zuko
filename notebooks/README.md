@@ -8,10 +8,10 @@ truth**.
 | notebook | what it is |
 |---|---|
 | `intro_tram_dag.py` | didactic walkthrough of the TRAM-DAG model (SI/CI/LS/CS, L1–L3, all claims checked against a hand-built SCM) |
-| `transforms_tram_dag.py` | choosing the per-node transform (Bernstein / spline / affine) on the intro SCM: per-node NLL diagnosis, recovered h-curves, mixing transforms per node, capacity sweep, and why misspecification bends tail-risk do() queries |
-| `classical_fit_tram_dag.py` | `fit_classical` for all-`ls` models: deterministic float64 L-BFGS vs Adam (bimodal demo), exact equivalence to statsmodels ordered-logit (stroke) with an R `tram::Colr` snippet, and the classical→further-training warm-start handoff |
-| `additive_vs_joint_ci.py` | additive (`I("x1")+I("x2")`) vs joint (`I("x1","x2")`) complex intercept: why the two fit alike yet differ structurally, and how `flow.intercept_contributions` extracts exact, mean-centered, separable per-parent partial effects (issue #20) |
 | `demo_tram_dag_colab.py` | 5-minute showcase on the paper's bimodal VACA benchmark, GPU-ready ([open in Colab](https://colab.research.google.com/github/tensorchiefs/tramdag/blob/main/notebooks/demo_tram_dag_colab.ipynb)) |
+
+Further notebooks are parked in [`stale/`](stale/README.md) until they are
+migrated to the current API.
 
 ## Rules
 
