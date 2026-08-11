@@ -90,6 +90,9 @@ select = ["I", "E", "F", "D", "UP"]
 # paragraph: E501 would force hard wraps into rendered markdown. Their
 # docstrings are narrative, so the numpydoc summary rules do not apply.
 "notebooks/*" = ["D100", "D101", "D102", "D103", "D104", "D205", "D401", "E501"]
+# the pdoc include directive makes README.md the docs landing page; a
+# trailing period would break the file name
+"src/*/__init__.py" = ["D400"]
 # Test docstrings state what a test guarantees, in prose. They are not API
 # documentation, and tests/ is the measurement -- reformatting it is churn.
 "tests/*" = ["D100", "D101", "D102", "D103", "D104", "D205", "D400", "D401"]
