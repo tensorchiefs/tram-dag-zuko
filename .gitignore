@@ -25,3 +25,7 @@ dist/
 
 # machine-benchmark outputs (collected manually per machine)
 perf_*.json
+
+# jupyter runtime litter
+.ipynb_checkpoints/
+.virtual_documents/
