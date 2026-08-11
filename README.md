@@ -46,12 +46,10 @@ from tramdag import CausalFlowDAG, ContinuousNode, OrdinalNode, I, LS, CS
 
 spec = {  # the spec IS the labelled DAG
     "Age": ContinuousNode(),
-    "mRS_pre": OrdinalNode(levels=6, terms=[I("Age")]),
-    "NIHSSa": ContinuousNode(terms=[I("Age"), LS("mRS_pre")]),
-    "T": OrdinalNode(levels=2, terms=[I("Age"), LS("mRS_pre"), CS("NIHSSa")]),
-    "mRS_3m": OrdinalNode(
-        levels=7, terms=[I("Age"), LS("mRS_pre"), CS("NIHSSa"), LS("T")]
-    ),
+    "mRS_pre": OrdinalNode(6, I("Age")),
+    "NIHSSa": ContinuousNode(I("Age") + LS("mRS_pre")),
+    "T": OrdinalNode(2, I("Age") + LS("mRS_pre") + CS("NIHSSa")),
+    "mRS_3m": OrdinalNode(7, I("Age") + LS("mRS_pre") + CS("NIHSSa") + LS("T")),
 }
 flow = CausalFlowDAG(spec)  # validates acyclicity, builds the flow
 
@@ -86,7 +84,7 @@ flow.intercept_contributions("NIHSSa", df)  # interpret: per-parent partial effe
 
 # heterogeneous treatment effects: a small, penalized effect head beta(x)*T
 # (VC term) with a first-class read-out — see docs/varying-coefficients.md
-# e.g. terms=[CS("Age", "NIHSSa"), VC("T", "Age")] ->
+# e.g. CS("Age", "NIHSSa") + VC("T", "Age") ->
 # flow.varying_coef("mRS_3m", df)          # beta(x): deterministic, y-free
 
 flow.scores(df, node="mRS_3m")  # per-observation scores dl_i/dtheta

@@ -19,14 +19,10 @@ spec = {
     "X1": td.ContinuousNode(),
     "X2": td.ContinuousNode(),
     "X3": td.ContinuousNode(),
-    "T": td.OrdinalNode(levels=2, terms=[td.LS("X1"), td.LS("X2")]),
+    "T": td.OrdinalNode(2, td.LS("X1") + td.LS("X2")),
     "Y": td.ContinuousNode(
-        terms=[
-            td.CS("X1", "X2", "X3"),  # prognostic part g(x): as flexible as you like
-            td.VC(
-                "T", "X2", "X3", penalty=1.0
-            ),  # effect part beta(X2, X3) * T: small + penalized
-        ]
+        td.CS("X1", "X2", "X3")  # prognostic part g(x): as flexible as you like
+        + td.VC("T", "X2", "X3", penalty=1.0)  # effect beta(X2, X3) * T
     ),
 }
 flow = td.CausalFlowDAG(spec, seed=0).fit(train, val, restore_best=True)

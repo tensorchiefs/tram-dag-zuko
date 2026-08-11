@@ -1,8 +1,28 @@
 # Changelog
 
-## 0.3.1 (unreleased)
+## 0.4.0 (unreleased)
 
 ### Added
+
+- **Transformation syntax**: a node's additive formula is now its first
+  positional argument and can be written as a `+` sum — the formula reads
+  like the math (`ContinuousNode(I("x1") + CS("x2"))`,
+  `OrdinalNode(4, [I, LS("x1")])`). New on `I`:
+  `allow_interaction=False` (multi-parent intercept becomes additive,
+  `I("a","b", allow_interaction=False) == I("a") + I("b")`) and
+  `transform=`/`transform_kwargs=` (the monotone basis moves onto the
+  intercept term, e.g. `I("x1", transform="spline")`). Everything
+  normalizes to the same internal term list: checkpoints, `flow.py` and
+  the serialized format are unchanged, and equivalence is pinned by
+  state-dict-identical tests (`tests/test_transformation_syntax.py`).
+
+### Deprecated
+
+- `terms=` still works on both node types but warns; it goes away in the
+  next breaking release. `node.terms` stays as a read-only alias of
+  `node.transformation`.
+
+### Added (0.3.1)
 
 - **Propensity-centered VC: `VC(..., center=True, center_folds=5)`** (issue
   #30): the R-learner orthogonalization `beta(x)·(t − ê(x))` inside the

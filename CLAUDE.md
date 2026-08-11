@@ -30,13 +30,15 @@ Experiments default to the synthetic data (`magic-mrclean/nl`). The `magic` sour
 ## Architecture (src/tramdag/)
 
 - `spec.py` — user-facing DAG spec: `{name: ContinuousNode|OrdinalNode}`, each node
-  declares `terms=[...]` (term-formula notation, since 0.3.0; the legacy
-  `parents={parent: term}` dict was removed). Term constructors: `LS(parent)`
+  declares its transformation as the first positional argument — a list of terms
+  or a `+` sum (`I("a") + LS("b")`), since 0.4.0; `terms=` is a deprecated alias
+  (the legacy `parents={parent: term}` dict was removed in 0.3.0). Term constructors: `LS(parent)`
   (linear shift), `CS(*parents)` (complex shift MLP), `I(*parents)` (complex
   intercept — transform params from parents), `VC(on, *modifiers, penalty=)`
   (varying-coefficient effect head `beta(modifiers)·x_on`, small penalized
   zero-init net; read out with `flow.varying_coef` — see
-  docs/varying-coefficients.md). A **multi-parent** term is one
+  docs/varying-coefficients.md). `I(..., transform=)` picks the monotone basis;
+  `I("a","b", allow_interaction=False)` == `I("a") + I("b")`. A **multi-parent** term is one
   *joint* network over the group (`CS("a","b")`, `I("a","b")`); **separate** terms
   are *additive* (`CS("a")+CS("b")`; `I("a")+I("b")` = per-parent intercept nets
   summed in unconstrained coeff space). `term(effect, *parents)` builds a term from
