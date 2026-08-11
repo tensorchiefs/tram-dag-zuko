@@ -39,11 +39,12 @@ Experiments default to the synthetic data (`magic-mrclean/nl`). The `magic` sour
   (varying-coefficient effect head `beta(modifiers)·x_t`, small penalized
   zero-init net; read out with `flow.varying_coef` — see
   docs/varying-coefficients.md). `I(..., transform=)` picks the monotone basis,
-  `units=[...]` on I/CS/VC sizes the term's network;
-  `I("a","b", allow_interaction=False)` == `I("a") + I("b")`. A **multi-parent** term is one
-  *joint* network over the group (`CS("a","b")`, `I("a","b")`); **separate** terms
-  are *additive* (`CS("a")+CS("b")`; `I("a")+I("b")` = per-parent intercept nets
-  summed in unconstrained coeff space). `term(effect, *parents)` builds a term from
+  `units=[...]` on I/CS/VC sizes the term's network. A node takes at most ONE
+  I term with parents; a **multi-parent** `I("a","b")` is one *joint* network
+  (interaction on the thetas, the default), and
+  `I("a","b", allow_interaction=False)` is the *additive* intercept (one net
+  per parent, coefficient vectors summed). For shifts, grouping decides:
+  `CS("a","b")` is joint, `CS("a")+CS("b")` additive. `term(effect, *parents)` builds a term from
   a data-driven label. No intercept term → `SimpleIntercept` baseline. Every
   parent enters through exactly one edge-owning term (VC modifiers exempt — they
   may also appear prognostically).
