@@ -19,7 +19,7 @@
 # *TRAM-DAGs* ([paper](https://arxiv.org/abs/2503.16206),
 # [original R/Keras code](https://github.com/tensorchiefs/tram-dag)) are causal models
 # that use **structured transformation functions** to map a latent representation
-# $Z$ to the observed data $X$. For continuous variables they are **bijective causal
+# $U$ to the observed data $X$. For continuous variables they are **bijective causal
 # models**, so once trained a single model answers all three rungs of Pearl's causal
 # hierarchy:
 #
@@ -74,7 +74,7 @@
 #
 # $$
 # u_i \;=\; h(x_i \mid \mathrm{pa}(x_i)) \;=\;
-# \underbrace{h_\theta(x_i)}_{\text{intercept}}
+# \underbrace{h_{\boldsymbol{\vartheta}}(x_i)}_{\text{intercept}}
 # \;+\; \underbrace{\textstyle\sum_j \beta_{ij}\, x_j}_{\text{linear shifts (LS)}}
 # \;+\; \underbrace{\textstyle\sum_k g_{ik}(x_k)}_{\text{complex shifts (CS)}} ,
 # $$
@@ -82,10 +82,10 @@
 # with every causal parent assigned to exactly one term. Take $x_5$ with parents
 # $\mathrm{pa}(x_5) = \{x_1, x_2, x_4\}$ as the running example:
 #
-# * **Simple intercept (SI):** $h_\theta(x_5)$ has *constant* parameters $\theta$ —
+# * **Simple intercept (SI):** $h_{\boldsymbol{\vartheta}}(x_5)$ has *constant* parameters $\boldsymbol{\vartheta}$ —
 #   a flexible monotone baseline transformation (here: a Bernstein polynomial),
 #   the same for every observation.
-# * **Complex intercept (CI):** the parameters $\theta$ of $h_\theta(x_5)$ are
+# * **Complex intercept (CI):** the parameters $\boldsymbol{\vartheta}$ of $h_{\boldsymbol{\vartheta}}(x_5)$ are
 #   themselves a function of (a subset of) the parents — the whole transformation
 #   bends with the parent, allowing interactions beyond additive shifts.
 # * **Linear shift (LS):** $\beta_{51} x_1 + \beta_{52} x_2$ — one interpretable
@@ -97,7 +97,7 @@
 # the shifts move to the other side:
 #
 # $$
-# x_5 = h^{-1}(u_5 \mid x_1, x_2, x_4) = h_\theta^{-1}\!\Big(u_5
+# x_5 = h^{-1}(u_5 \mid x_1, x_2, x_4) = h_{\boldsymbol{\vartheta}}^{-1}\!\Big(u_5
 # - \underbrace{\beta_{51} x_1 + \beta_{52} x_2}_{\text{LS}}
 # - \underbrace{g(x_4)}_{\text{CS}}\Big).
 # $$
@@ -109,8 +109,8 @@
 #
 # | paper component | `tramdag` |
 # |---|---|
-# | SI — baseline $h_\theta(x_i)$, constant $\theta$ | automatic: every node owns a monotone transform (`bernstein` / `spline` / `affine`); with no intercept term its $\theta$ is a free parameter vector |
-# | CI — $\theta$ depends on parents | `I("X1")` (several `I(...)` parents feed **one joint** network → interactions) |
+# | SI — baseline $h_{\boldsymbol{\vartheta}}(x_i)$, constant $\boldsymbol{\vartheta}$ | automatic: every node owns a monotone transform (`bernstein` / `spline` / `affine`); with no intercept term its $\boldsymbol{\vartheta}$ is a free parameter vector |
+# | CI — $\boldsymbol{\vartheta}$ depends on parents | `I("X1")` (several `I(...)` parents feed **one joint** network → interactions) |
 # | LS — $\beta_{ij} x_j$ | `LS("X1")` (a single weight, no bias) |
 # | CS — $g_{ik}(x_k)$ | `CS("X1")` (64-128-64 MLP, additive) |
 
@@ -123,15 +123,15 @@
 #
 # | `transformation` | $u_3 = h(x_3 \mid \mathrm{pa})$ | what carries each parent |
 # |---|---|---|
-# | `None` / `[I]` (source) | $h_\theta(x_3)$ | `SimpleIntercept` — $\theta$ a free vector |
-# | `[LS("X1")]` | $h_\theta(x_3) + \beta\,x_1$ | `LinearShift` — **one number** $\beta$ |
-# | `[CS("X1")]` | $h_\theta(x_3) + g_1(x_1)$ | `ComplexShift` — additive MLP $g_1$ |
-# | `[I("X1")]` | $h_{\theta(x_1)}(x_3)$ | `ComplexIntercept` — **no shift term**; $\theta$ (the whole shape) bends with $x_1$ |
-# | `LS("X1") + CS("X2")` | $h_\theta(x_3) + \beta x_1 + g_2(x_2)$ | one `LinearShift` + one `ComplexShift` (the model fitted below) |
-# | `[CS("X1", "X2")]` | $h_\theta(x_3) + g_{1,2}(x_1, x_2)$ | **one joint** `ComplexShift` — an interaction in the shift |
-# | `CS("X1") + CS("X2")` | $h_\theta(x_3) + g_1(x_1) + g_2(x_2)$ | two **additive** `ComplexShift`s |
-# | `[I("X1", "X2", allow_interaction=False)]` | $h_{\theta(x_1) + \theta(x_2)}(x_3)$ | **additive** CI, same as `I("X1") + I("X2")` — each parent reshapes the transform independently |
-# | `[I("X1", "X2")]` | $h_{\theta(x_1,x_2)}(x_3)$ | **one joint** `ComplexIntercept` over both parents (they interact) |
+# | `None` / `[I]` (source) | $h_{\boldsymbol{\vartheta}}(x_3)$ | `SimpleIntercept` — $\boldsymbol{\vartheta}$ a free vector |
+# | `[LS("X1")]` | $h_{\boldsymbol{\vartheta}}(x_3) + \beta\,x_1$ | `LinearShift` — **one number** $\beta$ |
+# | `[CS("X1")]` | $h_{\boldsymbol{\vartheta}}(x_3) + g_1(x_1)$ | `ComplexShift` — additive MLP $g_1$ |
+# | `[I("X1")]` | $h_{\boldsymbol{\vartheta}(x_1)}(x_3)$ | `ComplexIntercept` — **no shift term**; $\boldsymbol{\vartheta}$ (the whole shape) bends with $x_1$ |
+# | `LS("X1") + CS("X2")` | $h_{\boldsymbol{\vartheta}}(x_3) + \beta x_1 + g_2(x_2)$ | one `LinearShift` + one `ComplexShift` (the model fitted below) |
+# | `[CS("X1", "X2")]` | $h_{\boldsymbol{\vartheta}}(x_3) + g_{1,2}(x_1, x_2)$ | **one joint** `ComplexShift` — an interaction in the shift |
+# | `CS("X1") + CS("X2")` | $h_{\boldsymbol{\vartheta}}(x_3) + g_1(x_1) + g_2(x_2)$ | two **additive** `ComplexShift`s |
+# | `[I("X1", "X2", allow_interaction=False)]` | $h_{\boldsymbol{\vartheta}(x_1) + \boldsymbol{\vartheta}(x_2)}(x_3)$ | **additive** CI — one network per parent, coefficient vectors summed; each parent reshapes the transform independently |
+# | `[I("X1", "X2")]` | $h_{\boldsymbol{\vartheta}(x_1,x_2)}(x_3)$ | **one joint** `ComplexIntercept` over both parents (they interact) |
 #
 # List and `+` sum are interchangeable: `[LS("X1"), CS("X2")]` ==
 # `LS("X1") + CS("X2")`. The basis of the monotone transform is chosen on the
@@ -332,7 +332,7 @@ flow.nll(val_df)
 # **fitted** flow. Two small helpers do the job: `describe_node` reports which
 # network carries each parent (the structural view), and `decompose_row` prints the
 # actual numbers for one observation and verifies they rebuild the per-node
-# log-likelihood **exactly** — $u = h_\theta(x) + \sum \text{shifts}$ is an
+# log-likelihood **exactly** — $u = h_{\boldsymbol{\vartheta}}(x) + \sum \text{shifts}$ is an
 # identity, not a picture. We run both on `X2` (an `ls` edge), `X3` (`ls` + `cs`),
 # and the ordinal `Y` (shift **subtracted**).
 
