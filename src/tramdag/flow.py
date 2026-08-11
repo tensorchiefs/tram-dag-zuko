@@ -34,6 +34,7 @@ from .conditioners import (
 from .spec import (
     LS,
     ContinuousNode,
+    I,
     NodeSpec,
     OrdinalNode,
     node_parents,
@@ -78,7 +79,9 @@ class _Node(nn.Module):
         self.kind = node.kind
         terms = node_terms(node)
         self.parents = tuple(node_parents(node))  # ordered parent names
-        i_groups = [tuple(t.parents) for t in terms if t.effect == "I" and t.parents]
+        i_terms = [t for t in terms if t.effect == "I" and t.parents]
+        i_groups = [tuple(t.parents) for t in i_terms]
+        i_units = [t.units for t in i_terms]
         self._intercept_groups = i_groups
         self.ci_parents = [
             p for grp in i_groups for p in grp
@@ -106,14 +109,14 @@ class _Node(nn.Module):
             self.intercept_nets = None
         elif len(i_groups) == 1:
             self.intercept = ComplexIntercept(
-                sum(width(p) for p in i_groups[0]), n_params
+                sum(width(p) for p in i_groups[0]), n_params, units=i_units[0]
             )
             self.intercept_nets = None
         else:
             self.intercept = None
             self.intercept_nets = nn.ModuleList(
-                ComplexIntercept(sum(width(p) for p in grp), n_params)
-                for grp in i_groups
+                ComplexIntercept(sum(width(p) for p in grp), n_params, units=u)
+                for grp, u in zip(i_groups, i_units)
             )
 
         # shift terms: one network per term, over the term's (possibly joint)
@@ -129,7 +132,9 @@ class _Node(nn.Module):
             if term.effect == "VC":
                 on, mods = term.parents[0], tuple(term.parents[1:])
                 self.shifts[on] = VaryingCoef(
-                    sum(width(p) for p in mods), penalty=term.penalty
+                    sum(width(p) for p in mods),
+                    penalty=term.penalty,
+                    units=term.units,
                 )
                 self._vc_groups.append(
                     _VCGroup(
@@ -149,7 +154,7 @@ class _Node(nn.Module):
             self.shifts[key] = (
                 LinearShift(feat_width)
                 if term.effect == "LS"
-                else ComplexShift(feat_width)
+                else ComplexShift(feat_width, units=term.units)
             )
             self._shift_groups.append((key, ps))
 
@@ -667,18 +672,22 @@ class CausalFlowDAG(nn.Module):
             for p in nd.parents:
                 pn = self.spec[p]
                 proxy_spec[p] = (
-                    OrdinalNode(levels=pn.levels)
+                    OrdinalNode(pn.levels)
                     if isinstance(pn, OrdinalNode)
-                    else ContinuousNode(transform="affine")
+                    else ContinuousNode([I(transform="affine")])
                 )
             ls_terms = [LS(p) for p in nd.parents]
             if isinstance(node_spec, OrdinalNode):
                 proxy_spec[name] = OrdinalNode(node_spec.levels, ls_terms)
             else:
                 proxy_spec[name] = ContinuousNode(
-                    ls_terms,
-                    transform=node_spec.transform,
-                    transform_kwargs=dict(node_spec.transform_kwargs),
+                    [
+                        I(
+                            transform=node_spec.transform,
+                            transform_kwargs=dict(node_spec.transform_kwargs),
+                        ),
+                        *ls_terms,
+                    ]
                 )
             proxy = CausalFlowDAG(proxy_spec, device=str(self.device))
             proxy.fit_classical(train_df[list(nd.parents) + [name]], verbose=False)
@@ -791,11 +800,11 @@ class CausalFlowDAG(nn.Module):
         for p in on_nd.parents:
             pn = self.spec[p]
             proxy_spec[p] = (
-                OrdinalNode(levels=pn.levels)
+                OrdinalNode(pn.levels)
                 if isinstance(pn, OrdinalNode)
-                else ContinuousNode(transform="affine")
+                else ContinuousNode([I(transform="affine")])
             )
-        terms = list(node_spec.terms) if node_spec.terms else None
+        terms = node_terms(node_spec) or None
         proxy_spec[on] = OrdinalNode(2, terms)
         all_ls = all(t.effect == "LS" for t in (terms or []))
         cols = list(on_nd.parents) + [on]

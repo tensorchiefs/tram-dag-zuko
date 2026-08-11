@@ -13,10 +13,7 @@ from .spec import (
     LS,
     VC,
     ContinuousNode,
-    CShift,
     I,
-    Intercept,
-    LinShift,
     OrdinalNode,
     Term,
     Transformation,
@@ -37,8 +34,5 @@ __all__ = [
     "CS",
     "VC",
     "term",
-    "Intercept",
-    "LinShift",
-    "CShift",
 ]
 __version__ = version("tramdag")
