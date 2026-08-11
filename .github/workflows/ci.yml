@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, dev-*]   # both contributors' dev branches
   pull_request:
   workflow_dispatch:        # manual full-suite run from the Actions tab
   schedule:
