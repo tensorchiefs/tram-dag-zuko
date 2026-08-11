@@ -38,54 +38,36 @@ jobs:
     # The kernel runs in the OUTPUT file's directory, and the notebooks
     # resolve data/ relative to that -- so the executed copy must land in
     # notebooks/ (gitignored).
-    - name: execute the notebooks
-      run: |
-        set -euo pipefail
-        for name in $NOTEBOOKS; do
-          uv run --group dev --group notebooks --with nbconvert \
-            jupytext --to notebook --execute \
-              --output notebooks/$name.exec.ipynb notebooks/$name.py
-        done
-
-    - name: convert executed notebooks to markdown
+    - name: execute the notebooks and convert to markdown
       run: |
         set -euo pipefail
         mkdir -p build/nbmd
         for name in $NOTEBOOKS; do
-          uv run --with nbconvert jupyter nbconvert --to markdown \
-            notebooks/$name.exec.ipynb --output $name --output-dir build/nbmd
+          uv run --group dev --group notebooks --with nbconvert bash -c "
+            jupytext --to notebook --execute \
+              --output notebooks/$name.exec.ipynb notebooks/$name.py &&
+            jupyter nbconvert --to markdown notebooks/$name.exec.ipynb \
+              --output $name --output-dir build/nbmd"
         done
 
+    # One stub module per document; its docstring includes the markdown,
+    # so pdoc renders guides and notebooks with the same chrome as the API.
     - name: generate the guide and notebook stub modules
       run: |
-        uv run python - <<'EOF'
-        """One stub module per document; its docstring includes the markdown,
-        so pdoc renders guides and notebooks with the same chrome as the API.
-        """
-        import os
-        import pathlib
-
-        guides = pathlib.Path("build/stubs/guides")
-        examples = pathlib.Path("build/stubs/examples")
-        guides.mkdir(parents=True, exist_ok=True)
-        examples.mkdir(parents=True, exist_ok=True)
-        guides.joinpath("__init__.py").write_text(
-            '"""How-to guides: fitting, training speed, scores, '
-            'varying coefficients, and the stroke case study."""\n'
-        )
-        examples.joinpath("__init__.py").write_text(
-            '"""The notebooks, executed, with their outputs."""\n'
-        )
-        for md in sorted(pathlib.Path("docs").glob("*.md")):
-            mod = md.stem.replace("-", "_")
-            guides.joinpath(f"{mod}.py").write_text(
-                f'""".. include:: ../../../docs/{md.name}"""\n'
-            )
-        for name in os.environ["NOTEBOOKS"].split():
-            examples.joinpath(f"{name}.py").write_text(
-                f'""".. include:: ../../nbmd/{name}.md"""\n'
-            )
-        EOF
+        set -euo pipefail
+        mkdir -p build/stubs/{guides,examples}
+        echo '"""How-to guides."""' > build/stubs/guides/__init__.py
+        echo '"""The notebooks, executed, with their outputs."""' \
+          > build/stubs/examples/__init__.py
+        for f in docs/*.md; do
+          s=$(basename "$f" .md)
+          echo "\"\"\".. include:: ../../../docs/$s.md\"\"\"" \
+            > "build/stubs/guides/${s//-/_}.py"
+        done
+        for n in $NOTEBOOKS; do
+          echo "\"\"\".. include:: ../../nbmd/$n.md\"\"\"" \
+            > "build/stubs/examples/$n.py"
+        done
 
     - name: build the site with pdoc
       run: |
@@ -108,13 +90,9 @@ jobs:
             p.stem: p.stem.replace("-", "_") for p in pathlib.Path("docs").glob("*.md")
         }
         notebooks = [p.stem for p in pathlib.Path("notebooks").glob("*.py")]
-        total = 0
 
         def fix(page, basedir, prefix):
-            global total
-
             def repl(m):
-                global total
                 target = m.group(1)
                 if target.startswith(("http://", "https://", "#")):
                     return m.group(0)
@@ -122,7 +100,6 @@ jobs:
                 while full.startswith("../"):
                     full = full[3:]
                 stem = pathlib.PurePosixPath(full).stem
-                total += 1
                 if full.startswith("docs/") and stem in guides:
                     return f'href="{prefix}guides/{guides[stem]}.html"'
                 if full.startswith("notebooks/") and stem in notebooks:
@@ -138,13 +115,13 @@ jobs:
             depth = len(rel.parts) - 1
             basedir = "docs" if depth and rel.parts[0] == "guides" else ""
             fix(page, basedir, "../" * depth)
-        print(f"rewrote {total} links")
         EOF
 
     - name: build the PDF (README + guides)
       run: |
         set -euo pipefail
         # neither pandoc nor weasyprint's pango are preinstalled
+        sudo apt-get update -qq
         sudo apt-get install -y -qq pandoc libpango-1.0-0 libpangocairo-1.0-0
         uv run --with weasyprint pandoc -f gfm -s \
           --resource-path=.:docs --metadata title="tramdag documentation" \
