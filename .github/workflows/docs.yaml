@@ -53,12 +53,18 @@ jobs:
       run: |
         set -euo pipefail
         mkdir -p site/notebooks
-        for f in notebooks/*.py; do
-          name=$(basename "$f" .py)
+        # Only the two showcase notebooks for now; the other three train
+        # long enough to dominate the run. Add them here when wanted.
+        #
+        # The executed .ipynb must land in notebooks/: the kernel runs in
+        # the OUTPUT file's directory, and the notebooks resolve data/
+        # relative to that (an output under /tmp made them look for /data).
+        for name in demo_tram_dag_colab intro_tram_dag; do
           uv run --group dev --group notebooks --with nbconvert bash -c "
-            jupytext --to notebook --execute --output /tmp/$name.ipynb '$f' &&
-            jupyter nbconvert --to html /tmp/$name.ipynb \
-              --output-dir site/notebooks"
+            jupytext --to notebook --execute \
+              --output notebooks/$name.exec.ipynb notebooks/$name.py &&
+            jupyter nbconvert --to html notebooks/$name.exec.ipynb \
+              --output=$name --output-dir site/notebooks"
         done
 
     - name: point the landing page's links at the rendered files
