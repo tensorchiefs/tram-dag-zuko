@@ -21,8 +21,8 @@ uv run pytest tests/ -q          # full suite; -m "not slow" is ~2 min
 cd experiments
 uv run python sim_flow.py nl     # headline storyline (all-ls vs flexible vs known truth)
 uv run python validate_ls.py     # spot-on flow == statsmodels == R polr check
-# paper replications are pinned by tests/test_paper_dgps.py; the old
-# scripts are parked in experiments/stale/
+uv run python paper_triangle.py atan cs  # CLeaR replications (paper_*.py);
+                                 # also pinned by tests/test_paper_dgps.py
 ```
 
 Experiments default to the synthetic data (`magic-mrclean/nl`). The `magic` source

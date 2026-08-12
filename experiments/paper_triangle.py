@@ -41,8 +41,8 @@ out = results_dir(f"paper-triangle-{f_name}-{model}")
 
 spec = {
     "x1": ContinuousNode(),
-    "x2": ContinuousNode(terms=[LS("x1")]),
-    "x3": ContinuousNode(terms=[term("ls", "x1"), term(model, "x2")]),
+    "x2": ContinuousNode([LS("x1")]),
+    "x3": ContinuousNode([term("ls", "x1"), term(model, "x2")]),
 }
 
 truths = {"beta12": 2.0, "beta13": -0.2}

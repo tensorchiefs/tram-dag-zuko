@@ -30,8 +30,8 @@ out = results_dir("paper-carefl")
 spec = {
     "x1": ContinuousNode(),
     "x2": ContinuousNode(),
-    "x3": ContinuousNode(terms=[I("x1", "x2")]),
-    "x4": ContinuousNode(terms=[I("x1", "x2")]),
+    "x3": ContinuousNode([I("x1", "x2")]),
+    "x4": ContinuousNode([I("x1", "x2")]),
 }
 
 print(f"fitting all-ci flow on the CAREFL SCM, n={N} ...")
