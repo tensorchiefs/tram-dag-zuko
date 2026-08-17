@@ -3,11 +3,11 @@
 This document benchmarks learning-rate schedules, per-node freezing, batch sizes, devices,
 and LBFGS. The benchmark ran in June 2026 on an Apple-silicon Mac mini with torch 2.12
 (CPU unless noted). To reproduce it, use `experiments/stale/bench_training.py` (parked).
-Migrate the script to the current API first. The grid takes ≈ 35 min. The raw numbers are
-in `results/bench-training/results.csv`. For a quick **cross-machine** comparison, use the
+Migrate the script to the current API first. The grid takes ≈ 35 min. For a quick **cross-machine** comparison, use the
 self-contained `experiments/stale/perf_machine.py` (parked). It runs fixed 200-epoch
 workloads on all available devices and writes a machine fingerprint to JSON. After
-`pip install tramdag`, it runs on any machine.
+`pip install tramdag`, it runs on any machine. The raw CSV is a local artifact of
+the parked benchmark and is not committed.
 
 ## The options, and how to use them
 
@@ -30,7 +30,7 @@ still make progress. Freezing state is per-`fit()`-call: a second `fit` call tra
 nodes again.
 
 **Switching it all off**: for an exact comparison with classical methods (`statsmodels`,
-R `polr`/`tram`), omit both arguments. This PR does not change the defaults, so
+R `polr`/`tram`), omit both arguments. The benchmark changed no defaults, so
 
 ```python
 flow.fit(train_df, epochs=4000, learning_rate=1e-2)  # constant lr, no freezing
@@ -43,36 +43,18 @@ this, `restore_best=False` remains the default (see CHANGELOG). The guard test
 even *with* plateau+freezing the all-`ls` fit lands on the classical MLE within the usual
 tolerances.
 
-**LBFGS** is *not* a `fit()` option. It is a classical full-batch optimizer that only
-makes sense for small, parametric (all-`ls`) models. The recipe (also in
-`experiments/stale/bench_training.py::run_lbfgs`):
+**LBFGS** is *not* a `fit()` option — it ships as its own method.
+[`fit_classical`](fitting.md) runs float64 full-batch L-BFGS with a strong-Wolfe
+line search and supersedes the hand-rolled recipe this report benchmarked: it is
+deterministic, lands on the exact MLE, matches `statsmodels`/R `polr`, and
+refuses non-`ls` specs (minibatch noise also regularizes the MLPs, so flexible
+models belong in `fit`). The float32 single-precision variant measured here was
+fast (< 2 s) but not robust across seeds (Findings #2) — `fit_classical`'s
+float64 upcast is what fixed that.
 
 ```python
-flow = CausalFlowDAG(build_spec("ls"))
-flow._set_ranges(train_df)  # transform ranges from train quantiles
-vals = flow._tensorize(train_df)
-opt = torch.optim.LBFGS(
-    flow.parameters(),
-    lr=1.0,
-    max_iter=40,
-    history_size=30,
-    line_search_fn="strong_wolfe",
-)
-
-
-def closure():
-    opt.zero_grad()
-    loss = torch.stack([-lp.mean() for lp in flow.node_log_prob(vals).values()]).sum()
-    loss.backward()
-    return loss
-
-
-for _ in range(10):
-    loss = opt.step(closure)  # full-batch quasi-Newton steps
+report = flow.fit_classical(train_df)  # exact classical MLE, seconds
 ```
-
-LBFGS is fast (< 2 s to coefficient-level accuracy) but not robust across seeds (see
-Findings #2). Use it as a quick first shot with the plateau trainer as fallback.
 
 ## Method: time-to-target, not loss-go-down
 
@@ -165,7 +147,7 @@ The generous `epochs` value is only a ceiling. The fit stops itself. For exact c
 comparisons where the last 1e-3 matters, append a short constant-lr polish phase
 (`epochs=500, learning_rate=1e-3`) after the plateau fit. Or run the old two-phase recipe.
 
-We deliberately did **not** change `fit()`/`run_experiment` defaults in this PR. Default
-changes are their own reviewed decision (see the `restore_best` episode in CHANGELOG.md).
-If this report convinces us, the switch of `experiments/common.py::run_experiment` to the
-plateau recipe is a 3-line follow-up.
+The benchmark deliberately changed no `fit()`/`run_experiment` defaults. Default
+changes are their own reviewed decision (see the `restore_best` episode in
+CHANGELOG.md). `run_experiment` still uses the two-phase constant-lr recipe; the
+switch to the plateau recipe remains an open 3-line follow-up.
