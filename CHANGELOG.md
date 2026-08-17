@@ -46,7 +46,7 @@
   the intro and Colab demo notebooks plus `sim_flow.py` and
   `validate_ls.py`.
 
-### Added (0.3.1)
+### Added (staged earlier as an unreleased 0.3.1)
 
 - **Propensity-centered VC: `VC(..., center=True, center_folds=5)`** (issue
   #30): the R-learner orthogonalization `beta(x)·(t − ê(x))` inside the
@@ -64,7 +64,7 @@
   (1.10–1.24 → 0.11–0.27 over 3 seeds). Docs:
   `docs/varying-coefficients.md`.
 
-- **`flow.scores(df, node)` + `flow.effect_modifier_scan(df, node, on)`**
+- **`flow.scores(df, node)` + `flow.effect_modifier_scan(df, node, t)`**
   (issue #29): per-observation scores ψᵢ = ∂ℓᵢ/∂θ for every `LS` weight and
   `VC` `beta0` — **analytic and exact** (shifts enter the latent additively, so
   ∂ℓᵢ/∂β = (∂ℓᵢ/∂sᵢ)·xᵢ with the latent derivative in closed form; pinned by a

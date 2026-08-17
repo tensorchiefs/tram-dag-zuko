@@ -29,7 +29,7 @@ resolution. "Fixed here" means a commit on `feat/refactoring`.
 | `CLAUDE.md:117` | Frozen-CSV contract list omits `data/vc-shift/` | Fixed here |
 | `CLAUDE.md` (architecture) | `flow.py` method list omits `fit_classical`; simulations bullet omits `vc_shift.py` | Fixed here |
 | `CHANGELOG.md:49` | "### Added (0.3.1)" sits inside the 0.4.0 section; 0.3.1 was never released | Fixed here: folded into 0.4.0 |
-| `CHANGELOG.md` (0.4.0) | The `effect_modifier_scan` rename `on` → `t` (f566170) is breaking but undocumented | Fixed here |
+| `CHANGELOG.md` (0.4.0) | The scan entry still shows the old `on` parameter (renamed to `t` in f566170). The scores feature never shipped (0.3.1 was not released), so the signature is corrected in place — no breaking-change note is needed | Fixed here |
 | `src/tramdag/spec.py:64` | Comment claims `_LEGACY` labels are "still accepted by the checkpoint loader" — the pre-0.3 loader path is gone; only `term()` uses them (same stale claim in `tests/test_spec_terms.py:3`) | Fixed here |
 | `docs/fitting.md:83-101` | `fit` option list omits `marginal_init=` and `vc_warm_start=` | Fixed here |
 | `docs/training-speed.md:7,33,42` | Points to a non-existent `results/` CSV; "this PR" phrasing for merged history | Fixed here |
