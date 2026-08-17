@@ -61,8 +61,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-# legacy dict term labels -> term effect (still accepted by ``term()`` and by the
-# checkpoint loader, so old saved models keep loading)
+# legacy term labels -> term effect. Only ``term()`` accepts them (data-driven
+# sweeps still say "ls"/"cs"/"ci"); the pre-0.3 checkpoint loader is gone.
 _LEGACY = {"ls": "LS", "cs": "CS", "ci": "I"}
 
 EFFECTS = ("I", "LS", "CS", "VC")
