@@ -68,6 +68,20 @@ _LEGACY = {"ls": "LS", "cs": "CS", "ci": "I"}
 EFFECTS = ("I", "LS", "CS", "VC")
 
 
+# defaults of the effect-specific options; a constructor value equal to its
+# default stays out of ``Term.options``, so term equality is canonical
+_OPTION_DEFAULTS = {
+    "penalty": None,  # VC: L2 weight on b_theta
+    "center": False,  # VC: propensity centering
+    "center_folds": 5,  # VC: folds of the out-of-fold refits
+}
+
+
+def _options(**kwargs) -> tuple:
+    """Canonicalize effect-specific options: sorted pairs, defaults dropped."""
+    return tuple(sorted((k, v) for k, v in kwargs.items() if v != _OPTION_DEFAULTS[k]))
+
+
 # TODO: mayn of the named attributes ar not generic: reconsider design choices
 # here. we just need it for the operator, so there might be a simpler solution.
 @dataclass(frozen=True)
@@ -88,13 +102,12 @@ class Term:
         Ordered parent names the term depends on. Empty only for the bare
         simple-intercept ``I()``. For a ``VC`` term, ``parents[0]`` is the
         treatment (``on``) and the rest are the effect modifiers.
-    penalty : float | None
-        L2 penalty weight of a ``VC`` term. ``None`` for every other
-        effect.
-    center : bool | str
-        Propensity centering of a ``VC`` term, see :func:`VC`.
-    center_folds : int
-        Fold count for ``VC(center=True)``.
+    options : tuple[tuple[str, object], ...]
+        Effect-specific settings as canonical ``(key, value)`` pairs:
+        sorted by key, defaults omitted. Attribute access serves them
+        with their defaults — ``term.penalty`` (VC L2 weight, ``None``
+        for other effects), ``term.center`` (VC propensity centering,
+        ``False``) and ``term.center_folds`` (VC fold count, 5).
     transform : str | None
         Basis of the node's monotone transform, carried by one ``I`` term:
         ``"bernstein"``, ``"spline"`` or ``"affine"``.
@@ -111,15 +124,18 @@ class Term:
     effect: str
     slot: str
     parents: tuple[str, ...]
-    # TODO: this is VC specific, either pass as kwarg** or use overloading
-    penalty: float | None = None
-    center: bool | str = False
-    center_folds: int = 5
+    options: tuple = ()  # canonical (key, value) pairs, see _OPTION_DEFAULTS
     transform: str | None = None
     transform_kwargs: tuple | None = None  # dict.items() tuple, keeps Term hashable
     units: tuple[int, ...] | None = None  # hidden layers of the term's network
     # multi-parent I: one joint net (True) or one net per parent (False)
     allow_interaction: bool = True
+
+    def __getattr__(self, name: str):
+        """Serve the effect-specific options, with their defaults."""
+        if name in _OPTION_DEFAULTS:
+            return dict(self.options).get(name, _OPTION_DEFAULTS[name])
+        raise AttributeError(name)
 
     def __add__(self, other: Term | list[Term]) -> list[Term]:
         """Concatenate into a plain term list."""
@@ -328,9 +344,9 @@ def VC(
         "VC",
         "shift",
         (t, *modifiers),
-        penalty=float(penalty),
-        center=center,
-        center_folds=int(center_folds),
+        options=_options(
+            penalty=float(penalty), center=center, center_folds=int(center_folds)
+        ),
         units=tuple(units) if units else None,
     )
 
