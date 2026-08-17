@@ -6,12 +6,12 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 > ⚠️ **Status: beta (0.x), under active development.** The API may change between
-> releases until 1.0; pin a version (`tramdag==0.2.*`) for reproducibility.
+> releases until 1.0; pin a version (`tramdag==0.3.*`) for reproducibility.
 
 **TRAM-DAGs** model each variable of a structural causal model with a
 (transformation-model) flow: one triangular normalizing flow from iid
-standard-logistic latents to the observed variables. The structure is of the triangular
-Adjacency Matrix is exactly your causal DAG. Fit it **once** on observational data and answer all
+standard-logistic latents to the observed variables. The triangular adjacency
+structure is exactly your causal DAG. Fit it **once** on observational data and answer all
 three rungs of Pearl's causal hierarchy — observational (L1), interventional
 (L2, the do-operator), and counterfactual (L3, Pearl abduction) — while keeping
 **interpretable effects**: every linear-shift coefficient is a log-odds ratio,
@@ -88,7 +88,7 @@ flow.intercept_contributions("NIHSSa", df)  # interpret: per-parent partial effe
 # flow.varying_coef("mRS_3m", df)          # beta(x): deterministic, y-free
 
 flow.scores(df, node="mRS_3m")  # per-observation scores dl_i/dtheta
-flow.effect_modifier_scan(df, "mRS_3m", on="T")  # which VC modifiers? (CUSUM
+flow.effect_modifier_scan(df, "mRS_3m", t="T")  # which VC modifiers? (CUSUM
 # scan from a cheap all-ls fit) — docs/scores.md
 
 flow.save("flow.pt")
@@ -203,14 +203,15 @@ See the [`tests/README.md`](tests/README.md) file for more details.
 
 ```
 src/tramdag/            spec.py transforms.py conditioners.py flow.py
+                        scores.py env.py
                         simulations/   (magic_mrclean, triangle, vaca, carefl,
                                         vc_shift + CLIs)
 data/                   frozen synthetic CSVs + truth.json — a test contract
-experiments/            stroke pipeline, paper replications, training benchmark
+experiments/            stroke pipeline + paper replications
 notebooks/              intro (didactic) + Colab demo   (jupytext .py — see README there)
 tests/                  unit, known-truth recovery, R regression
-docs/                   training-speed.md, stroke-case-study.md,
-                        varying-coefficients.md, scores.md
+docs/                   fitting.md, notation.md, training-speed.md,
+                        stroke-case-study.md, varying-coefficients.md, scores.md
 ```
 
 Implementation conventions (latent-scale signs, raw/one-hot parent encoding,
