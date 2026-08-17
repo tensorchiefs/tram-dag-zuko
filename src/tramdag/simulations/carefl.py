@@ -127,7 +127,20 @@ class Carefl4:
     # -------------------------------------------------------------- ground truth
     @staticmethod
     def abduct_noise(obs: dict[str, float] | pd.DataFrame) -> dict[str, np.ndarray]:
-        """Exact noise values consistent with an observation (vectorized)."""
+        """Give the exact noise values consistent with an observation.
+
+        The computation is vectorized, so ``obs`` can hold arrays.
+
+        Parameters
+        ----------
+        obs : dict[str, float] | pd.DataFrame
+            Observed values of ``x1`` to ``x4``.
+
+        Returns
+        -------
+        dict[str, np.ndarray]
+            One noise array per variable.
+        """
         x1, x2 = np.asarray(obs["x1"], float), np.asarray(obs["x2"], float)
         x3, x4 = np.asarray(obs["x3"], float), np.asarray(obs["x4"], float)
         return {
@@ -140,7 +153,20 @@ class Carefl4:
     def true_counterfactual(
         self, obs: dict[str, float], do: dict[str, float]
     ) -> dict[str, float]:
-        """Analytic counterfactual of a single observation under ``do``."""
+        """Give the analytic counterfactual of one observation under ``do``.
+
+        Parameters
+        ----------
+        obs : dict[str, float]
+            The factual observation, values of ``x1`` to ``x4``.
+        do : dict[str, float]
+            Hard interventions ``{node: value}``.
+
+        Returns
+        -------
+        dict[str, float]
+            The counterfactual values of every variable.
+        """
         eps = self.abduct_noise({k: np.atleast_1d(v) for k, v in obs.items()})
         cf = self.simulate(do=do, latents=eps)
         return {k: float(cf[k].iloc[0]) for k in cf}
@@ -149,6 +175,13 @@ class Carefl4:
         self, obs: dict[str, float] = X_OBS, alphas: np.ndarray = ALPHA_GRID
     ) -> dict:
         """Compute the two analytic counterfactual curves of paper Fig. 6.
+
+        Parameters
+        ----------
+        obs : dict[str, float], optional
+            The factual observation, by default the paper's ``X_OBS``.
+        alphas : np.ndarray, optional
+            Intervention grid, by default ``ALPHA_GRID``.
 
         Returns
         -------

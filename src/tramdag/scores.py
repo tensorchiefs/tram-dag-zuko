@@ -64,16 +64,38 @@ def _dl_ds(
 def node_scores(flow, df: pd.DataFrame, node: str) -> pd.DataFrame:
     """Compute the per-observation scores of the interpretable coefficients.
 
-    The result has shape ``(n, k)`` and covers every ``LS`` weight and the
-    ``beta0`` of every ``VC`` term.
+    The scores cover every ``LS`` weight and the ``beta0`` of every ``VC``
+    term. ``CS`` terms carry no interpretable coefficient, so this function
+    skips them.
 
-    One column comes from each coefficient. A continuous ``LS`` parent gives one
-    column, named after the parent. An ordinal ``LS`` parent gives one column
-    per one-hot level, named ``"{parent}[{k}]"``. A ``VC`` term gives one column
-    named after its treatment, which holds the ``beta0`` score. For a binary
-    ordinal treatment that score belongs to the identified contrast of level 1
-    against level 0. ``CS`` terms carry no interpretable coefficient, so this
-    function skips them.
+    Parameters
+    ----------
+    flow : CausalFlowDAG
+        The fitted flow.
+    df : pd.DataFrame
+        Observations. Must contain the node, its parents, and the
+        propensity inputs of centered VC terms.
+    node : str
+        Name of the node whose coefficients are scored.
+
+    Returns
+    -------
+    pd.DataFrame
+        One column per coefficient, shape ``(n, k)``, indexed like ``df``.
+        A continuous ``LS`` parent gives one column, named after the
+        parent. An ordinal ``LS`` parent gives one column per one-hot
+        level, named ``"{parent}[{k}]"``. A ``VC`` term gives one column
+        named after its treatment, which holds the ``beta0`` score. For a
+        binary ordinal treatment that score belongs to the identified
+        contrast of level 1 against level 0.
+
+    Raises
+    ------
+    KeyError
+        If ``node`` is unknown, or if a needed column is missing from
+        ``df``.
+    ValueError
+        If the node has no ``LS`` or ``VC`` term.
     """
     if node not in flow.nodes:
         raise KeyError(f"unknown node {node!r}")
@@ -129,7 +151,20 @@ def node_scores(flow, df: pd.DataFrame, node: str) -> pd.DataFrame:
 
 
 def sup_bb_pvalue(stat: float, terms: int = 100) -> float:
-    """P(sup |Brownian bridge| > stat) — the Kolmogorov series."""
+    """Give ``P(sup |Brownian bridge| > stat)``, the Kolmogorov series.
+
+    Parameters
+    ----------
+    stat : float
+        Observed supremum statistic.
+    terms : int, optional
+        Number of series terms, by default 100.
+
+    Returns
+    -------
+    float
+        The p-value, clipped to [0, 1].
+    """
     if stat <= 0:
         return 1.0
     s = sum(
@@ -142,26 +177,50 @@ def sup_bb_pvalue(stat: float, terms: int = 100) -> float:
 def effect_modifier_scan(
     flow, df: pd.DataFrame, node: str, t: str, candidates: list[str] | None = None
 ) -> pd.DataFrame:
-    """Zeileis–Hornik fluctuation scan of the ``t``-coefficient scores.
+    """Scan the ``t``-coefficient scores for effect-modifier drift.
 
-    For each candidate covariate ``c``: order the per-observation scores of the
-    treatment coefficient by ``c`` and form the scaled cumulative-sum process
+    For each candidate covariate ``c``, the scan orders the
+    per-observation scores of the treatment coefficient by ``c`` and forms
+    the scaled cumulative-sum process
     ``B_j = sum_{i<=j} psi_(i) / (sd(psi) * sqrt(n))``. Under parameter
-    stability ``B`` converges to a Brownian bridge, so ``sup_j |B_j|`` has the
-    Kolmogorov distribution (5% critical value 1.3581); a systematic drift —
-    the true effect varying with ``c`` — inflates it. Covariates flagged here
-    are the measured candidates for ``VC`` modifiers.
+    stability ``B`` converges to a Brownian bridge, so ``sup_j |B_j|`` has
+    the Kolmogorov distribution (5% critical value 1.3581). A systematic
+    drift — the true effect varying with ``c`` — inflates it. Covariates
+    flagged here are the measured candidates for ``VC`` modifiers
+    (Zeileis-Hornik fluctuation test).
 
-    ``t`` names the treatment: its scores column is ``t`` itself for a
-    continuous parent or a VC term, the identified level-1 column ``"{t}[1]"``
-    for a binary ordinal LS parent. ``candidates`` defaults to every column of
-    ``df`` except ``node`` and ``t``. For heavily tied (few-level) candidates
-    the ordering is only partial — read the scan as a ranking diagnostic, not
-    an exact-size test.
+    For heavily tied (few-level) candidates the ordering is only partial.
+    Read the scan as a ranking diagnostic, not as an exact-size test.
 
-    Returns a DataFrame indexed by candidate, sorted by ``stat`` descending,
-    with columns ``stat``, ``p_value``, ``crit_5pct`` and ``flag``
-    (``stat > crit_5pct``).
+    Parameters
+    ----------
+    flow : CausalFlowDAG
+        The fitted flow.
+    df : pd.DataFrame
+        Observations, as for :func:`node_scores`.
+    node : str
+        Name of the outcome node.
+    t : str
+        Name of the treatment. Its scores column is ``t`` itself for a
+        continuous parent or a VC term, and the identified level-1 column
+        ``"{t}[1]"`` for a binary ordinal LS parent.
+    candidates : list[str] | None, optional
+        Candidate covariates. Defaults to every column of ``df`` except
+        ``node`` and ``t``.
+
+    Returns
+    -------
+    pd.DataFrame
+        Indexed by candidate, sorted by ``stat`` descending, with columns
+        ``stat``, ``p_value``, ``crit_5pct`` and ``flag``
+        (``stat > crit_5pct``).
+
+    Raises
+    ------
+    KeyError
+        If no score column exists for ``t`` on ``node``.
+    ValueError
+        If the score column is constant.
     """
     psi_df = node_scores(flow, df, node)
     if t in psi_df.columns:

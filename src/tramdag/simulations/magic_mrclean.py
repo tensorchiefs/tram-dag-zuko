@@ -71,9 +71,14 @@ def _sigmoid(x: np.ndarray) -> np.ndarray:
 class MagicMrClean:
     """SCM generator for the synthetic stroke cohort.
 
-    Args:
-        variant: ``"ls"`` (all linear shifts) or ``"nl"`` (mild non-linearities).
-        seed: master seed; each draw uses an independent child stream.
+    Parameters
+    ----------
+    variant : str, optional
+        ``"ls"`` (all linear shifts) or ``"nl"`` (mild non-linearities),
+        by default ``"nl"``.
+    seed : int, optional
+        Master seed, by default 7. Each draw uses an independent child
+        stream.
     """
 
     variant: str = "nl"
@@ -126,22 +131,43 @@ class MagicMrClean:
     ) -> pd.DataFrame:
         """Forward-sample the SCM.
 
-        Args:
-            randomize_T: if True, assign T ~ Bernoulli(0.5) independently of its
-                parents (the RCT design); otherwise T follows the confounded
-                observational mechanism.
-            population: covariate population. ``"obs"`` is the full observational
-                cohort; ``"rct"`` mimics trial inclusion — a **younger** enrolled
-                population (age location shifted down). Only the ``Age`` source
-                marginal differs; all structural equations are unchanged. With the
-                heterogeneous ``nl`` treatment effect this fit-vs-eval shift is
-                what biases an all-``ls`` model (it cannot extrapolate ``tau(Age)``
-                from the older obs cohort to the younger trial). The ``ls`` DGP has
-                constant ``tau`` and is therefore unaffected.
-            do: hard interventions {node: value} (graph mutilation); the node is
-                clamped and its structural equation skipped.
-            latents: reuse a fixed latent draw (for counterfactuals / paired
-                interventions). If given, ``n`` and ``rng`` are ignored.
+        Parameters
+        ----------
+        n : int | None, optional
+            Number of rows. Required unless ``latents`` is given.
+        rng : np.random.Generator | None, optional
+            Random source. Defaults to a generator seeded with
+            ``self.seed``.
+        randomize_T : bool, optional
+            If True, assign ``T ~ Bernoulli(0.5)`` independently of its
+            parents (the RCT design). Otherwise ``T`` follows the
+            confounded observational mechanism. Default False.
+        population : str, optional
+            Covariate population, by default ``"obs"``. ``"obs"`` is the
+            full observational cohort. ``"rct"`` mimics trial inclusion —
+            a **younger** enrolled population (age location shifted down).
+            Only the ``Age`` source marginal differs; all structural
+            equations are unchanged. With the heterogeneous ``nl``
+            treatment effect this fit-vs-eval shift is what biases an
+            all-``ls`` model: it cannot extrapolate ``tau(Age)`` from the
+            older observational cohort to the younger trial. The ``ls``
+            DGP has constant ``tau`` and is therefore unaffected.
+        do : dict[str, float] | None, optional
+            Hard interventions ``{node: value}`` (graph mutilation). The
+            node is clamped and its structural equation skipped.
+        latents : dict[str, np.ndarray] | None, optional
+            Reuse a fixed latent draw, for counterfactuals and paired
+            interventions. If given, ``n`` and ``rng`` are ignored.
+
+        Returns
+        -------
+        pd.DataFrame
+            The sample, one column per variable.
+
+        Raises
+        ------
+        ValueError
+            If both ``n`` and ``latents`` are omitted.
         """
         do = do or {}
         if latents is None:
@@ -251,13 +277,24 @@ class MagicMrClean:
     def true_ate(self, n: int = 500_000, on: str = "rct") -> dict:
         """Estimate the true ATE of T on ``P(mRS_3m <= 2)`` by Monte Carlo.
 
-        Both arms use the same latent draw, so the result is the do-effect and
-        carries none of the confounding in T.
+        Both arms use the same latent draw, so the result is the do-effect
+        and carries none of the confounding in T.
 
-        ``on`` selects the covariate population the ATE is averaged over:
-        ``"rct"`` (default) mirrors the **younger trial** population that
-        :meth:`rct` enrols and that ``evaluate_rct`` scores on; ``"obs"`` the
-        observational cohort.
+        Parameters
+        ----------
+        n : int, optional
+            Monte Carlo sample size, by default 500_000.
+        on : str, optional
+            Covariate population the ATE is averaged over, by default
+            ``"rct"``. ``"rct"`` mirrors the **younger trial** population
+            that :meth:`rct` enrolls. ``"obs"`` is the observational
+            cohort.
+
+        Returns
+        -------
+        dict
+            ``p_good_do_T0``, ``p_good_do_T1``, ``ate_population``,
+            ``true_ate``, the confounded ``naive_obs_diff``, and ``mc_n``.
         """
         rng = np.random.default_rng(self.seed + 9001)
         latents = self.draw_latents(n, rng)
@@ -285,8 +322,22 @@ class MagicMrClean:
         """Draw a factual sample and its counterfactual under ``do``.
 
         Both share the same latents, so the pair gives true individual
-        counterfactuals. Real data cannot supply these. Use them to score the
-        abduction of the flow.
+        counterfactuals. Real data cannot supply these. Use them to score
+        the abduction of the flow.
+
+        Parameters
+        ----------
+        n : int
+            Number of rows.
+        do : dict[str, float]
+            Hard interventions for the counterfactual arm.
+        seed_offset : int, optional
+            Added to the generator seed, by default 0.
+
+        Returns
+        -------
+        tuple[pd.DataFrame, pd.DataFrame]
+            The factual and the counterfactual sample.
         """
         rng = np.random.default_rng(self.seed + 2 + seed_offset)
         latents = self.draw_latents(n, rng)

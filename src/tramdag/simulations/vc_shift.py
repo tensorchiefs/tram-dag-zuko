@@ -56,8 +56,11 @@ def _sigmoid(x: np.ndarray) -> np.ndarray:
 class VCLogisticShift:
     """SCM generator for the VC validation cohort (issue #28).
 
-    Args:
-        seed: master seed; each dataset draw uses an independent child stream.
+    Parameters
+    ----------
+    seed : int, optional
+        Master seed, by default 42. Each dataset draw uses an independent
+        child stream.
     """
 
     seed: int = 42
@@ -68,6 +71,18 @@ class VCLogisticShift:
 
         The sources get Gaussian primitives. T gets a logistic assignment
         latent and Y gets the logistic TRAM latent.
+
+        Parameters
+        ----------
+        n : int
+            Number of rows to draw.
+        rng : np.random.Generator
+            Random source.
+
+        Returns
+        -------
+        dict[str, np.ndarray]
+            One array of length ``n`` per variable.
         """
         return {
             "X1": rng.normal(size=n),
@@ -86,7 +101,32 @@ class VCLogisticShift:
         do: dict[str, float] | None = None,
         latents: dict[str, np.ndarray] | None = None,
     ) -> pd.DataFrame:
-        """Forward-sample the SCM (``do`` clamps nodes; ``latents`` reuses noise)."""
+        """Forward-sample the SCM.
+
+        Parameters
+        ----------
+        n : int | None, optional
+            Number of rows. Required unless ``latents`` is given.
+        rng : np.random.Generator | None, optional
+            Random source. Defaults to a generator seeded with
+            ``self.seed``.
+        do : dict[str, float] | None, optional
+            Hard interventions ``{node: value}``. The node is clamped and
+            its structural equation skipped.
+        latents : dict[str, np.ndarray] | None, optional
+            Reuse a fixed latent draw. If given, ``n`` and ``rng`` are
+            ignored.
+
+        Returns
+        -------
+        pd.DataFrame
+            The sample, one column per variable.
+
+        Raises
+        ------
+        ValueError
+            If both ``n`` and ``latents`` are omitted.
+        """
         do = do or {}
         if latents is None:
             if n is None:
@@ -137,8 +177,18 @@ class VCLogisticShift:
         """Give the true effect function ``beta(x)`` on the latent scale.
 
         The scale is log-odds. A fitted VC term must recover this function
-        through :meth:`~tramdag.CausalFlowDAG.varying_coef`. ``x`` is a
-        DataFrame with X2 and X3 columns. Other columns are ignored.
+        through :meth:`~tramdag.CausalFlowDAG.varying_coef`.
+
+        Parameters
+        ----------
+        x : pd.DataFrame
+            Rows with ``X2`` and ``X3`` columns. Other columns are
+            ignored.
+
+        Returns
+        -------
+        np.ndarray
+            The effect values, shape ``(n,)``.
         """
         return (
             B0
@@ -153,6 +203,20 @@ class VCLogisticShift:
 
         Both share the same latents, so the pair gives true individual
         counterfactuals.
+
+        Parameters
+        ----------
+        n : int
+            Number of rows.
+        do : dict[str, float]
+            Hard interventions for the counterfactual arm.
+        seed_offset : int, optional
+            Added to the generator seed, by default 0.
+
+        Returns
+        -------
+        tuple[pd.DataFrame, pd.DataFrame]
+            The factual and the counterfactual sample.
         """
         rng = np.random.default_rng(self.seed + 2 + seed_offset)
         latents = self.draw_latents(n, rng)

@@ -155,11 +155,23 @@ class VacaTriangle:
 
     # -------------------------------------------------------------- ground truth
     def true_moments(self, mc_n: int = 1_000_000) -> dict:
-        """Observational moments + the analytic moments of x3 under do(x2 = a).
+        """Give the observational and interventional ground-truth moments.
 
-        Under do(x2=a): x3 = x1 + 0.25 a + N(0,1), so E = E[x1] + 0.25 a and
-        Var = Var[x1] + 1 — exact, but MC values are stored too (same estimator
-        a test would use).
+        Under ``do(x2=a)``: ``x3 = x1 + 0.25 a + N(0,1)``, so
+        ``E = E[x1] + 0.25 a`` and ``Var = Var[x1] + 1``. These are exact.
+        Monte Carlo values for the observational moments are stored too,
+        with the same estimator a test uses.
+
+        Parameters
+        ----------
+        mc_n : int, optional
+            Monte Carlo sample size, by default 1_000_000.
+
+        Returns
+        -------
+        dict
+            ``mc_n``, the observational ``obs_mean`` and ``obs_std`` per
+            column, and the analytic x3 moments per ``do(x2)`` value.
         """
         mu1 = 0.5 * (-2.0) + 0.5 * 1.5
         var1 = 0.5 * (1.5 + (-2.0 - mu1) ** 2) + 0.5 * (1.0 + (1.5 - mu1) ** 2)

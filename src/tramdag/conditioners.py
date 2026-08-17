@@ -105,6 +105,8 @@ class ComplexIntercept(nn.Module):
         Width of the encoded parent features.
     n_params : int
         Number of transform parameters to produce.
+    units : tuple[int, ...] | None, optional
+        Hidden layers of the network, by default ``(8, 8)``.
     """
 
     def __init__(
@@ -172,6 +174,8 @@ class ComplexShift(nn.Module):
     ----------
     n_features : int
         Width of the encoded parent features.
+    units : tuple[int, ...] | None, optional
+        Hidden layers of the network, by default ``(64, 128, 64)``.
     """
 
     def __init__(self, n_features: int, units: tuple[int, ...] | None = None):
@@ -197,16 +201,17 @@ class ComplexShift(nn.Module):
 class VaryingCoef(nn.Module):
     """Varying-coefficient effect head ``beta(x) = beta0 + b_theta(x)``.
 
-    ``b_theta`` is deliberately small: one hidden layer of ``hidden`` units. Its
-    weights carry an L2 ``penalty`` in the fitting objective (see :meth:`l2`;
-    ``fit`` adds ``penalty * l2()`` on the total-NLL scale). ``beta0`` is not
-    penalized.
+    ``b_theta`` is deliberately small: one hidden layer by default. Its
+    weights carry an L2 ``penalty`` in the fitting objective (see
+    :meth:`l2`; ``fit`` adds ``penalty * l2()`` on the total-NLL scale).
+    ``beta0`` is not penalized.
 
-    The output layer starts at zero, so ``beta(x)`` equals ``beta0`` exactly at
-    construction. The head therefore learns only the deviation from a constant
-    effect, which makes the arm difference an estimate instead of a by-product.
-    The unpenalized reduced form ``CS(on, x...)`` reaches a correlation of only
-    about 0.5 against the true effect function (issue #28).
+    The output layer starts at zero, so ``beta(x)`` equals ``beta0``
+    exactly at construction. The head therefore learns only the deviation
+    from a constant effect, which makes the arm difference an estimate
+    instead of a by-product. The unpenalized reduced form ``CS(on, x...)``
+    reaches a correlation of only about 0.5 against the true effect
+    function (issue #28).
 
     With ``n_features == 0`` there are no modifiers, there is no network, and the
     term is exactly ``LS(on)``.
