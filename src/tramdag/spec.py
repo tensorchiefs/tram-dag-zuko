@@ -74,6 +74,10 @@ _OPTION_DEFAULTS = {
     "penalty": None,  # VC: L2 weight on b_theta
     "center": False,  # VC: propensity centering
     "center_folds": 5,  # VC: folds of the out-of-fold refits
+    "transform": None,  # I: basis of the monotone transform
+    "transform_kwargs": None,  # I: kwargs of the basis, as sorted pairs
+    "units": None,  # I/CS/VC: hidden layers of the term's network
+    "allow_interaction": True,  # I: one joint net, or one net per parent
 }
 
 
@@ -82,8 +86,6 @@ def _options(**kwargs) -> tuple:
     return tuple(sorted((k, v) for k, v in kwargs.items() if v != _OPTION_DEFAULTS[k]))
 
 
-# TODO: mayn of the named attributes ar not generic: reconsider design choices
-# here. we just need it for the operator, so there might be a simpler solution.
 @dataclass(frozen=True)
 class Term:
     """One additive term of a node's transformation.
@@ -96,8 +98,6 @@ class Term:
     ----------
     effect : str
         One of ``"I"``, ``"LS"``, ``"CS"``, ``"VC"``.
-    slot : str
-        ``"intercept"`` for ``I``, ``"shift"`` for ``LS``/``CS``/``VC``.
     parents : tuple[str, ...]
         Ordered parent names the term depends on. Empty only for the bare
         simple-intercept ``I()``. For a ``VC`` term, ``parents[0]`` is the
@@ -105,31 +105,26 @@ class Term:
     options : tuple[tuple[str, object], ...]
         Effect-specific settings as canonical ``(key, value)`` pairs:
         sorted by key, defaults omitted. Attribute access serves them
-        with their defaults — ``term.penalty`` (VC L2 weight, ``None``
-        for other effects), ``term.center`` (VC propensity centering,
-        ``False``) and ``term.center_folds`` (VC fold count, 5).
-    transform : str | None
-        Basis of the node's monotone transform, carried by one ``I`` term:
-        ``"bernstein"``, ``"spline"`` or ``"affine"``.
-    transform_kwargs : tuple | None
-        Keyword arguments for the basis, stored as a ``dict.items()``
-        tuple so the term stays hashable.
-    units : tuple[int, ...] | None
-        Hidden layers of the term's network.
-    allow_interaction : bool
-        For a multi-parent ``I`` term: one joint net (``True``) or one net
-        per parent with summed coefficients (``False``).
+        with their defaults, so ``term.penalty`` stays valid on every
+        term. Keys: ``penalty``, ``center`` and ``center_folds`` (VC,
+        see :func:`VC`); ``transform`` and ``transform_kwargs`` (I, the
+        basis of the monotone transform, kwargs stored as sorted pairs);
+        ``units`` (hidden layers of the term's network);
+        ``allow_interaction`` (multi-parent I: one joint net or one net
+        per parent).
+    slot : str
+        Derived from the effect: ``"intercept"`` for ``I``, ``"shift"``
+        for ``LS``/``CS``/``VC``.
     """
 
     effect: str
-    slot: str
     parents: tuple[str, ...]
     options: tuple = ()  # canonical (key, value) pairs, see _OPTION_DEFAULTS
-    transform: str | None = None
-    transform_kwargs: tuple | None = None  # dict.items() tuple, keeps Term hashable
-    units: tuple[int, ...] | None = None  # hidden layers of the term's network
-    # multi-parent I: one joint net (True) or one net per parent (False)
-    allow_interaction: bool = True
+
+    @property
+    def slot(self) -> str:
+        """str: the slot the term sums in."""
+        return "intercept" if self.effect == "I" else "shift"
 
     def __getattr__(self, name: str):
         """Serve the effect-specific options, with their defaults."""
@@ -195,12 +190,13 @@ def intercept(
     kw = tuple(sorted(transform_kwargs.items())) if transform_kwargs else None
     return Term(
         "I",
-        "intercept",
         tuple(parents),
-        transform=transform,
-        transform_kwargs=kw,
-        units=tuple(units) if units is not None else None,
-        allow_interaction=bool(allow_interaction) or len(parents) < 2,
+        _options(
+            transform=transform,
+            transform_kwargs=kw,
+            units=tuple(units) if units is not None else None,
+            allow_interaction=bool(allow_interaction) or len(parents) < 2,
+        ),
     )
 
 
@@ -224,7 +220,7 @@ def LS(*parents: str) -> Term:
     """
     if len(parents) != 1:
         raise ValueError("LS() takes exactly one parent.")
-    return Term("LS", "shift", tuple(parents))
+    return Term("LS", tuple(parents))
 
 
 def CS(*parents: str, units: list[int] | tuple[int, ...] | None = None) -> Term:
@@ -250,7 +246,7 @@ def CS(*parents: str, units: list[int] | tuple[int, ...] | None = None) -> Term:
     """
     if not parents:
         raise ValueError("CS() needs at least one parent.")
-    return Term("CS", "shift", tuple(parents), units=tuple(units) if units else None)
+    return Term("CS", tuple(parents), _options(units=tuple(units) if units else None))
 
 
 def VC(
@@ -342,12 +338,13 @@ def VC(
         raise ValueError(f"VC(): center_folds must be >= 2, got {center_folds}.")
     return Term(
         "VC",
-        "shift",
         (t, *modifiers),
-        options=_options(
-            penalty=float(penalty), center=center, center_folds=int(center_folds)
+        _options(
+            penalty=float(penalty),
+            center=center,
+            center_folds=int(center_folds),
+            units=tuple(units) if units else None,
         ),
-        units=tuple(units) if units else None,
     )
 
 
