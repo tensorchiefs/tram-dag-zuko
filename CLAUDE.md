@@ -53,7 +53,8 @@ Experiments default to the synthetic data (`magic-mrclean/nl`). The `magic` sour
   bisection inverse) + the ordinal ordered-logit transform
   (`P(Y<=k) = sigmoid(theta_k - shift)`, cutpoints `[t0, t0+cumsum(exp(...))]`).
 - `conditioners.py` — ls/cs/ci networks (widths replicate the original Keras/TF implementation).
-- `flow.py` — `CausalFlowDAG`: `fit`, `sample(n, do=, u=)`, `abduct`, `pmf`,
+- `flow.py` — `CausalFlowDAG`: `fit`, `fit_classical` (float64 full-batch
+  L-BFGS, exact MLE for all-`ls` specs), `sample(n, do=, u=)`, `abduct`, `pmf`,
   `log_prob`, `save/load`, `varying_coef` (VC read-out), `scores` /
   `effect_modifier_scan` (analytic per-row ∂ℓᵢ/∂θ + CUSUM modifier scan,
   `scores.py`). NLL decomposes per node → one Adam fits all nodes jointly.
@@ -62,7 +63,8 @@ Experiments default to the synthetic data (`magic-mrclean/nl`). The `magic` sour
   `magic_mrclean.py` (stroke SCM, `ls`/`nl`), `triangle.py` (paper §6 continuous +
   ordinal triangles, f variants linear/cubic/exp/atan/sin), `vaca.py` (App. C.1
   bimodal L1/L2 benchmark), `carefl.py` (App. C.2 Laplace SCM, **analytic**
-  counterfactuals).
+  counterfactuals), `vc_shift.py` (issue #28 heterogeneous-effect DGP with
+  known `beta(x)`).
 
 ## Conventions that matter (easy to get wrong)
 
@@ -114,7 +116,8 @@ Experiments default to the synthetic data (`magic-mrclean/nl`). The `magic` sour
 
 ## Testing policy
 
-- Frozen CSVs in `data/` (`magic-mrclean`, `triangle*`, `vaca`, `carefl`) are a
+- Frozen CSVs in `data/` (`magic-mrclean`, `triangle*`, `vaca`, `carefl`,
+  `vc-shift`) are a
   contract — **never regenerate silently**; a new seed/equations → new folder
   (sim2-style), regenerate `ref_ls/` with R where applicable, update
   truth-dependent tests. `test_paper_dgps.py::test_frozen_csv_contract` pins the
@@ -131,7 +134,8 @@ Experiments default to the synthetic data (`magic-mrclean/nl`). The `magic` sour
 - ~~Generalize `simulations/` registry beyond the stroke DAG~~ — done for the
   TRAM-DAG paper's DGPs (triangle/triangle-mixed/vaca/carefl, June 2026). Still
   open: hidden confounding à la DeCaFlow.
-- ~~Package for PyPI~~ — published as `tramdag` 0.2.0 (June 2026); release flow:
+- ~~Package for PyPI~~ — published as `tramdag` (latest 0.3.0, June 2026);
+  release flow:
   bump `version` in pyproject (`__init__` now reads it back from the installed
   metadata, so there is only one place to edit), `uv build`, `uv publish`
   (Oliver's PyPI token), CHANGELOG section.
