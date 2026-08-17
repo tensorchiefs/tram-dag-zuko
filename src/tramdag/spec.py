@@ -121,22 +121,18 @@ class Term:
     # multi-parent I: one joint net (True) or one net per parent (False)
     allow_interaction: bool = True
 
-    def __add__(self, other: Term | Transformation) -> Transformation:
-        """Combine two terms into a :class:`Transformation`."""
-        return Transformation([self]) + other
-
-
-class Transformation(list):
-    """A ``+`` sum of terms — an additive formula for one node's ``h``."""
-
-    # TODO: check if this is needed: this is effectifly a list, operator should
-    # be defined. als, investigate if tuple is a better fit.
-    def __add__(self, other: Term | Transformation) -> Transformation:
-        """Append a term or concatenate another sum."""
+    def __add__(self, other: Term | list[Term]) -> list[Term]:
+        """Concatenate into a plain term list."""
         if isinstance(other, Term):
-            return Transformation([*self, other])
-        if isinstance(other, Transformation):
-            return Transformation([*self, *other])
+            return [self, other]
+        if isinstance(other, list):
+            return [self, *other]
+        return NotImplemented
+
+    def __radd__(self, other: list[Term]) -> list[Term]:
+        """Extend a term list from the right, for ``list + term`` chains."""
+        if isinstance(other, list):
+            return [*other, self]
         return NotImplemented
 
 
@@ -406,8 +402,8 @@ def _normalize_transformation(value, *, name: str = "transformation"):
     for element in value:
         if element is I:
             element = I()
-        if isinstance(element, Transformation):
-            out.extend(element)
+        if isinstance(element, (list, tuple)):  # a nested `+` sum
+            out.extend(_normalize_transformation(element, name=name))
         elif isinstance(element, Term):
             out.append(element)
         else:
@@ -470,7 +466,7 @@ class ContinuousNode:
 
     Parameters
     ----------
-    transformation : Term | Transformation | list | None, optional
+    transformation : Term | list[Term] | None, optional
         The additive formula for ``h``: a list of terms, a ``+`` sum, a single
         term, or the bare ``I``. ``None`` (default) is a source node. The
         basis of the monotone transform is chosen on the intercept term,
@@ -509,7 +505,7 @@ class OrdinalNode:
     ----------
     levels : int
         Number of ordered classes.
-    transformation : Term | Transformation | list | None, optional
+    transformation : Term | list[Term] | None, optional
         The additive formula, as for :class:`ContinuousNode`, by default
         ``None``.
     """

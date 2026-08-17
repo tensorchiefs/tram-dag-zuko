@@ -16,7 +16,6 @@ from .spec import (
     I,
     OrdinalNode,
     Term,
-    Transformation,
     intercept,
     term,
 )
@@ -29,7 +28,6 @@ __all__ = [
     "simulations",
     # term-formula notation
     "Term",
-    "Transformation",
     "I",
     "intercept",
     "LS",
