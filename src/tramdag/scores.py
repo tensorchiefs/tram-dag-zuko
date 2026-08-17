@@ -39,9 +39,8 @@ from .transforms import _bounds
 
 __all__ = ["node_scores", "effect_modifier_scan", "sup_bb_pvalue"]
 
-# 5% / 1% critical values of sup |Brownian bridge| (Kolmogorov distribution)
+# 5% critical value of sup |Brownian bridge| (Kolmogorov distribution)
 CRIT_5PCT = 1.3581
-CRIT_1PCT = 1.6276
 
 
 def _dl_ds(
@@ -137,11 +136,8 @@ def node_scores(flow, df: pd.DataFrame, node: str) -> pd.DataFrame:
         if len(ps) == 1 and isinstance(flow.spec[ps[0]], OrdinalNode):
             for k in range(psi.shape[1]):
                 cols[f"{ps[0]}[{k}]"] = psi[:, k]
-        elif psi.shape[1] == 1:
+        else:  # LS is single-parent, so a non-ordinal parent is one column
             cols[key] = psi[:, 0]
-        else:  # joint LS cannot occur (LS is
-            for k in range(psi.shape[1]):  # single-parent); keep generic
-                cols[f"{key}[{k}]"] = psi[:, k]
     for g in nd._vc_groups:
         t = feats[g.on][:, -1:] if g.on_is_ord else feats[g.on]
         if g.center:  # d s / d beta0 = t - e_hat(x)

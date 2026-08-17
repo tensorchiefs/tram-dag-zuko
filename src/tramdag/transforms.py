@@ -84,22 +84,6 @@ class StandardLogistic:
         return torch.log(u) - torch.log1p(-u)
 
     @staticmethod
-    def cdf(z: Tensor) -> Tensor:
-        """Give the cumulative probability at ``z``.
-
-        Parameters
-        ----------
-        z : Tensor
-            Evaluation points.
-
-        Returns
-        -------
-        Tensor
-            ``P(Z <= z)``, same shape as ``z``.
-        """
-        return torch.sigmoid(z)
-
-    @staticmethod
     def icdf(u: Tensor, eps: float = 1e-7) -> Tensor:
         """Give the quantile at probability ``u``.
 

@@ -38,8 +38,6 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-COLUMNS = ["X1", "X2", "X3", "T", "Y"]
-
 B0, B2, B3 = -1.0, 0.8, -0.6  # beta(x) = B0 + B2*X2 + B3*X3
 H_SCALE = 2.0  # h(y) = H_SCALE * y
 
