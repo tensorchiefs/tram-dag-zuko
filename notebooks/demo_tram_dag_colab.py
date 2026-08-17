@@ -90,10 +90,10 @@ plt.show()
 # %% [markdown]
 # ## 2. Fit the TRAM-DAG — the spec *is* the DAG
 #
-# Each node gets a monotone Bernstein transform. The edge labels say how parents
-# enter (`ci` = the parents control the transform parameters, for maximal
+# Each node gets a monotone Bernstein transform. The terms say how parents
+# enter (`I(...)` = the parents control the transform parameters, for maximal
 # flexibility). Training maximizes the exact joint likelihood with one Adam.
-# The new `schedule="plateau"` + `freeze_patience` lets each node decay its
+# `schedule="plateau"` + `freeze_patience` lets each node decay its
 # learning rate **independently** and leave training after it converges.
 # The fit stops itself.
 
@@ -372,9 +372,9 @@ if len(timings) > 1:
 # | L3 | individual counterfactuals | `flow.abduct(df)` + `flow.sample(do=..., u=u)` | per-unit DGP truth, r ≈ 0.99+ |
 #
 # And the same model family stays **interpretable** when you want it to be.
-# Declare an edge as `"ls"` instead of `"ci"`. Then its coefficient is a
-# log-odds ratio that you can read after training (this is the actual point of
-# the paper).
+# Write an edge as `LS("parent")` instead of `I("parent")`. Then its
+# coefficient is a log-odds ratio that you can read after training (this is
+# the actual point of the paper).
 #
 # **More:** [repo](https://github.com/tensorchiefs/tramdag) ·
 # [paper](https://arxiv.org/abs/2503.16206) ·
