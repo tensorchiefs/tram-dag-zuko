@@ -164,6 +164,40 @@ def test_roundtrip_keeps_hoisted_transform_and_terms():
     assert back["x2"].transformation == [I("x1")]
 
 
+def test_0_3_format_dict_still_loads():
+    """The two 0.3-checkpoint shims in spec_from_dict, pinned.
+
+    0.3 stored the basis on the node (not on an I term) and wrote an
+    additive intercept as several parented I terms. Both forms must
+    keep loading.
+    """
+    d = {
+        "x1": {
+            "kind": "continuous",
+            "terms": [],
+            "transform": "spline",
+            "transform_kwargs": {"bins": 6},
+        },
+        "x2": {"kind": "continuous", "terms": [], "transform": "bernstein"},
+        "y": {
+            "kind": "continuous",
+            "terms": [
+                {"effect": "I", "parents": ["x1"]},
+                {"effect": "I", "parents": ["x2"]},
+            ],
+            "transform": "bernstein",
+        },
+    }
+    spec = spec_from_dict(d)
+    # node-level basis is carried onto an inserted bare I term
+    assert spec["x1"].transform == "spline"
+    assert spec["x1"].transform_kwargs == {"bins": 6}
+    # several parented I terms merge into one additive intercept
+    assert spec["y"].transformation == [I("x1", "x2", allow_interaction=False)]
+    assert validate_and_sort(spec) == ["x1", "x2", "y"]
+    CausalFlowDAG(spec)  # and the merged spec builds
+
+
 def test_saved_checkpoint_of_new_syntax_loads(tmp_path):
     spec = {"x": ContinuousNode(), "y": ContinuousNode(I("x") + LS("x"))}
     with pytest.raises(ValueError, match="more than one"):
