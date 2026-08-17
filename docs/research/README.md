@@ -28,7 +28,9 @@ instance runs its first benchmark.
 One-time setup (per machine): `claude`, [`uv`](https://docs.astral.sh/uv/),
 and `gh` installed and authenticated (`gh auth status` green), repo cloned.
 
-Then for each run:
+Then for each run (note: the mission's benchmark scripts are parked in
+`experiments/stale/` and need an API migration first — see the note in
+`MISSION_autoresearch.md`):
 
 ```bash
 ssh -t <rack> tmux new -As GPU_Rack_tramdag        # named, disconnect-proof session
