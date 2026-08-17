@@ -35,6 +35,7 @@ __all__ = [
     "AffineUT",
     "make_univariate_transform",
     "ordinal_cutpoints",
+    "ordinal_marginal_init_theta",
     "ordinal_log_prob",
     "ordinal_pmf",
     "ordinal_sample",
