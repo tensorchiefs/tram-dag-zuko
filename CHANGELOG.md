@@ -16,6 +16,10 @@
   the serialized format are unchanged, and equivalence is pinned by
   state-dict-identical tests (`tests/test_transformation_syntax.py`).
 
+- **`intercept()`** is the pythonic name of the intercept-term
+  constructor; `I` stays as the exported alias (the notation of the docs
+  and the paper).
+
 - **`units=` on `I`, `CS` and `VC`** sizes the term's network directly,
   e.g. `units=[16]` for one hidden layer (defaults: I `[8, 8]`,
   CS `[64, 128, 64]`, VC `[16]`); serialized per term. All conditioner

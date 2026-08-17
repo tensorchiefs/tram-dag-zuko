@@ -17,6 +17,7 @@ from .spec import (
     OrdinalNode,
     Term,
     Transformation,
+    intercept,
     term,
 )
 
@@ -30,6 +31,7 @@ __all__ = [
     "Term",
     "Transformation",
     "I",
+    "intercept",
     "LS",
     "CS",
     "VC",

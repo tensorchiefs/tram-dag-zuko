@@ -140,9 +140,7 @@ class Transformation(list):
         return NotImplemented
 
 
-def I(  # noqa: E743 - single-letter name is the intended notation
-    # TODO: have i pythonic name for the function and alias it at the end of
-    # the file
+def intercept(
     *parents: str,
     allow_interaction: bool = True,
     transform: str | None = None,
@@ -151,8 +149,9 @@ def I(  # noqa: E743 - single-letter name is the intended notation
 ) -> Term:
     """Build an intercept term: the parents reshape the monotone transform.
 
-    ``I()`` with no parents, or the bare name ``I``, is the simple-intercept
-    baseline.
+    ``I`` is the exported alias of this function, the notation of the docs
+    and the paper. A call with no parents, or the bare name ``I``, is the
+    simple-intercept baseline.
 
     Parameters
     ----------
@@ -789,3 +788,7 @@ def spec_from_dict(d: dict) -> dict[str, NodeSpec]:
         else:
             spec[name] = OrdinalNode(int(nd["levels"]), terms or None)
     return spec
+
+
+# the single-letter notation of the docs and the paper
+I = intercept  # noqa: E741 - ambiguous only out of context
