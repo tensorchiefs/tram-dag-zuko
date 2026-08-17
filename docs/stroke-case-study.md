@@ -19,12 +19,12 @@ outcome node. It does not use Monte Carlo.
 
 ```bash
 cd experiments
-uv run python sim_flow.py nl                  # headline storyline (synthetic, default)
-uv run python sim_flow.py nl                  # all-ls vs flexible, known truth
-# the single-config runners (all_ls_flow, nihss6_flow) are parked in stale/
+uv run python sim_flow.py nl                  # headline storyline: all-ls vs
+                                              # flexible vs known truth
 uv run python validate_ls.py                  # all-ls flow vs statsmodels MLE
-# counterfactual_demo.py is parked in stale/
-uv run python all_ls_long.py                  # 4x-longer convergence check
+# parked in stale/ (need an API migration before use): the single-config
+# runners (all_ls_flow, nihss6_flow), counterfactual_demo.py, and the
+# 4x-longer convergence check all_ls_long.py
 ```
 
 Experiments default to the public synthetic source `magic-mrclean/nl`. The
@@ -108,7 +108,8 @@ Reading notes:
 
 ## Counterfactual demo
 
-`experiments/counterfactual_demo.py` is a capability beyond the original
+`experiments/stale/counterfactual_demo.py` (parked, needs an API migration
+before it runs again) is a capability beyond the original
 scripts. It abducts the latents of the 128 held-out test patients and confirms
 exact factual reconstruction. It then predicts the outcome of each patient
 under the opposite treatment (`results/<name>/counterfactuals_test.csv`,

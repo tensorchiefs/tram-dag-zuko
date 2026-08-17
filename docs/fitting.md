@@ -98,6 +98,13 @@ learning rates, per-node freezing (below), and the all-`ls` classical fit.
 - **`restore_best`**: when enabled, `fit` snapshots each node's best-validation
   weights and restores them at the end (early-stopping regularization). The
   default is `False`, so the fit sits at the training-data MLE.
+- **`marginal_init=`**: opt-in calibrated initialization of the unconditional
+  intercepts — Bernstein nodes start at the linear map onto the latent
+  5%/95% quantiles, ordinal cutpoints at the empirical class log-odds. A pure
+  init; the converged MLE is unchanged.
+- **`vc_warm_start=`** (default on): each `VC` term's `beta0` starts at the
+  classical all-`ls` solution of its node's conditional, so the penalized
+  head only learns deviations.
 
 ### How per-node freezing works
 
@@ -218,8 +225,9 @@ These extensions are worth consideration as the package matures:
   why `fit_classical` refuses them).
 - **Modern first-order variants.** AdamW (decoupled weight decay), RAdam (warmup-
   free), or Lion/Sophia are drop-in alternatives to Adam. The benchmark harness
-  ([`experiments/bench_training.py`](../experiments/bench_training.py)) exists to
-  evaluate exactly such swaps on time-to-target.
+  ([`experiments/stale/bench_training.py`](../experiments/stale/bench_training.py),
+  parked — needs an API migration) exists to evaluate exactly such swaps on
+  time-to-target.
 - **Per-node optimizer selection.** The loss decomposes, and the optimizer
   already holds one group per node. Therefore different nodes can in principle
   use different optimizers (for example, L-BFGS for the `ls` nodes and Adam for
