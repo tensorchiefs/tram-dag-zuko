@@ -30,32 +30,19 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from ._common import resolve_latents
+from ._common import DatasetDraws, resolve_latents
 
 DO_X2_VALUES = (-3.0, -1.0, 0.0)  # the paper's Fig. 5 interventions
 
 
 @dataclass
-class VacaTriangle:
+class VacaTriangle(DatasetDraws):
     """SCM generator for the VACA bimodal triangle."""
 
     seed: int = 42
 
     def draw_latents(self, n: int, rng: np.random.Generator) -> dict[str, np.ndarray]:
-        """Draw the latent noise of every variable.
-
-        Parameters
-        ----------
-        n : int
-            Number of rows to draw.
-        rng : np.random.Generator
-            Random source.
-
-        Returns
-        -------
-        dict[str, np.ndarray]
-            One array of length ``n`` per variable.
-        """
+        """Draw the latent noise of every variable, ``n`` rows each."""
         return {
             "x1_mix": rng.uniform(size=n),
             "x1_a": rng.normal(size=n),  # N(-2, sqrt(1.5)) branch
@@ -108,47 +95,6 @@ class VacaTriangle:
             else x1 + 0.25 * x2 + latents["x3"]
         )
         return pd.DataFrame({"x1": x1, "x2": x2, "x3": x3})
-
-    # ----------------------------------------------------------------- datasets
-    def observational(self, n: int, seed_offset: int = 0) -> pd.DataFrame:
-        """Draw an observational sample.
-
-        Parameters
-        ----------
-        n : int
-            Number of rows.
-        seed_offset : int, optional
-            Added to the generator seed, by default ``0``.
-
-        Returns
-        -------
-        pd.DataFrame
-            The sample.
-        """
-        rng = np.random.default_rng(self.seed + 1 + seed_offset)
-        return self.simulate(n, rng=rng)
-
-    def interventional(
-        self, n: int, do: dict[str, float], seed_offset: int = 0
-    ) -> pd.DataFrame:
-        """Draw a sample under an intervention.
-
-        Parameters
-        ----------
-        n : int
-            Number of rows.
-        do : dict[str, float]
-            Variables to hold at a fixed value.
-        seed_offset : int, optional
-            Added to the generator seed, by default ``0``.
-
-        Returns
-        -------
-        pd.DataFrame
-            The sample.
-        """
-        rng = np.random.default_rng(self.seed + 501 + seed_offset)
-        return self.simulate(n, rng=rng, do=do)
 
     # -------------------------------------------------------------- ground truth
     def true_moments(self, mc_n: int = 1_000_000) -> dict:

@@ -42,7 +42,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from ._common import logistic, resolve_latents
+from ._common import DatasetDraws, logistic, resolve_latents
 
 F_VARIANTS = {
     "linear": (lambda x: -0.3 * x, "-0.3*x"),
@@ -68,7 +68,7 @@ def _clamp(value, n: int) -> np.ndarray:
 
 
 @dataclass
-class _TriangleBase:
+class _TriangleBase(DatasetDraws):
     """Shared x1 (GMM source) and x2 (Colr-type TRAM) mechanisms.
 
     Parameters
@@ -90,22 +90,10 @@ class _TriangleBase:
 
     # ------------------------------------------------------------------ latents
     def draw_latents(self, n: int, rng: np.random.Generator) -> dict[str, np.ndarray]:
-        """Draw all noise of the SCM.
+        """Draw all noise of the SCM, ``n`` rows each.
 
         The GMM source gets its primitives (component indicator plus two
         normal branches). x2 and x3 get their TRAM latents.
-
-        Parameters
-        ----------
-        n : int
-            Number of rows to draw.
-        rng : np.random.Generator
-            Random source.
-
-        Returns
-        -------
-        dict[str, np.ndarray]
-            One array of length ``n`` per latent.
         """
         return {
             "x1_mix": rng.uniform(size=n),  # component indicator
@@ -174,76 +162,6 @@ class _TriangleBase:
 
     def _x3(self, x1, x2, do, latents):  # pragma: no cover - abstract
         raise NotImplementedError
-
-    # ----------------------------------------------------------------- datasets
-    def observational(self, n: int, seed_offset: int = 0) -> pd.DataFrame:
-        """Draw an observational sample.
-
-        Parameters
-        ----------
-        n : int
-            Number of rows.
-        seed_offset : int, optional
-            Added to the generator seed, by default 0.
-
-        Returns
-        -------
-        pd.DataFrame
-            The sample.
-        """
-        rng = np.random.default_rng(self.seed + 1 + seed_offset)
-        return self.simulate(n, rng=rng)
-
-    def interventional(
-        self, n: int, do: dict[str, float], seed_offset: int = 0
-    ) -> pd.DataFrame:
-        """Draw a fresh sample from the mutilated SCM (the L2 ground truth).
-
-        Parameters
-        ----------
-        n : int
-            Number of rows.
-        do : dict[str, float]
-            Hard interventions ``{node: value}``.
-        seed_offset : int, optional
-            Added to the generator seed, by default 0.
-
-        Returns
-        -------
-        pd.DataFrame
-            The sample.
-        """
-        rng = np.random.default_rng(self.seed + 501 + seed_offset)
-        return self.simulate(n, rng=rng, do=do)
-
-    def counterfactual_pair(
-        self, n: int, do: dict[str, float], seed_offset: int = 0
-    ) -> tuple[pd.DataFrame, pd.DataFrame]:
-        """Draw a factual sample and its counterfactual under ``do``.
-
-        Both share the same latents, so the pair gives true individual
-        counterfactuals. They are exact for the continuous family. For the
-        mixed family the ordinal x3 is still well defined inside the
-        generator, because the latent is shared, even though no model can
-        identify it from data.
-
-        Parameters
-        ----------
-        n : int
-            Number of rows.
-        do : dict[str, float]
-            Hard interventions for the counterfactual arm.
-        seed_offset : int, optional
-            Added to the generator seed, by default 0.
-
-        Returns
-        -------
-        tuple[pd.DataFrame, pd.DataFrame]
-            The factual and the counterfactual sample.
-        """
-        rng = np.random.default_rng(self.seed + 2 + seed_offset)
-        latents = self.draw_latents(n, rng)
-        return self.simulate(latents=latents), self.simulate(latents=latents, do=do)
 
     # -------------------------------------------------------------- ground truth
     def true_shift_curve(self, x2_grid: np.ndarray) -> np.ndarray:

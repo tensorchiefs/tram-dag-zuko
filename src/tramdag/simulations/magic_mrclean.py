@@ -40,7 +40,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from ._common import logistic, resolve_latents, sigmoid
+from ._common import DatasetDraws, logistic, resolve_latents, sigmoid
 
 COLUMNS = ["Age", "mRS_pre", "NIHSSa", "T", "mRS_3m"]
 
@@ -61,7 +61,7 @@ def _ordinal(shift: np.ndarray, cuts: np.ndarray, u: np.ndarray) -> np.ndarray:
 
 
 @dataclass
-class MagicMrClean:
+class MagicMrClean(DatasetDraws):
     """SCM generator for the synthetic stroke cohort.
 
     Parameters
@@ -95,20 +95,7 @@ class MagicMrClean:
 
     # ------------------------------------------------------------------ latents
     def draw_latents(self, n: int, rng: np.random.Generator) -> dict[str, np.ndarray]:
-        """Draw the latent noise of every variable.
-
-        Parameters
-        ----------
-        n : int
-            Number of rows to draw.
-        rng : np.random.Generator
-            Random source.
-
-        Returns
-        -------
-        dict[str, np.ndarray]
-            One array of length ``n`` per variable.
-        """
+        """Draw the latent noise of every variable, ``n`` rows each."""
         return {k: logistic(rng, n) for k in COLUMNS}
 
     # --------------------------------------------------------------------- SCM
@@ -220,25 +207,6 @@ class MagicMrClean:
             {"Age": Age, "mRS_pre": mRS_pre, "NIHSSa": NIHSSa, "T": T, "mRS_3m": mRS_3m}
         )
 
-    # ----------------------------------------------------------------- datasets
-    def observational(self, n: int, seed_offset: int = 0) -> pd.DataFrame:
-        """Draw an observational sample.
-
-        Parameters
-        ----------
-        n : int
-            Number of rows.
-        seed_offset : int, optional
-            Added to the generator seed, by default ``0``.
-
-        Returns
-        -------
-        pd.DataFrame
-            The sample.
-        """
-        rng = np.random.default_rng(self.seed + 1 + seed_offset)
-        return self.simulate(n, rng=rng)
-
     def rct(self, n: int, seed_offset: int = 0) -> pd.DataFrame:
         """Draw a randomized-trial sample.
 
@@ -302,35 +270,6 @@ class MagicMrClean:
             "naive_obs_diff": naive,
             "mc_n": n,
         }
-
-    def counterfactual_pair(
-        self, n: int, do: dict[str, float], seed_offset: int = 0
-    ) -> tuple[pd.DataFrame, pd.DataFrame]:
-        """Draw a factual sample and its counterfactual under ``do``.
-
-        Both share the same latents, so the pair gives true individual
-        counterfactuals. Real data cannot supply these. Use them to score
-        the abduction of the flow.
-
-        Parameters
-        ----------
-        n : int
-            Number of rows.
-        do : dict[str, float]
-            Hard interventions for the counterfactual arm.
-        seed_offset : int, optional
-            Added to the generator seed, by default 0.
-
-        Returns
-        -------
-        tuple[pd.DataFrame, pd.DataFrame]
-            The factual and the counterfactual sample.
-        """
-        rng = np.random.default_rng(self.seed + 2 + seed_offset)
-        latents = self.draw_latents(n, rng)
-        factual = self.simulate(latents=latents)
-        cf = self.simulate(latents=latents, do=do)
-        return factual, cf
 
 
 # --------------------------------------------------------------------------- CLI

@@ -38,14 +38,14 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from ._common import logistic, resolve_latents
+from ._common import DatasetDraws, logistic, resolve_latents
 
 B0, B2, B3 = -1.0, 0.8, -0.6  # beta(x) = B0 + B2*X2 + B3*X3
 H_SCALE = 2.0  # h(y) = H_SCALE * y
 
 
 @dataclass
-class VCLogisticShift:
+class VCLogisticShift(DatasetDraws):
     """SCM generator for the VC validation cohort (issue #28).
 
     Parameters
@@ -59,22 +59,10 @@ class VCLogisticShift:
 
     # ------------------------------------------------------------------ latents
     def draw_latents(self, n: int, rng: np.random.Generator) -> dict[str, np.ndarray]:
-        """Draw all noise of the SCM.
+        """Draw all noise of the SCM, ``n`` rows each.
 
         The sources get Gaussian primitives. T gets a logistic assignment
         latent and Y gets the logistic TRAM latent.
-
-        Parameters
-        ----------
-        n : int
-            Number of rows to draw.
-        rng : np.random.Generator
-            Random source.
-
-        Returns
-        -------
-        dict[str, np.ndarray]
-            One array of length ``n`` per variable.
         """
         return {
             "X1": rng.normal(size=n),
@@ -140,25 +128,6 @@ class VCLogisticShift:
             {"X1": x["X1"], "X2": x["X2"], "X3": x["X3"], "T": T, "Y": Y}
         )
 
-    # ----------------------------------------------------------------- datasets
-    def observational(self, n: int, seed_offset: int = 0) -> pd.DataFrame:
-        """Draw an observational sample.
-
-        Parameters
-        ----------
-        n : int
-            Number of rows.
-        seed_offset : int, optional
-            Added to the generator seed, by default ``0``.
-
-        Returns
-        -------
-        pd.DataFrame
-            The sample.
-        """
-        rng = np.random.default_rng(self.seed + 1 + seed_offset)
-        return self.simulate(n, rng=rng)
-
     # -------------------------------------------------------------- ground truth
     def true_beta(self, x) -> np.ndarray:
         """Give the true effect function ``beta(x)`` on the latent scale.
@@ -182,32 +151,6 @@ class VCLogisticShift:
             + B2 * np.asarray(x["X2"], dtype=float)
             + B3 * np.asarray(x["X3"], dtype=float)
         )
-
-    def counterfactual_pair(
-        self, n: int, do: dict[str, float], seed_offset: int = 0
-    ) -> tuple[pd.DataFrame, pd.DataFrame]:
-        """Draw a factual sample and its counterfactual under ``do``.
-
-        Both share the same latents, so the pair gives true individual
-        counterfactuals.
-
-        Parameters
-        ----------
-        n : int
-            Number of rows.
-        do : dict[str, float]
-            Hard interventions for the counterfactual arm.
-        seed_offset : int, optional
-            Added to the generator seed, by default 0.
-
-        Returns
-        -------
-        tuple[pd.DataFrame, pd.DataFrame]
-            The factual and the counterfactual sample.
-        """
-        rng = np.random.default_rng(self.seed + 2 + seed_offset)
-        latents = self.draw_latents(n, rng)
-        return self.simulate(latents=latents), self.simulate(latents=latents, do=do)
 
 
 # --------------------------------------------------------------------------- CLI

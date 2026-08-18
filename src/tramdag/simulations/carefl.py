@@ -31,7 +31,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from ._common import resolve_latents
+from ._common import DatasetDraws, resolve_latents
 
 X_OBS = {"x1": 2.00, "x2": 1.50, "x3": 0.81, "x4": -0.28}  # the paper's observation
 ALPHA_GRID = np.round(np.linspace(-3.0, 3.0, 61), 4)
@@ -39,26 +39,13 @@ _SCALE = 1.0 / np.sqrt(2.0)
 
 
 @dataclass
-class Carefl4:
+class Carefl4(DatasetDraws):
     """SCM generator for the 4-variable CAREFL benchmark."""
 
     seed: int = 42
 
     def draw_latents(self, n: int, rng: np.random.Generator) -> dict[str, np.ndarray]:
-        """Draw the latent noise of every variable.
-
-        Parameters
-        ----------
-        n : int
-            Number of rows to draw.
-        rng : np.random.Generator
-            Random source.
-
-        Returns
-        -------
-        dict[str, np.ndarray]
-            One array of length ``n`` per variable.
-        """
+        """Draw the latent noise of every variable, ``n`` rows each."""
         return {
             k: rng.laplace(loc=0.0, scale=_SCALE, size=n)
             for k in ["x1", "x2", "x3", "x4"]
@@ -101,25 +88,6 @@ class Carefl4:
         x3 = clamp_or("x3", x1 + 0.5 * x2**3 + latents["x3"])
         x4 = clamp_or("x4", -x2 + 0.5 * x1**2 + latents["x4"])
         return pd.DataFrame({"x1": x1, "x2": x2, "x3": x3, "x4": x4})
-
-    # ----------------------------------------------------------------- datasets
-    def observational(self, n: int, seed_offset: int = 0) -> pd.DataFrame:
-        """Draw an observational sample.
-
-        Parameters
-        ----------
-        n : int
-            Number of rows.
-        seed_offset : int, optional
-            Added to the generator seed, by default ``0``.
-
-        Returns
-        -------
-        pd.DataFrame
-            The sample.
-        """
-        rng = np.random.default_rng(self.seed + 1 + seed_offset)
-        return self.simulate(n, rng=rng)
 
     # -------------------------------------------------------------- ground truth
     @staticmethod
