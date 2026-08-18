@@ -41,7 +41,11 @@ jobs:
         python-version: ${{ matrix.python-version }}
         enable-cache: true
 
-    - run: uv sync --group test --python ${{ matrix.python-version }}
+    # --no-default-groups: dev is a default group, and it now pulls the
+    # editor/docs tooling too (144 packages against 45 for test alone)
+    - run: >-
+        uv sync --no-default-groups --group test
+        --python ${{ matrix.python-version }}
 
     - name: Tests
       shell: bash
