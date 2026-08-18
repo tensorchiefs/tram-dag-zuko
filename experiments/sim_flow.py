@@ -14,12 +14,22 @@ Expected reading:
 Usage: uv run python sim_flow.py [ls|nl]   (default nl)
 """
 
-import sys
+import argparse
 
-from common import DEFAULT_SOURCE, run_experiment
+from common import run_experiment
 
 if __name__ == "__main__":
-    variant = sys.argv[1] if len(sys.argv) > 1 else "nl"
+    parser = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
+    parser.add_argument(
+        "variant",
+        nargs="?",
+        default="nl",
+        choices=("ls", "nl"),
+        help="magic-mrclean variant (default: nl)",
+    )
+    variant = parser.parse_args().variant
     source = f"magic-mrclean/{variant}"
     print(f"\n################ all-ls flow on {source} ################")
     run_experiment(f"sim_{variant}_ls", style="ls", source=source)

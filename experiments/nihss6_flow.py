@@ -11,11 +11,8 @@ to switch, e.g. `magic` for the private clinical cohort:
     uv run python nihss6_flow.py magic            # private clinical cohort
 """
 
-import sys
-
-from common import DEFAULT_SOURCE, run_experiment
+from common import run_experiment, run_name, source_arg
 
 if __name__ == "__main__":
-    source = sys.argv[1] if len(sys.argv) > 1 else DEFAULT_SOURCE
-    name = "nihss6" if source == "magic" else f"nihss6_{source.split('/')[-1]}"
-    run_experiment(name, style="flexible", source=source)
+    source = source_arg(__doc__)
+    run_experiment(run_name("nihss6", source), style="flexible", source=source)

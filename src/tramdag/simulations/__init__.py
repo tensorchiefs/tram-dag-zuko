@@ -21,5 +21,12 @@ REGISTRY = {
     "vc-shift": VCLogisticShift,
 }
 
-__all__ = ["MagicMrClean", "TriangleContinuous", "TriangleMixed",
-           "VacaTriangle", "Carefl4", "VCLogisticShift", "REGISTRY"]
+__all__ = [
+    "MagicMrClean",
+    "TriangleContinuous",
+    "TriangleMixed",
+    "VacaTriangle",
+    "Carefl4",
+    "VCLogisticShift",
+    "REGISTRY",
+]

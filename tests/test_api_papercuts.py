@@ -1,18 +1,21 @@
 """Tests for the API papercuts in issue #12: constructor seeding, history +
-machine-info persistence through save/load, and the machine_info() helper."""
+machine-info persistence through save/load, and the machine_info() helper.
+"""
 
 import numpy as np
 import pandas as pd
 import torch
 
 import tramdag as td
-from tramdag import CausalFlowDAG, ContinuousNode, LS, OrdinalNode
+from tramdag import LS, CausalFlowDAG, ContinuousNode, OrdinalNode
 
 
 def _spec():
-    return {"x1": ContinuousNode(),
-            "x2": ContinuousNode(terms=[LS("x1")]),
-            "y": OrdinalNode(levels=3, terms=[LS("x1")])}
+    return {
+        "x1": ContinuousNode(),
+        "x2": ContinuousNode(terms=[LS("x1")]),
+        "y": OrdinalNode(levels=3, terms=[LS("x1")]),
+    }
 
 
 # -------------------------------------------------- #1 constructor seeding
@@ -26,8 +29,9 @@ def test_constructor_seed_makes_init_reproducible():
 def test_constructor_seed_differs_across_seeds():
     a = CausalFlowDAG(_spec(), seed=42)
     c = CausalFlowDAG(_spec(), seed=7)
-    assert any(not torch.equal(pa, pc)
-               for pa, pc in zip(a.parameters(), c.parameters()))
+    assert any(
+        not torch.equal(pa, pc) for pa, pc in zip(a.parameters(), c.parameters())
+    )
 
 
 def test_no_seed_still_works():
@@ -38,8 +42,13 @@ def test_no_seed_still_works():
 
 # ------------------------------------------- #2 history persists through io
 def test_save_load_round_trips_history(tmp_path):
-    df = pd.DataFrame({"x1": np.random.randn(200), "x2": np.random.randn(200),
-                       "y": np.random.randint(0, 3, 200).astype(float)})
+    df = pd.DataFrame(
+        {
+            "x1": np.random.randn(200),
+            "x2": np.random.randn(200),
+            "y": np.random.randint(0, 3, 200).astype(float),
+        }
+    )
     flow = CausalFlowDAG(_spec(), seed=0)
     flow.fit(df, df, epochs=12, verbose=0)
     assert len(flow.history["val"]) == 12
@@ -48,14 +57,24 @@ def test_save_load_round_trips_history(tmp_path):
     loaded = CausalFlowDAG.load(p)
     assert set(loaded.history) == {"train", "val", "lr", "time"}
     assert len(loaded.history["val"]) == 12
-    assert len(loaded.history["time"]) == 12   # wall-clock curve survives too
+    assert len(loaded.history["time"]) == 12  # wall-clock curve survives too
 
 
 # ----------------------------------------- #4 machine/env info in metadata
 def test_machine_info_has_expected_fields():
     info = td.machine_info()
-    for k in ["hostname", "os", "cpu_count", "python", "torch", "zuko",
-              "tramdag", "cuda", "mps", "ram_gb"]:
+    for k in [
+        "hostname",
+        "os",
+        "cpu_count",
+        "python",
+        "torch",
+        "zuko",
+        "tramdag",
+        "cuda",
+        "mps",
+        "ram_gb",
+    ]:
         assert k in info
     assert info["torch"] == torch.__version__
     assert info["tramdag"] == td.__version__
@@ -76,9 +95,11 @@ def test_load_of_metaless_checkpoint_is_graceful(tmp_path):
     # backward compatibility: an old checkpoint without "meta" still loads
     flow = CausalFlowDAG(_spec(), seed=0)
     from tramdag.spec import spec_to_dict
+
     p = tmp_path / "old.pt"
-    torch.save({"spec": spec_to_dict(flow.spec),
-                "state_dict": flow.state_dict()}, p)   # no history, no meta
+    torch.save(
+        {"spec": spec_to_dict(flow.spec), "state_dict": flow.state_dict()}, p
+    )  # no history, no meta
     loaded = CausalFlowDAG.load(p)
     assert loaded.meta == {}
     assert set(loaded.history) == {"train", "val", "lr", "time"}

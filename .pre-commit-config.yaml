@@ -1,0 +1,32 @@
+# Activate in a fresh clone with:
+#   pre-commit install --install-hooks
+repos:
+- repo: https://github.com/astral-sh/ruff-pre-commit
+  rev: v0.16.2
+  hooks:
+  - id: ruff-check
+    args: [--fix]
+  - id: ruff-format
+
+- repo: https://github.com/pre-commit/pre-commit-hooks
+  rev: v6.0.0
+  hooks:
+  - id: check-added-large-files
+  - id: check-executables-have-shebangs
+  - id: check-merge-conflict
+  - id: check-shebang-scripts-are-executable
+    exclude: ^data/   # frozen test contract; not ours to chmod
+  - id: check-toml
+  - id: check-yaml
+  - id: end-of-file-fixer
+  - id: mixed-line-ending
+  - id: trailing-whitespace
+
+- repo: https://github.com/macisamuele/language-formatters-pre-commit-hooks
+  rev: v2.16.0
+  hooks:
+  - id: pretty-format-yaml
+    args: [--autofix, --indent, '2']
+  - id: pretty-format-toml
+    args: [--autofix]
+    exclude: ^uv\.lock$   # uv owns this file; formatting reorders 2883 lines

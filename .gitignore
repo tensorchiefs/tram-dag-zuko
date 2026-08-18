@@ -25,3 +25,10 @@ dist/
 
 # machine-benchmark outputs (collected manually per machine)
 perf_*.json
+
+# jupyter runtime litter
+.ipynb_checkpoints/
+.virtual_documents/
+
+# docs build scratch (stub modules, notebook markdown)
+build/

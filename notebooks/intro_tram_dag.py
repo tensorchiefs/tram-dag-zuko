@@ -27,7 +27,7 @@
 # |---|---|---|
 # | L1 association | $p(x)$, sampling | `flow.log_prob(df)`, `flow.sample(n)` |
 # | L2 intervention | $p(x \mid do(x_j{=}a))$ | `flow.sample(n, do={...})`, `flow.pmf(df, node, do={...})` |
-# | L3 counterfactual | "what would $x_i$ have been, had $x_j$ been $a$?" | `flow.abduct(df)` + `flow.sample(do={...}, u=u)` |
+# | L3 counterfactual | "what would $x_i$ have been, had $x_j$ been $a$?" | `u=flow.abduct(df); flow.sample(do={...}, u=u)` |
 #
 # This notebook walks through the model exactly as written in the paper notation,
 # builds a small data-generating process (DGP) **inside the model family**, fits a
@@ -44,26 +44,26 @@
 #
 # $$
 # \begin{align*}
-# z_1 &= h(x_1) \\
-# z_2 &= h(x_2 \mid x_1)\\
-# z_3 &= h(x_3 \mid x_1, x_2) \\
+# u_1 &= h(x_1) \\
+# u_2 &= h(x_2 \mid x_1)\\
+# u_3 &= h(x_3 \mid x_1, x_2) \\
 # \dots &\\
-# z_p &= h(x_p \mid x_1, x_2, \dots, x_{p-1})
+# u_p &= h(x_p \mid x_1, x_2, \dots, x_{p-1})
 # \end{align*}
 # $$
 #
 # This **observed → latent** map is the convention of the paper (Eq. 2,
 # $F_{X\mid\mathrm{pa}}(x)=F_U\!\big(h(x\mid\mathrm{pa})\big)$) and of the code
-# (`z = h(x) + shift`). It is also the **training direction**: $h$ is evaluated
+# (in code: `z = h(x) + shift`). It is also the **training direction**: $h$ is evaluated
 # *directly* to score the likelihood (cheap). **Sampling** runs the inverse
-# $x_i = h^{-1}(z_i \mid \mathrm{pa})$, which has no closed form and is solved by
+# $x_i = h^{-1}(u_i \mid \mathrm{pa})$, which has no closed form and is solved by
 # bracketed bisection — the costlier direction.
 #
 # Together the $h$'s form one **triangular** flow; each variable may depend only on
 # a *subset* of its predecessors — its causal parents $\mathrm{pa}(x_i)$ — so the
 # Jacobian sparsity of the flow *is* the DAG.
 #
-# For the latents $z_1,\dots,z_p$ we assume a **standard logistic** distribution.
+# For the latents $u_1,\dots,u_p$ we assume a **standard logistic** distribution.
 # That choice is what makes the fitted parameters interpretable: shifts on the
 # latent scale are **log-odds ratios** (Section 6).
 #
@@ -73,7 +73,7 @@
 # the latent scale**. Each node's $h$ (observed → latent, as above) is
 #
 # $$
-# z_i \;=\; h(x_i \mid \mathrm{pa}(x_i)) \;=\;
+# u_i \;=\; h(x_i \mid \mathrm{pa}(x_i)) \;=\;
 # \underbrace{f_\theta(x_i)}_{\text{intercept}}
 # \;+\; \underbrace{\textstyle\sum_j \beta_{ij}\, x_j}_{\text{linear shifts (LS)}}
 # \;+\; \underbrace{\textstyle\sum_k g_{ik}(x_k)}_{\text{complex shifts (CS)}} ,
@@ -97,7 +97,7 @@
 # the shifts move to the other side:
 #
 # $$
-# x_5 = h^{-1}(z_5 \mid x_1, x_2, x_4) = f_\theta^{-1}\!\Big(z_5
+# x_5 = h^{-1}(u_5 \mid x_1, x_2, x_4) = f_\theta^{-1}\!\Big(u_5
 # - \underbrace{\beta_{51} x_1 + \beta_{52} x_2}_{\text{LS}}
 # - \underbrace{g(x_4)}_{\text{CS}}\Big).
 # $$
@@ -120,16 +120,16 @@
 # in **exactly one** term — the intercept (the *shape*) or one shift — and the
 # table shows the resulting decomposition for a single continuous target $X_3$:
 #
-# | `terms=` | $z_3 = h(x_3 \mid \mathrm{pa})$ | what carries each parent |
+# | `terms=` | $u_3 = h(x_3 \mid \mathrm{pa})$ | what carries each parent |
 # |---|---|---|
-# | `[]` (source) | $f_\theta(x_3)$ | `SimpleIntercept` — $\theta$ a free vector |
-# | `[LS("X1")]` | $f_\theta(x_3) + \beta\,x_1$ | `LinearShift` — **one number** $\beta$ |
-# | `[CS("X1")]` | $f_\theta(x_3) + g(x_1)$ | `ComplexShift` — additive MLP $g$ |
-# | `[I("X1")]` | $f_{\theta(x_1)}(x_3)$ | `ComplexIntercept` — **no shift term**; $\theta$ (the whole shape) bends with $x_1$ |
-# | `[LS("X1"), CS("X2")]` | $f_\theta(x_3) + \beta x_1 + g(x_2)$ | one `LinearShift` + one `ComplexShift` (the model fitted below) |
-# | `[CS("X1", "X2")]` | $f_\theta(x_3) + g(x_1, x_2)$ | **one joint** `ComplexShift` — an interaction in the shift |
-# | `[I("X1"), I("X2")]` | $f_{\theta(x_1) + \theta(x_2)}(x_3)$ | **additive** CI — each parent reshapes the transform independently (two nets summed) |
-# | `[I("X1", "X2")]` | $f_{\theta(x_1,x_2)}(x_3)$ | **one joint** `ComplexIntercept` over both parents (they interact) |
+# | `[]` (source) | $h_\theta(x_3)$ | `SimpleIntercept` — $\theta$ a free vector |
+# | `[LS("X1")]` | $h_\theta(x_3) + \beta\,x_1$ | `LinearShift` — **one number** $\beta$ |
+# | `[CS("X1")]` | $h_\theta(x_3) + g(x_1)$ | `ComplexShift` — additive MLP $g$ |
+# | `[I("X1")]` | $h_{\theta(x_1)}(x_3)$ | `ComplexIntercept` — **no shift term**; $\theta$ (the whole shape) bends with $x_1$ |
+# | `[LS("X1"), CS("X2")]` | $h_\theta(x_3) + \beta x_1 + g(x_2)$ | one `LinearShift` + one `ComplexShift` (the model fitted below) |
+# | `[CS("X1", "X2")]` | $h_\theta(x_3) + g(x_1, x_2)$ | **one joint** `ComplexShift` — an interaction in the shift |
+# | `[I("X1"), I("X2")]` | $h_{\theta(x_1) + \theta(x_2)}(x_3)$ | **additive** CI — each parent reshapes the transform independently (two nets summed) |
+# | `[I("X1", "X2")]` | $h_{\theta(x_1,x_2)}(x_3)$ | **one joint** `ComplexIntercept` over both parents (they interact) |
 #
 # For an **ordinal** target the intercept is not a Bernstein curve but the vector of
 # ordered cutpoints $\vartheta_k(\mathrm{pa})$, and the shift is **subtracted**:
@@ -142,14 +142,13 @@
 # interpretability price of letting the transformation's *shape* depend on the parent.
 
 # %%
-from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import torch
 
-from tramdag import CS, LS, CausalFlowDAG, ContinuousNode, I, OrdinalNode
+from tramdag import CS, LS, CausalFlowDAG, ContinuousNode, OrdinalNode
 
 plt.rcParams["figure.dpi"] = 110
 
@@ -165,16 +164,16 @@ plt.rcParams["figure.dpi"] = 110
 #
 # $$
 # \begin{aligned}
-# z_1 &= h_1(x_1) = 1.2\,x_1 - 0.4
-#   &&\Rightarrow\; x_1 = (z_1 + 0.4)/1.2 \\[2pt]
-# z_2 &= h_2(x_2) + \beta_{21} x_1, \quad h_2(x) = 2x + 1,\; \beta_{21} = 1.5
-#   &&\Rightarrow\; x_2 = (z_2 - 1.5\,x_1 - 1)/2 \\[2pt]
-# z_3 &= h_3(x_3) + \beta_{31} x_1 + g(x_2), \quad h_3(x) = \sinh(x),\;
+# u_1 &= h_1(x_1) = 1.2\,x_1 - 0.4
+#   &&\Rightarrow\; x_1 = (u_1 + 0.4)/1.2 \\[2pt]
+# u_2 &= h_2(x_2) + \beta_{21} x_1, \quad h_2(x) = 2x + 1,\; \beta_{21} = 1.5
+#   &&\Rightarrow\; x_2 = (u_2 - 1.5\,x_1 - 1)/2 \\[2pt]
+# u_3 &= h_3(x_3) + \beta_{31} x_1 + g(x_2), \quad h_3(x) = \sinh(x),\;
 #       \beta_{31} = 0.8,\; g(x) = \tfrac12 x^2
-#   &&\Rightarrow\; x_3 = \operatorname{asinh}\!\big(z_3 - 0.8\,x_1 - \tfrac12 x_2^2\big) \\[2pt]
+#   &&\Rightarrow\; x_3 = \operatorname{asinh}\!\big(u_3 - 0.8\,x_1 - \tfrac12 x_2^2\big) \\[2pt]
 # P(Y \le k) &= \sigma(\vartheta_k - \beta_{Y} x_3), \quad
 #       \vartheta = (-2, 0, 1.5),\; \beta_{Y} = 1
-#   &&\Rightarrow\; y = \#\{k : z_4 > \vartheta_k - \beta_Y x_3\}
+#   &&\Rightarrow\; y = \#\{k : u_4 > \vartheta_k - \beta_Y x_3\}
 # \end{aligned}
 # $$
 #
@@ -182,14 +181,63 @@ plt.rcParams["figure.dpi"] = 110
 # them):
 #
 # * continuous nodes: the shift is **added** on the latent scale,
-#   $z = h(x) + \text{shift}$;
+#   $u = h(x) + \text{shift}$;
 # * ordinal nodes: the shift is **subtracted** inside the sigmoid,
 #   $P(Y \le k) = \sigma(\vartheta_k - \text{shift})$, with increasing cutpoints
 #   $\vartheta_k$ (an *ordered logit*). The flip makes a positive $\beta$ push $Y$
 #   towards *higher* categories.
 #
-# $X_2$ enters $X_3$ through a **complex shift** quadratic shift $g(x_2)=\tfrac12 x_2^2$ 
+# $X_2$ enters $X_3$ through a **complex shift** quadratic shift $g(x_2)=\tfrac12 x_2^2$
 # that a linear shift cannot represent. We will come to that later.
+
+# %% [markdown]
+# The wiring at a glance — each edge is labelled with the term its parent
+# enters through:
+
+# %%
+fig, ax = plt.subplots(figsize=(7, 3.2))
+pos = {"X1": (0, 1.0), "X2": (0, 0.0), "X3": (1.4, 0.5), "Y": (2.6, 0.5)}
+edges = [
+    ("X1", "X2", r"LS: $\beta_{21}=1.5$", (-0.32, 0.5)),
+    ("X1", "X3", r"LS: $\beta_{31}=0.8$", (0.62, 0.93)),
+    ("X2", "X3", r"CS: $g(x)=\frac{1}{2}x^2$", (0.62, 0.07)),
+    ("X3", "Y", r"LS: $\beta_{Y}=1$", (2.0, 0.62)),
+]
+for src, dst, label, (lx, ly) in edges:
+    ax.annotate(
+        "",
+        xy=pos[dst],
+        xytext=pos[src],
+        arrowprops=dict(
+            arrowstyle="-|>", color="#333333", lw=1.4, shrinkA=16, shrinkB=16
+        ),
+    )
+    ax.text(lx, ly, label, fontsize=10, ha="center", va="center")
+for name, (x, y) in pos.items():
+    ordinal = name == "Y"
+    ax.scatter(
+        x,
+        y,
+        s=900,
+        facecolor="white" if not ordinal else "#dce8f4",
+        edgecolor="#333333",
+        zorder=3,
+    )
+    ax.text(
+        x,
+        y,
+        f"${name[0]}_{name[1]}$" if len(name) > 1 else f"${name}$",
+        ha="center",
+        va="center",
+        fontsize=13,
+        zorder=4,
+    )
+ax.text(2.6, 0.24, "ordinal (4 levels)", fontsize=9, ha="center", color="#555555")
+ax.set_xlim(-0.7, 3.1)
+ax.set_ylim(-0.35, 1.35)
+ax.axis("off")
+ax.set_title("The DGP's DAG", fontsize=11)
+plt.show()
 
 # %%
 TRUE = dict(b21=1.5, b31=0.8, bY=1.0, theta_Y=np.array([-2.0, 0.0, 1.5]))
@@ -206,25 +254,26 @@ def g_cs(x2):
     return 0.5 * x2**2
 
 
-def simulate(n, rng, x1=None, z=None):
+def simulate(n, rng, x1=None, u=None):
     """Sample from the SCM. `x1` overrides the source node (= do(X1)),
-    `z` reuses given latents (= counterfactuals)."""
-    if z is None:
-        z = {k: rlogis(rng, n) for k in ["z1", "z2", "z3", "z4"]}
+    `u` reuses given latents (= counterfactuals).
+    """
+    if u is None:
+        u = {k: rlogis(rng, n) for k in ["u1", "u2", "u3", "u4"]}
     if x1 is None:
-        x1 = (z["z1"] + 0.4) / 1.2
+        x1 = (u["u1"] + 0.4) / 1.2
     else:
         x1 = np.full(n, float(x1))
-    x2 = (z["z2"] - TRUE["b21"] * x1 - 1.0) / 2.0
-    x3 = np.arcsinh(z["z3"] - TRUE["b31"] * x1 - g_cs(x2))
+    x2 = (u["u2"] - TRUE["b21"] * x1 - 1.0) / 2.0
+    x3 = np.arcsinh(u["u3"] - TRUE["b31"] * x1 - g_cs(x2))
     cut = TRUE["theta_Y"][None, :] - TRUE["bY"] * x3[:, None]
-    y = (z["z4"][:, None] > cut).sum(axis=1)
+    y = (u["u4"][:, None] > cut).sum(axis=1)
     df = pd.DataFrame({"X1": x1, "X2": x2, "X3": x3, "Y": y.astype(float)})
-    return df, z
+    return df, u
 
 
 rng = np.random.default_rng(1)
-df, z_obs = simulate(6000, rng)            # keep the latents -> true counterfactuals
+df, u_obs = simulate(6000, rng)  # keep the latents -> true counterfactuals
 train_df, val_df = df.iloc[:5000], df.iloc[5000:]
 df.describe().round(2)
 
@@ -245,8 +294,8 @@ plt.show()
 # continuous node automatically gets its monotone baseline transformation
 # (default: Bernstein polynomial with 20 coefficients, the TRAM-faithful choice);
 # the edges declare how each parent enters.
-# 
-# 
+#
+#
 # Fitting maximises the joint likelihood. Because the flow is triangular, the
 # negative log-likelihood **decomposes per node**
 # ($\log p(x) = \sum_i \log p(x_i \mid \mathrm{pa}(x_i))$), and one Adam optimizer
@@ -258,11 +307,15 @@ spec = {
     "X1": ContinuousNode(transform="bernstein"),
     "X2": ContinuousNode(terms=[LS("X1")]),
     "X3": ContinuousNode(terms=[LS("X1"), CS("X2")]),
-    "Y":  OrdinalNode(levels=4, terms=[LS("X3")]),
+    "Y": OrdinalNode(levels=4, terms=[LS("X3")]),
 }
 
-flow = CausalFlowDAG(spec, seed=1)  # seed here too, for the Bernsteins' initial uniform knots
-flow.fit(train_df, val_df, epochs=800, learning_rate=1e-2, batch_size=20000, verbose=200)
+flow = CausalFlowDAG(
+    spec, seed=1
+)  # seed here too, for the Bernsteins' initial uniform knots
+flow.fit(
+    train_df, val_df, epochs=800, learning_rate=1e-2, batch_size=20000, verbose=200
+)
 flow.fit(train_df, val_df, epochs=300, learning_rate=1e-3, verbose=300)  # polish
 flow.nll(val_df)
 
@@ -273,12 +326,16 @@ flow.nll(val_df)
 # **fitted** flow. Two small helpers do the job: `describe_node` reports which
 # network carries each parent (the structural view), and `decompose_row` prints the
 # actual numbers for one observation and verifies they rebuild the per-node
-# log-likelihood **exactly** — $z = f_\theta(x) + \sum \text{shifts}$ is an
+# log-likelihood **exactly** — $u = h_\theta(x) + \sum \text{shifts}$ is an
 # identity, not a picture. We run both on `X2` (an `ls` edge), `X3` (`ls` + `cs`),
 # and the ordinal `Y` (shift **subtracted**).
 
 # %%
-from tramdag.transforms import StandardLogistic, ordinal_cutpoints, ordinal_log_prob  # noqa: E402
+from tramdag.transforms import (  # noqa: E402
+    StandardLogistic,
+    ordinal_cutpoints,
+    ordinal_log_prob,
+)
 
 
 def describe_node(flow, name):
@@ -300,30 +357,37 @@ def describe_node(flow, name):
 
 
 def decompose_row(flow, name, row_df):
-    """Numeric view: print z = intercept + sum(shifts) for one row and check it
-    reproduces flow.node_log_prob exactly."""
+    """Numeric view: print u = intercept + sum(shifts) for one row and check it
+    reproduces flow.node_log_prob exactly.
+    """
     node = flow.nodes[name]
     vals = flow._tensorize(row_df)
     feats = flow._features(vals)
     theta, shift = node.theta_shift(feats, len(row_df))
-    parts = {p: node.shifts[p](feats[p]) for p in node.shifts}   # per-parent shift
+    parts = {p: node.shifts[p](feats[p]) for p in node.shifts}  # per-parent shift
     print(f"{name} = {float(vals[name][0]):+.3f}  ({node.kind})")
     if node.kind == "continuous":
-        z0, ladj = node.ut.forward(theta, vals[name])
-        terms = "  +  ".join([f"f_theta(x)={float(z0[0]):+.3f}"]
-                             + [f"{p}={float(v[0]):+.3f}" for p, v in parts.items()])
-        z = z0 + shift
-        print(f"  z = {terms}  =  {float(z[0]):+.3f}   (standard-logistic latent)")
-        lp = StandardLogistic.log_prob(z) + ladj
-    else:   # ordinal: cutpoints minus a subtracted shift
+        h0, ladj = node.ut.forward(theta, vals[name])
+        terms = "  +  ".join(
+            [f"h_theta(x)={float(h0[0]):+.3f}"]
+            + [f"{p}={float(v[0]):+.3f}" for p, v in parts.items()]
+        )
+        u = h0 + shift
+        print(f"  u = {terms}  =  {float(u[0]):+.3f}   (standard-logistic latent)")
+        lp = StandardLogistic.log_prob(u) + ladj
+    else:  # ordinal: cutpoints minus a subtracted shift
         cuts = ordinal_cutpoints(theta)[0, 1:-1].detach().numpy().round(3)
         terms = "  +  ".join(f"{p}={float(v[0]):+.3f}" for p, v in parts.items()) or "0"
         print(f"  cutpoints theta_k = {cuts}")
-        print(f"  shift (SUBTRACTED) = {terms}   ->   P(Y<=k) = sigmoid(theta_k - shift)")
+        print(
+            f"  shift (SUBTRACTED) = {terms}   ->   P(Y<=k) = sigmoid(theta_k - shift)"
+        )
         lp = ordinal_log_prob(theta, shift, vals[name])
     check = flow.node_log_prob(vals)[name]
-    print(f"  log p(row) rebuilt = {float(lp[0]):+.4f}   node_log_prob = "
-          f"{float(check[0]):+.4f}   match={bool(torch.allclose(lp, check))}\n")
+    print(
+        f"  log p(row) rebuilt = {float(lp[0]):+.4f}   node_log_prob = "
+        f"{float(check[0]):+.4f}   match={bool(torch.allclose(lp, check))}\n"
+    )
 
 
 for nm in ["X2", "X3", "Y"]:
@@ -346,15 +410,33 @@ fig, axes = plt.subplots(1, 4, figsize=(13, 3))
 for ax, col in zip(axes[:3], ["X1", "X2", "X3"]):
     bins = np.linspace(df[col].min(), df[col].max(), 60)
     ax.hist(df[col], bins=bins, density=True, alpha=0.45, label="data")
-    ax.hist(samp[col], bins=bins, density=True, histtype="step", lw=1.8,
-            color="C3", label="flow")
+    ax.hist(
+        samp[col],
+        bins=bins,
+        density=True,
+        histtype="step",
+        lw=1.8,
+        color="C3",
+        label="flow",
+    )
     ax.set_title(col)
 levels = np.arange(4)
 w = 0.35
-axes[3].bar(levels - w / 2, df["Y"].value_counts(normalize=True).sort_index(),
-            width=w, alpha=0.6, label="data")
-axes[3].bar(levels + w / 2, samp["Y"].value_counts(normalize=True).sort_index(),
-            width=w, color="C3", alpha=0.8, label="flow")
+axes[3].bar(
+    levels - w / 2,
+    df["Y"].value_counts(normalize=True).sort_index(),
+    width=w,
+    alpha=0.6,
+    label="data",
+)
+axes[3].bar(
+    levels + w / 2,
+    samp["Y"].value_counts(normalize=True).sort_index(),
+    width=w,
+    color="C3",
+    alpha=0.8,
+    label="flow",
+)
 axes[3].set_title("Y"), axes[3].set_xticks(levels)
 axes[0].legend()
 fig.suptitle("L1: observational marginals, data vs. flow samples")
@@ -365,7 +447,7 @@ plt.show()
 # ## 6. Single-number interpretable statistics
 #
 # Because the latents are standard logistic, every linear-shift weight is a
-# **log-odds ratio**. For a continuous node ($z = h(x) + \beta\, x_{\text{pa}}$),
+# **log-odds ratio**. For a continuous node ($u = h(x) + \beta\, x_{\text{pa}}$),
 # a unit increase of the parent multiplies the odds of $\{X \le x\}$ by $e^\beta$
 # — uniformly in $x$ (a proportional-odds / Colr-type effect). For the ordinal
 # node the sign convention flips ($\sigma(\vartheta_k - \text{shift})$), so a
@@ -380,7 +462,6 @@ b21_hat = float(flow.nodes["X2"].shifts["X1"].weight.detach())
 b31_hat = float(flow.nodes["X3"].shifts["X1"].weight.detach())
 bY_hat = float(flow.nodes["Y"].shifts["X3"].weight.detach())
 
-from tramdag.transforms import ordinal_cutpoints  # noqa: E402
 
 with torch.no_grad():
     theta_hat = ordinal_cutpoints(flow.nodes["Y"].intercept(1))[0, 1:-1].numpy()
@@ -397,14 +478,15 @@ print(f"cutpoints theta_Y:   true {TRUE['theta_Y']}   fitted {theta_hat.round(3)
 # move freely between the intercept and a complex shift (only their sum is
 # identified). We therefore center both curves before comparing.
 
+
 # %%
 def fitted_baseline(flow, name, grid):
     """h_hat(x) for a continuous node with constant (simple) intercept."""
     node = flow.nodes[name]
     x = torch.as_tensor(grid, dtype=torch.float32)
     with torch.no_grad():
-        z0, _ = node.ut.forward(node.intercept(len(grid)), x)
-    return z0.detach().numpy()
+        h0, _ = node.ut.forward(node.intercept(len(grid)), x)
+    return h0.detach().numpy()
 
 
 def fitted_cs(flow, name, parent, grid):
@@ -447,18 +529,22 @@ plt.show()
 spec_ls = {
     "X1": ContinuousNode(transform="bernstein"),
     "X2": ContinuousNode(terms=[LS("X1")]),
-    "X3": ContinuousNode(terms=[LS("X1"), LS("X2")]),   # <- cs replaced by ls
-    "Y":  OrdinalNode(levels=4, terms=[LS("X3")]),
+    "X3": ContinuousNode(terms=[LS("X1"), LS("X2")]),  # <- cs replaced by ls
+    "Y": OrdinalNode(levels=4, terms=[LS("X3")]),
 }
 torch.manual_seed(7)
 flow_ls = CausalFlowDAG(spec_ls)
 flow_ls.fit(train_df, val_df, epochs=800, learning_rate=1e-2, batch_size=512, verbose=0)
 flow_ls.fit(train_df, val_df, epochs=300, learning_rate=1e-3, verbose=0)
 
-print(f"misspecified beta_32 (X2 -> X3): "
-      f"{float(flow_ls.nodes['X3'].shifts['X2'].weight.detach()):+.3f}")
-print(f"val NLL of node X3:  cs model {flow.nll(val_df)['X3']:.4f}"
-      f"   ls model {flow_ls.nll(val_df)['X3']:.4f}")
+print(
+    f"misspecified beta_32 (X2 -> X3): "
+    f"{float(flow_ls.nodes['X3'].shifts['X2'].weight.detach()):+.3f}"
+)
+print(
+    f"val NLL of node X3:  cs model {flow.nll(val_df)['X3']:.4f}"
+    f"   ls model {flow_ls.nll(val_df)['X3']:.4f}"
+)
 
 # %% [markdown]
 # ## 7. Rung 2 — interventions: the do-operator
@@ -478,13 +564,30 @@ for ax, a in zip(axes, [-1.0, 1.0]):
     fls = flow_ls.sample(20000, do={"X1": a}, seed=5)
     bins = np.linspace(truth["X3"].min(), truth["X3"].max(), 60)
     ax.hist(truth["X3"], bins=bins, density=True, alpha=0.4, label="DGP truth")
-    ax.hist(fl["X3"], bins=bins, density=True, histtype="step", lw=2,
-            color="C3", label="flow (cs)")
-    ax.hist(fls["X3"], bins=bins, density=True, histtype="step", lw=1.5,
-            color="C7", ls=":", label="flow (all-ls)")
+    ax.hist(
+        fl["X3"],
+        bins=bins,
+        density=True,
+        histtype="step",
+        lw=2,
+        color="C3",
+        label="flow (cs)",
+    )
+    ax.hist(
+        fls["X3"],
+        bins=bins,
+        density=True,
+        histtype="step",
+        lw=1.5,
+        color="C7",
+        ls=":",
+        label="flow (all-ls)",
+    )
     ax.set_title(f"$p(x_3 \\mid do(X_1 = {a:+.0f}))$"), ax.set_xlabel("$x_3$")
-    print(f"E[X3 | do(X1={a:+.0f})]:  truth {truth['X3'].mean():+.3f}   "
-          f"flow(cs) {fl['X3'].mean():+.3f}   flow(all-ls) {fls['X3'].mean():+.3f}")
+    print(
+        f"E[X3 | do(X1={a:+.0f})]:  truth {truth['X3'].mean():+.3f}   "
+        f"flow(cs) {fl['X3'].mean():+.3f}   flow(all-ls) {fls['X3'].mean():+.3f}"
+    )
 axes[0].legend()
 fig.suptitle("L2: interventional distributions")
 fig.tight_layout()
@@ -525,21 +628,20 @@ print("  true:", pmf_true.round(4), "\n  flow:", pmf_flow.round(4))
 # %%
 u = flow.abduct(val_df, seed=11)
 recon = flow.sample(u=u)
-err = (recon[["X1", "X2", "X3"]].to_numpy()
-       - val_df[["X1", "X2", "X3"]].to_numpy())
+err = recon[["X1", "X2", "X3"]].to_numpy() - val_df[["X1", "X2", "X3"]].to_numpy()
 print(f"max |reconstruction error| (continuous): {np.abs(err).max():.2e}")
 print(f"Y level-exact: {(recon['Y'].to_numpy() == val_df['Y'].to_numpy()).mean():.1%}")
 
 # %% [markdown]
 # Now the counterfactual *"what would $X_2, X_3$ have been for **this** unit, had
-# $X_1$ been 0?"*. The DGP kept every unit's true latents `z_obs`, so we can
+# $X_1$ been 0?"*. The DGP kept every unit's true latents `u_obs`, so we can
 # compute the **true individual counterfactuals** and compare unit by unit — the
 # strongest test on the ladder.
 
 # %%
 cf_flow = flow.sample(do={"X1": 0.0}, u=u)
-z_val = {k: v[5000:] for k, v in z_obs.items()}
-cf_true, _ = simulate(len(val_df), rng, x1=0.0, z=z_val)
+u_val = {k: v[5000:] for k, v in u_obs.items()}
+cf_true, _ = simulate(len(val_df), rng, x1=0.0, u=u_val)
 
 fig, axes = plt.subplots(1, 2, figsize=(9, 3.4))
 for ax, col in zip(axes, ["X2", "X3"]):

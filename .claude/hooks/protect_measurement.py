@@ -19,6 +19,7 @@ Activate on the research machine only by copying
 so it never affects other checkouts. Exit 0 = allow; fails open on any error so a
 malformed event can't wedge the agent.
 """
+
 import json
 import re
 import sys
@@ -51,26 +52,33 @@ READ_DENY = (
 if tool in ("Write", "Edit", "NotebookEdit"):
     p = str(ti.get("file_path", "")).replace("\\", "/")
     if any(rx.search(p) for rx in WRITE_DENY):
-        block("BLOCKED (autoresearch integrity): tests/, data/, and the benchmark "
-              "harness are the measurement — you may not edit them. If a test "
-              "fails, your change is wrong, not the test. Changing the measurement "
-              "is not a result.")
+        block(
+            "BLOCKED (autoresearch integrity): tests/, data/, and the benchmark "
+            "harness are the measurement — you may not edit them. If a test "
+            "fails, your change is wrong, not the test. Changing the measurement "
+            "is not a result."
+        )
 
 if tool == "Read":
     p = str(ti.get("file_path", "")).replace("\\", "/")
     if any(rx.search(p) for rx in READ_DENY):
-        block("BLOCKED (autoresearch integrity): reading the target values (test "
-              "assertions / truth.json / ref_ls) is disallowed to prevent "
-              "overfitting to the harness. Run the tests and trust pass/fail; "
-              "optimize for gains that generalize off the benchmark.")
+        block(
+            "BLOCKED (autoresearch integrity): reading the target values (test "
+            "assertions / truth.json / ref_ls) is disallowed to prevent "
+            "overfitting to the harness. Run the tests and trust pass/fail; "
+            "optimize for gains that generalize off the benchmark."
+        )
 
 if tool == "Bash":
     cmd = str(ti.get("command", ""))
     reads_target = re.search(
-        r"tests/test_[^\s]*\.py|data/[^\s]*/truth\.json|data/[^\s]*/ref_ls", cmd)
+        r"tests/test_[^\s]*\.py|data/[^\s]*/truth\.json|data/[^\s]*/ref_ls", cmd
+    )
     uses_reader = re.search(r"\b(cat|less|more|head|tail|bat|grep|rg|awk|sed)\b", cmd)
     if reads_target and uses_reader:
-        block("BLOCKED (autoresearch integrity): reading the target values via the "
-              "shell is disallowed. Trust the test pass/fail signal instead.")
+        block(
+            "BLOCKED (autoresearch integrity): reading the target values via the "
+            "shell is disallowed. Trust the test pass/fail signal instead."
+        )
 
 sys.exit(0)

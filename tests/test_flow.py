@@ -5,10 +5,16 @@ import pandas as pd
 import pytest
 import torch
 
-from tramdag import CS, CausalFlowDAG, ContinuousNode, LS, OrdinalNode
+from tramdag import CS, LS, CausalFlowDAG, ContinuousNode, OrdinalNode
 from tramdag.spec import validate_and_sort
-from tramdag.transforms import (BernsteinUT, SplineUT, AffineUT,
-                                 ordinal_cutpoints, ordinal_log_prob, ordinal_pmf)
+from tramdag.transforms import (
+    AffineUT,
+    BernsteinUT,
+    SplineUT,
+    ordinal_cutpoints,
+    ordinal_log_prob,
+    ordinal_pmf,
+)
 
 torch.manual_seed(0)
 
@@ -42,10 +48,11 @@ def test_ordinal_log_prob_matches_pmf():
 def test_ordinal_log_prob_gradient_survives_saturation():
     """Regression: with raw sigmoid differences a saturated node (|shift| > ~17
     in float32) has exactly-zero gradients and can never recover. The log-space
-    form must keep finite, non-zero gradients."""
-    theta = torch.zeros(8, 1, requires_grad=True)       # binary node
+    form must keep finite, non-zero gradients.
+    """
+    theta = torch.zeros(8, 1, requires_grad=True)  # binary node
     shift = torch.full((8,), -60.0, requires_grad=True)  # heavily saturated
-    y = torch.ones(8)                                    # observed level has p ~ 0
+    y = torch.ones(8)  # observed level has p ~ 0
     lp = ordinal_log_prob(theta, shift, y)
     assert torch.isfinite(lp).all()
     lp.sum().backward()
@@ -100,8 +107,15 @@ def fitted_flow():
         "W": ContinuousNode(transform="bernstein", terms=[LS("X"), LS("Y")]),
     }
     flow = CausalFlowDAG(spec)
-    flow.fit(df.iloc[:2400], df.iloc[2400:], epochs=300, learning_rate=0.05,
-             batch_size=600, verbose=0, seed=0)
+    flow.fit(
+        df.iloc[:2400],
+        df.iloc[2400:],
+        epochs=300,
+        learning_rate=0.05,
+        batch_size=600,
+        verbose=0,
+        seed=0,
+    )
     return flow, df
 
 
@@ -110,7 +124,13 @@ def test_pmf_matches_do_sampling(fitted_flow):
     grid = pd.DataFrame({"X": [1.5]})
     pmf = flow.pmf(grid, node="Y")[0]
     s = flow.sample(40_000, do={"X": 1.5}, seed=11)
-    emp = s["Y"].value_counts(normalize=True).sort_index().reindex(range(4), fill_value=0).values
+    emp = (
+        s["Y"]
+        .value_counts(normalize=True)
+        .sort_index()
+        .reindex(range(4), fill_value=0)
+        .values
+    )
     assert pmf.sum() == pytest.approx(1.0, abs=1e-5)
     assert np.abs(pmf - emp).max() < 0.02
 
@@ -158,7 +178,8 @@ def test_save_load_roundtrip(tmp_path, fitted_flow):
 # ----------------------------------------------- ls == ordered logit (MLE)
 def test_ls_node_equals_proportional_odds():
     """An all-ls ordinal node is exactly a proportional-odds model: the SGD fit
-    must agree with the statsmodels MLE (same data) in coefficients and PMFs."""
+    must agree with the statsmodels MLE (same data) in coefficients and PMFs.
+    """
     from statsmodels.miscmodels.ordinal_model import OrderedModel
 
     rng = np.random.default_rng(42)
@@ -175,11 +196,11 @@ def test_ls_node_equals_proportional_odds():
         "Y": OrdinalNode(levels=4, terms=[LS("X1"), LS("X2")]),
     }
     flow = CausalFlowDAG(spec)
-    flow.fit(df, df, epochs=400, learning_rate=0.05, batch_size=1000,
-             verbose=0, seed=1)
+    flow.fit(df, df, epochs=400, learning_rate=0.05, batch_size=1000, verbose=0, seed=1)
 
     res = OrderedModel(df["Y"].astype(int), df[["X1", "X2"]], distr="logit").fit(
-        method="bfgs", disp=False)
+        method="bfgs", disp=False
+    )
 
     # our model: P(Y<=k) = sigmoid(theta_k - (w1 x1 + w2 x2)); statsmodels likewise
     w1 = float(flow.nodes["Y"].shifts["X1"].weight)
@@ -189,5 +210,7 @@ def test_ls_node_equals_proportional_odds():
 
     # per-row PMFs agree
     pmf_flow = flow.pmf(df.iloc[:500], node="Y")
-    pmf_sm = res.model.predict(res.params, exog=df[["X1", "X2"]].values[:500], which="prob")
+    pmf_sm = res.model.predict(
+        res.params, exog=df[["X1", "X2"]].values[:500], which="prob"
+    )
     assert np.abs(pmf_flow - pmf_sm).max() < 0.01

@@ -17,7 +17,7 @@ that **clinical data is NOT in this repo** and never should be. The synthetic
 
 ```bash
 uv sync                          # install (uv.lock pinned: zuko, torch, statsmodels, ...)
-uv run pytest tests/ -q          # full suite ~11 min; tests/test_flow.py alone ~20 s
+uv run pytest tests/ -q          # full suite; -m "not slow" is ~2 min
 cd experiments
 uv run python sim_flow.py nl     # headline storyline (all-ls vs flexible vs known truth)
 uv run python validate_ls.py     # spot-on flow == statsmodels == R polr check
@@ -127,5 +127,6 @@ Experiments default to the synthetic data (`magic-mrclean/nl`). The `magic` sour
   TRAM-DAG paper's DGPs (triangle/triangle-mixed/vaca/carefl, June 2026). Still
   open: hidden confounding à la DeCaFlow.
 - ~~Package for PyPI~~ — published as `tramdag` 0.2.0 (June 2026); release flow:
-  bump version in pyproject + `__init__`, `uv build`, `uv publish` (Oliver's
-  PyPI token), CHANGELOG section.
+  bump `version` in pyproject (`__init__` now reads it back from the installed
+  metadata, so there is only one place to edit), `uv build`, `uv publish`
+  (Oliver's PyPI token), CHANGELOG section.

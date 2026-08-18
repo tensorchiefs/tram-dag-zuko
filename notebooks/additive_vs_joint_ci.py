@@ -38,10 +38,10 @@
 # space, and that is precisely what `intercept_contributions` surfaces.
 
 # %%
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import torch
-import matplotlib.pyplot as plt
 
 from tramdag import CausalFlowDAG, ContinuousNode, I
 
@@ -77,17 +77,20 @@ train.head()
 #
 # Same data, same node — only the grouping of the two `I` parents differs.
 
+
 # %%
 def make_flow(joint: bool):
-    spec = {"x1": ContinuousNode(), "x2": ContinuousNode(),
-            "x3": ContinuousNode(terms=[I("x1", "x2")] if joint
-                                 else [I("x1"), I("x2")])}
+    spec = {
+        "x1": ContinuousNode(),
+        "x2": ContinuousNode(),
+        "x3": ContinuousNode(terms=[I("x1", "x2")] if joint else [I("x1"), I("x2")]),
+    }
     return CausalFlowDAG(spec, seed=0)
 
 
 flow_joint = make_flow(joint=True)
 flow_add = make_flow(joint=False)
-#flow_add.fit(train, val, epochs=10, learning_rate=1e-2, verbose=0)
+# flow_add.fit(train, val, epochs=10, learning_rate=1e-2, verbose=0)
 # TC: Using a net with I("x1"), I("x2") adds the coefficients of the two nets together (see theta_shift in flow.py)
 
 for f in (flow_joint, flow_add):
@@ -111,19 +114,23 @@ print("val NLL  additive:", round(sum(flow_add.nll(val).values()), 4))
 res_add = flow_add.intercept_contributions("x3", train)
 res_joint = flow_joint.intercept_contributions("x3", train)
 
-print("additive terms :", list(res_add["contributions"]))    # 'x1', 'x2' — separable
+print("additive terms :", list(res_add["contributions"]))  # 'x1', 'x2' — separable
 print("joint terms    :", list(res_joint["contributions"]))  # 'x1+x2' — inseparable
 
 # exactness: baseline + sum of contributions reproduces theta; centering: ~0 means
 nd = flow_add.nodes["x3"]
 feats = flow_add._features(flow_add._tensorize(train))
 with torch.no_grad():
-    theta = sum(net(torch.cat([feats[p] for p in g], 1))
-                for net, g in zip(nd.intercept_nets, nd._intercept_groups)).numpy()
+    theta = sum(
+        net(torch.cat([feats[p] for p in g], 1))
+        for net, g in zip(nd.intercept_nets, nd._intercept_groups)
+    ).numpy()
 recon = res_add["baseline"][None] + sum(res_add["contributions"].values())
 print("max |reconstruction - theta| :", np.abs(recon - theta).max())
-print("per-term column means (≈0)   :",
-      {k: float(np.abs(v.mean(0)).max()) for k, v in res_add["contributions"].items()})
+print(
+    "per-term column means (≈0)   :",
+    {k: float(np.abs(v.mean(0)).max()) for k, v in res_add["contributions"].items()},
+)
 
 # %% [markdown]
 # ## The structural difference: separable curves vs an entangled cloud
@@ -144,7 +151,7 @@ print("per-term column means (≈0)   :",
 c1 = res_add["contributions"]["x1"]
 c2 = res_add["contributions"]["x2"]
 cj = res_joint["contributions"]["x1+x2"]
-k = int((c1.var(0) + c2.var(0)).argmax())   # most-varying coefficient
+k = int((c1.var(0) + c2.var(0)).argmax())  # most-varying coefficient
 x1v, x2v = train["x1"].values, train["x2"].values
 
 fig, axes = plt.subplots(1, 2, figsize=(11, 4.2), sharey=True)

@@ -12,7 +12,8 @@ Conventions follow the original TRAM-DAG implementation
   fitted on the value range scaled from the train 5%/95% quantiles to ``[-B, B]``
   and linearly extrapolated outside.
 - ordinal:    ``P(x <= k) = sigmoid(theta_k - s(parents))`` with increasing
-  cutpoints ``theta`` (the original implementation's ``transform_intercepts_ordinal`` parametrization).
+  cutpoints ``theta``. This is the parametrization of
+  ``transform_intercepts_ordinal`` in the original implementation.
 """
 
 from __future__ import annotations
@@ -46,25 +47,30 @@ class StandardLogistic:
 
     @staticmethod
     def log_prob(z: Tensor) -> Tensor:
+        """Give the log density at ``z``."""
         return -z - 2.0 * torch.nn.functional.softplus(-z)
 
     @staticmethod
     def sample(shape, device=None, eps: float = 1e-7) -> Tensor:
+        """Draw samples of the given ``shape``."""
         u = torch.rand(shape, device=device).clamp(eps, 1.0 - eps)
         return torch.log(u) - torch.log1p(-u)
 
     @staticmethod
     def cdf(z: Tensor) -> Tensor:
+        """Give the cumulative probability at ``z``."""
         return torch.sigmoid(z)
 
     @staticmethod
     def icdf(u: Tensor, eps: float = 1e-7) -> Tensor:
+        """Give the quantile at probability ``u``."""
         u = u.clamp(eps, 1.0 - eps)
         return torch.log(u) - torch.log1p(-u)
 
 
-def _expanding_bisection(f, z: Tensor, lo: Tensor, hi: Tensor,
-                         max_expand: int = 60, iters: int = 80) -> Tensor:
+def _expanding_bisection(
+    f, z: Tensor, lo: Tensor, hi: Tensor, max_expand: int = 60, iters: int = 80
+) -> Tensor:
     """Solve f(t) = z element-wise for monotone increasing f.
 
     Starts from the bracket [lo, hi] and doubles it outward until the root is
@@ -123,12 +129,13 @@ class _ScaledUT(torch.nn.Module):
     def _log_dt_dx(self) -> Tensor:
         # derive dtype from the range buffers so float64 stays pure (no float32
         # literal promotion) inside fit_classical
-        two_b = torch.as_tensor(2.0 * self.bound, dtype=self.xmin.dtype,
-                                device=self.xmin.device)
+        two_b = torch.as_tensor(
+            2.0 * self.bound, dtype=self.xmin.dtype, device=self.xmin.device
+        )
         return torch.log(two_b) - torch.log(self.xmax - self.xmin)
 
     def forward(self, theta: Tensor, x: Tensor) -> tuple[Tensor, Tensor]:
-        """x (n,) original units, theta (n, P) -> (z0, log|dz0/dx|), both (n,)."""
+        """X (n,) original units, theta (n, P) -> (z0, log|dz0/dx|), both (n,)."""
         t = self._scale(x)
         T = self._build(theta)
         z0, ladj = T.call_and_ladj(t)
@@ -139,7 +146,9 @@ class _ScaledUT(torch.nn.Module):
         T = self._build(theta)
         B = torch.tensor(self.bound, dtype=z0.dtype, device=z0.device)
         with torch.no_grad():
-            t = _expanding_bisection(T, z0, -B.expand_as(z0).clone(), B.expand_as(z0).clone())
+            t = _expanding_bisection(
+                T, z0, -B.expand_as(z0).clone(), B.expand_as(z0).clone()
+            )
         return self._unscale(t)
 
 
@@ -152,15 +161,18 @@ class BernsteinUT(_ScaledUT):
 
     @property
     def n_params(self) -> int:
+        """int: number of transform parameters this transform needs."""
         return self._n
 
     def _build(self, theta: Tensor):
         return BernsteinTransform(theta, bound=self.bound)
 
     def marginal_init_theta(self, q: float = 0.05) -> Tensor:
-        """Unconstrained Bernstein coefficients (n_params,) whose transform is the
-        *calibrated linear* map of the pre-scaled domain [-B, B] onto the standard
-        logistic quantiles [logit(q), logit(1-q)].
+        """Give the unconstrained Bernstein coefficients of the calibrated map.
+
+        The coefficients have shape ``(n_params,)``. Their transform is the
+        calibrated linear map from the pre-scaled domain ``[-B, B]`` onto the
+        standard logistic quantiles ``[logit(q), logit(1-q)]``.
 
         Rationale: after ``set_range`` each node's 5%/95% data quantiles already sit
         at the domain bounds -+B, so a single canonical theta maps every node's body
@@ -168,16 +180,22 @@ class BernsteinUT(_ScaledUT):
         default (zero) theta instead maps -+B onto ~-+log(2)*B/... (here -6.93/+7.63),
         ~2.5x too steep, so early training is spent rescaling. This is a pure init:
         the converged MLE is unchanged. See the inversion of
-        ``BernsteinTransform._constrain_theta`` (cumsum of softplus diffs)."""
+        ``BernsteinTransform._constrain_theta`` (cumsum of softplus diffs).
+        """
         import math
+
         n = self._n
-        a = math.log(q) - math.log(1.0 - q)        # logit(q), e.g. -2.9444 at q=.05
-        span = -2.0 * a                            # logit(1-q) - logit(q)
-        order = n + 1                              # constrained control points: n+2
-        b = span / order                           # per-step increment (constant)
-        shift = math.log(2.0) * n / 2.0            # zuko's centering offset
-        theta = torch.full((n,), math.log(math.expm1(b)),
-                           dtype=self.xmin.dtype, device=self.xmin.device)
+        a = math.log(q) - math.log(1.0 - q)  # logit(q), e.g. -2.9444 at q=.05
+        span = -2.0 * a  # logit(1-q) - logit(q)
+        order = n + 1  # constrained control points: n+2
+        b = span / order  # per-step increment (constant)
+        shift = math.log(2.0) * n / 2.0  # zuko's centering offset
+        theta = torch.full(
+            (n,),
+            math.log(math.expm1(b)),
+            dtype=self.xmin.dtype,
+            device=self.xmin.device,
+        )
         theta[0] = a + shift
         return theta
 
@@ -191,11 +209,16 @@ class SplineUT(_ScaledUT):
 
     @property
     def n_params(self) -> int:
+        """int: number of transform parameters this transform needs."""
         return 3 * self.bins - 1
 
     def _build(self, theta: Tensor):
         K = self.bins
-        widths, heights, derivs = theta[..., :K], theta[..., K:2 * K], theta[..., 2 * K:]
+        widths, heights, derivs = (
+            theta[..., :K],
+            theta[..., K : 2 * K],
+            theta[..., 2 * K :],
+        )
         return MonotonicRQSTransform(widths, heights, derivs, bound=self.bound)
 
 
@@ -204,6 +227,7 @@ class AffineUT(_ScaledUT):
 
     @property
     def n_params(self) -> int:
+        """int: number of transform parameters this transform needs."""
         return 2
 
     def _build(self, theta: Tensor):
@@ -214,16 +238,38 @@ _TRANSFORMS = {"bernstein": BernsteinUT, "spline": SplineUT, "affine": AffineUT}
 
 
 def make_univariate_transform(name: str, **kwargs) -> _ScaledUT:
+    """Build a scaled univariate transform by name.
+
+    Parameters
+    ----------
+    name : str
+        One of the registered names: ``"bernstein"``, ``"spline"``, ``"affine"``.
+    **kwargs
+        Passed to the transform class.
+
+    Returns
+    -------
+    _ScaledUT
+        The transform.
+
+    Raises
+    ------
+    ValueError
+        If ``name`` is not registered.
+    """
     try:
         cls = _TRANSFORMS[name]
     except KeyError:
-        raise ValueError(f"Unknown transform '{name}'. Choose from {sorted(_TRANSFORMS)}.")
+        raise ValueError(
+            f"Unknown transform '{name}'. Choose from {sorted(_TRANSFORMS)}."
+        )
     return cls(**kwargs)
 
 
 # ---------------------------------------------------------------------------
 # Ordinal ("ordered logit") transform — exact port of the original parametrization
 # ---------------------------------------------------------------------------
+
 
 def ordinal_cutpoints(theta_tilde: Tensor) -> Tensor:
     """(n, K-1) unconstrained -> (n, K+1) increasing cutpoints with ±inf ends.
@@ -232,8 +278,12 @@ def ordinal_cutpoints(theta_tilde: Tensor) -> Tensor:
     ``[-inf, t0, t0 + cumsum(exp(t1:)), +inf]``.
     """
     n = theta_tilde.shape[0]
-    neg_inf = torch.full((n, 1), -torch.inf, device=theta_tilde.device, dtype=theta_tilde.dtype)
-    pos_inf = torch.full((n, 1), torch.inf, device=theta_tilde.device, dtype=theta_tilde.dtype)
+    neg_inf = torch.full(
+        (n, 1), -torch.inf, device=theta_tilde.device, dtype=theta_tilde.dtype
+    )
+    pos_inf = torch.full(
+        (n, 1), torch.inf, device=theta_tilde.device, dtype=theta_tilde.dtype
+    )
     first = theta_tilde[:, :1]
     if theta_tilde.shape[1] > 1:
         rest = first + torch.cumsum(torch.exp(theta_tilde[:, 1:]), dim=1)
@@ -242,7 +292,9 @@ def ordinal_cutpoints(theta_tilde: Tensor) -> Tensor:
 
 
 def ordinal_marginal_init_theta(counts, eps: float = 1e-3) -> Tensor:
-    """Unconstrained cutpoint params ``theta_tilde`` (K-1,) whose marginal
+    """Give the unconstrained cutpoint parameters that match the class counts.
+
+    ``theta_tilde`` has shape ``(K-1,)`` and its marginal
     ``P(Y<=k) = sigmoid(cutpoint_k)`` matches the empirical class frequencies.
 
     Inverts ``ordinal_cutpoints``: the finite cutpoints are
@@ -250,13 +302,15 @@ def ordinal_marginal_init_theta(counts, eps: float = 1e-3) -> Tensor:
     ``c_k = logit(F(k))`` (empirical CDF, clamped off 0/1), recover
     ``tt[0] = c_0`` and ``tt[i] = log(c_i - c_{i-1})``. Like the Bernstein
     marginal-init, a pure init: the converged MLE is unchanged. ``counts`` is the
-    per-class count vector (length K)."""
+    per-class count vector (length K).
+    """
     import numpy as np
+
     counts = np.asarray(counts, dtype=np.float64)
     p = counts / counts.sum()
-    F = np.clip(np.cumsum(p)[:-1], eps, 1 - eps)        # P(Y<=k), k=0..K-2
-    c = np.log(F) - np.log1p(-F)                         # logit -> increasing
-    c = np.maximum.accumulate(c)                         # guard ties (empty classes)
+    F = np.clip(np.cumsum(p)[:-1], eps, 1 - eps)  # P(Y<=k), k=0..K-2
+    c = np.log(F) - np.log1p(-F)  # logit -> increasing
+    c = np.maximum.accumulate(c)  # guard ties (empty classes)
     diffs = np.maximum(np.diff(c), eps)
     tt = np.empty_like(c)
     tt[0] = c[0]
@@ -277,19 +331,32 @@ def _log1mexp(x: Tensor) -> Tensor:
     # mask each branch's input so the unused branch cannot produce inf/NaN grads
     x_hi = x.clamp(min=-math.log(2.0))
     x_lo = x.clamp(max=-math.log(2.0))
-    return torch.where(branch, torch.log(-torch.expm1(x_hi)), torch.log1p(-torch.exp(x_lo)))
+    return torch.where(
+        branch, torch.log(-torch.expm1(x_hi)), torch.log1p(-torch.exp(x_lo))
+    )
 
 
 def ordinal_log_prob(theta_tilde: Tensor, shift: Tensor, y: Tensor) -> Tensor:
-    """log P(Y = y | cutpoints, shift) under P(Y <= k) = sigmoid(theta_k - shift).
+    """Give ``log P(Y = y | cutpoints, shift)``.
 
-    Computed in log-space via
-        log(sigmoid(u) - sigmoid(l)) = logsigmoid(u)  + log1mexp(logsigmoid(l)  - logsigmoid(u))
-                                     = logsigmoid(-l) + log1mexp(logsigmoid(-u) - logsigmoid(-l)),
-    choosing per element the side whose logsigmoids are far from -0 (better
-    conditioned). Unlike the naive sigmoid difference this keeps non-zero
-    gradients when the sigmoids saturate in float32 (|t| > ~17), so a badly
-    initialised node recovers instead of freezing on exactly-zero gradients.
+    The model is ``P(Y <= k) = sigmoid(theta_k - shift)``.
+
+    Notes
+    -----
+    The computation stays in log-space. Both of these identities hold::
+
+        log(sigmoid(u) - sigmoid(l))
+            = logsigmoid(u) + log1mexp(logsigmoid(l) - logsigmoid(u))
+            = logsigmoid(-l) + log1mexp(logsigmoid(-u) - logsigmoid(-l))
+
+    For each element the function takes the side whose logsigmoids are far from
+    zero, because that side is better conditioned.
+
+    **Do not replace this with the direct difference of two sigmoids.** That
+    form loses all gradient when the sigmoids saturate in float32, which happens
+    for ``|t| > 17`` or so. The gradient is then exactly zero and a badly
+    initialised node freezes at its starting values forever. The log-space form
+    keeps the gradient non-zero, so such a node recovers.
     """
     lower, upper = _bounds(theta_tilde, shift, y)
     ls = torch.nn.functional.logsigmoid
@@ -310,10 +377,17 @@ def ordinal_sample(theta_tilde: Tensor, shift: Tensor, z: Tensor) -> Tensor:
     return (z.view(-1, 1) > finite).sum(dim=1).float()
 
 
-def ordinal_abduct(theta_tilde: Tensor, shift: Tensor, y: Tensor,
-                   generator: torch.Generator | None = None) -> Tensor:
-    """Pearl abduction for an ordinal node: sample the latent z from the standard
-    logistic truncated to the interval consistent with the observed level y."""
+def ordinal_abduct(
+    theta_tilde: Tensor,
+    shift: Tensor,
+    y: Tensor,
+    generator: torch.Generator | None = None,
+) -> Tensor:
+    """Abduct the latent of an ordinal node, Pearl step 1.
+
+    The latent ``z`` is drawn from the standard logistic, truncated to the
+    interval that is consistent with the observed level ``y``.
+    """
     lower, upper = _bounds(theta_tilde, shift, y)
     u_lo, u_hi = torch.sigmoid(lower), torch.sigmoid(upper)
     u = u_lo + (u_hi - u_lo) * torch.rand(

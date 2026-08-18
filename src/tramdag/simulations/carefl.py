@@ -43,12 +43,51 @@ class Carefl4:
     seed: int = 42
 
     def draw_latents(self, n: int, rng: np.random.Generator) -> dict[str, np.ndarray]:
-        return {k: rng.laplace(loc=0.0, scale=_SCALE, size=n)
-                for k in ["x1", "x2", "x3", "x4"]}
+        """Draw the latent noise of every variable.
 
-    def simulate(self, n: int | None = None, *, rng: np.random.Generator | None = None,
-                 do: dict[str, float] | None = None,
-                 latents: dict[str, np.ndarray] | None = None) -> pd.DataFrame:
+        Parameters
+        ----------
+        n : int
+            Number of rows to draw.
+        rng : np.random.Generator
+            Random source.
+
+        Returns
+        -------
+        dict[str, np.ndarray]
+            One array of length ``n`` per variable.
+        """
+        return {
+            k: rng.laplace(loc=0.0, scale=_SCALE, size=n)
+            for k in ["x1", "x2", "x3", "x4"]
+        }
+
+    def simulate(
+        self,
+        n: int | None = None,
+        *,
+        rng: np.random.Generator | None = None,
+        do: dict[str, float] | None = None,
+        latents: dict[str, np.ndarray] | None = None,
+    ) -> pd.DataFrame:
+        """Simulate the SCM, with optional interventions and reused latents.
+
+        Parameters
+        ----------
+        n : int | None, optional
+            Number of rows, by default ``None``. Then ``latents`` sets the count.
+        rng : np.random.Generator | None, optional
+            Random source, by default ``None``.
+        do : dict[str, float] | None, optional
+            Variables to hold at a fixed value, by default ``None``.
+        latents : dict[str, np.ndarray] | None, optional
+            Latent values to reuse, by default ``None``. Then they are drawn fresh.
+
+        Returns
+        -------
+        pd.DataFrame
+            One column per variable.
+        """
         do = do or {}
         if latents is None:
             if n is None:
@@ -68,6 +107,20 @@ class Carefl4:
 
     # ----------------------------------------------------------------- datasets
     def observational(self, n: int, seed_offset: int = 0) -> pd.DataFrame:
+        """Draw an observational sample.
+
+        Parameters
+        ----------
+        n : int
+            Number of rows.
+        seed_offset : int, optional
+            Added to the generator seed, by default ``0``.
+
+        Returns
+        -------
+        pd.DataFrame
+            The sample.
+        """
         rng = np.random.default_rng(self.seed + 1 + seed_offset)
         return self.simulate(n, rng=rng)
 
@@ -77,28 +130,55 @@ class Carefl4:
         """Exact noise values consistent with an observation (vectorized)."""
         x1, x2 = np.asarray(obs["x1"], float), np.asarray(obs["x2"], float)
         x3, x4 = np.asarray(obs["x3"], float), np.asarray(obs["x4"], float)
-        return {"x1": x1, "x2": x2,
-                "x3": x3 - x1 - 0.5 * x2**3,
-                "x4": x4 + x2 - 0.5 * x1**2}
+        return {
+            "x1": x1,
+            "x2": x2,
+            "x3": x3 - x1 - 0.5 * x2**3,
+            "x4": x4 + x2 - 0.5 * x1**2,
+        }
 
-    def true_counterfactual(self, obs: dict[str, float],
-                            do: dict[str, float]) -> dict[str, float]:
+    def true_counterfactual(
+        self, obs: dict[str, float], do: dict[str, float]
+    ) -> dict[str, float]:
         """Analytic counterfactual of a single observation under ``do``."""
         eps = self.abduct_noise({k: np.atleast_1d(v) for k, v in obs.items()})
         cf = self.simulate(do=do, latents=eps)
         return {k: float(cf[k].iloc[0]) for k in cf}
 
-    def true_cf_curves(self, obs: dict[str, float] = X_OBS,
-                       alphas: np.ndarray = ALPHA_GRID) -> dict:
-        """The paper's two Fig.-6 curves, analytic."""
+    def true_cf_curves(
+        self, obs: dict[str, float] = X_OBS, alphas: np.ndarray = ALPHA_GRID
+    ) -> dict:
+        """Compute the two analytic counterfactual curves of paper Fig. 6.
+
+        Returns
+        -------
+        dict
+            The observation, the intervention grid, and the counterfactual
+            values of x3 under do(x2) and of x4 under do(x1).
+        """
         x3_cf = [self.true_counterfactual(obs, {"x2": a})["x3"] for a in alphas]
         x4_cf = [self.true_counterfactual(obs, {"x1": a})["x4"] for a in alphas]
-        return {"x_obs": dict(obs), "alphas": [float(a) for a in alphas],
-                "x3_cf_do_x2": x3_cf, "x4_cf_do_x1": x4_cf}
+        return {
+            "x_obs": dict(obs),
+            "alphas": [float(a) for a in alphas],
+            "x3_cf_do_x2": x3_cf,
+            "x4_cf_do_x1": x4_cf,
+        }
 
 
 # --------------------------------------------------------------------------- CLI
 def main(argv: list[str] | None = None) -> None:
+    """Regenerate the frozen CSV files of this data-generating process.
+
+    Parameters
+    ----------
+    argv : list[str] | None, optional
+        Command-line arguments, by default ``None`` (``sys.argv``).
+
+    Returns
+    -------
+    None
+    """
     p = argparse.ArgumentParser(description="Generate the CAREFL benchmark data.")
     p.add_argument("--out", type=Path, default=Path("data/carefl"))
     p.add_argument("--seed", type=int, default=42)
@@ -110,15 +190,24 @@ def main(argv: list[str] | None = None) -> None:
     obs = gen.observational(args.n_obs)
     obs.to_csv(args.out / "obs.csv", index=False)
 
-    truth = {"source": "arXiv:2503.16206 App. C.2 (orig. Khemakhem 2021 Fig. 5)",
-             "seed": args.seed, "n_obs": args.n_obs,
-             "scm": {"x1": "Laplace(0, 1/sqrt(2))", "x2": "Laplace(0, 1/sqrt(2))",
-                     "x3": "x1 + 0.5*x2^3 + Laplace", "x4": "-x2 + 0.5*x1^2 + Laplace"},
-             **gen.true_cf_curves()}
+    truth = {
+        "source": "arXiv:2503.16206 App. C.2 (orig. Khemakhem 2021 Fig. 5)",
+        "seed": args.seed,
+        "n_obs": args.n_obs,
+        "scm": {
+            "x1": "Laplace(0, 1/sqrt(2))",
+            "x2": "Laplace(0, 1/sqrt(2))",
+            "x3": "x1 + 0.5*x2^3 + Laplace",
+            "x4": "-x2 + 0.5*x1^2 + Laplace",
+        },
+        **gen.true_cf_curves(),
+    }
     (args.out / "truth.json").write_text(json.dumps(truth, indent=2) + "\n")
-    print(f"[carefl] n={len(obs)}  cf sanity: "
-          f"x3_cf(do x2=1.5)={gen.true_counterfactual(X_OBS, {'x2': 1.5})['x3']:.3f} "
-          f"(factual {X_OBS['x3']})")
+    print(
+        f"[carefl] n={len(obs)}  cf sanity: "
+        f"x3_cf(do x2=1.5)={gen.true_counterfactual(X_OBS, {'x2': 1.5})['x3']:.3f} "
+        f"(factual {X_OBS['x3']})"
+    )
 
 
 if __name__ == "__main__":

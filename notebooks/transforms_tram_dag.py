@@ -38,7 +38,7 @@ import numpy as np
 import pandas as pd
 import torch
 
-from tramdag import CS, CausalFlowDAG, ContinuousNode, LS, OrdinalNode
+from tramdag import CS, LS, CausalFlowDAG, ContinuousNode, OrdinalNode
 
 plt.rcParams["figure.dpi"] = 110
 
@@ -59,6 +59,7 @@ plt.rcParams["figure.dpi"] = 110
 # So this DAG contains both regimes at once: two nodes where the 2-parameter
 # affine transform is *the correct model*, and one node where it cannot work.
 # That makes the transform choice observable in the per-node likelihoods.
+
 
 # %%
 def simulate(n, rng):
@@ -82,6 +83,7 @@ train, val = df.iloc[:5400], df.iloc[5400:]
 # only `transform=` differs. `make_spec` shows how the choice is declared
 # per node:
 
+
 # %%
 def make_spec(transform, **kwargs):
     tk = dict(transform=transform, transform_kwargs=kwargs)
@@ -96,9 +98,17 @@ def make_spec(transform, **kwargs):
 def fit(spec, seed=7):
     torch.manual_seed(seed)
     flow = CausalFlowDAG(spec)
-    flow.fit(train, val, epochs=1500, learning_rate=1e-2, batch_size=512,
-             verbose=0, schedule="plateau", plateau_patience=15,
-             freeze_patience=60)
+    flow.fit(
+        train,
+        val,
+        epochs=1500,
+        learning_rate=1e-2,
+        batch_size=512,
+        verbose=0,
+        schedule="plateau",
+        plateau_patience=15,
+        freeze_patience=60,
+    )
     return flow
 
 
@@ -124,6 +134,7 @@ print(nll.round(4))
 #   modeled with the wrong density slope whenever the true slope differs.
 #   Bernstein extrapolates with its *boundary derivative* and has no such
 #   constraint.
+
 
 # %%
 def fitted_h(flow, name, grid):
@@ -172,6 +183,7 @@ plt.show()
 # risks like $P(x_3 < -3 \mid do)$, quantiles, ITE distributions — inherits
 # the error:
 
+
 # %%
 def dgp_do_x1(n, value, rng):
     z = {k: rng.logistic(size=n) for k in "234"}
@@ -189,8 +201,9 @@ print("under do(X1=1):      E[X3]    P(X3 < -3)")
 print(f"  truth             {truth.mean():+.3f}    {float((truth < -3).mean()):.4f}")
 for name, color in [("bernstein", "C3"), ("spline", "C0"), ("affine", "C2")]:
     s = flows[name].sample(50_000, do={"X1": 1.0}, seed=2)["X3"]
-    ax.hist(s, bins=bins, density=True, histtype="step", lw=1.8, color=color,
-            label=name)
+    ax.hist(
+        s, bins=bins, density=True, histtype="step", lw=1.8, color=color, label=name
+    )
     print(f"  {name:9s}        {s.mean():+.3f}    {float((s < -3).mean()):.4f}")
 ax.set_xlabel("$x_3$"), ax.legend()
 ax.set_title("$p(x_3 \\mid do(X_1{=}1))$ under the three transforms")
@@ -208,8 +221,7 @@ plt.show()
 spec_mixed = {
     "X1": ContinuousNode(transform="affine"),
     "X2": ContinuousNode(transform="affine", terms=[LS("X1")]),
-    "X3": ContinuousNode(transform="bernstein",
-                         terms=[LS("X1"), CS("X2")]),
+    "X3": ContinuousNode(transform="bernstein", terms=[LS("X1"), CS("X2")]),
     "Y": OrdinalNode(levels=4, terms=[LS("X3")]),
 }
 flows["mixed"] = fit(spec_mixed)
@@ -219,9 +231,12 @@ def n_params(flow):
     return sum(p.numel() for p in flow.parameters())
 
 
-cmp = pd.DataFrame({name: {"val NLL (total)": sum(f.nll(val).values()),
-                           "parameters": n_params(f)}
-                    for name, f in flows.items()}).T
+cmp = pd.DataFrame(
+    {
+        name: {"val NLL (total)": sum(f.nll(val).values()), "parameters": n_params(f)}
+        for name, f in flows.items()
+    }
+).T
 print(cmp.round(4))
 
 # %% [markdown]
@@ -240,8 +255,10 @@ print(cmp.round(4))
 h0, h1 = fitted_h(flows["mixed"], "X1", np.array([0.0, 1.0]))
 a, b = h1 - h0, h0
 print(f"fitted  h1(x) = {a:.3f}·x + {b:+.3f}   (truth: 1.2·x − 0.4)")
-print(f"=> X1 ~ Logistic(loc={-b / a:.3f}, scale={1 / a:.3f})   "
-      f"(truth: loc=0.333, scale=0.833)")
+print(
+    f"=> X1 ~ Logistic(loc={-b / a:.3f}, scale={1 / a:.3f})   "
+    f"(truth: loc=0.333, scale=0.833)"
+)
 
 # %% [markdown]
 # ## 5. `transform_kwargs`: how much flexibility do you need?
@@ -251,8 +268,10 @@ print(f"=> X1 ~ Logistic(loc={-b / a:.3f}, scale={1 / a:.3f})   "
 # can't bend into $\sinh$, while beyond ~10 the extra capacity is free but idle:
 
 # %%
-sweeps = [("bernstein", "n_coeffs", [3, 5, 10, 20, 40]),
-          ("spline", "bins", [2, 4, 8, 16])]
+sweeps = [
+    ("bernstein", "n_coeffs", [3, 5, 10, 20, 40]),
+    ("spline", "bins", [2, 4, 8, 16]),
+]
 fig, ax = plt.subplots(figsize=(6.5, 3.6))
 for (name, kw, values), color in zip(sweeps, ["C3", "C0"]):
     nlls = [fit(make_spec(name, **{kw: v})).nll(val)["X3"] for v in values]

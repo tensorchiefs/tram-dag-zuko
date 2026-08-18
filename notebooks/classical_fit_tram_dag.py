@@ -44,7 +44,7 @@ import numpy as np
 import pandas as pd
 import torch
 
-from tramdag import CausalFlowDAG, ContinuousNode, LS, OrdinalNode
+from tramdag import LS, CausalFlowDAG, ContinuousNode, OrdinalNode
 from tramdag.simulations import VacaTriangle
 
 warnings.filterwarnings("ignore")
@@ -74,7 +74,7 @@ spec_vaca = {
 
 torch.manual_seed(0)
 flow_c = CausalFlowDAG(spec_vaca)
-rep = flow_c.fit_classical(df)          # prints iters / NLL / time
+rep = flow_c.fit_classical(df)  # prints iters / NLL / time
 print("\nlinear-shift coefficients (log-odds scale):")
 for node, parents in flow_c.ls_coefficients().items():
     for p, w in parents.items():
@@ -82,6 +82,7 @@ for node, parents in flow_c.ls_coefficients().items():
 
 # %% [markdown]
 # **Deterministic?** Same seed, twice — bit-identical (no minibatch RNG):
+
 
 # %%
 def fit_T_coef(seed):
@@ -106,8 +107,16 @@ print(f"two runs, same seed: {a:.10f} == {b:.10f}  ->  {a == b}")
 torch.manual_seed(0)
 flow_a = CausalFlowDAG(spec_vaca)
 t0 = time.perf_counter()
-flow_a.fit(df, epochs=2000, learning_rate=1e-1, batch_size=4096, verbose=0,
-           schedule="plateau", plateau_patience=15, freeze_patience=60)
+flow_a.fit(
+    df,
+    epochs=2000,
+    learning_rate=1e-1,
+    batch_size=4096,
+    verbose=0,
+    schedule="plateau",
+    plateau_patience=15,
+    freeze_patience=60,
+)
 t_adam = time.perf_counter() - t0
 
 print(f"{'coef':<10}{'classical':>12}{'adam':>12}{'|diff|':>10}")
@@ -152,7 +161,9 @@ spec_stroke = {
     "mRS_pre": OrdinalNode(levels=6, terms=[LS("Age")]),
     "NIHSSa": ContinuousNode(terms=[LS("Age"), LS("mRS_pre")]),
     "T": OrdinalNode(levels=2, terms=[LS("Age"), LS("mRS_pre"), LS("NIHSSa")]),
-    "mRS_3m": OrdinalNode(levels=7, terms=[LS("Age"), LS("mRS_pre"), LS("NIHSSa"), LS("T")]),
+    "mRS_3m": OrdinalNode(
+        levels=7, terms=[LS("Age"), LS("mRS_pre"), LS("NIHSSa"), LS("T")]
+    ),
 }
 
 torch.manual_seed(7)
@@ -178,14 +189,17 @@ def design(d):
     return X.drop(columns=["mRS_pre_0"])
 
 
-res = OrderedModel(obs["mRS_3m"].astype(int), design(obs),
-                   distr="logit").fit(method="bfgs", disp=False)
+res = OrderedModel(obs["mRS_3m"].astype(int), design(obs), distr="logit").fit(
+    method="bfgs", disp=False
+)
 
 n = flow_s.nodes["mRS_3m"]
 w_t = n.shifts["T"].weight.detach().numpy().ravel()
-rows = [("Age", float(n.shifts["Age"].weight.detach()), res.params["Age"]),
-        ("NIHSSa", float(n.shifts["NIHSSa"].weight.detach()), res.params["NIHSSa"]),
-        ("T (1 vs 0)", w_t[1] - w_t[0], res.params["T"])]
+rows = [
+    ("Age", float(n.shifts["Age"].weight.detach()), res.params["Age"]),
+    ("NIHSSa", float(n.shifts["NIHSSa"].weight.detach()), res.params["NIHSSa"]),
+    ("T (1 vs 0)", w_t[1] - w_t[0], res.params["T"]),
+]
 print(f"{'coefficient':<14}{'fit_classical':>14}{'statsmodels':>13}{'|diff|':>9}")
 for name, a_, b_ in rows:
     print(f"{name:<14}{a_:>14.4f}{b_:>13.4f}{abs(a_ - b_):>9.4f}")
@@ -212,8 +226,9 @@ for name, a_, b_ in rows:
 before = {k: v.copy() for k, v in flow_s.ls_coefficients()["mRS_3m"].items()}
 
 # continue training from the classical solution with a gentle Adam phase
-flow_s.fit(obs, epochs=300, learning_rate=1e-3, batch_size=256, verbose=0,
-           restore_best=False)
+flow_s.fit(
+    obs, epochs=300, learning_rate=1e-3, batch_size=256, verbose=0, restore_best=False
+)
 after = flow_s.ls_coefficients()["mRS_3m"]
 
 print("coefficient drift after 300 more Adam epochs from the classical MLE:")

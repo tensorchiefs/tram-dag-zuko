@@ -10,7 +10,7 @@
 
 **TRAM-DAGs** model each variable of a structural causal model with a
 (transformation-model) flow: one triangular normalizing flow from iid
-standard-logistic latents to the observed variables. The structure is of the triangular 
+standard-logistic latents to the observed variables. The structure is of the triangular
 Adjacency Matrix is exactly your causal DAG. Fit it **once** on observational data and answer all
 three rungs of Pearl's causal hierarchy — observational (L1), interventional
 (L2, the do-operator), and counterfactual (L3, Pearl abduction) — while keeping
@@ -44,52 +44,59 @@ Pin the dev install to a commit for reproducibility, e.g. `...tramdag.git@<sha>`
 import tramdag as td
 from tramdag import CausalFlowDAG, ContinuousNode, OrdinalNode, I, LS, CS
 
-spec = {                                  # the spec IS the labelled DAG
-    "Age":     ContinuousNode(),
+spec = {  # the spec IS the labelled DAG
+    "Age": ContinuousNode(),
     "mRS_pre": OrdinalNode(levels=6, terms=[I("Age")]),
-    "NIHSSa":  ContinuousNode(terms=[I("Age"), LS("mRS_pre")]),
-    "T":       OrdinalNode(levels=2,
-                           terms=[I("Age"), LS("mRS_pre"), CS("NIHSSa")]),
-    "mRS_3m":  OrdinalNode(levels=7,
-                           terms=[I("Age"), LS("mRS_pre"),
-                                  CS("NIHSSa"), LS("T")]),
+    "NIHSSa": ContinuousNode(terms=[I("Age"), LS("mRS_pre")]),
+    "T": OrdinalNode(levels=2, terms=[I("Age"), LS("mRS_pre"), CS("NIHSSa")]),
+    "mRS_3m": OrdinalNode(
+        levels=7, terms=[I("Age"), LS("mRS_pre"), CS("NIHSSa"), LS("T")]
+    ),
 }
-flow = CausalFlowDAG(spec)                # validates acyclicity, builds the flow
+flow = CausalFlowDAG(spec)  # validates acyclicity, builds the flow
 
 # self-stopping training: per-node plateau lr decay + freezing of converged
 # nodes (exact, since the per-node NLLs have independent gradients);
 # see docs/training-speed.md for benchmarks and the classic two-phase recipe
-flow.fit(train_df, val_df, epochs=4000, learning_rate=1e-2,
-         schedule="plateau", plateau_patience=30, freeze_patience=120)
+flow.fit(
+    train_df,
+    val_df,
+    epochs=4000,
+    learning_rate=1e-2,
+    schedule="plateau",
+    plateau_patience=30,
+    freeze_patience=120,
+)
 
 # all-`ls` model? fit it classically instead: deterministic float64 L-BFGS,
 # exact MLE matching statsmodels/R (see notebooks/classical_fit_tram_dag.py)
-flow.fit_classical(train_df)               # raises on cs/ci specs
+flow.fit_classical(train_df)  # raises on cs/ci specs
 
-flow.log_prob(df)                          # L1: joint log-likelihood per row
-flow.sample(1000)                          # L1: observational sampling
-flow.sample(1000, do={"T": 1})             # L2: interventional (graph mutilation)
-flow.pmf(df, node="mRS_3m", do={"T": 1})   # L2: analytic interventional PMF
+flow.log_prob(df)  # L1: joint log-likelihood per row
+flow.sample(1000)  # L1: observational sampling
+flow.sample(1000, do={"T": 1})  # L2: interventional (graph mutilation)
+flow.pmf(df, node="mRS_3m", do={"T": 1})  # L2: analytic interventional PMF
 
-u  = flow.abduct(df)                       # L3 step 1: latents from observations
-cf = flow.sample(do={"T": 1}, u=u)         # L3 steps 2+3: counterfactuals
+u = flow.abduct(df)  # L3 step 1: latents from observations
+cf = flow.sample(do={"T": 1}, u=u)  # L3 steps 2+3: counterfactuals
 
-flow.ls_coefficients()                     # interpret: per-edge log-odds-ratios
-flow.intercept_contributions("NIHSSa", df) # interpret: per-parent partial effects
-                                           # of an additive complex intercept (centered)
+flow.ls_coefficients()  # interpret: per-edge log-odds-ratios
+flow.intercept_contributions("NIHSSa", df)  # interpret: per-parent partial effects
+# of an additive complex intercept (centered)
 
 # heterogeneous treatment effects: a small, penalized effect head beta(x)*T
 # (VC term) with a first-class read-out — see docs/varying-coefficients.md
 # e.g. terms=[CS("Age", "NIHSSa"), VC("T", "Age")] ->
 # flow.varying_coef("mRS_3m", df)          # beta(x): deterministic, y-free
 
-flow.scores(df, node="mRS_3m")             # per-observation scores dl_i/dtheta
+flow.scores(df, node="mRS_3m")  # per-observation scores dl_i/dtheta
 flow.effect_modifier_scan(df, "mRS_3m", on="T")  # which VC modifiers? (CUSUM
-                                           # scan from a cheap all-ls fit) — docs/scores.md
+# scan from a cheap all-ls fit) — docs/scores.md
 
-flow.save("flow.pt"); flow = CausalFlowDAG.load("flow.pt")
+flow.save("flow.pt")
+flow = CausalFlowDAG.load("flow.pt")
 
-td.simulations.REGISTRY                    # synthetic DGPs with known ground truth
+td.simulations.REGISTRY  # synthetic DGPs with known ground truth
 ```
 
 ## The model in one table
@@ -97,11 +104,12 @@ td.simulations.REGISTRY                    # synthetic DGPs with known ground tr
 Per node, the transformation is additive on the latent (log-odds) scale —
 `u = h(x; θ) + Σ β·x_pa + Σ g(x_pa)` — and each parent edge declares how it enters:
 
-| edge term | meaning | interpretability |
+| term | meaning | interpretability |
 |---|---|---|
-| `ls` | linear shift `β·x_pa` | `exp(β)` is an odds ratio — one number per edge |
-| `cs` | complex shift `g(x_pa)` (MLP), still additive | plot `g` |
-| `ci` | complex intercept: the transform's parameters depend on the parents (several `ci` parents feed one joint network) | maximal flexibility, interactions not interpretable |
+| `LS(pa)` | linear shift `β·x_pa` | `exp(β)` is an odds ratio — one number per edge |
+| `CS(pa)` | complex shift `g(x_pa)` (MLP), still additive | plot `g` |
+| `I(pa)` | complex intercept: the transform's parameters depend on the parents (several parents in one `I(...)` feed one joint network) | maximal flexibility, interactions not interpretable |
+| `VC(on, *mods)` | varying-coefficient shift `β(mods)·x_on` | read out with `flow.varying_coef` |
 
 Continuous nodes carry a monotone 1-D transform (`bernstein` — TRAM-faithful
 default, `spline`, `affine`; `ContinuousNode(transform=..., transform_kwargs=...)`);
@@ -113,8 +121,9 @@ There are two ways to fit the model: a stochastic deep learning optimizer (`fit`
 
 ## Validation (all pinned by tests)
 
-- **Paper replication** — every experiment of the CLeaR paper [TODO: double-check this, reformualte] is tested against the registry
-  family (numpy-only SCM + frozen CSVs + replication script):
+- **Paper replication** — each of the paper's four DGP families has a generator in
+  the registry (numpy-only SCM + frozen CSVs + replication script) and is pinned
+  by tests:
 
   | family | paper | demonstrates |
   |---|---|---|

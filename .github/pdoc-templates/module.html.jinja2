@@ -1,0 +1,26 @@
+{% extends "default/module.html.jinja2" %}
+{#
+  Adds the hand-written documentation to every module page's sidebar.
+  New guide or notebook? Add one line to the matching list below.
+#}
+{% block nav_title %}
+{{ super() }}
+{% set root = "../" * module.modulename.count(".") %}
+<h2>Guides</h2>
+<ul class="memberlist">
+  <li><a href="{{ root }}guides/fitting.html">Fitting</a></li>
+  <li><a href="{{ root }}guides/training_speed.html">Training speed</a></li>
+  <li><a href="{{ root }}guides/scores.html">Scores &amp; modifier scan</a></li>
+  <li><a href="{{ root }}guides/varying_coefficients.html">Varying coefficients</a></li>
+  <li><a href="{{ root }}guides/stroke_case_study.html">Stroke case study</a></li>
+</ul>
+<h2>Notebooks</h2>
+<ul class="memberlist">
+  <li><a href="{{ root }}examples/demo_tram_dag_colab.html">5-minute demo</a></li>
+  <li><a href="{{ root }}examples/intro_tram_dag.html">Didactic intro</a></li>
+</ul>
+<h2>Download</h2>
+<ul class="memberlist">
+  <li><a href="{{ root }}tramdag-docs.pdf">Documentation as PDF</a></li>
+</ul>
+{% endblock %}

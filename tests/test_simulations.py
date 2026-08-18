@@ -1,7 +1,7 @@
 """Tests for the magic-mrclean synthetic cohort and the flow's recovery of its
-known ground truth, plus a regression check against the committed R reference."""
+known ground truth, plus a regression check against the committed R reference.
+"""
 
-import csv
 import json
 from pathlib import Path
 
@@ -24,10 +24,27 @@ def _spec(style: str) -> dict:
     return {
         "Age": ContinuousNode(transform="bernstein"),
         "mRS_pre": OrdinalNode(levels=6, terms=[term(t["Age"], "Age")]),
-        "NIHSSa": ContinuousNode(transform="bernstein",
-                                 terms=[term(t["Age"], "Age"), term(t["mRS_pre"], "mRS_pre")]),
-        "T": OrdinalNode(levels=2, terms=[term(t["Age"], "Age"), term(t["mRS_pre"], "mRS_pre"), term(t["NIHSSa"], "NIHSSa")]),
-        "mRS_3m": OrdinalNode(levels=7, terms=[term(t["Age"], "Age"), term(t["mRS_pre"], "mRS_pre"), term(t["NIHSSa"], "NIHSSa"), term(t["T"], "T")]),
+        "NIHSSa": ContinuousNode(
+            transform="bernstein",
+            terms=[term(t["Age"], "Age"), term(t["mRS_pre"], "mRS_pre")],
+        ),
+        "T": OrdinalNode(
+            levels=2,
+            terms=[
+                term(t["Age"], "Age"),
+                term(t["mRS_pre"], "mRS_pre"),
+                term(t["NIHSSa"], "NIHSSa"),
+            ],
+        ),
+        "mRS_3m": OrdinalNode(
+            levels=7,
+            terms=[
+                term(t["Age"], "Age"),
+                term(t["mRS_pre"], "mRS_pre"),
+                term(t["NIHSSa"], "NIHSSa"),
+                term(t["T"], "T"),
+            ],
+        ),
     }
 
 
@@ -93,13 +110,28 @@ def _fit_and_ate(style, obs, rct, epochs=(1500, 500), restore_best=None):
     if restore_best is None:
         restore_best = style != "ls"
     n = len(obs)
-    tr, va = obs.iloc[:int(0.85 * n)], obs.iloc[int(0.85 * n):]
+    tr, va = obs.iloc[: int(0.85 * n)], obs.iloc[int(0.85 * n) :]
     torch.manual_seed(0)
     flow = CausalFlowDAG(_spec(style))
-    flow.fit(tr, va, epochs=epochs[0], learning_rate=1e-2, batch_size=256, verbose=0,
-             seed=0, restore_best=restore_best)
-    flow.fit(tr, va, epochs=epochs[1], learning_rate=1e-3, batch_size=256, verbose=0,
-             restore_best=restore_best)
+    flow.fit(
+        tr,
+        va,
+        epochs=epochs[0],
+        learning_rate=1e-2,
+        batch_size=256,
+        verbose=0,
+        seed=0,
+        restore_best=restore_best,
+    )
+    flow.fit(
+        tr,
+        va,
+        epochs=epochs[1],
+        learning_rate=1e-3,
+        batch_size=256,
+        verbose=0,
+        restore_best=restore_best,
+    )
     p0 = flow.pmf(rct, node="mRS_3m", do={"T": 0})[:, :3].sum(axis=1)
     p1 = flow.pmf(rct, node="mRS_3m", do={"T": 1})[:, :3].sum(axis=1)
     return flow, float((p1 - p0).mean())
@@ -110,25 +142,37 @@ def _fit_full_mle(style, obs, epochs=((4000, 1e-2), (2000, 1e-3), (1000, 1e-4)))
     torch.manual_seed(0)
     flow = CausalFlowDAG(_spec(style))
     for ep, lr in epochs:
-        flow.fit(obs, epochs=ep, learning_rate=lr, batch_size=256, verbose=0,
-                 seed=0 if lr == 1e-2 else None, restore_best=False)
+        flow.fit(
+            obs,
+            epochs=ep,
+            learning_rate=lr,
+            batch_size=256,
+            verbose=0,
+            seed=0 if lr == 1e-2 else None,
+            restore_best=False,
+        )
     return flow
 
 
 def _load(variant):
     base = DATA / variant
     cols = ["Age", "mRS_pre", "NIHSSa", "T", "mRS_3m"]
-    return (pd.read_csv(base / "obs.csv")[cols],
-            pd.read_csv(base / "rct.csv")[cols],
-            json.loads((base / "truth.json").read_text()))
+    return (
+        pd.read_csv(base / "obs.csv")[cols],
+        pd.read_csv(base / "rct.csv")[cols],
+        json.loads((base / "truth.json").read_text()),
+    )
 
 
 # ----------------------------------------------- flow recovers the true ATE
 @pytest.mark.slow
-@pytest.mark.parametrize("variant,style,tol", [
-    ("ls", "ls", 0.04),        # all-ls DGP, all-ls model: exact up to finite-sample
-    ("nl", "flexible", 0.04),  # nl DGP needs the flexible model to recover truth
-])
+@pytest.mark.parametrize(
+    "variant,style,tol",
+    [
+        ("ls", "ls", 0.04),  # all-ls DGP, all-ls model: exact up to finite-sample
+        ("nl", "flexible", 0.04),  # nl DGP needs the flexible model to recover truth
+    ],
+)
 def test_flow_recovers_true_ate(variant, style, tol):
     obs, rct, truth = _load(variant)
     _, ate = _fit_and_ate(style, obs, rct)
@@ -140,15 +184,18 @@ def test_nl_storyline_all_ls_underestimates_flexible_recovers():
     """The headline simulation result: on the heterogeneous-effect `nl` cohort the
     all-`ls` model (which cannot extrapolate tau(Age) from the older observational
     cohort to the younger trial) undershoots the true ATE, while the flexible
-    ci/cs flow recovers it. Both massively de-confound the naive contrast."""
+    ci/cs flow recovers it. Both massively de-confound the naive contrast.
+    """
     obs, rct, truth = _load("nl")
-    _, ate_ls = _fit_and_ate("ls", obs, rct)            # constrained -> no early stop
-    _, ate_flex = _fit_and_ate("flexible", obs, rct)    # flexible -> early-stop regularized
+    _, ate_ls = _fit_and_ate("ls", obs, rct)  # constrained -> no early stop
+    _, ate_flex = _fit_and_ate(
+        "flexible", obs, rct
+    )  # flexible -> early-stop regularized
     true = truth["true_ate"]
-    assert ate_ls < true - 0.015                       # all-ls biased low (misspecified)
-    assert abs(ate_flex - true) < abs(ate_ls - true)   # flexible closer to truth
-    assert ate_flex == pytest.approx(true, abs=0.04)    # ...and close in absolute terms
-    assert ate_ls < truth["naive_obs_diff"] - 0.1      # both far below the confounded naive
+    assert ate_ls < true - 0.015  # all-ls biased low (misspecified)
+    assert abs(ate_flex - true) < abs(ate_ls - true)  # flexible closer to truth
+    assert ate_flex == pytest.approx(true, abs=0.04)  # ...and close in absolute terms
+    assert ate_ls < truth["naive_obs_diff"] - 0.1  # both far below the confounded naive
 
 
 # ------------------------------------------- spot-on MLE (no early stopping)
@@ -159,21 +206,30 @@ def test_all_ls_flow_is_exact_mle():
     (and, where present, the R polr reference) to within SGD tolerance.
 
     This is *only* achievable because fit() no longer early-stops by default --
-    best-validation restoration would otherwise pin the fit off the train optimum."""
+    best-validation restoration would otherwise pin the fit off the train optimum.
+    """
     from statsmodels.miscmodels.ordinal_model import OrderedModel
 
     obs, _, _ = _load("ls")
     torch.manual_seed(0)
     flow = CausalFlowDAG(_spec("ls"))
     for ep, lr in [(4000, 1e-2), (2000, 1e-3), (1000, 1e-4)]:
-        flow.fit(obs, epochs=ep, learning_rate=lr, batch_size=256, verbose=0,
-                 seed=0 if lr == 1e-2 else None, restore_best=False)
+        flow.fit(
+            obs,
+            epochs=ep,
+            learning_rate=lr,
+            batch_size=256,
+            verbose=0,
+            seed=0 if lr == 1e-2 else None,
+            restore_best=False,
+        )
 
     X = pd.DataFrame({"Age": obs["Age"], "NIHSSa": obs["NIHSSa"], "T": obs["T"]})
     for k in range(1, 6):
         X[f"mRS_pre_{k}"] = (obs["mRS_pre"] == k).astype(float)
     res = OrderedModel(obs["mRS_3m"].astype(int), X, distr="logit").fit(
-        method="bfgs", disp=False)
+        method="bfgs", disp=False
+    )
 
     y = flow.nodes["mRS_3m"]
     w_age = float(y.shifts["Age"].weight.detach())
@@ -187,15 +243,24 @@ def test_all_ls_flow_is_exact_mle():
 @pytest.mark.slow
 def test_restore_best_changes_the_fit():
     """Guard the new default: restore_best=True (early stopping on a held-out
-    split) lands at a different point than the converged MLE-style fit."""
+    split) lands at a different point than the converged MLE-style fit.
+    """
     obs, _, _ = _load("ls")
     tr, va = obs.iloc[:1000], obs.iloc[1000:]
     fits = {}
     for rb in (False, True):
         torch.manual_seed(0)
         f = CausalFlowDAG(_spec("ls"))
-        f.fit(tr, va, epochs=800, learning_rate=1e-2, batch_size=256, verbose=0,
-              seed=0, restore_best=rb)
+        f.fit(
+            tr,
+            va,
+            epochs=800,
+            learning_rate=1e-2,
+            batch_size=256,
+            verbose=0,
+            seed=0,
+            restore_best=rb,
+        )
         fits[rb] = float(f.nodes["mRS_3m"].shifts["T"].weight.detach().ravel()[1])
     assert fits[False] != fits[True]
 
@@ -205,7 +270,8 @@ def test_restore_best_changes_the_fit():
 @pytest.mark.parametrize("variant", ["ls", "nl"])
 def test_flow_matches_r_reference(variant):
     """The all-ls flow must agree with the committed classical R fit (fit_ls.R)
-    on the outcome-node coefficients and the ATE. Skips if R outputs are absent."""
+    on the outcome-node coefficients and the ATE. Skips if R outputs are absent.
+    """
     ref = DATA / variant / "ref_ls"
     if not (ref / "ate.csv").exists():
         pytest.skip(f"R reference not generated yet (run Rscript fit_ls.R {variant})")

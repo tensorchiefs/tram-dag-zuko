@@ -1,6 +1,7 @@
 """Tests for the term-formula notation (I/LS/CS) — construction, validation,
 serialization, and the meta-adjacency view. (The legacy ``parents={...}`` dict
-API was removed in 0.3.0; only old *checkpoints* are still read.)"""
+API was removed in 0.3.0; only old *checkpoints* are still read.)
+"""
 
 import warnings
 
@@ -27,7 +28,7 @@ def _terms_spec():
         "X1": ContinuousNode(),
         "X2": ContinuousNode(terms=[LS("X1")]),
         "X3": ContinuousNode(terms=[I("X1"), CS("X2")]),
-        "Y":  OrdinalNode(levels=4, terms=[LS("X3")]),
+        "Y": OrdinalNode(levels=4, terms=[LS("X3")]),
     }
 
 
@@ -43,9 +44,9 @@ def test_terms_spec_builds_and_scores():
 
 def test_node_internal_structure_matches():
     flow = CausalFlowDAG(_terms_spec(), seed=0)
-    assert flow.nodes["X3"].ci_parents == ["X1"]          # I("X1") -> ci-parent
-    assert set(flow.nodes["X3"].shifts) == {"X2"}         # CS("X2") -> shift
-    assert flow.nodes["X3"].parents == ("X1", "X2")       # ordered parent names
+    assert flow.nodes["X3"].ci_parents == ["X1"]  # I("X1") -> ci-parent
+    assert set(flow.nodes["X3"].shifts) == {"X2"}  # CS("X2") -> shift
+    assert flow.nodes["X3"].parents == ("X1", "X2")  # ordered parent names
 
 
 # ---------------------------------------------------------------- validation
@@ -54,27 +55,29 @@ def test_ls_requires_exactly_one_parent():
         LS("X1", "X2")
 
 
-@pytest.mark.parametrize("term,n_shift,n_ci", [(CS("X1", "X2"), 1, 0),
-                                               (I("X1", "X2"), 0, 2)])
+@pytest.mark.parametrize(
+    "term,n_shift,n_ci", [(CS("X1", "X2"), 1, 0), (I("X1", "X2"), 0, 2)]
+)
 def test_joint_terms_build(term, n_shift, n_ci):
     """Joint (multi-parent) terms build one network over the parent group."""
-    spec = {"X1": ContinuousNode(), "X2": ContinuousNode(),
-            "X3": ContinuousNode(terms=[term])}
+    spec = {
+        "X1": ContinuousNode(),
+        "X2": ContinuousNode(),
+        "X3": ContinuousNode(terms=[term]),
+    }
     node = CausalFlowDAG(spec, seed=0).nodes["X3"]
-    assert len(node.shifts) == n_shift          # joint CS -> a single shift module
-    assert len(node.ci_parents) == n_ci         # joint I  -> both parents pooled
+    assert len(node.shifts) == n_shift  # joint CS -> a single shift module
+    assert len(node.ci_parents) == n_ci  # joint I  -> both parents pooled
 
 
 def test_duplicate_parent_across_terms_raises():
-    spec = {"X1": ContinuousNode(),
-            "X3": ContinuousNode(terms=[LS("X1"), CS("X1")])}
+    spec = {"X1": ContinuousNode(), "X3": ContinuousNode(terms=[LS("X1"), CS("X1")])}
     with pytest.raises(ValueError):
         CausalFlowDAG(spec)
 
 
 def test_cycle_detected():
-    spec = {"A": ContinuousNode(terms=[LS("B")]),
-            "B": ContinuousNode(terms=[LS("A")])}
+    spec = {"A": ContinuousNode(terms=[LS("B")]), "B": ContinuousNode(terms=[LS("A")])}
     with pytest.raises(ValueError):
         CausalFlowDAG(spec)
 
@@ -93,12 +96,21 @@ def test_serialization_roundtrip_terms():
 
 def test_legacy_parents_checkpoint_still_loads():
     """A checkpoint serialized in the old ``parents``-dict layout must still
-    rebuild (no deprecation warning, since we translate to terms directly)."""
+    rebuild (no deprecation warning, since we translate to terms directly).
+    """
     legacy = {
-        "X1": {"kind": "continuous", "parents": {}, "transform": "bernstein",
-               "transform_kwargs": {}},
-        "X2": {"kind": "continuous", "parents": {"X1": "ci"}, "transform": "bernstein",
-               "transform_kwargs": {}},
+        "X1": {
+            "kind": "continuous",
+            "parents": {},
+            "transform": "bernstein",
+            "transform_kwargs": {},
+        },
+        "X2": {
+            "kind": "continuous",
+            "parents": {"X1": "ci"},
+            "transform": "bernstein",
+            "transform_kwargs": {},
+        },
     }
     with warnings.catch_warnings():
         warnings.simplefilter("error", DeprecationWarning)  # must NOT warn
@@ -111,7 +123,7 @@ def test_legacy_parents_checkpoint_still_loads():
 def test_to_matrix():
     m = CausalFlowDAG(_terms_spec(), seed=0).to_matrix()
     assert m.loc["X1", "X2"] == "LS"
-    assert m.loc["X1", "X3"] == "CI"     # I("X1")
+    assert m.loc["X1", "X3"] == "CI"  # I("X1")
     assert m.loc["X2", "X3"] == "CS"
     assert m.loc["X3", "Y"] == "LS"
-    assert m.loc["X1", "X1"] == ""       # no self-edge
+    assert m.loc["X1", "X1"] == ""  # no self-edge

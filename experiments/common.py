@@ -7,9 +7,8 @@ random_state=42; evaluation on the MR CLEAN RCT cohort (data/exp_data.csv).
 
 from __future__ import annotations
 
+import argparse
 import json
-import os
-import sys
 from pathlib import Path
 
 import matplotlib
@@ -23,9 +22,7 @@ import torch
 from sklearn.model_selection import train_test_split
 from statsmodels.stats.proportion import proportion_confint
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
-
-from tramdag import CausalFlowDAG, ContinuousNode, OrdinalNode, term  # noqa: E402
+from tramdag import CausalFlowDAG, ContinuousNode, OrdinalNode, term
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 RESULTS_ROOT = Path(__file__).resolve().parents[1] / "results"
@@ -52,9 +49,15 @@ def load_magic(nihss_min: float = 6.0) -> pd.DataFrame:
 
 
 def load_magic_rct() -> pd.DataFrame:
-    rct = pd.read_csv(REPO_ROOT / "data" / "exp_data.csv").rename(columns={
-        "Age_rct": "Age", "NIHSSa_rct": "NIHSSa", "mRS_pre_rct": "mRS_pre",
-        "T_rct": "T", "mRS_3m_rct": "mRS_3m"})
+    rct = pd.read_csv(REPO_ROOT / "data" / "exp_data.csv").rename(
+        columns={
+            "Age_rct": "Age",
+            "NIHSSa_rct": "NIHSSa",
+            "mRS_pre_rct": "mRS_pre",
+            "T_rct": "T",
+            "mRS_3m_rct": "mRS_3m",
+        }
+    )
     rct = rct[NODES].dropna().reset_index(drop=True)
     return rct.astype({"NIHSSa": int, "mRS_pre": int, "T": int, "mRS_3m": int})
 
@@ -73,17 +76,14 @@ def load_data(source: str = DEFAULT_SOURCE):
     if not (base / "obs.csv").exists():
         raise FileNotFoundError(
             f"unknown data source '{source}' (looked in {base}). "
-            "Use 'magic' or 'magic-mrclean/{ls,nl}'.")
+            "Use 'magic' or 'magic-mrclean/{ls,nl}'."
+        )
     obs = pd.read_csv(base / "obs.csv")[NODES]
     rct = pd.read_csv(base / "rct.csv")[NODES].astype(
-        {"NIHSSa": float, "mRS_pre": int, "T": int, "mRS_3m": int})
+        {"NIHSSa": float, "mRS_pre": int, "T": int, "mRS_3m": int}
+    )
     truth = json.loads((base / "truth.json").read_text())
     return obs, rct, truth
-
-
-# backward-compatible alias
-def load_rct() -> pd.DataFrame:
-    return load_magic_rct()
 
 
 def DATA_R_REF(source: str) -> Path | None:
@@ -98,6 +98,51 @@ def split(df: pd.DataFrame):
     train_df, temp_df = train_test_split(df, test_size=0.2, random_state=42)
     val_df, test_df = train_test_split(temp_df, test_size=0.5, random_state=42)
     return train_df, val_df, test_df
+
+
+def source_arg(description: str | None = None) -> str:
+    """Parse the optional data-source argument shared by the runner scripts.
+
+    Parameters
+    ----------
+    description : str | None, optional
+        Help text for ``--help``, by default ``None`` (the caller's docstring
+        is the usual argument).
+
+    Returns
+    -------
+    str
+        The requested source, ``DEFAULT_SOURCE`` when none was given.
+    """
+    parser = argparse.ArgumentParser(
+        description=description, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
+    parser.add_argument(
+        "source",
+        nargs="?",
+        default=DEFAULT_SOURCE,
+        help=f"data source, e.g. 'magic-mrclean/ls' or 'magic' "
+        f"(default: {DEFAULT_SOURCE})",
+    )
+    return parser.parse_args().source
+
+
+def run_name(base: str, source: str) -> str:
+    """Result-folder name: bare for the clinical cohort, suffixed otherwise.
+
+    Parameters
+    ----------
+    base : str
+        Experiment name, e.g. ``"all_ls"``.
+    source : str
+        The data source as given to :func:`run_experiment`.
+
+    Returns
+    -------
+    str
+        ``base`` for the ``"magic"`` cohort, else ``f"{base}_{variant}"``.
+    """
+    return base if source == "magic" else f"{base}_{source.split('/')[-1]}"
 
 
 # ------------------------------------------------------------------- specs
@@ -115,14 +160,29 @@ def build_spec(style: str) -> dict:
     else:
         raise ValueError(f"unknown style '{style}'")
     return {
-        "Age":     ContinuousNode(transform="bernstein"),
+        "Age": ContinuousNode(transform="bernstein"),
         "mRS_pre": OrdinalNode(levels=6, terms=[term(t["Age"], "Age")]),
-        "NIHSSa":  ContinuousNode(transform="bernstein",
-                                  terms=[term(t["Age"], "Age"), term(t["mRS_pre"], "mRS_pre")]),
-        "T":       OrdinalNode(levels=2,
-                               terms=[term(t["Age"], "Age"), term(t["mRS_pre"], "mRS_pre"), term(t["NIHSSa"], "NIHSSa")]),
-        "mRS_3m":  OrdinalNode(levels=7,
-                               terms=[term(t["Age"], "Age"), term(t["mRS_pre"], "mRS_pre"), term(t["NIHSSa"], "NIHSSa"), term(t["T"], "T")]),
+        "NIHSSa": ContinuousNode(
+            transform="bernstein",
+            terms=[term(t["Age"], "Age"), term(t["mRS_pre"], "mRS_pre")],
+        ),
+        "T": OrdinalNode(
+            levels=2,
+            terms=[
+                term(t["Age"], "Age"),
+                term(t["mRS_pre"], "mRS_pre"),
+                term(t["NIHSSa"], "NIHSSa"),
+            ],
+        ),
+        "mRS_3m": OrdinalNode(
+            levels=7,
+            terms=[
+                term(t["Age"], "Age"),
+                term(t["mRS_pre"], "mRS_pre"),
+                term(t["NIHSSa"], "NIHSSa"),
+                term(t["T"], "T"),
+            ],
+        ),
     }
 
 
@@ -145,7 +205,9 @@ def plot_loss_history(flow: CausalFlowDAG, save):
             continue
         total = [sum(e.values()) for e in hist]
         ax.plot(total, style, label=f"{which} (total)")
-    ax.set_xlabel("epoch"); ax.set_ylabel("NLL"); ax.legend()
+    ax.set_xlabel("epoch")
+    ax.set_ylabel("NLL")
+    ax.legend()
     ax.set_title("Joint flow training (sum of per-node NLLs)")
     save("loss_history.png")
 
@@ -160,36 +222,50 @@ def plot_training_speed(flow: CausalFlowDAG, save):
     for which, style in [("train", "-"), ("val", "--")]:
         total = [sum(e.values()) for e in flow.history[which]]
         ax.plot(t, total, style, label=f"{which} NLL")
-    ax.set_xlabel("wall-clock time [s]"); ax.set_ylabel("total NLL")
+    ax.set_xlabel("wall-clock time [s]")
+    ax.set_ylabel("total NLL")
     ax2 = ax.twinx()
     ax2.step(t, lr, where="post", color="grey", alpha=0.6, lw=1.2, label="lr")
-    ax2.set_yscale("log"); ax2.set_ylabel("learning rate", color="grey")
+    ax2.set_yscale("log")
+    ax2.set_ylabel("learning rate", color="grey")
     ax2.tick_params(axis="y", colors="grey")
     h1, l1 = ax.get_legend_handles_labels()
     h2, l2 = ax2.get_legend_handles_labels()
     ax.legend(h1 + h2, l1 + l2, loc="upper right")
     n_ep, total_s = len(t), t[-1]
-    ax.set_title(f"Training speed: {n_ep} epochs in {total_s:.0f} s "
-                 f"({n_ep / total_s:.1f} epochs/s, CPU)")
+    ax.set_title(
+        f"Training speed: {n_ep} epochs in {total_s:.0f} s "
+        f"({n_ep / total_s:.1f} epochs/s, CPU)"
+    )
     save("training_speed.png")
-    print(f"Training wall-clock: {total_s:.1f} s for {n_ep} epochs "
-          f"({n_ep / total_s:.1f} epochs/s)")
+    print(
+        f"Training wall-clock: {total_s:.1f} s for {n_ep} epochs "
+        f"({n_ep / total_s:.1f} epochs/s)"
+    )
 
 
 def plot_samples_vs_true(flow: CausalFlowDAG, train_df: pd.DataFrame, save, n=10_000):
     sampled = flow.sample(n, seed=1)
     fig, axes = plt.subplots(2, len(NODES), figsize=(4 * len(NODES), 7))
     for j, node in enumerate(NODES):
-        for row, (label, data) in enumerate([("observed (train)", train_df[node]),
-                                             ("sampled", sampled[node])]):
+        for row, (label, data) in enumerate(
+            [("observed (train)", train_df[node]), ("sampled", sampled[node])]
+        ):
             ax = axes[row][j]
             if node in ("Age", "NIHSSa"):
                 ax.hist(data, bins=30, color="steelblue", edgecolor="white")
             else:
                 lv = range(int(train_df[node].max()) + 1)
-                counts = pd.Series(data).round().astype(int).value_counts(
-                    normalize=True).reindex(lv, fill_value=0)
-                ax.bar(counts.index, counts.values, color="steelblue", edgecolor="white")
+                counts = (
+                    pd.Series(data)
+                    .round()
+                    .astype(int)
+                    .value_counts(normalize=True)
+                    .reindex(lv, fill_value=0)
+                )
+                ax.bar(
+                    counts.index, counts.values, color="steelblue", edgecolor="white"
+                )
             ax.set_title(f"{label} — {node}", fontsize=10)
             ax.spines[["top", "right"]].set_visible(False)
     plt.tight_layout()
@@ -205,12 +281,18 @@ def plot_interventional(flow: CausalFlowDAG, save, n=10_000):
     fig, axes = plt.subplots(1, 3, figsize=(15, 4), sharey=True)
     x = np.arange(7)
     for ax, (name, s) in zip(axes, sets.items()):
-        counts = s["mRS_3m"].round().astype(int).value_counts(
-            normalize=True).reindex(MRS_LEVELS, fill_value=0)
+        counts = (
+            s["mRS_3m"]
+            .round()
+            .astype(int)
+            .value_counts(normalize=True)
+            .reindex(MRS_LEVELS, fill_value=0)
+        )
         ax.bar(x, counts.values, color="steelblue", edgecolor="white")
         good = (s["mRS_3m"] <= 2).mean()
         ax.set_title(f"{name}\nP(mRS<=2) = {good:.3f}")
-        ax.set_xlabel("mRS_3m"); ax.set_xticks(x)
+        ax.set_xlabel("mRS_3m")
+        ax.set_xticks(x)
         ax.spines[["top", "right"]].set_visible(False)
     axes[0].set_ylabel("probability")
     plt.tight_layout()
@@ -221,10 +303,17 @@ def plot_interventional(flow: CausalFlowDAG, save, n=10_000):
 
 
 # --------------------------------------------------------------- evaluation
-def evaluate_rct(flow: CausalFlowDAG, results_dir: Path, save,
-                 rct: pd.DataFrame | None = None, truth: dict | None = None) -> pd.DataFrame:
-    """Per-patient interventional PMFs on the RCT covariates -> ATE/ITE,
-    calibration and RCT-vs-predicted distribution plots.
+def evaluate_rct(
+    flow: CausalFlowDAG,
+    results_dir: Path,
+    save,
+    rct: pd.DataFrame | None = None,
+    truth: dict | None = None,
+) -> pd.DataFrame:
+    """Evaluate the flow against the trial: ATE, ITE, calibration and plots.
+
+    The evaluation computes per-patient interventional PMFs on the RCT
+    covariates.
 
     Mirrors the analytic evaluation in the original implementation's scripts
     (predict_ordinal_pmf in stroke_fully_connected.py / nihss6.py). ``truth``,
@@ -254,11 +343,16 @@ def evaluate_rct(flow: CausalFlowDAG, results_dir: Path, save,
     print(f"  ATE  = {ate:+.4f}   median ITE = {result['p_good_diff'].median():+.4f}")
     if truth is not None:
         err = ate - truth["true_ate"]
-        print(f"  TRUE ATE (known) = {truth['true_ate']:+.4f}   "
-              f"flow error = {err:+.4f}   (naive obs. diff {truth['naive_obs_diff']:+.4f})")
+        print(
+            f"  TRUE ATE (known) = {truth['true_ate']:+.4f}   "
+            f"flow error = {err:+.4f}   "
+            f"(naive obs. diff {truth['naive_obs_diff']:+.4f})"
+        )
     else:
-        print(f"  MR CLEAN reference: +{RCT_ATE:.3f} "
-              f"(95% CI [{RCT_CI[0]:+.3f}, {RCT_CI[1]:+.3f}])")
+        print(
+            f"  MR CLEAN reference: +{RCT_ATE:.3f} "
+            f"(95% CI [{RCT_CI[0]:+.3f}, {RCT_CI[1]:+.3f}])"
+        )
     print(f"  Saved per-patient PMFs -> {out_csv}")
 
     # --- observed RCT arms vs predicted distribution ---
@@ -266,16 +360,32 @@ def evaluate_rct(flow: CausalFlowDAG, results_dir: Path, save,
     x = np.arange(7)
     fig, axes = plt.subplots(1, 2, figsize=(14, 5), sharey=True)
     for arm, color in [(0, "#e07b54"), (1, "steelblue")]:
-        obs = rct.loc[rct["T"] == arm, "mRS_3m"].value_counts(
-            normalize=True).reindex(MRS_LEVELS, fill_value=0)
-        axes[0].bar(x + (arm - 0.5) * width, obs.values * 100, width=width,
-                    label=f"RCT (T={arm})", color=color)
+        obs = (
+            rct.loc[rct["T"] == arm, "mRS_3m"]
+            .value_counts(normalize=True)
+            .reindex(MRS_LEVELS, fill_value=0)
+        )
+        axes[0].bar(
+            x + (arm - 0.5) * width,
+            obs.values * 100,
+            width=width,
+            label=f"RCT (T={arm})",
+            color=color,
+        )
         pred = (pmf_t1 if arm else pmf_t0).mean(axis=0)
-        axes[1].bar(x + (arm - 0.5) * width, pred * 100, width=width,
-                    label=f"predicted do(T={arm})", color=color)
-    axes[0].set_title("MR CLEAN observed"); axes[1].set_title("Flow predicted (RCT covariates)")
+        axes[1].bar(
+            x + (arm - 0.5) * width,
+            pred * 100,
+            width=width,
+            label=f"predicted do(T={arm})",
+            color=color,
+        )
+    axes[0].set_title("MR CLEAN observed")
+    axes[1].set_title("Flow predicted (RCT covariates)")
     for ax in axes:
-        ax.set_xlabel("mRS_3m"); ax.set_xticks(x); ax.legend()
+        ax.set_xlabel("mRS_3m")
+        ax.set_xticks(x)
+        ax.legend()
         ax.spines[["top", "right"]].set_visible(False)
     axes[0].set_ylabel("percent")
     plt.tight_layout()
@@ -285,7 +395,9 @@ def evaluate_rct(flow: CausalFlowDAG, results_dir: Path, save,
     sub0 = result[result["T_actual"] == 0]
     n0 = len(sub0)
     pred_cal = sub0[[f"p_mRS{k}_T0" for k in MRS_LEVELS]].mean().values
-    counts = sub0["mRS_3m_observed"].value_counts().reindex(MRS_LEVELS, fill_value=0).values
+    counts = (
+        sub0["mRS_3m_observed"].value_counts().reindex(MRS_LEVELS, fill_value=0).values
+    )
     obs_cal = counts / n0
     lo, hi = proportion_confint(counts, n0, alpha=0.05, method="wilson")
     yerr = np.vstack([obs_cal - lo, hi - obs_cal])
@@ -293,10 +405,16 @@ def evaluate_rct(flow: CausalFlowDAG, results_dir: Path, save,
     w = 0.4
     ax.bar(x - w / 2, pred_cal, width=w, label="predicted (do T=0)", color="steelblue")
     ax.bar(x + w / 2, obs_cal, width=w, label="observed", color="#e07b54")
-    ax.errorbar(x + w / 2, obs_cal, yerr=yerr, fmt="none", ecolor="black", capsize=3, lw=1)
-    ax.set_xticks(x); ax.set_xlabel("mRS at 3 months"); ax.set_ylabel("probability")
-    ax.set_title(f"T=0 arm calibration (N={n0}); "
-                 f"P(good): pred {pred_cal[:3].sum():.3f} vs obs {obs_cal[:3].sum():.3f}")
+    ax.errorbar(
+        x + w / 2, obs_cal, yerr=yerr, fmt="none", ecolor="black", capsize=3, lw=1
+    )
+    ax.set_xticks(x)
+    ax.set_xlabel("mRS at 3 months")
+    ax.set_ylabel("probability")
+    ax.set_title(
+        f"T=0 arm calibration (N={n0}); "
+        f"P(good): pred {pred_cal[:3].sum():.3f} vs obs {obs_cal[:3].sum():.3f}"
+    )
     ax.legend()
     plt.tight_layout()
     save("calibration_T0.png")
@@ -308,18 +426,27 @@ def evaluate_rct(flow: CausalFlowDAG, results_dir: Path, save,
     ax.axvline(0, color="grey", ls=":", lw=1)
     ax.axvline(ate, color="red", ls="--", lw=2, label=f"ATE = {ate:+.3f}")
     ax.set_xlabel("ITE = P(good | do(T=1)) - P(good | do(T=0))")
-    ax.set_ylabel("patients"); ax.legend()
-    ax.set_title(f"Per-patient thrombectomy effect (N={len(ite)}, benefit>0: "
-                 f"{100 * (ite > 0).mean():.0f}%)")
+    ax.set_ylabel("patients")
+    ax.legend()
+    ax.set_title(
+        f"Per-patient thrombectomy effect (N={len(ite)}, benefit>0: "
+        f"{100 * (ite > 0).mean():.0f}%)"
+    )
     plt.tight_layout()
     save("ite_histogram.png")
 
     return result
 
 
-def run_experiment(name: str, style: str, source: str = DEFAULT_SOURCE,
-                   phases=((3000, 1e-2), (1000, 1e-3)), batch_size=256, seed=123,
-                   restore_best: bool | None = None):
+def run_experiment(
+    name: str,
+    style: str,
+    source: str = DEFAULT_SOURCE,
+    phases=((3000, 1e-2), (1000, 1e-3)),
+    batch_size=256,
+    seed=123,
+    restore_best: bool | None = None,
+):
     """Full pipeline: fit -> diagnostics -> RCT evaluation -> save model.
 
     ``source`` selects the data ("magic" private clinical, or a synthetic
@@ -338,9 +465,11 @@ def run_experiment(name: str, style: str, source: str = DEFAULT_SOURCE,
 
     df, rct, truth = load_data(source)
     train_df, val_df, test_df = split(df)
-    print(f"data '{source}': N={len(df)}  train/val/test = "
-          f"{len(train_df)}/{len(val_df)}/{len(test_df)}"
-          + (f"  | true ATE {truth['true_ate']:+.4f}" if truth else ""))
+    print(
+        f"data '{source}': N={len(df)}  train/val/test = "
+        f"{len(train_df)}/{len(val_df)}/{len(test_df)}"
+        + (f"  | true ATE {truth['true_ate']:+.4f}" if truth else "")
+    )
 
     torch.manual_seed(seed)  # weight init happens at construction -> must be seeded
     flow = CausalFlowDAG(build_spec(style))
@@ -350,9 +479,16 @@ def run_experiment(name: str, style: str, source: str = DEFAULT_SOURCE,
     print(f"restore_best (early stopping) = {restore_best}")
     for i, (epochs, lr) in enumerate(phases):
         print(f"--- phase {i + 1}/{len(phases)}: {epochs} epochs at lr {lr:g} ---")
-        flow.fit(train_df, val_df, epochs=epochs, learning_rate=lr,
-                 batch_size=batch_size, verbose=200, seed=seed if i == 0 else None,
-                 restore_best=restore_best)
+        flow.fit(
+            train_df,
+            val_df,
+            epochs=epochs,
+            learning_rate=lr,
+            batch_size=batch_size,
+            verbose=200,
+            seed=seed if i == 0 else None,
+            restore_best=restore_best,
+        )
 
     print("\nPer-node val NLL:", {k: round(v, 4) for k, v in flow.nll(val_df).items()})
     print("Per-node test NLL:", {k: round(v, 4) for k, v in flow.nll(test_df).items()})

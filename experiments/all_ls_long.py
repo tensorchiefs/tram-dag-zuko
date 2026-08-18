@@ -10,5 +10,6 @@ Compare with: uv run python validate_ls.py all_ls_long
 from common import run_experiment
 
 if __name__ == "__main__":
-    run_experiment("all_ls_long", style="ls",
-                   phases=((6000, 1e-2), (6000, 1e-3), (4000, 1e-4)))
+    run_experiment(
+        "all_ls_long", style="ls", phases=((6000, 1e-2), (6000, 1e-3), (4000, 1e-4))
+    )
