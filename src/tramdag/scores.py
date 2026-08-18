@@ -118,7 +118,7 @@ def node_scores(flow, df: pd.DataFrame, node: str) -> pd.DataFrame:
     missing = [c for c in needed if c not in df.columns]
     if missing:
         raise KeyError(f"data is missing column(s): {missing}")
-    np_dtype = np.float64 if flow._dtype == torch.float64 else np.float32
+    np_dtype = flow._np_dtype
     values = {
         c: torch.as_tensor(df[c].to_numpy(dtype=np_dtype), device=flow.device)
         for c in needed

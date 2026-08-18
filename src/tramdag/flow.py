@@ -308,8 +308,13 @@ class CausalFlowDAG(nn.Module):
         """Current model dtype (float32 normally; float64 inside fit_classical)."""
         return next(self.parameters()).dtype
 
+    @property
+    def _np_dtype(self) -> type:
+        """Numpy dtype that matches the current model dtype."""
+        return np.float64 if self._dtype == torch.float64 else np.float32
+
     def _tensorize(self, df: pd.DataFrame) -> dict[str, Tensor]:
-        np_dtype = np.float64 if self._dtype == torch.float64 else np.float32
+        np_dtype = self._np_dtype
         out = {}
         for name in self.order:
             vals = torch.as_tensor(
@@ -847,7 +852,7 @@ class CausalFlowDAG(nn.Module):
         ``sigmoid(shift - theta_0)``.
         """
         nd = self.nodes[on]
-        np_dtype = np.float64 if self._dtype == torch.float64 else np.float32
+        np_dtype = self._np_dtype
         values = {
             p: torch.as_tensor(df[p].to_numpy(dtype=np_dtype), device=self.device)
             for p in nd.parents
@@ -884,7 +889,7 @@ class CausalFlowDAG(nn.Module):
         if not jobs:
             return None
         self.vc_center_info = {}
-        np_dtype = np.float64 if self._dtype == torch.float64 else np.float32
+        np_dtype = self._np_dtype
         out: dict[str, dict[str, Tensor]] = {}
         rng_state = torch.get_rng_state()  # proxies reseed; keep fit reproducible
         try:
@@ -1056,7 +1061,7 @@ class CausalFlowDAG(nn.Module):
             raise KeyError(f"data is missing modifier column(s): {missing}")
         mod_feat = None
         if mods:
-            np_dtype = np.float64 if self._dtype == torch.float64 else np.float32
+            np_dtype = self._np_dtype
             vals = {
                 p: torch.as_tensor(data[p].to_numpy(dtype=np_dtype), device=self.device)
                 for p in mods
@@ -1211,7 +1216,7 @@ class CausalFlowDAG(nn.Module):
         if missing:
             raise KeyError(f"data is missing intercept-parent column(s): {missing}")
 
-        np_dtype = np.float64 if self._dtype == torch.float64 else np.float32
+        np_dtype = self._np_dtype
         vals = {
             p: torch.as_tensor(data[p].to_numpy(dtype=np_dtype), device=self.device)
             for p in nd.ci_parents
@@ -1436,7 +1441,7 @@ class CausalFlowDAG(nn.Module):
         if seed is not None:
             gen = torch.Generator(device=self.device).manual_seed(seed)
 
-        np_dtype = np.float64 if self._dtype == torch.float64 else np.float32
+        np_dtype = self._np_dtype
         if u is not None:
             n = len(u)
             u_vals = {
@@ -1552,7 +1557,7 @@ class CausalFlowDAG(nn.Module):
         for col, val in (do or {}).items():
             df_local[col] = val
         nd = self.nodes[node]
-        np_dtype = np.float64 if self._dtype == torch.float64 else np.float32
+        np_dtype = self._np_dtype
         cols = list(nd.parents) + self._vc_ehat_columns(nd)  # + e_hat inputs
         values = {
             p: torch.as_tensor(df_local[p].to_numpy(dtype=np_dtype), device=self.device)
