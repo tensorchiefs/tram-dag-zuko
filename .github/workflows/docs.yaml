@@ -43,7 +43,7 @@ jobs:
         set -euo pipefail
         mkdir -p build/nbmd
         for name in $NOTEBOOKS; do
-          uv run --group dev --group notebooks --with nbconvert bash -c "
+          uv run --group notebooks --group docs bash -c "
             jupytext --to notebook --execute \
               --output notebooks/$name.exec.ipynb notebooks/$name.py &&
             jupyter nbconvert --to markdown notebooks/$name.exec.ipynb \
@@ -71,7 +71,7 @@ jobs:
 
     - name: build the site with pdoc
       run: |
-        uv run --with pdoc env PYTHONPATH=build/stubs \
+        uv run --group docs env PYTHONPATH=build/stubs \
           pdoc -d numpy --template-directory .github/pdoc-templates \
             -o site tramdag guides examples
 

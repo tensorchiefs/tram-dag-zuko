@@ -3,19 +3,30 @@ build-backend = "hatchling.build"
 requires = ["hatchling"]
 
 [dependency-groups]
+# dev is the default `uv sync` group: everything a working checkout needs
 dev = [
-  "pytest",
-  "scipy",
-  "statsmodels",
-  "scikit-learn",
-  "matplotlib"
+  {include-group = "test"},
+  {include-group = "experiments"}
 ]
 docs = [
-  "pdoc"
+  "pdoc",
+  "nbconvert"  # notebooks -> markdown for the pdoc site
+]
+experiments = [
+  "matplotlib",
+  "scikit-learn",  # train/val/test split in experiments/common.py
+  "statsmodels"  # classical references (OrderedModel, proportion CIs)
 ]
 notebooks = [
   "jupytext",
-  "ipykernel"  # so JupyterLab / VS Code can run the generated .ipynb
+  "ipykernel",  # so JupyterLab / VS Code can run the generated .ipynb
+  "matplotlib",  # the notebooks plot ...
+  "scipy"  # ... and use scipy.stats
+]
+test = [
+  "pytest",
+  "scipy",  # scipy.stats in the generator tests
+  "statsmodels"  # exact-MLE agreement tests
 ]
 
 [project]
@@ -59,10 +70,6 @@ version = "0.3.0"
 Homepage = "https://github.com/tensorchiefs/tramdag"
 "Method paper (CLeaR 2025)" = "https://arxiv.org/abs/2503.16206"
 "Stroke case study" = "https://arxiv.org/abs/2606.12623"
-
-[tool.basedpyright]
-venv = ".venv"
-venvPath = "."
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/tramdag"]
