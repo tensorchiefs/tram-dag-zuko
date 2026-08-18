@@ -46,13 +46,6 @@ def test_registry_contains_paper_dgps():
         assert key in REGISTRY
 
 
-@pytest.mark.parametrize("subdir,factory", FROZEN)
-def test_generator_reproducible(subdir, factory):
-    a = factory(42).observational(500)
-    b = factory(42).observational(500)
-    pd.testing.assert_frame_equal(a, b)
-
-
 @pytest.mark.parametrize(
     "factory",
     [

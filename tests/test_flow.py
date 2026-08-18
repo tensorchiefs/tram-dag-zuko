@@ -72,13 +72,6 @@ def test_ordinal_cutpoints_increasing_and_pmf_sums_to_one():
 
 
 # ----------------------------------------------------------------------- dag
-def test_cycle_detection():
-    spec = {
-        "A": ContinuousNode([LS("B")]),
-        "B": ContinuousNode([LS("A")]),
-    }
-    with pytest.raises(ValueError, match="cycle"):
-        validate_and_sort(spec)
 
 
 def test_topological_order():

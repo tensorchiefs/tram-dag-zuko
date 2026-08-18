@@ -13,8 +13,6 @@ import torch
 
 from tramdag import CS, LS, VC, CausalFlowDAG, ContinuousNode, I, OrdinalNode
 
-RNG = np.random.default_rng(11)
-
 
 def _hetero_df(n: int, seed: int = 11) -> pd.DataFrame:
     """Randomized-treatment SCM with an (X2, X3)-modified effect, inert X1:
