@@ -5,8 +5,13 @@ requires = ["hatchling"]
 [dependency-groups]
 # dev is the default `uv sync` group: everything a working checkout needs
 dev = [
+  {include-group = "docs"},
+  {include-group = "experiments"},
   {include-group = "test"},
-  {include-group = "experiments"}
+  "pre-commit",
+  "pylsp-rope",
+  "python-lsp-ruff",
+  "python-lsp-server[all]"
 ]
 docs = [
   "pdoc",
