@@ -61,6 +61,7 @@ flow.fit(
     val_df,
     epochs=4000,
     learning_rate=1e-2,
+    batch_size=512,
     schedule="plateau",
     plateau_patience=30,
     freeze_patience=120,

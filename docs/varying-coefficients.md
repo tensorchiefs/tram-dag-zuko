@@ -25,7 +25,9 @@ spec = {
         + td.VC("X2", "X3", t="T", penalty=1.0)  # effect beta(X2, X3) * T
     ),
 }
-flow = td.CausalFlowDAG(spec, seed=0).fit(train, val, restore_best=True)
+flow = td.CausalFlowDAG(spec, seed=0).fit(
+    train, val, epochs=500, learning_rate=1e-2, batch_size=512, restore_best=True
+)
 
 beta = flow.varying_coef("Y", df_new)  # (n,) array beta(x) — deterministic, y-free
 beta0 = float(flow.nodes["Y"].shifts["T"].beta0)  # interpretable main effect

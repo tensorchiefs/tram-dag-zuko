@@ -323,7 +323,9 @@ flow = CausalFlowDAG(
 flow.fit(
     train_df, val_df, epochs=800, learning_rate=1e-2, batch_size=20000, verbose=200
 )
-flow.fit(train_df, val_df, epochs=300, learning_rate=1e-3, verbose=300)  # polish
+flow.fit(
+    train_df, val_df, epochs=300, learning_rate=1e-3, batch_size=512, verbose=300
+)  # polish
 flow.nll(val_df)
 
 # %% [markdown]
@@ -542,7 +544,7 @@ spec_ls = {
 torch.manual_seed(7)
 flow_ls = CausalFlowDAG(spec_ls)
 flow_ls.fit(train_df, val_df, epochs=800, learning_rate=1e-2, batch_size=512, verbose=0)
-flow_ls.fit(train_df, val_df, epochs=300, learning_rate=1e-3, verbose=0)
+flow_ls.fit(train_df, val_df, epochs=300, learning_rate=1e-3, batch_size=512, verbose=0)
 
 print(
     f"misspecified beta_32 (X2 -> X3): "

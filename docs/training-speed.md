@@ -33,8 +33,8 @@ nodes again.
 R `polr`/`tram`), omit both arguments. The benchmark changed no defaults, so
 
 ```python
-flow.fit(train_df, epochs=4000, learning_rate=1e-2)  # constant lr, no freezing
-flow.fit(train_df, epochs=2000, learning_rate=1e-3)  # classic two-phase recipe
+flow.fit(train_df, epochs=4000, learning_rate=1e-2, batch_size=512)  # constant lr
+flow.fit(train_df, epochs=2000, learning_rate=1e-3, batch_size=512)  # 2nd phase
 ```
 
 is still the exact-MLE path that `experiments/validate_ls.py` uses. Independent of all
