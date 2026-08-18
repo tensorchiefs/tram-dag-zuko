@@ -151,7 +151,6 @@
 # parent.
 
 # %%
-
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -335,7 +334,7 @@ flow.nll(val_df)
 # network carries each parent (the structural view). `decompose_row` prints the
 # actual numbers for one observation and verifies that they rebuild the per-node
 # log-likelihood **exactly**. The equation $u = h_{\boldsymbol{\vartheta}}(x) + \sum \text{shifts}$ is an
-# identity, not a picture. We run both on `X2` (an `ls` edge), `X3` (`ls` + `cs`),
+# identity, not a picture. We run both on `X2` (an `LS` edge), `X3` (`LS` + `CS`),
 # and the ordinal `Y` (shift **subtracted**).
 
 # %%
@@ -527,7 +526,7 @@ plt.show()
 #
 # What happens if we declare the $X_2 \to X_3$ edge as a *linear* shift? The best
 # a linear shift can do is the **average local slope** of $g$. The data mass sits
-# around $E[x_2] \approx -0.75$, so the `ls` model finds
+# around $E[x_2] \approx -0.75$, so the `LS` model finds
 # $\hat\beta_{32} \approx E[g'(x_2)] = E[x_2] \approx -0.7$. That is the tangent
 # of the U-shape, not the U-shape. The model loses the curvature. The per-node
 # validation NLL makes the misfit measurable, and the interventional
@@ -537,7 +536,7 @@ plt.show()
 spec_ls = {
     "X1": ContinuousNode(),
     "X2": ContinuousNode(LS("X1")),
-    "X3": ContinuousNode(LS("X1") + LS("X2")),  # <- cs replaced by ls
+    "X3": ContinuousNode(LS("X1") + LS("X2")),  # <- CS replaced by LS
     "Y": OrdinalNode(4, LS("X3")),
 }
 torch.manual_seed(7)
@@ -560,7 +559,7 @@ print(
 # `flow.sample(n, do={"X1": a})` performs **graph mutilation**: it clamps $X_1$
 # to $a$ and discards the node's own mechanism (and latent). All downstream nodes
 # react. Because we own the DGP, we can simulate the *true* interventional
-# distribution and compare. We also show the misspecified all-`ls` model. It
+# distribution and compare. We also show the misspecified all-`LS` model. It
 # gets the interventional distribution of $X_3$ visibly wrong.
 
 # %%
@@ -677,10 +676,10 @@ plt.show()
 #   synthetic cohort with known ground truth.
 # * **Early stopping vs. exact MLE** — this notebook's DGP has no unobserved
 #   confounding, so the MLE (`restore_best=False`, the default) is the right
-#   target. On the synthetic stroke cohort, flexible (`ci`/`cs`) models *overfit
+#   target. On the synthetic stroke cohort, flexible (`I`/`CS`) models *overfit
 #   observational confounding* at the MLE and need `restore_best=True` to recover
 #   the causal effect. See `CHANGELOG.md` and the README's "Results" notes.
-# * **Validation against classical models** — an all-`ls` flow trained to
+# * **Validation against classical models** — an all-`LS` flow trained to
 #   convergence *is* the classical proportional-odds MLE
 #   (`experiments/validate_ls.py` pins flow ≡ `statsmodels` ≡ R `polr`).
 # * **Joint terms** — write several parents inside one term to model an

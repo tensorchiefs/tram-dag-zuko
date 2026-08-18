@@ -85,10 +85,9 @@ Kept deliberately (checked, not dead):
 
 ## 7. Next steps (not done on this branch)
 
-1. **`notebooks/intro_tram_dag.py`** has uncommitted local changes — left
-   untouched. Its prose uses informal lowercase `ls`/`cs`/`ci` labels in a
-   few places (lines 337, 530, 539, 679, 684); align when the local edits
-   land.
+1. ~~**`notebooks/intro_tram_dag.py`** prose labels~~ — done: the six
+   informal lowercase `ls`/`cs`/`ci` mentions now use the constructor
+   names (`LS`, `CS`, `I`), which the notebook actually teaches.
 2. **pyproject classifiers**: add `Programming Language :: Python :: 3.10`
    to `3.12` before the next PyPI release (release-flow decision).
 3. **`simulations.REGISTRY`** is only consumed by one test; experiments
