@@ -85,8 +85,9 @@ packages = ["src/tramdag"]
 
 [tool.pytest.ini_options]
 addopts = ["-v", "--tb=short"]
-# no -n auto: torch already saturates the cores (the fast subset spends
-# 32 min CPU in 2 min wall), so xdist workers only oversubscribe
+# -n auto is passed by the CI invocation, not baked into addopts, so a bare
+# local `pytest` stays serial and readable. Parallel does pay off: 16 workers
+# run the full suite in ~12 min wall against ~24 min serial (32-core box).
 markers = [
   "slow: long fit/training tests — excluded from PR CI, run in the nightly full suite"
 ]
