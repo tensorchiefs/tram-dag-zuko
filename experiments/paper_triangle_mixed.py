@@ -19,6 +19,7 @@ import numpy as np
 from paper_common import (
     PAPER_N,
     cs_curve,
+    finish,
     fit_chunked,
     ls_weight,
     plot_hist_grid,
@@ -80,8 +81,7 @@ if model == "cs":  # fitted CS == -f(x2) + const, anchored at x2 = 0
     ax.plot(grid, fitted, "o", ms=3, color="C0", label="fitted CS")
     ax.set_xlabel("$x_2$"), ax.legend()
     ax.set_title(f"complex shift on ordinal node, DGP f = {f_name}")
-    fig.tight_layout(), fig.savefig(out / "plots" / "cs_curve.png", dpi=150)
-    plt.close(fig)
+    finish(fig, out / "plots" / "cs_curve.png")
 
 # L1 + L2 (Fig. 9 / 20): obs and do(x1 = -1), x3 as level frequencies
 n_show = 10_000

@@ -29,6 +29,20 @@ SIM_DATA = Path(__file__).resolve().parents[1] / "data"
 
 NODES = ["Age", "mRS_pre", "NIHSSa", "T", "mRS_3m"]
 MRS_LEVELS = list(range(7))
+MRS_X = np.arange(len(MRS_LEVELS))  # bar positions
+
+
+def mrs_freq(values, levels=None) -> pd.Series:
+    """Give the level frequencies of an mRS-like column, zero-filled."""
+    levels = MRS_LEVELS if levels is None else levels
+    return (
+        pd.Series(values)
+        .round()
+        .astype(int)
+        .value_counts(normalize=True)
+        .reindex(levels, fill_value=0)
+    )
+
 
 # RCT benchmark (Berkhemer et al., 2015)
 RCT_ATE = 0.135
@@ -207,14 +221,7 @@ def plot_samples_vs_true(flow: CausalFlowDAG, train_df: pd.DataFrame, save, n=10
             if node in ("Age", "NIHSSa"):
                 ax.hist(data, bins=30, color="steelblue", edgecolor="white")
             else:
-                lv = range(int(train_df[node].max()) + 1)
-                counts = (
-                    pd.Series(data)
-                    .round()
-                    .astype(int)
-                    .value_counts(normalize=True)
-                    .reindex(lv, fill_value=0)
-                )
+                counts = mrs_freq(data, range(int(train_df[node].max()) + 1))
                 ax.bar(
                     counts.index, counts.values, color="steelblue", edgecolor="white"
                 )
@@ -231,15 +238,9 @@ def plot_interventional(flow: CausalFlowDAG, save, n=10_000):
     s_t1 = flow.sample(n, do={"T": 1}, seed=2)
     sets = {"Observational": s_obs, "do(T=0)": s_t0, "do(T=1)": s_t1}
     fig, axes = plt.subplots(1, 3, figsize=(15, 4), sharey=True)
-    x = np.arange(7)
+    x = MRS_X
     for ax, (name, s) in zip(axes, sets.items()):
-        counts = (
-            s["mRS_3m"]
-            .round()
-            .astype(int)
-            .value_counts(normalize=True)
-            .reindex(MRS_LEVELS, fill_value=0)
-        )
+        counts = mrs_freq(s["mRS_3m"])
         ax.bar(x, counts.values, color="steelblue", edgecolor="white")
         good = (s["mRS_3m"] <= 2).mean()
         ax.set_title(f"{name}\nP(mRS<=2) = {good:.3f}")
@@ -309,14 +310,10 @@ def evaluate_rct(
 
     # --- observed RCT arms vs predicted distribution ---
     width = 0.38
-    x = np.arange(7)
+    x = MRS_X
     fig, axes = plt.subplots(1, 2, figsize=(14, 5), sharey=True)
     for arm, color in [(0, "#e07b54"), (1, "steelblue")]:
-        obs = (
-            rct.loc[rct["T"] == arm, "mRS_3m"]
-            .value_counts(normalize=True)
-            .reindex(MRS_LEVELS, fill_value=0)
-        )
+        obs = mrs_freq(rct.loc[rct["T"] == arm, "mRS_3m"])
         axes[0].bar(
             x + (arm - 0.5) * width,
             obs.values * 100,
