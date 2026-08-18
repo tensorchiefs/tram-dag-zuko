@@ -4,8 +4,10 @@ updates:
   directory: /
   schedule:
     interval: weekly
+  target-branch: dev-marcel
 
 - package-ecosystem: uv
   directory: /
   schedule:
     interval: weekly
+  target-branch: dev-marcel
