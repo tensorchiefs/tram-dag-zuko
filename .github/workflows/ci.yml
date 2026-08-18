@@ -41,12 +41,10 @@ jobs:
         python-version: ${{ matrix.python-version }}
         enable-cache: true
 
-    - run: uv sync --group test
+    - run: uv sync --group test --python ${{ matrix.python-version }}
 
     - name: Tests
       shell: bash
       run: >-
         uv run pytest tests/ -q -n auto
-        ${{ github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
-            && ''
-            || '-m "not slow"' }}
+        ${{ (github.event_name != 'schedule' && github.event_name != 'workflow_dispatch') && '-m "not slow"' || '' }}
