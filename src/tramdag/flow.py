@@ -508,6 +508,8 @@ class CausalFlowDAG(nn.Module):
         min_delta: float = 1e-4,
         marginal_init: bool = False,
         vc_warm_start: bool = True,
+        plateau_factor: float = 0.3,
+        vc_oof_fit: dict | None = None,
     ) -> CausalFlowDAG:
         """Fit all nodes jointly by maximum likelihood.
 
@@ -561,7 +563,7 @@ class CausalFlowDAG(nn.Module):
             ``epochs``. ``"plateau"`` decays **per node**: when the
             validation NLL of a node did not improve by ``min_delta`` for
             ``plateau_patience`` epochs, its learning rate decreases by
-            factor 0.3, with floor ``1e-3 * learning_rate``.
+            ``plateau_factor``, with floor ``1e-3 * learning_rate``.
         plateau_patience : int, optional
             Epochs without improvement before one plateau decay step,
             by default 15.
@@ -571,7 +573,9 @@ class CausalFlowDAG(nn.Module):
             from the loss and the backward pass. This is a real compute
             saving, because the per-node losses are independent. When
             every node is frozen the fit returns early. Freeze epochs are
-            recorded in ``history["frozen"]``.
+            recorded in ``history["frozen"]``. Under ``schedule="plateau"``
+            a node freezes only after its learning rate decayed to
+            ``1e-2 * learning_rate`` or below.
         min_delta : float, optional
             Smallest validation improvement that counts, by default 1e-4.
         marginal_init : bool, optional
@@ -593,6 +597,15 @@ class CausalFlowDAG(nn.Module):
             and only learns deviations. Applied once per term — a buffer
             that survives ``save``/``load`` guards against re-runs. Does
             nothing without VC terms.
+        plateau_factor : float, optional
+            Multiplier of one per-node plateau decay step, by default 0.3.
+            Read only under ``schedule="plateau"``.
+        vc_oof_fit : dict | None, optional
+            Keyword overrides for the stage-1 out-of-fold proxy fits of
+            centered VC terms, merged over the default
+            ``{"epochs": 300, "learning_rate": 1e-2, "batch_size": 512}``.
+            Ignored when the treatment node is all-``ls`` — the
+            deterministic :meth:`fit_classical` runs instead.
 
         Returns
         -------
@@ -642,7 +655,7 @@ class CausalFlowDAG(nn.Module):
         # stage 1 for centered VC terms (issue #30): frozen OUT-OF-FOLD e_hat
         # for the training rows — a plain tensor, so the Y-node loss has no
         # gradient path into the treatment node (per-node factorization intact).
-        vc_ehat_train = self._vc_oof_stage(train_df)
+        vc_ehat_train = self._vc_oof_stage(train_df, vc_oof_fit)
 
         train_vals = self._tensorize(train_df)
         val_vals = self._tensorize(val_df) if val_df is not None else train_vals
@@ -744,7 +757,7 @@ class CausalFlowDAG(nn.Module):
                     and node_bad[name] > 0
                     and node_bad[name] % plateau_patience == 0
                 ):
-                    g["lr"] = max(g["lr"] * 0.3, learning_rate * 1e-3)
+                    g["lr"] = max(g["lr"] * plateau_factor, learning_rate * 1e-3)
                 # under "plateau", only freeze nodes whose lr has already been
                 # decayed substantially — otherwise a node can freeze while a
                 # smaller lr would still make progress toward the optimum
@@ -864,7 +877,7 @@ class CausalFlowDAG(nn.Module):
         return torch.sigmoid(shift - theta[:, 0]).cpu().numpy()
 
     def _vc_oof_stage(
-        self, train_df: pd.DataFrame
+        self, train_df: pd.DataFrame, vc_oof_fit: dict | None = None
     ) -> dict[str, dict[str, Tensor]] | None:
         """Compute stage 1 of the two-stage centered-VC design, issue #30.
 
@@ -905,7 +918,9 @@ class CausalFlowDAG(nn.Module):
                         )
                     fold_id = None
                 else:
-                    e, fold_id = self._vc_oof_propensity(g.on, train_df, g.folds)
+                    e, fold_id = self._vc_oof_propensity(
+                        g.on, train_df, g.folds, vc_oof_fit
+                    )
                 out.setdefault(name, {})[g.on] = torch.as_tensor(
                     e.astype(np_dtype), device=self.device
                 )
@@ -921,7 +936,7 @@ class CausalFlowDAG(nn.Module):
         return out
 
     def _vc_oof_propensity(
-        self, on: str, train_df: pd.DataFrame, k: int
+        self, on: str, train_df: pd.DataFrame, k: int, vc_oof_fit: dict | None = None
     ) -> tuple[np.ndarray, np.ndarray]:
         """Compute the out-of-fold ``P(on=1|pa_on)``.
 
@@ -932,7 +947,8 @@ class CausalFlowDAG(nn.Module):
 
         A treatment with all-``ls`` terms uses :meth:`fit_classical`, which is
         deterministic and takes seconds. Any other treatment uses a
-        fixed-budget Adam fit.
+        fixed-budget Adam fit — ``vc_oof_fit`` overrides its keywords, see
+        :meth:`fit`.
         """
         on_nd = self.nodes[on]
         if any(g.center for g in on_nd._vc_groups):
@@ -963,14 +979,9 @@ class CausalFlowDAG(nn.Module):
             if all_ls:
                 proxy.fit_classical(held_in, verbose=False)
             else:
-                proxy.fit(
-                    held_in,
-                    epochs=300,
-                    learning_rate=1e-2,
-                    verbose=0,
-                    seed=0,
-                    restore_best=False,
-                )
+                fit_kw = {"epochs": 300, "learning_rate": 1e-2, "batch_size": 512}
+                fit_kw.update(vc_oof_fit or {})
+                proxy.fit(held_in, verbose=0, seed=0, restore_best=False, **fit_kw)
             e[fold_id == j] = proxy._predict_p1(on, train_df.iloc[fold_id == j])
         return e, fold_id
 
@@ -1250,6 +1261,8 @@ class CausalFlowDAG(nn.Module):
         *,
         max_iter: int = 400,
         tol: float = 1e-6,
+        chunk: int = 25,
+        history_size: int = 50,
         verbose: bool = True,
     ) -> dict:
         """Fit an all-``ls`` model the classical way.
@@ -1275,6 +1288,11 @@ class CausalFlowDAG(nn.Module):
         tol : float, optional
             Relative NLL change between L-BFGS rounds that counts as
             converged, by default 1e-6.
+        chunk : int, optional
+            Inner L-BFGS iterations per round, by default 25. Convergence
+            is checked between rounds.
+        history_size : int, optional
+            L-BFGS memory, by default 50.
         verbose : bool, optional
             Print a one-line summary, by default True.
 
@@ -1321,7 +1339,7 @@ class CausalFlowDAG(nn.Module):
         self.double()  # parameters + buffers (xmin/xmax) -> float64, one call
         assert next(self.parameters()).dtype == torch.float64
         t0 = time.perf_counter()
-        chunk = 25  # inner L-BFGS iterations per round; we stop on NLL change
+        # chunk: inner L-BFGS iterations per round; we stop on NLL change
         try:
             vals = self._tensorize(train_df)
             self.train()
@@ -1329,7 +1347,7 @@ class CausalFlowDAG(nn.Module):
                 self.parameters(),
                 lr=1.0,
                 max_iter=chunk,
-                history_size=50,
+                history_size=history_size,
                 tolerance_grad=0.0,
                 tolerance_change=0.0,
                 line_search_fn="strong_wolfe",

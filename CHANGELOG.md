@@ -16,6 +16,16 @@
   the serialized format are unchanged, and equivalence is pinned by
   state-dict-identical tests (`tests/test_transformation_syntax.py`).
 
+- **Transparent training internals**: the previously hardcoded training
+  knobs are optional kwargs with unchanged defaults —
+  `fit(plateau_factor=0.3)` (per-node plateau decay multiplier) and
+  `fit(vc_oof_fit={...})` (settings of the stage-1 out-of-fold proxy fits
+  behind `VC(center=True)`, default
+  `{"epochs": 300, "learning_rate": 1e-2, "batch_size": 512}`), plus
+  `fit_classical(chunk=25, history_size=50)` (L-BFGS round length and
+  memory). The plateau lr floor (`1e-3 * learning_rate`) and the freeze
+  guard (`1e-2 * learning_rate`) are documented in the `fit` docstring.
+
 - **`intercept()`** is the pythonic name of the intercept-term
   constructor; `I` stays as the exported alias (the notation of the docs
   and the paper).
