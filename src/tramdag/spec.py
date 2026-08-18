@@ -686,7 +686,10 @@ def validate_and_sort(spec: dict[str, NodeSpec]) -> list[str]:
 
 
 def spec_to_dict(spec: dict[str, NodeSpec]) -> dict:
-    """Give a JSON-serializable representation of a spec, for checkpoints.
+    """Give the serialized representation of a spec, for checkpoints.
+
+    ``Term.options`` is already canonical — sorted by key, defaults
+    dropped — so a term serializes as its three fields and nothing else.
 
     Parameters
     ----------
@@ -700,61 +703,21 @@ def spec_to_dict(spec: dict[str, NodeSpec]) -> dict:
     """
     out = {}
     for name, node in spec.items():
-        terms = [
-            {
-                "effect": t.effect,
-                "parents": list(t.parents),
-                **({"units": list(t.units)} if t.units else {}),
-                **({"allow_interaction": False} if not t.allow_interaction else {}),
-                **({"transform": t.transform} if t.transform else {}),
-                **(
-                    {"transform_kwargs": dict(t.transform_kwargs)}
-                    if t.transform_kwargs
-                    else {}
-                ),
-                **(
-                    {
-                        "penalty": t.penalty,
-                        "center": t.center,
-                        "center_folds": t.center_folds,
-                    }
-                    if t.effect == "VC"
-                    else {}
-                ),
-            }
-            for t in node_terms(node)
-        ]
-        d = {"kind": node.kind, "terms": terms}
+        d = {
+            "kind": node.kind,
+            "terms": [
+                {
+                    "effect": t.effect,
+                    "parents": list(t.parents),
+                    "options": dict(t.options),
+                }
+                for t in node_terms(node)
+            ],
+        }
         if isinstance(node, OrdinalNode):
             d["levels"] = node.levels
         out[name] = d
     return out
-
-
-def _term_from_dict(t: dict) -> Term:
-    """Rebuild one term from its serialized form."""
-    units = tuple(t["units"]) if t.get("units") else None
-    if t["effect"] == "VC":
-        on, *mods = t["parents"]
-        return varying_coefficient(
-            *mods,
-            t=on,
-            penalty=t["penalty"],
-            center=t["center"],
-            center_folds=t["center_folds"],
-            units=units,
-        )
-    if t["effect"] == "I":
-        return intercept(
-            *t["parents"],
-            allow_interaction=t.get("allow_interaction", True),
-            transform=t.get("transform"),
-            transform_kwargs=t.get("transform_kwargs"),
-            units=units,
-        )
-    if t["effect"] == "LS":
-        return linear_shift(*t["parents"])
-    return complex_shift(*t["parents"], units=units)
 
 
 def spec_from_dict(d: dict) -> dict[str, NodeSpec]:
@@ -772,7 +735,14 @@ def spec_from_dict(d: dict) -> dict[str, NodeSpec]:
     """
     spec: dict[str, NodeSpec] = {}
     for name, nd in d.items():
-        terms = [_term_from_dict(t) for t in nd["terms"]] or None
+        terms = [
+            Term(
+                t["effect"],
+                tuple(t["parents"]),
+                tuple(sorted(t["options"].items())),
+            )
+            for t in nd["terms"]
+        ] or None
         if nd["kind"] == "continuous":
             spec[name] = ContinuousNode(terms)
         else:
