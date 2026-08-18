@@ -7,7 +7,11 @@ positional argument, written as a list or as a ``+`` sum::
     "X3": ContinuousNode([I("X1"), CS("X2")])       # h = h_theta(x1) + g(x2)
     "X3": ContinuousNode(I("X1") + CS("X2"))        # the same, formula style
 
-Term constructors name the parent(s) a term depends on:
+Term constructors name the parent(s) a term depends on. Each has a
+pythonic name and a short alias — ``intercept``/``I``,
+``linear_shift``/``LS``, ``complex_shift``/``CS`` and
+``varying_coefficient``/``VC`` — and the two spellings are the same
+object, so use whichever reads better:
 
 - :func:`I`  — *intercept* term: the parent(s) reshape the monotone transform
   (its Bernstein coefficients / ordinal cutpoints). ``I()`` with no parent — or
@@ -192,8 +196,11 @@ def intercept(
     )
 
 
-def LS(*parents: str) -> Term:
+def linear_shift(*parents: str) -> Term:
     """Build a linear-shift term ``beta * x``.
+
+    ``LS`` is the exported alias of this function, the notation of the
+    docs and the paper.
 
     Parameters
     ----------
@@ -215,8 +222,13 @@ def LS(*parents: str) -> Term:
     return Term("LS", tuple(parents))
 
 
-def CS(*parents: str, units: list[int] | tuple[int, ...] | None = None) -> Term:
+def complex_shift(
+    *parents: str, units: list[int] | tuple[int, ...] | None = None
+) -> Term:
     """Build a complex-shift term: an additive MLP ``g(x)``.
+
+    ``CS`` is the exported alias of this function, the notation of the
+    docs and the paper.
 
     Parameters
     ----------
@@ -241,7 +253,7 @@ def CS(*parents: str, units: list[int] | tuple[int, ...] | None = None) -> Term:
     return Term("CS", tuple(parents), _options(units=tuple(units) if units else None))
 
 
-def VC(
+def varying_coefficient(
     *modifiers: str,
     t: str,
     penalty: float = 1.0,
@@ -250,6 +262,9 @@ def VC(
     units: list[int] | tuple[int, ...] | None = None,
 ) -> Term:
     """Build a varying-coefficient shift term ``beta(modifiers) * x_t``.
+
+    ``VC`` is the exported alias of this function, the notation of the
+    docs and the paper.
 
     This is the treatment-effect term of issue #28:
     ``VC("X2", "X3", t="T")`` is ``(beta0 + b_theta(x2, x3)) * x_t``.
@@ -371,16 +386,16 @@ def term(effect: str, *parents: str, penalty: float | None = None) -> Term:
     if penalty is not None and effect != "VC":
         raise ValueError(f"term(): penalty only applies to 'VC', not '{effect}'.")
     if effect == "I":
-        return I(*parents)
+        return intercept(*parents)
     if effect == "LS":
-        return LS(*parents)
+        return linear_shift(*parents)
     if effect == "CS":
-        return CS(*parents)
+        return complex_shift(*parents)
     if effect == "VC":
         t, mods = parents[0], parents[1:]
         if penalty is None:
-            return VC(*mods, t=t)
-        return VC(*mods, t=t, penalty=penalty)
+            return varying_coefficient(*mods, t=t)
+        return varying_coefficient(*mods, t=t, penalty=penalty)
     raise ValueError(f"unknown term effect '{effect}'.")
 
 
@@ -392,8 +407,8 @@ def _normalize_transformation(value, *, name: str = "transformation"):
     """
     if value is None:
         return None
-    if value is I:
-        value = [I()]
+    if value is intercept:
+        value = [intercept()]
     elif isinstance(value, Term):
         value = [value]
     if not isinstance(value, (list, tuple)):
@@ -403,8 +418,8 @@ def _normalize_transformation(value, *, name: str = "transformation"):
         )
     out: list[Term] = []
     for element in value:
-        if element is I:
-            element = I()
+        if element is intercept:
+            element = intercept()
         if isinstance(element, (list, tuple)):  # a nested `+` sum
             out.extend(_normalize_transformation(element, name=name))
         elif isinstance(element, Term):
@@ -721,7 +736,7 @@ def _term_from_dict(t: dict) -> Term:
     units = tuple(t["units"]) if t.get("units") else None
     if t["effect"] == "VC":
         on, *mods = t["parents"]
-        return VC(
+        return varying_coefficient(
             *mods,
             t=on,
             penalty=t["penalty"],
@@ -730,7 +745,7 @@ def _term_from_dict(t: dict) -> Term:
             units=units,
         )
     if t["effect"] == "I":
-        return I(
+        return intercept(
             *t["parents"],
             allow_interaction=t.get("allow_interaction", True),
             transform=t.get("transform"),
@@ -738,8 +753,8 @@ def _term_from_dict(t: dict) -> Term:
             units=units,
         )
     if t["effect"] == "LS":
-        return LS(*t["parents"])
-    return CS(*t["parents"], units=units)
+        return linear_shift(*t["parents"])
+    return complex_shift(*t["parents"], units=units)
 
 
 def spec_from_dict(d: dict) -> dict[str, NodeSpec]:
@@ -765,5 +780,10 @@ def spec_from_dict(d: dict) -> dict[str, NodeSpec]:
     return spec
 
 
-# the single-letter notation of the docs and the paper
+# The short aliases are the notation of the docs and the paper, and the
+# spelling nearly every caller uses; the long names above are their
+# definitions, so `I is intercept` and the bare `I` sugar keeps working.
 I = intercept  # noqa: E741 - ambiguous only out of context
+LS = linear_shift
+CS = complex_shift
+VC = varying_coefficient

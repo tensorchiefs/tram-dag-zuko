@@ -6,13 +6,16 @@ The last section lists every training hyperparameter and where it lives.
 
 ## `spec.py` — declare the model
 
+Every term constructor has a pythonic name and a short alias; the two
+are the same object, so `LS is linear_shift`.
+
 | Name | Role |
 |---|---|
 | `Term` | One additive term of a node's transformation: the frozen triple `(effect, parents, options)`. `slot` is derived from the effect. `+` on terms builds plain lists. Effect-specific settings live in `options` and read as attributes (`term.penalty`, `term.units`, ...). |
 | `intercept()` / `I` | Intercept term: the parents reshape the monotone transform. `I()` or the bare name `I` is the simple-intercept baseline. Carries the basis choice (`transform=`, default `"bernstein"`) and `allow_interaction=` (joint vs. additive multi-parent intercept). |
-| `LS()` | Linear shift `beta * x` — the interpretable log-odds coefficient. Exactly one parent. |
-| `CS()` | Complex shift: an MLP `g(x)`, additive on the latent scale. Several parents form one joint network. |
-| `VC()` | Varying-coefficient shift `(beta0 + b_theta(mods)) * x_t` — the penalized treatment-effect head (issue #28). `center=` adds propensity centering (issue #30). |
+| `linear_shift()` / `LS` | Linear shift `beta * x` — the interpretable log-odds coefficient. Exactly one parent. |
+| `complex_shift()` / `CS` | Complex shift: an MLP `g(x)`, additive on the latent scale. Several parents form one joint network. |
+| `varying_coefficient()` / `VC` | Varying-coefficient shift `(beta0 + b_theta(mods)) * x_t` — the penalized treatment-effect head (issue #28). `center=` adds propensity centering (issue #30). |
 | `term()` | Build a term from a data-driven label (`"I"`, `"LS"`, `"CS"`, `"VC"`). For sweeps that read the effect type from config. |
 | `ContinuousNode` | Continuous variable: monotone 1-D transform plus shifts. The transformation is the first positional argument. |
 | `OrdinalNode` | Ordinal variable with `levels` classes: ordered logit (cutpoints) plus shifts. |

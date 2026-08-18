@@ -25,9 +25,11 @@
   memory). The plateau lr floor (`1e-3 * learning_rate`) and the freeze
   guard (`1e-2 * learning_rate`) are documented in the `fit` docstring.
 
-- **`intercept()`** is the pythonic name of the intercept-term
-  constructor; `I` stays as the exported alias (the notation of the docs
-  and the paper).
+- **Pythonic names for every term constructor**, with the short
+  notation kept as an alias of the same object: `intercept`/`I`,
+  `linear_shift`/`LS`, `complex_shift`/`CS` and
+  `varying_coefficient`/`VC`. Both spellings are exported, so
+  `LS is linear_shift` and existing code reads unchanged.
 
 - **`units=` on `I`, `CS` and `VC`** sizes the term's network directly,
   e.g. `units=[16]` for one hidden layer (defaults: I `[8, 8]`,

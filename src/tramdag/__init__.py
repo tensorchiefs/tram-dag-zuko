@@ -16,8 +16,11 @@ from .spec import (
     I,
     OrdinalNode,
     Term,
+    complex_shift,
     intercept,
+    linear_shift,
     term,
+    varying_coefficient,
 )
 
 __all__ = [
@@ -26,13 +29,16 @@ __all__ = [
     "OrdinalNode",
     "machine_info",
     "simulations",
-    # term-formula notation
+    # term-formula notation: short aliases and their definitions
     "Term",
     "I",
     "intercept",
     "LS",
+    "linear_shift",
     "CS",
+    "complex_shift",
     "VC",
+    "varying_coefficient",
     "term",
 ]
 __version__ = version("tramdag")
