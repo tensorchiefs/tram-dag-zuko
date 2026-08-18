@@ -105,6 +105,12 @@ Kept deliberately (checked, not dead):
 
 ## 8. Open after the simplification pass (2026-08-18)
 
+Sections 1-7 are the 2026-08-17 record and stay as written. Three of the
+decisions there were superseded the next day, when backward compatibility
+was dropped: the `_LEGACY` labels kept in §3 are gone, the
+`counterfactual_pair` methods kept in §3 moved to a shared mixin, and the
+0.3-shim test added in §4 was removed with the shims it pinned.
+
 1. **Intercept unification** — the three-branch intercept
    (`intercept` / `intercept_nets` / `None`) can become one `ModuleList`
    now that checkpoint compatibility is gone (about −30 lines in
