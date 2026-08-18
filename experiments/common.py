@@ -102,14 +102,14 @@ def split(df: pd.DataFrame):
 def build_spec(style: str) -> dict:
     """DAG spec for the fully-connected stroke DAG.
 
-    style="flexible": the nihss6 configuration (Age 'ci', mRS_pre 'ls',
-    NIHSSa 'cs', T 'ls' — per-edge terms as in nihss6/configuration.json).
+    style="flexible": the nihss6 configuration (Age 'I', mRS_pre 'LS',
+    NIHSSa 'CS', T 'LS' — per-edge terms as in nihss6/configuration.json).
     style="ls": all edges linear shift (classical proportional-odds analog).
     """
     if style == "flexible":
-        t = {"Age": "ci", "mRS_pre": "ls", "NIHSSa": "cs", "T": "ls"}
+        t = {"Age": "I", "mRS_pre": "LS", "NIHSSa": "CS", "T": "LS"}
     elif style == "ls":
-        t = {"Age": "ls", "mRS_pre": "ls", "NIHSSa": "ls", "T": "ls"}
+        t = {"Age": "LS", "mRS_pre": "LS", "NIHSSa": "LS", "T": "LS"}
     else:
         raise ValueError(f"unknown style '{style}'")
     return {

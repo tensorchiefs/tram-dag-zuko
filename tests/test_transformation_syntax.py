@@ -1,9 +1,8 @@
-"""The 0.4 transformation syntax.
+"""The transformation syntax.
 
 Every spelling must produce the same normalized term list — and, at a
-fixed seed, the bit-identical model. The 0.3 keywords (``terms=``,
-node-level ``transform=``, VC's positional treatment) are gone and raise,
-and a node takes at most one intercept term with parents.
+fixed seed, the bit-identical model. A node takes at most one intercept
+term with parents, and a VC term names its treatment by keyword.
 """
 
 import pytest
@@ -84,22 +83,12 @@ def test_ordinal_rejects_i_transform():
         OrdinalNode(3, [I("a", transform="spline")])
 
 
-# -------------------------------------------------------- removed 0.3 API
-
-
-def test_terms_keyword_is_gone():
-    with pytest.raises(TypeError):
-        ContinuousNode(terms=[I("x1")])
-
-
-def test_node_level_transform_is_gone():
-    with pytest.raises(TypeError):
-        ContinuousNode(transform="spline")
+# ------------------------------------------------------- signature guards
 
 
 def test_vc_treatment_is_keyword_only():
     with pytest.raises(TypeError):
-        VC("T", "X2")  # 0.3 order: treatment positional
+        VC("T", "X2")  # the treatment is the keyword t=
 
 
 # --------------------------------------------------- model-level identity
@@ -162,40 +151,6 @@ def test_roundtrip_keeps_hoisted_transform_and_terms():
     back = spec_from_dict(spec_to_dict(spec))
     assert back["x1"].transform == "spline"
     assert back["x2"].transformation == [I("x1")]
-
-
-def test_0_3_format_dict_still_loads():
-    """The two 0.3-checkpoint shims in spec_from_dict, pinned.
-
-    0.3 stored the basis on the node (not on an I term) and wrote an
-    additive intercept as several parented I terms. Both forms must
-    keep loading.
-    """
-    d = {
-        "x1": {
-            "kind": "continuous",
-            "terms": [],
-            "transform": "spline",
-            "transform_kwargs": {"bins": 6},
-        },
-        "x2": {"kind": "continuous", "terms": [], "transform": "bernstein"},
-        "y": {
-            "kind": "continuous",
-            "terms": [
-                {"effect": "I", "parents": ["x1"]},
-                {"effect": "I", "parents": ["x2"]},
-            ],
-            "transform": "bernstein",
-        },
-    }
-    spec = spec_from_dict(d)
-    # node-level basis is carried onto an inserted bare I term
-    assert spec["x1"].transform == "spline"
-    assert spec["x1"].transform_kwargs == {"bins": 6}
-    # several parented I terms merge into one additive intercept
-    assert spec["y"].transformation == [I("x1", "x2", allow_interaction=False)]
-    assert validate_and_sort(spec) == ["x1", "x2", "y"]
-    CausalFlowDAG(spec)  # and the merged spec builds
 
 
 def test_saved_checkpoint_of_new_syntax_loads(tmp_path):

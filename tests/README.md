@@ -111,7 +111,7 @@ decreasing order of exactness:
 | [`test_fit_schedules.py`](test_fit_schedules.py) | lr schedules and per-node freezing, incl. the guard that plateau+freeze still lands on the MLE |
 | [`test_fit_classical.py`](test_fit_classical.py) | `fit_classical` — guard on non-`ls` specs, determinism, float64 round-trip, agreement with `statsmodels` and Adam |
 | [`test_spec_terms.py`](test_spec_terms.py) | term constructors, edge ownership, the meta-adjacency view |
-| [`test_transformation_syntax.py`](test_transformation_syntax.py) | the 0.4 formula syntax — every spelling normalizes identically, 0.3-dict shims, `units=` |
+| [`test_transformation_syntax.py`](test_transformation_syntax.py) | the formula syntax — every spelling normalizes identically, `units=`, round-trips |
 | [`test_joint_terms.py`](test_joint_terms.py) | joint multi-parent CS/I terms |
 | [`test_additive_ci.py`](test_additive_ci.py) | the additive intercept (`allow_interaction=False`) |
 | [`test_intercept_contributions.py`](test_intercept_contributions.py) | the post-hoc GAM decomposition of complex intercepts |

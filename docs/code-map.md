@@ -13,13 +13,13 @@ The last section lists every training hyperparameter and where it lives.
 | `LS()` | Linear shift `beta * x` — the interpretable log-odds coefficient. Exactly one parent. |
 | `CS()` | Complex shift: an MLP `g(x)`, additive on the latent scale. Several parents form one joint network. |
 | `VC()` | Varying-coefficient shift `(beta0 + b_theta(mods)) * x_t` — the penalized treatment-effect head (issue #28). `center=` adds propensity centering (issue #30). |
-| `term()` | Build a term from a data-driven label (`"LS"`, or legacy `"ls"`/`"cs"`/`"ci"`). For sweeps that read the effect type from config. |
+| `term()` | Build a term from a data-driven label (`"I"`, `"LS"`, `"CS"`, `"VC"`). For sweeps that read the effect type from config. |
 | `ContinuousNode` | Continuous variable: monotone 1-D transform plus shifts. The transformation is the first positional argument. |
 | `OrdinalNode` | Ordinal variable with `levels` classes: ordered logit (cutpoints) plus shifts. |
 | `node_terms()` / `node_parents()` | Canonical term list / ordered de-duplicated parent names of a node. |
 | `validate_and_sort()` | Edge-ownership validation plus Kahn topological sort. The returned order makes the flow triangular. |
-| `spec_to_dict()` / `spec_from_dict()` | Checkpoint (de)serialization. The loader carries the two 0.3-format shims: multi-`I` merge and node-level-transform carry. |
-| (`_normalize_transformation`, `_check_single_intercept`, `_hoist_transform`, `_options`, `_OPTION_DEFAULTS`, `_LEGACY`) | Input normalization, the one-parented-`I` rule, basis hoisting onto the node, canonical option storage, legacy label map for `term()`. |
+| `spec_to_dict()` / `spec_from_dict()` | Checkpoint (de)serialization. One format, no compatibility shims: the basis rides on the intercept term, so the node carries no copy of it. |
+| (`_normalize_transformation`, `_check_single_intercept`, `_hoist_transform`, `_options`, `_OPTION_DEFAULTS`) | Input normalization, the one-parented-`I` rule, basis hoisting onto the node, canonical option storage. |
 
 ## `transforms.py` — the monotone map h and the ordinal transform
 
@@ -67,7 +67,7 @@ stay comparable to it.
 | `intercept_contributions()` | Post-hoc GAM-style decomposition of a complex intercept into mean-centered per-term parts. |
 | `ls_coefficients()` | The per-node linear-shift weights — the interpretable coefficients. |
 | `to_matrix()` | The labeled meta-adjacency matrix of term effects. |
-| `save()` / `load()` | Checkpoints with history and machine provenance. 0.3 checkpoints load. |
+| `save()` / `load()` | Checkpoints with history and machine provenance. `load` requires a complete checkpoint and fails loudly otherwise. |
 | (`_Node`, `_VCGroup`) | Per-node module (intercept + shift `ModuleDict` + VC bookkeeping); `theta_shift()` computes `(theta, shift)`. |
 | (`_encode_parent`, `_features`, `_tensorize`, `_dtype`, `_np_dtype`) | Parent encoding (continuous raw, ordinal one-hot), DataFrame → tensors, dtype plumbing. |
 | (`_set_ranges`) | Train 5%/95% quantiles onto the transform domain, plus the optional marginal initialization. First fit only. |

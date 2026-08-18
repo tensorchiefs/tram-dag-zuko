@@ -1733,9 +1733,7 @@ class CausalFlowDAG(nn.Module):
             if node.kind == "continuous":
                 node.ut._fitted = True
         flow.load_state_dict(ckpt["state_dict"])
-        flow.history = ckpt.get(
-            "history", {"train": [], "val": [], "lr": [], "time": []}
-        )
-        flow.meta = ckpt.get("meta", {})
+        flow.history = ckpt["history"]
+        flow.meta = ckpt["meta"]
         flow.eval()
         return flow

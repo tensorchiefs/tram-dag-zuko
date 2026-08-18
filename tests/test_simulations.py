@@ -18,9 +18,9 @@ DATA = Path(__file__).resolve().parents[1] / "data" / "magic-mrclean"
 
 def _spec(style: str) -> dict:
     if style == "ls":
-        t = {"Age": "ls", "mRS_pre": "ls", "NIHSSa": "ls", "T": "ls"}
+        t = {"Age": "LS", "mRS_pre": "LS", "NIHSSa": "LS", "T": "LS"}
     else:
-        t = {"Age": "ci", "mRS_pre": "ls", "NIHSSa": "cs", "T": "ls"}
+        t = {"Age": "I", "mRS_pre": "LS", "NIHSSa": "CS", "T": "LS"}
     return {
         "Age": ContinuousNode(),
         "mRS_pre": OrdinalNode(6, [term(t["Age"], "Age")]),

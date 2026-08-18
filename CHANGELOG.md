@@ -12,8 +12,7 @@
   `I("a","b", allow_interaction=False) == I("a") + I("b")`) and
   `transform=`/`transform_kwargs=` (the monotone basis moves onto the
   intercept term, e.g. `I("x1", transform="spline")`). Everything
-  normalizes to the same internal term list: checkpoints, `flow.py` and
-  the serialized format are unchanged, and equivalence is pinned by
+  normalizes to the same internal term list, and equivalence is pinned by
   state-dict-identical tests (`tests/test_transformation_syntax.py`).
 
 - **Transparent training internals**: the previously hardcoded training
@@ -33,8 +32,7 @@
 - **`units=` on `I`, `CS` and `VC`** sizes the term's network directly,
   e.g. `units=[16]` for one hidden layer (defaults: I `[8, 8]`,
   CS `[64, 128, 64]`, VC `[16]`); serialized per term. All conditioner
-  networks now build through one `_mlp()` helper whose module indices
-  match the historical Sequentials, so 0.3 checkpoints still load.
+  networks now build through one `_mlp()` helper.
 
 ### Changed (breaking)
 
@@ -45,12 +43,22 @@
 
 ### Removed (breaking)
 
+- **All backward compatibility.** Pre-1.0, one API and one checkpoint
+  format: `term()` takes the current labels only (`"I"`, `"LS"`, `"CS"`,
+  `"VC"` — the lowercase `"ls"`/`"cs"`/`"ci"` aliases are gone), the two
+  0.3-checkpoint shims in `spec_from_dict` (the multi-`I` merge and the
+  node-level-basis carry) are gone with the redundant node-level
+  `transform`/`transform_kwargs` keys that fed them, VC terms read
+  `center`/`center_folds` directly, and `load` requires a complete
+  checkpoint (spec, weights, history, meta) instead of tolerating missing
+  blocks. Checkpoints and specs written by earlier versions no longer
+  load; regenerate them.
+
 - The `terms=` keyword (use the first positional argument), node-level
   `ContinuousNode(transform=/transform_kwargs=)` (choose the basis on the
   intercept term, `I(..., transform="spline")`), the unused
-  `Intercept`/`LinShift`/`CShift` aliases, and the pre-0.3
-  `parents={...}` checkpoint loader. 0.3 checkpoints (`terms` layout)
-  still load; their node-level basis is converted on load.
+  `Intercept`/`LinShift`/`CShift` aliases, and the `parents={...}`
+  checkpoint loader.
 - The unmaintained notebooks and experiment scripts moved to
   `notebooks/stale/` and `experiments/stale/`; the maintained set is
   the intro and Colab demo notebooks plus `sim_flow.py` and
@@ -108,7 +116,7 @@
 
 - **`flow.intercept_contributions(node, data)`** (issue #20, Option A) — post-hoc,
   mean-centered decomposition of an **additive complex intercept**
-  (`terms=[I("x1"), I("x2")]`). The per-term networks are summed in unconstrained
+  (`[I("x1"), I("x2")]`). The per-term networks are summed in unconstrained
   parameter space, so the sum is identified but each term's contribution only up to
   a constant; this returns each term's **sum-to-zero** (GAM-style mean-centered over
   `data`) contribution to the transform parameters plus the absorbed `baseline`, for

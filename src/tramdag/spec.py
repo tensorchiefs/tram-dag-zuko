@@ -51,19 +51,11 @@ Each parent enters through exactly one *edge-owning* term (I/LS/CS parents, and
 a VC term's ``on``). VC **modifiers** are exempt: ``CS("x2")`` + ``VC("t", "x2")``
 is the intended pattern — ``x2`` acts prognostically through the shift *and*
 modifies the treatment effect.
-
-The 0.3 spellings are gone: ``terms=`` became the positional argument, and
-the node-level ``transform=`` moved onto the intercept term. Checkpoints
-saved by 0.3 still load.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass
-
-# legacy term labels -> term effect. Only ``term()`` accepts them (data-driven
-# sweeps still say "ls"/"cs"/"ci"); the pre-0.3 checkpoint loader is gone.
-_LEGACY = {"ls": "LS", "cs": "CS", "ci": "I"}
 
 EFFECTS = ("I", "LS", "CS", "VC")
 
@@ -352,13 +344,12 @@ def term(effect: str, *parents: str, penalty: float | None = None) -> Term:
     """Build a :class:`Term` from an effect label.
 
     Use this when the effect type comes from data, for example when a
-    study sweeps ``"ls"`` against ``"cs"``.
+    study sweeps ``"LS"`` against ``"CS"``.
 
     Parameters
     ----------
     effect : str
-        A current label (``"I"``, ``"LS"``, ``"CS"``, ``"VC"``) or a
-        legacy label (``"ls"``, ``"cs"``, ``"ci"``), case-insensitive.
+        One of ``"I"``, ``"LS"``, ``"CS"``, ``"VC"``.
     *parents : str
         Parent names. For ``"VC"`` the first name is the treatment and
         the rest are the modifiers.
@@ -377,16 +368,15 @@ def term(effect: str, *parents: str, penalty: float | None = None) -> Term:
         If the label is unknown, or if ``penalty`` is given for a
         non-``VC`` effect.
     """
-    e = _LEGACY.get(effect.lower(), effect.upper())
-    if penalty is not None and e != "VC":
+    if penalty is not None and effect != "VC":
         raise ValueError(f"term(): penalty only applies to 'VC', not '{effect}'.")
-    if e == "I":
+    if effect == "I":
         return I(*parents)
-    if e == "LS":
+    if effect == "LS":
         return LS(*parents)
-    if e == "CS":
+    if effect == "CS":
         return CS(*parents)
-    if e == "VC":
+    if effect == "VC":
         t, mods = parents[0], parents[1:]
         if penalty is None:
             return VC(*mods, t=t)
@@ -720,10 +710,7 @@ def spec_to_dict(spec: dict[str, NodeSpec]) -> dict:
             for t in node_terms(node)
         ]
         d = {"kind": node.kind, "terms": terms}
-        if isinstance(node, ContinuousNode):
-            d["transform"] = node.transform
-            d["transform_kwargs"] = dict(node.transform_kwargs)
-        else:
+        if isinstance(node, OrdinalNode):
             d["levels"] = node.levels
         out[name] = d
     return out
@@ -738,8 +725,8 @@ def _term_from_dict(t: dict) -> Term:
             *mods,
             t=on,
             penalty=t["penalty"],
-            center=t.get("center", False),
-            center_folds=t.get("center_folds", 5),
+            center=t["center"],
+            center_folds=t["center_folds"],
             units=units,
         )
     if t["effect"] == "I":
@@ -770,32 +757,11 @@ def spec_from_dict(d: dict) -> dict[str, NodeSpec]:
     """
     spec: dict[str, NodeSpec] = {}
     for name, nd in d.items():
-        terms = [_term_from_dict(t) for t in nd["terms"]]
-        # 0.3 wrote an additive intercept as several I terms; merge them
-        parented_i = [t for t in terms if t.effect == "I" and t.parents]
-        if len(parented_i) > 1:
-            merged = I(
-                *(p for t in parented_i for p in t.parents),
-                allow_interaction=False,
-            )
-            terms = [merged if t is parented_i[0] else t for t in terms]
-            terms = [t for t in terms if t not in parented_i[1:]]
+        terms = [_term_from_dict(t) for t in nd["terms"]] or None
         if nd["kind"] == "continuous":
-            # 0.3 checkpoints store the basis on the node; carry it on a bare I
-            stored = nd.get("transform", "bernstein")
-            if not any(t.transform for t in terms) and (
-                stored != "bernstein" or nd.get("transform_kwargs")
-            ):
-                terms.insert(
-                    0,
-                    I(
-                        transform=stored,
-                        transform_kwargs=dict(nd.get("transform_kwargs") or {}),
-                    ),
-                )
-            spec[name] = ContinuousNode(terms or None)
+            spec[name] = ContinuousNode(terms)
         else:
-            spec[name] = OrdinalNode(int(nd["levels"]), terms or None)
+            spec[name] = OrdinalNode(int(nd["levels"]), terms)
     return spec
 
 

@@ -76,11 +76,6 @@ def test_center_serialization_roundtrip():
     }
     t = spec_from_dict(spec_to_dict(spec))["Y"].transformation[0]
     assert (t.center, t.center_folds) == (True, 3)
-    # pre-#30 checkpoints (no center key) load as uncentered
-    d = spec_to_dict(spec)
-    del d["Y"]["terms"][0]["center"], d["Y"]["terms"][0]["center_folds"]
-    t2 = spec_from_dict(d)["Y"].transformation[0]
-    assert (t2.center, t2.center_folds) == (False, 5)
 
 
 # ---------------------------------------- acceptance: center=False regression

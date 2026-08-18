@@ -47,7 +47,7 @@ def test_vc_constructor_and_term_factory():
         ("T", "X2", "X3"),
         2.5,
     )
-    t2 = term("vc", "T", "X2", penalty=2.5)
+    t2 = term("VC", "T", "X2", penalty=2.5)
     assert t2 == VC("X2", penalty=2.5, t="T")
     assert term("VC", "T").penalty == VC(t="T").penalty  # shared default
     with pytest.raises(ValueError):
@@ -55,7 +55,7 @@ def test_vc_constructor_and_term_factory():
     with pytest.raises(ValueError):
         VC(penalty=-1.0, t="T")  # negative penalty
     with pytest.raises(ValueError):
-        term("ls", "T", penalty=1.0)  # penalty is VC-only
+        term("LS", "T", penalty=1.0)  # penalty is VC-only
 
 
 def test_vc_modifier_may_repeat_but_on_owns_its_edge():

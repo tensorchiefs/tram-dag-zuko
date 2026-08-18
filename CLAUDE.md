@@ -32,8 +32,7 @@ Experiments default to the synthetic data (`magic-mrclean/nl`). The `magic` sour
 
 - `spec.py` — user-facing DAG spec: `{name: ContinuousNode|OrdinalNode}`, each node
   declares its transformation as the first positional argument — a list of terms
-  or a `+` sum (`I("a") + LS("b")`), since 0.4.0 (the 0.3 `terms=` keyword and
-  node-level `transform=` were removed; 0.3 checkpoints still load). Term constructors: `LS(parent)`
+  or a `+` sum (`I("a") + LS("b")`). Term constructors: `LS(parent)`
   (linear shift), `CS(*parents)` (complex shift MLP), `I(*parents)` (complex
   intercept — transform params from parents), `VC(*modifiers, t=, penalty=)`
   (varying-coefficient effect head `beta(modifiers)·x_t`, small penalized
@@ -52,7 +51,7 @@ Experiments default to the synthetic data (`magic-mrclean/nl`). The `magic` sour
   `AffineUT`; pre-scaled from train 5%/95% quantiles to [-5,5], expanding-bracket
   bisection inverse) + the ordinal ordered-logit transform
   (`P(Y<=k) = sigmoid(theta_k - shift)`, cutpoints `[t0, t0+cumsum(exp(...))]`).
-- `conditioners.py` — ls/cs/ci networks (widths replicate the original Keras/TF implementation).
+- `conditioners.py` — the LS/CS/I networks (widths replicate the reference Keras implementation).
 - `flow.py` — `CausalFlowDAG`: `fit`, `fit_classical` (float64 full-batch
   L-BFGS, exact MLE for all-`ls` specs), `sample(n, do=, u=)`, `abduct`, `pmf`,
   `log_prob`, `save/load`, `varying_coef` (VC read-out), `scores` /
@@ -90,7 +89,7 @@ Experiments default to the synthetic data (`magic-mrclean/nl`). The `magic` sour
 - **`fit(restore_best=False)` is the default** (keeps final converged weights = exact
   MLE; an all-`ls` model then matches statsmodels/R-polr to ~1e-3). `restore_best=True`
   = per-node best-validation restoration (early stopping). Key empirical finding:
-  **flexible (ci/cs) models overfit observational confounding at the MLE and need
+  **flexible (I/CS) models overfit observational confounding at the MLE and need
   `restore_best=True` to recover the causal effect; all-`ls` models don't.**
   `run_experiment` defaults per style. See CHANGELOG.md.
 

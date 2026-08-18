@@ -35,8 +35,7 @@ def _mlp(
     """Build the one MLP shape every conditioner uses.
 
     Hidden layers of the given ``units`` with ReLU, then a bias-free output
-    layer. The resulting module indices match the historical hand-written
-    Sequentials, so checkpoints saved before this helper still load.
+    layer.
 
     Parameters
     ----------

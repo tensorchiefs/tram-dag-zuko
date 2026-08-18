@@ -1,7 +1,5 @@
 """Tests for the term-formula notation (I/LS/CS) — construction, validation,
-serialization, and the meta-adjacency view. (The legacy ``parents={...}`` dict
-API and its checkpoint loader were removed; ``term()`` still accepts the
-lowercase labels, and 0.3 ``terms``-layout checkpoints still load.)
+serialization, and the meta-adjacency view.
 """
 
 import numpy as np

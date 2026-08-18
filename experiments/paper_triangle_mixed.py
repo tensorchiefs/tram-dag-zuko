@@ -42,7 +42,7 @@ out = results_dir(f"paper-triangle-mixed-{f_name}-{model}")
 spec = {
     "x1": ContinuousNode(),
     "x2": ContinuousNode([LS("x1")]),
-    "x3": OrdinalNode(4, [term("ls", "x1"), term(model, "x2")]),
+    "x3": OrdinalNode(4, [term("LS", "x1"), term(model.upper(), "x2")]),
 }
 
 truths = {"beta12": 2.0, "beta13_zuko": -0.2}  # ordinal sign flip (see docstring)
