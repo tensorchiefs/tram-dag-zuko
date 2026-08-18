@@ -147,3 +147,14 @@ def test_agrees_with_adam_mle():
         a = float(fa.nodes[name].shifts[parent].weight.detach())
         c = float(fc.nodes[name].shifts[parent].weight.detach())
         assert a == pytest.approx(c, abs=0.02), f"{name}<-{parent}: {a} vs {c}"
+
+
+def test_chunk_and_history_size_reach_the_solver():
+    """Chunk sets the L-BFGS round length that n_iter counts in."""
+    obs = _obs()
+    rep = CausalFlowDAG(_stroke_ls_spec(), seed=0).fit_classical(
+        obs, max_iter=10, chunk=5, history_size=7, verbose=False
+    )
+    assert rep["n_iter"] % 5 == 0 and 0 < rep["n_iter"] <= 10
+    with pytest.raises(TypeError):
+        CausalFlowDAG(_stroke_ls_spec(), seed=0).fit_classical(obs, not_a_kwarg=1)

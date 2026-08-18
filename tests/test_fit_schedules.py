@@ -130,3 +130,35 @@ def test_plateau_freeze_preserves_exact_mle():
     assert (w_t[1] - w_t[0]) == pytest.approx(ref_y["T"], abs=0.06)
     # and it should have converged well before the 4000-epoch budget
     assert len(flow.history["val"]) < 4000
+
+
+def test_plateau_factor_sets_the_decay_step():
+    """Each plateau step multiplies the node lr by exactly plateau_factor.
+
+    min_delta is absurdly high so every epoch after the first counts as
+    "no improvement", which makes the trajectory deterministic. Two
+    details of the recorded schedule: history["lr"] is appended before
+    that epoch's decay, and epoch 0 always improves (on the initial
+    infinite best), so the first decay lands after epoch 1.
+    """
+    df = _toy_df(n=200)
+    epochs = 4
+    for factor in (0.5, 0.1):
+        flow = CausalFlowDAG(_toy_spec(), seed=0)
+        flow.fit(
+            df,
+            epochs=epochs,
+            learning_rate=1e-1,
+            batch_size=200,
+            verbose=0,
+            schedule="plateau",
+            plateau_patience=1,
+            min_delta=1e9,
+            plateau_factor=factor,
+        )
+        expected = [1e-1] + [1e-1 * factor**k for k in range(epochs - 1)]
+        assert np.allclose(flow.history["lr"], expected), (
+            factor,
+            flow.history["lr"],
+            expected,
+        )

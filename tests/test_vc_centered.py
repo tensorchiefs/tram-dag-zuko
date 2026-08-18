@@ -265,3 +265,30 @@ def test_centered_roundtrip_after_load(tmp_path):
             flow.log_prob(df.head(50)).detach().numpy(),
             atol=1e-6,
         )
+
+
+def test_vc_oof_fit_reaches_the_stage_one_proxy():
+    """vc_oof_fit is forwarded to the stage-1 out-of-fold proxy fits.
+
+    The proxy uses Adam only when the treatment node is not all-``ls``
+    (an all-``ls`` treatment takes the deterministic fit_classical path),
+    so the treatment here carries a CS term. An unknown keyword must
+    surface as a TypeError from that fit, which is what proves the
+    forwarding rather than a silently ignored argument.
+    """
+    df = _confounded_df(200, seed=0)
+    spec = {
+        "X": ContinuousNode(),
+        "T": OrdinalNode(2, [CS("X")]),  # not all-ls -> the Adam proxy path
+        "Y": ContinuousNode([LS("X"), VC(t="T", center=True, center_folds=2)]),
+    }
+    kw = dict(epochs=1, learning_rate=1e-2, batch_size=200, verbose=0)
+
+    flow = CausalFlowDAG(spec, seed=0)
+    flow.fit(df, **kw, vc_oof_fit={"epochs": 1, "batch_size": 64})
+    info = flow.vc_center_info[("Y", "T")]
+    assert info["source"] == "oof-refit" and info["folds"] == 2
+    assert len(np.unique(info["fold_id"])) == 2
+
+    with pytest.raises(TypeError):
+        CausalFlowDAG(spec, seed=0).fit(df, **kw, vc_oof_fit={"not_a_kwarg": 1})

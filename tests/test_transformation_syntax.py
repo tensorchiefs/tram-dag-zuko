@@ -164,6 +164,77 @@ def test_saved_checkpoint_of_new_syntax_loads(tmp_path):
     assert loaded.spec["y"].transformation == [I("x")]
 
 
+def test_every_option_survives_the_roundtrip():
+    """One spec exercising every Term option, through the serializer."""
+    spec = {
+        "a": ContinuousNode([I(transform="spline", transform_kwargs={"bins": 6})]),
+        "b": ContinuousNode(),
+        "t": OrdinalNode(2, [LS("a")]),
+        "y": ContinuousNode(
+            [
+                I("a", "b", allow_interaction=False, units=[4, 4]),
+                VC("b", t="t", penalty=2.5, center=True, center_folds=3),
+            ]
+        ),
+    }
+    back = spec_from_dict(spec_to_dict(spec))
+    assert back == spec
+    i_term, vc_term = back["y"].transformation
+    assert (i_term.allow_interaction, i_term.units) == (False, (4, 4))
+    assert (vc_term.penalty, vc_term.center, vc_term.center_folds) == (2.5, True, 3)
+    assert back["a"].transform_kwargs == {"bins": 6}
+
+
+def test_malformed_serialized_spec_is_rejected():
+    """spec_from_dict builds Terms directly, so validation is the only guard.
+
+    A hand-edited or corrupted checkpoint can carry a term the
+    constructors would have refused; validate_and_sort has to catch it.
+    """
+
+    def spec_with(term_dict):
+        return {
+            "a": {"kind": "continuous", "terms": []},
+            "b": {"kind": "continuous", "terms": []},
+            "y": {"kind": "continuous", "terms": [term_dict]},
+        }
+
+    two_parent_ls = {"effect": "LS", "parents": ["a", "b"], "options": {}}
+    with pytest.raises(ValueError, match="exactly one parent"):
+        validate_and_sort(spec_from_dict(spec_with(two_parent_ls)))
+
+    unknown = {"effect": "XX", "parents": ["a"], "options": {}}
+    with pytest.raises(ValueError, match="unknown term effect"):
+        validate_and_sort(spec_from_dict(spec_with(unknown)))
+
+    unknown_parent = {"effect": "LS", "parents": ["nope"], "options": {}}
+    with pytest.raises(ValueError, match="unknown parent"):
+        validate_and_sort(spec_from_dict(spec_with(unknown_parent)))
+
+
+# ------------------------------------------------------- constructor aliases
+
+
+def test_short_aliases_are_the_definitions():
+    """LS is linear_shift, and both spellings build the same spec."""
+    import tramdag as td
+
+    assert (I, LS, CS, VC) == (
+        td.intercept,
+        td.linear_shift,
+        td.complex_shift,
+        td.varying_coefficient,
+    )
+    short = ContinuousNode(I("x") + LS("y") + CS("z") + VC("z", t="y"))
+    long = ContinuousNode(
+        td.intercept("x")
+        + td.linear_shift("y")
+        + td.complex_shift("z")
+        + td.varying_coefficient("z", t="y")
+    )
+    assert short.transformation == long.transformation
+
+
 # ------------------------------------------------------------------ units
 
 
