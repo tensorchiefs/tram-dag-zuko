@@ -11,7 +11,7 @@ are the same object, so `LS is linear_shift`.
 
 | Name | Role |
 |---|---|
-| `Term` | One additive term of a node's transformation: the frozen triple `(effect, parents, options)`. `slot` is derived from the effect. `+` on terms builds plain lists. Effect-specific settings live in `options` and read as attributes (`term.penalty`, `term.units`, ...). |
+| `Term` | One additive term of a node's transformation: the frozen triple `(effect, parents, options)`. `+` on terms builds plain lists. Effect-specific settings live in `options` and read as attributes (`term.penalty`, `term.units`, ...). |
 | `intercept()` / `I` | Intercept term: the parents reshape the monotone transform. `I()` or the bare name `I` is the simple-intercept baseline. Carries the basis choice (`transform=`, default `"bernstein"`) and `allow_interaction=` (joint vs. additive multi-parent intercept). |
 | `linear_shift()` / `LS` | Linear shift `beta * x` — the interpretable log-odds coefficient. Exactly one parent. |
 | `complex_shift()` / `CS` | Complex shift: an MLP `g(x)`, additive on the latent scale. Several parents form one joint network. |
@@ -21,7 +21,7 @@ are the same object, so `LS is linear_shift`.
 | `OrdinalNode` | Ordinal variable with `levels` classes: ordered logit (cutpoints) plus shifts. |
 | `node_terms()` / `node_parents()` | Canonical term list / ordered de-duplicated parent names of a node. |
 | `validate_and_sort()` | Edge-ownership validation plus Kahn topological sort. The returned order makes the flow triangular. |
-| `spec_to_dict()` / `spec_from_dict()` | Checkpoint (de)serialization. One format, no compatibility shims: the basis rides on the intercept term, so the node carries no copy of it. |
+| `spec_to_dict()` / `spec_from_dict()` | Checkpoint (de)serialization. A term serializes as `{effect, parents, options}` and nothing else, since `options` is already canonical. No compatibility shims, and `spec_from_dict` builds `Term` directly — so `validate_and_sort` is the only guard on that path. |
 | (`_normalize_transformation`, `_check_single_intercept`, `_hoist_transform`, `_options`, `_OPTION_DEFAULTS`) | Input normalization, the one-parented-`I` rule, basis hoisting onto the node, canonical option storage. |
 
 ## `transforms.py` — the monotone map h and the ordinal transform
@@ -72,9 +72,9 @@ stay comparable to it.
 | `to_matrix()` | The labeled meta-adjacency matrix of term effects. |
 | `save()` / `load()` | Checkpoints with history and machine provenance. `load` requires a complete checkpoint and fails loudly otherwise. |
 | (`_Node`, `_VCGroup`) | Per-node module (intercept + shift `ModuleDict` + VC bookkeeping); `theta_shift()` computes `(theta, shift)`. |
-| (`_encode_parent`, `_features`, `_tensorize`, `_dtype`, `_np_dtype`) | Parent encoding (continuous raw, ordinal one-hot), DataFrame → tensors, dtype plumbing. |
+| (`_node`, `_encode_parent`, `_features`, `_tensorize`, `_dtype`, `_np_dtype`) | Node lookup with one shared error; parent encoding (continuous raw, ordinal one-hot); `_tensorize(df, cols=None)` for any column subset; dtype plumbing. |
 | (`_set_ranges`) | Train 5%/95% quantiles onto the transform domain, plus the optional marginal initialization. First fit only. |
-| (`_vc_warm_start`, `_vc_oof_stage`, `_vc_oof_propensity`, `_predict_p1`, `_vc_ehat_live`, `_vc_ehat_columns`, `_recenter_vc`) | The VC machinery: classical `beta0` warm start; frozen out-of-fold propensities for training (DML); live full-fit propensities for inference (recomputed under `do`, never cached); post-fit re-centering. |
+| (`_vc_warm_start`, `_vc_oof_stage`, `_vc_oof_propensity`, `_predict_p1`, `_vc_ehat_live`, `_vc_ehat_columns`, `_recenter_vc`, `_source_proxies`) | The VC machinery: classical `beta0` warm start; frozen out-of-fold propensities for training (DML); live full-fit propensities for inference (recomputed under `do`, never cached); post-fit re-centering. |
 | (`_is_all_ls`) | Guard for `fit_classical`. |
 
 ## `scores.py` — effect-modifier detection (issue #29)
@@ -97,6 +97,13 @@ stay comparable to it.
 Each generator is independent of the flow implementation and has a CLI that
 regenerates its frozen `data/<name>/` CSVs (a test contract — never
 regenerate silently). `REGISTRY` maps name → class.
+
+`_common.py` holds what the generators share: `logistic`, `sigmoid`,
+`resolve_latents` (the `n`/`rng`/`latents` triple), and the `DatasetDraws`
+mixin — `observational`, `interventional`, `counterfactual_pair`. Those
+three carry the seed offsets (`+1`, `+501`, `+2`) that the frozen CSVs in
+`data/` depend on, so they are defined once. Each generator module then
+holds only its own structural equations and ground truth.
 
 | Class (module) | DGP | Ground-truth read-outs |
 |---|---|---|

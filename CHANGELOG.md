@@ -43,6 +43,16 @@
   keyword. `VC("X2", "X3", t="T")` reads as
   `(beta0 + b_theta(x2, x3)) * x_t`. (0.3 wrote `VC("T", "X2", "X3")`.)
 
+### Fixed
+
+- **`marginal_init` no longer resets a loaded model.** The calibration is
+  first-fit-only. A continuous node's guard is the transform's `_fitted`
+  flag, which `load` restores; an ordinal node's guard lived on the
+  intercept and `save`/`load` dropped it, so loading a trained model and
+  continuing with `fit(marginal_init=True)` silently reset the cutpoints
+  to the data marginal. `load` now closes both guards
+  (`tests/test_marginal_init.py`).
+
 ### Removed (breaking)
 
 - **All backward compatibility.** Pre-1.0, one API and one checkpoint
@@ -55,6 +65,26 @@
   checkpoint (spec, weights, history, meta) instead of tolerating missing
   blocks. Checkpoints and specs written by earlier versions no longer
   load; regenerate them.
+
+- **`Term.slot`** — derived from `effect`, and its only user in the repo
+  was a test assertion.
+
+### Changed (internal, no API surface)
+
+- **The serialized term is `{effect, parents, options}`.** `Term.options`
+  is already canonical (sorted, defaults dropped), so `spec_to_dict` emits
+  it whole and the per-key reader disappears. `spec_from_dict` now builds
+  `Term` directly, which makes `validate_and_sort` the only guard on the
+  load path — a malformed checkpoint is rejected there
+  (`tests/test_transformation_syntax.py`).
+
+- **The five SCM generators share one layer.** `simulations/_common.py`
+  holds `logistic`, `sigmoid`, `resolve_latents`, and the `DatasetDraws`
+  mixin (`observational`, `interventional`, `counterfactual_pair`) — with
+  it the seed offsets behind the frozen CSVs in `data/` (`+1`, `+501`,
+  `+2`) are defined once instead of five times. Every generator now
+  exposes the same three named draws. `simulations/` drops from 1663 to
+  1377 lines with the frozen-CSV contract unchanged.
 
 - The `terms=` keyword (use the first positional argument), node-level
   `ContinuousNode(transform=/transform_kwargs=)` (choose the basis on the

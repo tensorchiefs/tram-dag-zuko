@@ -105,6 +105,15 @@ learning rates, per-node freezing (below), and the all-`ls` classical fit.
 - **`vc_warm_start=`** (default on): each `VC` term's `beta0` starts at the
   classical all-`ls` solution of its node's conditional, so the penalized
   head only learns deviations.
+- **`plateau_factor=`** (default 0.3): the multiplier of one per-node
+  plateau decay step. Read only under `schedule="plateau"`; the floor is
+  `1e-3 × learning_rate`, and under this schedule a node may only freeze
+  once its lr has decayed to `1e-2 × learning_rate`.
+- **`vc_oof_fit=`**: keyword overrides for the stage-1 out-of-fold
+  propensity fits behind `VC(center=True)`, merged over
+  `{"epochs": 300, "learning_rate": 1e-2, "batch_size": 512}`. Ignored
+  when the treatment node is all-`ls`, which takes the deterministic
+  `fit_classical` path instead.
 
 ### How per-node freezing works
 
@@ -173,6 +182,11 @@ transformation model (ordered-logit / Colr). It raises on any `cs`/`ci` edge.
   minibatches, no schedule, and no early stopping. Therefore the fit is
   **deterministic** (same init → bit-identical) and lands on the **exact MLE**
   (matches `statsmodels`/R to ~1e-3 on well-identified coefficients).
+- **Solver budget** (`max_iter=400`, `tol=1e-6`, `chunk=25`,
+  `history_size=50`): the fit runs in rounds of `chunk` inner L-BFGS
+  iterations and checks NLL flatness between them, so `n_iter` in the
+  report counts in multiples of `chunk`. `history_size` is the L-BFGS
+  memory.
 - **float64 is a transient compute mode**: `self.double()` upcasts parameters
   *and* the transforms' range buffers in one call. The fit runs in double. A
   `finally: self.float()` restores float32. The stored model stays float32, and
