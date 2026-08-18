@@ -21,7 +21,8 @@ import torch
 from sklearn.model_selection import train_test_split
 from statsmodels.stats.proportion import proportion_confint
 
-from tramdag import CS, LS, CausalFlowDAG, ContinuousNode, I, OrdinalNode
+from tramdag import CausalFlowDAG
+from tramdag.simulations import MagicMrClean
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 RESULTS_ROOT = Path(__file__).resolve().parents[1] / "results"
@@ -116,43 +117,11 @@ def split(df: pd.DataFrame):
 def build_spec(style: str) -> dict:
     """DAG spec for the fully-connected stroke DAG.
 
-    style="flexible": the nihss6 configuration (Age I, mRS_pre LS,
-    NIHSSa CS, T LS — per-edge terms as in nihss6/configuration.json).
-    style="ls": all edges linear shift (classical proportional-odds analog).
-
-    The per-edge term constructor is the value in ``t``, so the style table
-    holds the terms themselves rather than labels to dispatch on.
+    The spec belongs to the DGP (it names the model family the data came
+    from), so it lives on the generator; this stays as the name the
+    experiment scripts already call.
     """
-    if style == "flexible":
-        t = {"Age": I, "mRS_pre": LS, "NIHSSa": CS, "T": LS}
-    elif style == "ls":
-        t = dict.fromkeys(("Age", "mRS_pre", "NIHSSa", "T"), LS)
-    else:
-        raise ValueError(f"unknown style '{style}'")
-    return {
-        "Age": ContinuousNode(),
-        "mRS_pre": OrdinalNode(6, [t["Age"]("Age")]),
-        "NIHSSa": ContinuousNode(
-            [t["Age"]("Age"), t["mRS_pre"]("mRS_pre")],
-        ),
-        "T": OrdinalNode(
-            2,
-            [
-                t["Age"]("Age"),
-                t["mRS_pre"]("mRS_pre"),
-                t["NIHSSa"]("NIHSSa"),
-            ],
-        ),
-        "mRS_3m": OrdinalNode(
-            7,
-            [
-                t["Age"]("Age"),
-                t["mRS_pre"]("mRS_pre"),
-                t["NIHSSa"]("NIHSSa"),
-                t["T"]("T"),
-            ],
-        ),
-    }
+    return MagicMrClean().spec(style)
 
 
 # ------------------------------------------------------------------- plots

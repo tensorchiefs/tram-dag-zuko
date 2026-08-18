@@ -12,19 +12,14 @@ import pandas as pd
 import pytest
 import torch
 
-from tramdag import CS, LS, CausalFlowDAG, ContinuousNode, I, OrdinalNode
+from tramdag import CS, LS, CausalFlowDAG, ContinuousNode, I
+from tramdag.simulations import MagicMrClean
 
 DATA = Path(__file__).resolve().parents[1] / "data"
 
 
 def _stroke_ls_spec() -> dict:
-    return {
-        "Age": ContinuousNode(),
-        "mRS_pre": OrdinalNode(6, [LS("Age")]),
-        "NIHSSa": ContinuousNode([LS("Age"), LS("mRS_pre")]),
-        "T": OrdinalNode(2, [LS("Age"), LS("mRS_pre"), LS("NIHSSa")]),
-        "mRS_3m": OrdinalNode(7, [LS("Age"), LS("mRS_pre"), LS("NIHSSa"), LS("T")]),
-    }
+    return MagicMrClean().spec("ls")
 
 
 def _obs() -> pd.DataFrame:
@@ -102,19 +97,12 @@ def test_matches_statsmodels_mle():
     from statsmodels.miscmodels.ordinal_model import OrderedModel
 
     obs = _obs()
-    X = pd.DataFrame(index=obs.index)
-    X["Age"] = obs["Age"].values
-    for k in range(6):
-        X[f"mRS_pre_{k}"] = (obs["mRS_pre"].values == k).astype(float)
-    X["NIHSSa"] = obs["NIHSSa"].values
-    X["T"] = obs["T"].values
-    X = X.drop(columns=["mRS_pre_0"])
+    torch.manual_seed(7)
+    flow = CausalFlowDAG(_stroke_ls_spec())
+    X = flow.design_matrix(obs, "mRS_3m", drop_first=True)
     res = OrderedModel(obs["mRS_3m"].astype(int), X, distr="logit").fit(
         method="bfgs", disp=False
     )
-
-    torch.manual_seed(7)
-    flow = CausalFlowDAG(_stroke_ls_spec())
     flow.fit_classical(obs, verbose=False)
     n = flow.nodes["mRS_3m"]
     w_age = float(n.shifts["Age"].weight.detach())
@@ -122,7 +110,7 @@ def test_matches_statsmodels_mle():
     w_t = n.shifts["T"].weight.detach().numpy().ravel()
     assert w_age == pytest.approx(res.params["Age"], abs=0.01)
     assert w_nih == pytest.approx(res.params["NIHSSa"], abs=0.01)
-    assert (w_t[1] - w_t[0]) == pytest.approx(res.params["T"], abs=0.06)
+    assert (w_t[1] - w_t[0]) == pytest.approx(res.params["T[1]"], abs=0.06)
 
 
 @pytest.mark.slow

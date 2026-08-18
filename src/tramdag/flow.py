@@ -1247,6 +1247,49 @@ class CausalFlowDAG(nn.Module):
             "parents": parents,
         }
 
+    @torch.no_grad()
+    def design_matrix(
+        self, df: pd.DataFrame, node: str, *, drop_first: bool = False
+    ) -> pd.DataFrame:
+        """Encode a node's parents the way the flow feeds them to its shifts.
+
+        A continuous parent stays raw in one column named after it. An
+        ordinal parent becomes one column per level, named
+        ``"{parent}[{k}]"`` — the same one-hot the flow builds internally.
+
+        Use ``drop_first=True`` to get the design a classical reference
+        expects (``statsmodels`` ``OrderedModel``, R ``polr``): with
+        cutpoints the full one-hot is unidentified, so each ordinal parent's
+        level-0 column drops out and its remaining coefficients read as
+        differences against level 0 — exactly what ``w[k] - w[0]`` gives on
+        the flow side.
+
+        Parameters
+        ----------
+        df : pd.DataFrame
+            Rows to encode. Must contain every parent column of ``node``.
+        node : str
+            Name of the node whose parents are encoded.
+        drop_first : bool, optional
+            Drop each ordinal parent's level-0 column, by default ``False``.
+
+        Returns
+        -------
+        pd.DataFrame
+            One column per encoded feature, indexed like ``df``.
+        """
+        nd = self._node(node)
+        feats = self._features(self._tensorize(df, nd.parents))
+        cols: dict[str, np.ndarray] = {}
+        for p in nd.parents:
+            arr = feats[p].cpu().numpy()
+            if arr.shape[1] == 1:  # continuous parent: raw
+                cols[p] = arr[:, 0]
+            else:
+                for k in range(1 if drop_first else 0, arr.shape[1]):
+                    cols[f"{p}[{k}]"] = arr[:, k]
+        return pd.DataFrame(cols, index=df.index)
+
     def fit_classical(
         self,
         train_df: pd.DataFrame,

@@ -228,6 +228,70 @@ class MagicMrClean(DatasetDraws):
         rng = np.random.default_rng(self.seed + 1001 + seed_offset)
         return self.simulate(n, rng=rng, randomize_T=True, population="rct")
 
+    # ---------------------------------------------------------------- the model
+    def spec(self, style: str = "ls") -> dict:
+        """Give the DAG spec for fitting this cohort.
+
+        ``style="ls"`` makes every edge a linear shift, so each
+        node-conditional is a classical transformation model and the flow,
+        ``statsmodels`` and R ``polr`` coincide. ``style="flexible"`` is the
+        paper's nihss6 configuration: Age enters the intercept, NIHSSa
+        through a complex shift, the rest linearly.
+
+        The spec is part of this DGP's ground truth — it says which model
+        family the data came from — which is why it lives next to
+        :meth:`true_ate` rather than in each caller. The term constructors
+        are imported here rather than at module scope so the module keeps
+        its numpy-only import surface.
+
+        Parameters
+        ----------
+        style : str, optional
+            ``"ls"`` (default) or ``"flexible"``.
+
+        Returns
+        -------
+        dict
+            The node specification, keyed by node name.
+
+        Raises
+        ------
+        ValueError
+            If ``style`` is neither of the two.
+        """
+        from ..spec import CS, LS, ContinuousNode, I, OrdinalNode
+
+        if style == "flexible":
+            t = {"Age": I, "mRS_pre": LS, "NIHSSa": CS, "T": LS}
+        elif style == "ls":
+            t = dict.fromkeys(("Age", "mRS_pre", "NIHSSa", "T"), LS)
+        else:
+            raise ValueError(f"unknown style '{style}'")
+        return {
+            "Age": ContinuousNode(),
+            "mRS_pre": OrdinalNode(6, [t["Age"]("Age")]),
+            "NIHSSa": ContinuousNode(
+                [t["Age"]("Age"), t["mRS_pre"]("mRS_pre")],
+            ),
+            "T": OrdinalNode(
+                2,
+                [
+                    t["Age"]("Age"),
+                    t["mRS_pre"]("mRS_pre"),
+                    t["NIHSSa"]("NIHSSa"),
+                ],
+            ),
+            "mRS_3m": OrdinalNode(
+                7,
+                [
+                    t["Age"]("Age"),
+                    t["mRS_pre"]("mRS_pre"),
+                    t["NIHSSa"]("NIHSSa"),
+                    t["T"]("T"),
+                ],
+            ),
+        }
+
     # -------------------------------------------------------------- ground truth
     def true_ate(self, n: int = 500_000, on: str = "rct") -> dict:
         """Estimate the true ATE of T on ``P(mRS_3m <= 2)`` by Monte Carlo.

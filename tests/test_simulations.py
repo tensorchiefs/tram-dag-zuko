@@ -10,41 +10,15 @@ import pandas as pd
 import pytest
 import torch
 
-from tramdag import CS, LS, CausalFlowDAG, ContinuousNode, I, OrdinalNode
+from tramdag import CausalFlowDAG
 from tramdag.simulations import MagicMrClean
 
 DATA = Path(__file__).resolve().parents[1] / "data" / "magic-mrclean"
 
 
 def _spec(style: str) -> dict:
-    if style == "ls":
-        t = dict.fromkeys(("Age", "mRS_pre", "NIHSSa", "T"), LS)
-    else:
-        t = {"Age": I, "mRS_pre": LS, "NIHSSa": CS, "T": LS}
-    return {
-        "Age": ContinuousNode(),
-        "mRS_pre": OrdinalNode(6, [t["Age"]("Age")]),
-        "NIHSSa": ContinuousNode(
-            [t["Age"]("Age"), t["mRS_pre"]("mRS_pre")],
-        ),
-        "T": OrdinalNode(
-            2,
-            [
-                t["Age"]("Age"),
-                t["mRS_pre"]("mRS_pre"),
-                t["NIHSSa"]("NIHSSa"),
-            ],
-        ),
-        "mRS_3m": OrdinalNode(
-            7,
-            [
-                t["Age"]("Age"),
-                t["mRS_pre"]("mRS_pre"),
-                t["NIHSSa"]("NIHSSa"),
-                t["T"]("T"),
-            ],
-        ),
-    }
+    return MagicMrClean().spec("ls" if style == "ls" else "flexible")
+
 
 
 # ----------------------------------------------------------------- generator
@@ -223,9 +197,7 @@ def test_all_ls_flow_is_exact_mle():
             restore_best=False,
         )
 
-    X = pd.DataFrame({"Age": obs["Age"], "NIHSSa": obs["NIHSSa"], "T": obs["T"]})
-    for k in range(1, 6):
-        X[f"mRS_pre_{k}"] = (obs["mRS_pre"] == k).astype(float)
+    X = flow.design_matrix(obs, "mRS_3m", drop_first=True)
     res = OrderedModel(obs["mRS_3m"].astype(int), X, distr="logit").fit(
         method="bfgs", disp=False
     )
@@ -236,7 +208,7 @@ def test_all_ls_flow_is_exact_mle():
     w_t = y.shifts["T"].weight.detach().numpy().ravel()
     assert w_age == pytest.approx(res.params["Age"], abs=0.01)
     assert w_nih == pytest.approx(res.params["NIHSSa"], abs=0.01)
-    assert (w_t[1] - w_t[0]) == pytest.approx(res.params["T"], abs=0.02)
+    assert (w_t[1] - w_t[0]) == pytest.approx(res.params["T[1]"], abs=0.02)
 
 
 @pytest.mark.slow

@@ -90,7 +90,8 @@ def finish(fig, path: Path) -> None:
 
 
 def ls_weight(flow: CausalFlowDAG, node: str, parent: str) -> float:
-    return float(flow.nodes[node].shifts[parent].weight.detach())
+    """Give the node's linear-shift weight on that parent."""
+    return float(flow.ls_coefficients()[node][parent][0])
 
 
 def cs_curve(

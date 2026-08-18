@@ -12,7 +12,8 @@ import pandas as pd
 import pytest
 import torch
 
-from tramdag import LS, CausalFlowDAG, ContinuousNode, OrdinalNode
+from tramdag import LS, CausalFlowDAG, ContinuousNode
+from tramdag.simulations import MagicMrClean
 
 DATA = Path(__file__).resolve().parents[1] / "data"
 
@@ -102,13 +103,7 @@ def test_plateau_freeze_preserves_exact_mle():
     ref = pd.read_csv(DATA / "magic-mrclean" / "ls" / "ref_ls" / "coefficients.csv")
     ref_y = ref[ref["node"] == "mRS_3m"].set_index("term")["estimate"]
 
-    spec = {
-        "Age": ContinuousNode(),
-        "mRS_pre": OrdinalNode(6, [LS("Age")]),
-        "NIHSSa": ContinuousNode([LS("Age"), LS("mRS_pre")]),
-        "T": OrdinalNode(2, [LS("Age"), LS("mRS_pre"), LS("NIHSSa")]),
-        "mRS_3m": OrdinalNode(7, [LS("Age"), LS("mRS_pre"), LS("NIHSSa"), LS("T")]),
-    }
+    spec = MagicMrClean().spec("ls")
     torch.manual_seed(3)
     flow = CausalFlowDAG(spec)
     flow.fit(
