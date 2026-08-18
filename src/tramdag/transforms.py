@@ -392,7 +392,7 @@ def make_univariate_transform(name: str, **kwargs) -> _ScaledUT:
     except KeyError:
         raise ValueError(
             f"Unknown transform '{name}'. Choose from {sorted(_TRANSFORMS)}."
-        )
+        ) from None
     return cls(**kwargs)
 
 

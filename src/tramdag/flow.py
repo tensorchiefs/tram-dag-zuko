@@ -148,7 +148,7 @@ class _Node(nn.Module):
             self.intercept = None
             self.intercept_nets = nn.ModuleList(
                 ComplexIntercept(sum(width(p) for p in grp), n_params, units=u)
-                for grp, u in zip(i_groups, i_units)
+                for grp, u in zip(i_groups, i_units, strict=True)
             )
 
         # shift terms: one network per term, over the term's (possibly joint)
@@ -221,7 +221,9 @@ class _Node(nn.Module):
         if self.intercept_nets is not None:  # additive complex intercept
             theta = sum(
                 net(torch.cat([feats[p] for p in grp], dim=1))
-                for net, grp in zip(self.intercept_nets, self._intercept_groups)
+                for net, grp in zip(
+                    self.intercept_nets, self._intercept_groups, strict=True
+                )
             )
         elif self.ci_parents:  # single or joint complex intercept
             theta = self.intercept(
@@ -371,7 +373,7 @@ class CausalFlowDAG(nn.Module):
             if not g.center:
                 continue
             on_nd = self.nodes[g.on]
-            cols += [p for p in on_nd.parents] + self._vc_ehat_columns(on_nd)
+            cols += [*on_nd.parents, *self._vc_ehat_columns(on_nd)]
         return [c for c in dict.fromkeys(cols) if c not in nd.parents]
 
     # ------------------------------------------------------------- likelihood
@@ -690,7 +692,7 @@ class CausalFlowDAG(nn.Module):
         best = self._best if restore_best else None
         # per-node plateau/freeze bookkeeping (local to this fit call)
         node_best = {name: float("inf") for name in self.order}
-        node_bad = {name: 0 for name in self.order}
+        node_bad = dict.fromkeys(self.order, 0)
         frozen: set[str] = set()
         t0 = time.perf_counter()
         t_offset = self.history["time"][-1] if self.history.get("time") else 0.0
@@ -701,7 +703,7 @@ class CausalFlowDAG(nn.Module):
             active = [name for name in self.order if name not in frozen]
             perm = torch.randperm(n, device=self.device)
             train_acc = {name: prev_train.get(name, float("nan")) for name in frozen}
-            train_acc.update({name: 0.0 for name in active})
+            train_acc.update(dict.fromkeys(active, 0.0))
             for start in range(0, n, batch_size):
                 idx = perm[start : start + batch_size]
                 batch = {k: v[idx] for k, v in train_vals.items()}
@@ -857,7 +859,7 @@ class CausalFlowDAG(nn.Module):
                     ]
                 )
             proxy = CausalFlowDAG(proxy_spec, device=str(self.device))
-            proxy.fit_classical(train_df[list(nd.parents) + [name]], verbose=False)
+            proxy.fit_classical(train_df[[*nd.parents, name]], verbose=False)
             for g in todo:
                 w = proxy.nodes[name].shifts[g.on].weight.detach()
                 b0 = float(w[-1] - w[0]) if g.on_is_ord else float(w[0])
@@ -966,7 +968,7 @@ class CausalFlowDAG(nn.Module):
         terms = node_terms(node_spec) or None
         proxy_spec[on] = OrdinalNode(2, terms)
         all_ls = all(t.effect == "LS" for t in (terms or []))
-        cols = list(on_nd.parents) + [on]
+        cols = [*on_nd.parents, on]
 
         n = len(train_df)
         fold_id = np.random.default_rng(0).permutation(n) % k
@@ -1230,7 +1232,7 @@ class CausalFlowDAG(nn.Module):
         contributions: dict[str, np.ndarray] = {}
         parents: dict[str, tuple] = {}
         baseline = None
-        for net, grp in zip(nets, groups):
+        for net, grp in zip(nets, groups, strict=True):
             raw = net(torch.cat([feats[p] for p in grp], dim=1))  # (n, P)
             mean = raw.mean(dim=0, keepdim=True)  # (1, P)
             label = "+".join(grp)

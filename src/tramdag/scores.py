@@ -110,11 +110,8 @@ def node_scores(flow, df: pd.DataFrame, node: str) -> pd.DataFrame:
             "at least one interpretable shift coefficient."
         )
 
-    needed = (
-        list(nd.parents)
-        + [node]  # scores are NOT y-free: l_i needs x
-        + flow._vc_ehat_columns(nd)
-    )  # + e_hat inputs of centered terms
+    # not y-free: l_i needs x. Plus the e_hat inputs of centered terms.
+    needed = [*nd.parents, node, *flow._vc_ehat_columns(nd)]
     missing = [c for c in needed if c not in df.columns]
     if missing:
         raise KeyError(f"data is missing column(s): {missing}")
