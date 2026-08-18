@@ -37,7 +37,8 @@ test = [
 [project]
 authors = [
   {name = "Oliver Dürr", email = "oliver.duerr@gmail.com"},
-  {name = "Beate Sick"}
+  {name = "Beate Sick"},
+  {name = "Marcel Arpogaus"}
 ]
 classifiers = [
   "Development Status :: 4 - Beta",
