@@ -118,11 +118,7 @@ def node_scores(flow, df: pd.DataFrame, node: str) -> pd.DataFrame:
     missing = [c for c in needed if c not in df.columns]
     if missing:
         raise KeyError(f"data is missing column(s): {missing}")
-    np_dtype = flow._np_dtype
-    values = {
-        c: torch.as_tensor(df[c].to_numpy(dtype=np_dtype), device=flow.device)
-        for c in needed
-    }
+    values = flow._tensorize(df, needed)
     feats = flow._features({p: values[p] for p in nd.parents})
     ehat = flow._vc_ehat_live(nd, values, len(df))
     dlds = _dl_ds(nd, feats, values[node], len(df), vc_ehat=ehat)

@@ -313,15 +313,18 @@ class CausalFlowDAG(nn.Module):
         """Numpy dtype that matches the current model dtype."""
         return np.float64 if self._dtype == torch.float64 else np.float32
 
-    def _tensorize(self, df: pd.DataFrame) -> dict[str, Tensor]:
-        np_dtype = self._np_dtype
-        out = {}
-        for name in self.order:
-            vals = torch.as_tensor(
-                df[name].to_numpy(dtype=np_dtype), device=self.device
-            )
-            out[name] = vals
-        return out
+    def _tensorize(
+        self, df: pd.DataFrame, cols: list[str] | tuple[str, ...] | None = None
+    ) -> dict[str, Tensor]:
+        """DataFrame columns -> one ``(n,)`` tensor each, in the model dtype.
+
+        ``cols=None`` takes every node, in topological order.
+        """
+        dtype = self._np_dtype
+        return {
+            c: torch.as_tensor(df[c].to_numpy(dtype=dtype), device=self.device)
+            for c in (self.order if cols is None else cols)
+        }
 
     def _features(self, values: dict[str, Tensor]) -> dict[str, Tensor]:
         return {name: self._encode_parent(name, vals) for name, vals in values.items()}
@@ -735,12 +738,8 @@ class CausalFlowDAG(nn.Module):
                 }
             self.history["train"].append(train_acc)
             self.history["val"].append(val_per_node)
-            self.history.setdefault("lr", []).append(
-                max(g["lr"] for g in opt.param_groups)
-            )
-            self.history.setdefault("time", []).append(
-                t_offset + time.perf_counter() - t0
-            )
+            self.history["lr"].append(max(g["lr"] for g in opt.param_groups))
+            self.history["time"].append(t_offset + time.perf_counter() - t0)
 
             # per-node improvement tracking (plateau decay + freezing)
             for g in opt.param_groups:
@@ -805,6 +804,23 @@ class CausalFlowDAG(nn.Module):
         return self
 
     # ------------------------------------------------- varying-coefficient (VC)
+    def _source_proxies(self, parents) -> dict[str, NodeSpec]:
+        """Give a proxy spec whose parents are sources.
+
+        A single-node proxy only has to reproduce one conditional, which the
+        parent marginals cannot influence — so each parent collapses to a
+        source node of the right kind.
+        """
+        out: dict[str, NodeSpec] = {}
+        for p in parents:
+            pn = self.spec[p]
+            out[p] = (
+                OrdinalNode(pn.levels)
+                if isinstance(pn, OrdinalNode)
+                else ContinuousNode([I(transform="affine")])
+            )
+        return out
+
     def _vc_warm_start(self, train_df: pd.DataFrame) -> None:
         """Initialize every VC term's ``beta0`` from the classical solution.
 
@@ -826,14 +842,7 @@ class CausalFlowDAG(nn.Module):
             if not todo:
                 continue
             node_spec = self.spec[name]
-            proxy_spec: dict[str, NodeSpec] = {}
-            for p in nd.parents:
-                pn = self.spec[p]
-                proxy_spec[p] = (
-                    OrdinalNode(pn.levels)
-                    if isinstance(pn, OrdinalNode)
-                    else ContinuousNode([I(transform="affine")])
-                )
+            proxy_spec = self._source_proxies(nd.parents)
             ls_terms = [LS(p) for p in nd.parents]
             if isinstance(node_spec, OrdinalNode):
                 proxy_spec[name] = OrdinalNode(node_spec.levels, ls_terms)
@@ -865,11 +874,7 @@ class CausalFlowDAG(nn.Module):
         ``sigmoid(shift - theta_0)``.
         """
         nd = self.nodes[on]
-        np_dtype = self._np_dtype
-        values = {
-            p: torch.as_tensor(df[p].to_numpy(dtype=np_dtype), device=self.device)
-            for p in nd.parents
-        }
+        values = self._tensorize(df, nd.parents)
         feats = self._features(values)
         theta, shift = nd.theta_shift(
             feats, len(df), vc_ehat=self._vc_ehat_live(nd, values, len(df))
@@ -957,14 +962,7 @@ class CausalFlowDAG(nn.Module):
                 "Chained centering is not supported."
             )
         node_spec = self.spec[on]
-        proxy_spec: dict[str, NodeSpec] = {}
-        for p in on_nd.parents:
-            pn = self.spec[p]
-            proxy_spec[p] = (
-                OrdinalNode(pn.levels)
-                if isinstance(pn, OrdinalNode)
-                else ContinuousNode([I(transform="affine")])
-            )
+        proxy_spec = self._source_proxies(on_nd.parents)
         terms = node_terms(node_spec) or None
         proxy_spec[on] = OrdinalNode(2, terms)
         all_ls = all(t.effect == "LS" for t in (terms or []))
@@ -1072,12 +1070,7 @@ class CausalFlowDAG(nn.Module):
             raise KeyError(f"data is missing modifier column(s): {missing}")
         mod_feat = None
         if mods:
-            np_dtype = self._np_dtype
-            vals = {
-                p: torch.as_tensor(data[p].to_numpy(dtype=np_dtype), device=self.device)
-                for p in mods
-            }
-            feats = self._features(vals)
+            feats = self._features(self._tensorize(data, mods))
             mod_feat = torch.cat([feats[p] for p in mods], dim=1)
         return nd.shifts[t].beta(mod_feat, len(data)).cpu().numpy()
 
@@ -1227,12 +1220,7 @@ class CausalFlowDAG(nn.Module):
         if missing:
             raise KeyError(f"data is missing intercept-parent column(s): {missing}")
 
-        np_dtype = self._np_dtype
-        vals = {
-            p: torch.as_tensor(data[p].to_numpy(dtype=np_dtype), device=self.device)
-            for p in nd.ci_parents
-        }
-        feats = self._features(vals)
+        feats = self._features(self._tensorize(data, nd.ci_parents))
         # one net per group: the additive case stores them in intercept_nets;
         # a single (possibly joint) I-term is the lone `intercept` network.
         nets = (
@@ -1575,12 +1563,8 @@ class CausalFlowDAG(nn.Module):
         for col, val in (do or {}).items():
             df_local[col] = val
         nd = self.nodes[node]
-        np_dtype = self._np_dtype
         cols = list(nd.parents) + self._vc_ehat_columns(nd)  # + e_hat inputs
-        values = {
-            p: torch.as_tensor(df_local[p].to_numpy(dtype=np_dtype), device=self.device)
-            for p in cols
-        }
+        values = self._tensorize(df_local, cols)
         feats = self._features({p: values[p] for p in nd.parents})
         theta, shift = nd.theta_shift(
             feats, len(df_local), vc_ehat=self._vc_ehat_live(nd, values, len(df_local))
