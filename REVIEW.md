@@ -94,8 +94,9 @@ Kept deliberately (checked, not dead):
    experiments look generators up via the registry; it maps name → class
    and experiments import the classes directly.
 4. **Pre-0.3 checkpoints** (`parents={...}` layout) no longer load anywhere.
-   If any survive outside the paper monorepo, they need a one-off converter;
-   otherwise declare them unsupported in the CHANGELOG at release.
+   The CHANGELOG 0.4.0 Removed section already declares the loader gone.
+   Open owner question: do any pre-0.3 checkpoints survive outside the
+   paper monorepo? If yes, they need a one-off converter.
 5. **`docs/research/` mission**: the autoresearch mission needs a real
    migration of the parked benchmark scripts before a next run — the path
    fixes here only make the docs honest.
