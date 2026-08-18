@@ -28,12 +28,13 @@ from paper_common import (
     save_json,
 )
 
-from tramdag import LS, ContinuousNode, term
+from tramdag import CS, LS, ContinuousNode
 from tramdag.simulations import TriangleContinuous
 
 f_name = sys.argv[1] if len(sys.argv) > 1 else "atan"
 model = sys.argv[2] if len(sys.argv) > 2 else "cs"
 assert model in ("ls", "cs")
+SHIFT = {"ls": LS, "cs": CS}  # the x2 -> x3 term, chosen on the CLI
 
 gen = TriangleContinuous(f=f_name, seed=42)
 df = gen.observational(PAPER_N)
@@ -43,7 +44,7 @@ out = results_dir(f"paper-triangle-{f_name}-{model}")
 spec = {
     "x1": ContinuousNode(),
     "x2": ContinuousNode([LS("x1")]),
-    "x3": ContinuousNode([term("LS", "x1"), term(model.upper(), "x2")]),
+    "x3": ContinuousNode([LS("x1"), SHIFT[model]("x2")]),
 }
 
 truths = {"beta12": 2.0, "beta13": -0.2}

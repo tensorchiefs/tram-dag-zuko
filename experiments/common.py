@@ -21,7 +21,7 @@ import torch
 from sklearn.model_selection import train_test_split
 from statsmodels.stats.proportion import proportion_confint
 
-from tramdag import CausalFlowDAG, ContinuousNode, OrdinalNode, term
+from tramdag import CS, LS, CausalFlowDAG, ContinuousNode, I, OrdinalNode
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 RESULTS_ROOT = Path(__file__).resolve().parents[1] / "results"
@@ -116,37 +116,40 @@ def split(df: pd.DataFrame):
 def build_spec(style: str) -> dict:
     """DAG spec for the fully-connected stroke DAG.
 
-    style="flexible": the nihss6 configuration (Age 'I', mRS_pre 'LS',
-    NIHSSa 'CS', T 'LS' — per-edge terms as in nihss6/configuration.json).
+    style="flexible": the nihss6 configuration (Age I, mRS_pre LS,
+    NIHSSa CS, T LS — per-edge terms as in nihss6/configuration.json).
     style="ls": all edges linear shift (classical proportional-odds analog).
+
+    The per-edge term constructor is the value in ``t``, so the style table
+    holds the terms themselves rather than labels to dispatch on.
     """
     if style == "flexible":
-        t = {"Age": "I", "mRS_pre": "LS", "NIHSSa": "CS", "T": "LS"}
+        t = {"Age": I, "mRS_pre": LS, "NIHSSa": CS, "T": LS}
     elif style == "ls":
-        t = {"Age": "LS", "mRS_pre": "LS", "NIHSSa": "LS", "T": "LS"}
+        t = dict.fromkeys(("Age", "mRS_pre", "NIHSSa", "T"), LS)
     else:
         raise ValueError(f"unknown style '{style}'")
     return {
         "Age": ContinuousNode(),
-        "mRS_pre": OrdinalNode(6, [term(t["Age"], "Age")]),
+        "mRS_pre": OrdinalNode(6, [t["Age"]("Age")]),
         "NIHSSa": ContinuousNode(
-            [term(t["Age"], "Age"), term(t["mRS_pre"], "mRS_pre")],
+            [t["Age"]("Age"), t["mRS_pre"]("mRS_pre")],
         ),
         "T": OrdinalNode(
             2,
             [
-                term(t["Age"], "Age"),
-                term(t["mRS_pre"], "mRS_pre"),
-                term(t["NIHSSa"], "NIHSSa"),
+                t["Age"]("Age"),
+                t["mRS_pre"]("mRS_pre"),
+                t["NIHSSa"]("NIHSSa"),
             ],
         ),
         "mRS_3m": OrdinalNode(
             7,
             [
-                term(t["Age"], "Age"),
-                term(t["mRS_pre"], "mRS_pre"),
-                term(t["NIHSSa"], "NIHSSa"),
-                term(t["T"], "T"),
+                t["Age"]("Age"),
+                t["mRS_pre"]("mRS_pre"),
+                t["NIHSSa"]("NIHSSa"),
+                t["T"]("T"),
             ],
         ),
     }

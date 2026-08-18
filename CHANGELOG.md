@@ -69,6 +69,15 @@
 - **`Term.slot`** — derived from `effect`, and its only user in the repo
   was a test assertion.
 
+- **`term(effect, *parents)`** — the string-label term factory. It was a
+  second, weaker way to build a term, its `VC` branch and `penalty=`
+  keyword were exercised only by its own tests, and a generic dispatcher
+  carrying one effect's parameter is the shape this release removed from
+  `Term` itself. When the effect type comes from config or the CLI, hold
+  the constructor in the table instead of a label to dispatch on:
+  `{"Age": I, "NIHSSa": CS}` then `t["Age"]("Age")` (see
+  `experiments/common.py::build_spec`).
+
 ### Changed (internal, no API surface)
 
 - **The serialized term is `{effect, parents, options}`.** `Term.options`

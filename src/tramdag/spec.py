@@ -347,48 +347,6 @@ def varying_coefficient(
     )
 
 
-def term(effect: str, *parents: str, penalty: float | None = None) -> Term:
-    """Build a :class:`Term` from an effect label.
-
-    Use this when the effect type comes from data, for example when a
-    study sweeps ``"LS"`` against ``"CS"``.
-
-    Parameters
-    ----------
-    effect : str
-        One of ``"I"``, ``"LS"``, ``"CS"``, ``"VC"``.
-    *parents : str
-        Parent names. For ``"VC"`` the first name is the treatment and
-        the rest are the modifiers.
-    penalty : float | None, optional
-        L2 penalty, ``"VC"`` only. When omitted, ``VC`` uses its own
-        default.
-
-    Returns
-    -------
-    Term
-        The term.
-
-    Raises
-    ------
-    ValueError
-        If the label is unknown, or if ``penalty`` is given for a
-        non-``VC`` effect.
-    """
-    if penalty is not None and effect != "VC":
-        raise ValueError(f"term(): penalty only applies to 'VC', not '{effect}'.")
-    if effect == "I":
-        return intercept(*parents)
-    if effect == "LS":
-        return linear_shift(*parents)
-    if effect == "CS":
-        return complex_shift(*parents)
-    if effect == "VC":
-        kw = {} if penalty is None else {"penalty": penalty}
-        return varying_coefficient(*parents[1:], t=parents[0], **kw)
-    raise ValueError(f"unknown term effect '{effect}'.")
-
-
 def _normalize_transformation(value):
     """Flatten a transformation into a plain term list.
 

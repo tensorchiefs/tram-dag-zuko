@@ -19,7 +19,6 @@ from .spec import (
     complex_shift,
     intercept,
     linear_shift,
-    term,
     varying_coefficient,
 )
 
@@ -39,6 +38,5 @@ __all__ = [
     "complex_shift",
     "VC",
     "varying_coefficient",
-    "term",
 ]
 __version__ = version("tramdag")

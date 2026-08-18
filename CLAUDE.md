@@ -43,8 +43,10 @@ Experiments default to the synthetic data (`magic-mrclean/nl`). The `magic` sour
   (interaction on the thetas, the default), and
   `I("a","b", allow_interaction=False)` is the *additive* intercept (one net
   per parent, coefficient vectors summed). For shifts, grouping decides:
-  `CS("a","b")` is joint, `CS("a")+CS("b")` additive. `term(effect, *parents)` builds a term from
-  a data-driven label. No intercept term → `SimpleIntercept` baseline. Every
+  `CS("a","b")` is joint, `CS("a")+CS("b")` additive. When the effect type
+  comes from config or the CLI, put the constructor itself in the table
+  (`{"Age": I, "NIHSSa": CS}`) — see `experiments/common.py::build_spec`.
+  No intercept term → `SimpleIntercept` baseline. Every
   parent enters through exactly one edge-owning term (VC modifiers exempt — they
   may also appear prognostically).
 - `transforms.py` — monotone 1-D transforms wrapping zuko (`BernsteinUT`, `SplineUT`,

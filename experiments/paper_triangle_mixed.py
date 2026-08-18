@@ -28,12 +28,13 @@ from paper_common import (
     save_json,
 )
 
-from tramdag import LS, ContinuousNode, OrdinalNode, term
+from tramdag import CS, LS, ContinuousNode, OrdinalNode
 from tramdag.simulations import TriangleMixed
 
 f_name = sys.argv[1] if len(sys.argv) > 1 else "linear"
 model = sys.argv[2] if len(sys.argv) > 2 else "ls"
 assert model in ("ls", "cs")
+SHIFT = {"ls": LS, "cs": CS}  # the x2 -> x3 term, chosen on the CLI
 
 gen = TriangleMixed(f=f_name, seed=42)
 df = gen.observational(PAPER_N)
@@ -43,7 +44,7 @@ out = results_dir(f"paper-triangle-mixed-{f_name}-{model}")
 spec = {
     "x1": ContinuousNode(),
     "x2": ContinuousNode([LS("x1")]),
-    "x3": OrdinalNode(4, [term("LS", "x1"), term(model.upper(), "x2")]),
+    "x3": OrdinalNode(4, [LS("x1"), SHIFT[model]("x2")]),
 }
 
 truths = {"beta12": 2.0, "beta13_zuko": -0.2}  # ordinal sign flip (see docstring)
