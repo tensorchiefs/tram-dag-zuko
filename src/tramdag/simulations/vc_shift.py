@@ -38,16 +38,10 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
+from ._common import logistic, resolve_latents
+
 B0, B2, B3 = -1.0, 0.8, -0.6  # beta(x) = B0 + B2*X2 + B3*X3
 H_SCALE = 2.0  # h(y) = H_SCALE * y
-
-
-def _logistic(rng: np.random.Generator, size: int) -> np.ndarray:
-    return rng.logistic(loc=0.0, size=size)
-
-
-def _sigmoid(x: np.ndarray) -> np.ndarray:
-    return 1.0 / (1.0 + np.exp(-x))
 
 
 @dataclass
@@ -86,8 +80,8 @@ class VCLogisticShift:
             "X1": rng.normal(size=n),
             "X2": rng.normal(size=n),
             "X3": rng.normal(size=n),
-            "T": _logistic(rng, n),
-            "Y": _logistic(rng, n),
+            "T": logistic(rng, n),
+            "Y": logistic(rng, n),
         }
 
     # --------------------------------------------------------------------- SCM
@@ -126,12 +120,7 @@ class VCLogisticShift:
             If both ``n`` and ``latents`` are omitted.
         """
         do = do or {}
-        if latents is None:
-            if n is None:
-                raise ValueError("provide either n or latents")
-            rng = rng or np.random.default_rng(self.seed)
-            latents = self.draw_latents(n, rng)
-        n = len(next(iter(latents.values())))
+        latents, n = resolve_latents(self, n, rng, latents)
 
         x = {}
         for name in ("X1", "X2", "X3"):
@@ -223,17 +212,7 @@ class VCLogisticShift:
 
 # --------------------------------------------------------------------------- CLI
 def main(argv: list[str] | None = None) -> None:
-    """Regenerate the frozen CSV files of this data-generating process.
-
-    Parameters
-    ----------
-    argv : list[str] | None, optional
-        Command-line arguments, by default ``None`` (``sys.argv``).
-
-    Returns
-    -------
-    None
-    """
+    """Regenerate the frozen CSV files of this data-generating process."""
     p = argparse.ArgumentParser(description="Generate the VC validation cohort.")
     p.add_argument("--out", type=Path, default=Path("data/vc-shift"))
     p.add_argument("--seed", type=int, default=42)

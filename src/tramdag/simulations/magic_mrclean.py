@@ -40,6 +40,8 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
+from ._common import logistic, resolve_latents, sigmoid
+
 COLUMNS = ["Age", "mRS_pre", "NIHSSa", "T", "mRS_3m"]
 
 # Ordered-logit cutpoints, P(Y <= k) = sigmoid(theta_k - shift); chosen so the
@@ -49,11 +51,6 @@ CUTS_PRE = np.array([0.20, 1.15, 2.05, 3.20, 5.20])  # 6 levels (0..5)
 CUTS_Y = np.array([-1.85, -0.75, 0.05, 0.80, 1.55, 2.35])  # 7 levels (0..6)
 
 
-def _logistic(rng: np.random.Generator, size: int) -> np.ndarray:
-    """Draw the standard logistic latent, the TRAM base distribution."""
-    return rng.logistic(loc=0.0, size=size)
-
-
 def _ordinal(shift: np.ndarray, cuts: np.ndarray, u: np.ndarray) -> np.ndarray:
     """Sample an ordered-logit level from the latent ``u``.
 
@@ -61,10 +58,6 @@ def _ordinal(shift: np.ndarray, cuts: np.ndarray, u: np.ndarray) -> np.ndarray:
     flow's ``ordinal_sample`` applies.
     """
     return (u[:, None] > (cuts[None, :] - shift[:, None])).sum(axis=1)
-
-
-def _sigmoid(x: np.ndarray) -> np.ndarray:
-    return 1.0 / (1.0 + np.exp(-x))
 
 
 @dataclass
@@ -116,7 +109,7 @@ class MagicMrClean:
         dict[str, np.ndarray]
             One array of length ``n`` per variable.
         """
-        return {k: _logistic(rng, n) for k in COLUMNS}
+        return {k: logistic(rng, n) for k in COLUMNS}
 
     # --------------------------------------------------------------------- SCM
     def simulate(
@@ -170,13 +163,7 @@ class MagicMrClean:
             If both ``n`` and ``latents`` are omitted.
         """
         do = do or {}
-        if latents is None:
-            if n is None:
-                raise ValueError("provide either n or latents")
-            rng = rng or np.random.default_rng(self.seed)
-            latents = self.draw_latents(n, rng)
-        else:
-            n = len(next(iter(latents.values())))
+        latents, n = resolve_latents(self, n, rng, latents)
         nl = self.nl
         age_loc = 73.0 - (9.0 if population == "rct" else 0.0)  # trial enrolls younger
 
@@ -202,7 +189,7 @@ class MagicMrClean:
         else:
             shift_nih = 0.45 * a + 0.25 * mRS_pre + nl * (0.20 * relu_a**2)
             lat_nih = shift_nih + 0.85 * latents["NIHSSa"]
-            NIHSSa = np.clip(6.0 + 36.0 * _sigmoid((lat_nih - 1.75) / 1.5), 6.0, 42.0)
+            NIHSSa = np.clip(6.0 + 36.0 * sigmoid((lat_nih - 1.75) / 1.5), 6.0, 42.0)
         s = (NIHSSa - 15.0) / 6.0  # standardized severity
 
         # --- T: thrombectomy assignment. Observational mechanism is confounded by
@@ -216,7 +203,7 @@ class MagicMrClean:
                 1.9
                 - 0.45 * np.maximum(a + 0.5, 0.0)
                 - 0.30 * np.maximum(s - 1.0, 0.0)
-                + nl * (-1.3 * _sigmoid((Age - 82.0) / 4.0))
+                + nl * (-1.3 * sigmoid((Age - 82.0) / 4.0))
             )
             T = (latents["T"] > -logit_T).astype(float)  # P(T=1) = sigmoid(logit_T)
 
@@ -225,7 +212,7 @@ class MagicMrClean:
         if "mRS_3m" in do:
             mRS_3m = np.full(n, float(do["mRS_3m"]))
         else:
-            tau = -0.85 + nl * (0.85 - 0.85 * _sigmoid((78.0 - Age) / 6.0))
+            tau = -0.85 + nl * (0.85 - 0.85 * sigmoid((78.0 - Age) / 6.0))
             zeta = 0.85 * s + 0.55 * a + 0.45 * mRS_pre + tau * T
             mRS_3m = _ordinal(zeta, CUTS_Y, latents["mRS_3m"]).astype(float)
 
@@ -383,17 +370,7 @@ def _write_variant(
 
 
 def main(argv: list[str] | None = None) -> None:
-    """Regenerate the frozen CSV files of this data-generating process.
-
-    Parameters
-    ----------
-    argv : list[str] | None, optional
-        Command-line arguments, by default ``None`` (``sys.argv``).
-
-    Returns
-    -------
-    None
-    """
+    """Regenerate the frozen CSV files of this data-generating process."""
     p = argparse.ArgumentParser(
         description="Generate the magic-mrclean synthetic cohort."
     )

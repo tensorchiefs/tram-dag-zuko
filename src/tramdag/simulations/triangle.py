@@ -42,6 +42,8 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
+from ._common import logistic, resolve_latents
+
 F_VARIANTS = {
     "linear": (lambda x: -0.3 * x, "-0.3*x"),
     "cubic": (lambda x: 2.0 * x**3 + x, "2*x^3 + x"),
@@ -54,10 +56,6 @@ THETA_MIXED = np.array([-2.0, 0.42, 1.02])  # ordinal cutpoints (4 levels)
 
 # the variants actually used in the paper (frozen by the CLI)
 PAPER_VARIANTS = {"continuous": ("linear", "atan", "sin"), "mixed": ("linear", "exp")}
-
-
-def _logistic(rng: np.random.Generator, size: int) -> np.ndarray:
-    return rng.logistic(loc=0.0, size=size)
 
 
 def _clamp(value, n: int) -> np.ndarray:
@@ -113,8 +111,8 @@ class _TriangleBase:
             "x1_mix": rng.uniform(size=n),  # component indicator
             "x1_a": rng.normal(size=n),  # N(0.25, 0.1) branch
             "x1_b": rng.normal(size=n),  # N(0.73, 0.05) branch
-            "x2": _logistic(rng, n),
-            "x3": _logistic(rng, n),
+            "x2": logistic(rng, n),
+            "x3": logistic(rng, n),
         }
 
     # --------------------------------------------------------------------- SCM
@@ -169,11 +167,7 @@ class _TriangleBase:
             If both ``n`` and ``latents`` are omitted.
         """
         do = do or {}
-        if latents is None:
-            if n is None:
-                raise ValueError("provide either n or latents")
-            rng = rng or np.random.default_rng(self.seed)
-            latents = self.draw_latents(n, rng)
+        latents, n = resolve_latents(self, n, rng, latents)
         x1, x2 = self._x1_x2(do, latents)
         x3 = self._x3(x1, x2, do, latents)
         return pd.DataFrame({"x1": x1, "x2": x2, "x3": x3})
@@ -432,17 +426,7 @@ def _write_variant(cls, out_dir: Path, f: str, seed: int, n_obs: int) -> None:
 
 
 def main(argv: list[str] | None = None) -> None:
-    """Regenerate the frozen CSV files of this data-generating process.
-
-    Parameters
-    ----------
-    argv : list[str] | None, optional
-        Command-line arguments, by default ``None`` (``sys.argv``).
-
-    Returns
-    -------
-    None
-    """
+    """Regenerate the frozen CSV files of this data-generating process."""
     p = argparse.ArgumentParser(
         description="Generate the TRAM-DAG paper triangle data."
     )

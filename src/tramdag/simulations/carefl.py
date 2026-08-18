@@ -31,6 +31,8 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
+from ._common import resolve_latents
+
 X_OBS = {"x1": 2.00, "x2": 1.50, "x3": 0.81, "x4": -0.28}  # the paper's observation
 ALPHA_GRID = np.round(np.linspace(-3.0, 3.0, 61), 4)
 _SCALE = 1.0 / np.sqrt(2.0)
@@ -89,12 +91,7 @@ class Carefl4:
             One column per variable.
         """
         do = do or {}
-        if latents is None:
-            if n is None:
-                raise ValueError("provide either n or latents")
-            rng = rng or np.random.default_rng(self.seed)
-            latents = self.draw_latents(n, rng)
-        n = len(latents["x1"])
+        latents, n = resolve_latents(self, n, rng, latents)
 
         def clamp_or(name, value):
             return np.full(n, float(do[name])) if name in do else value
@@ -201,17 +198,7 @@ class Carefl4:
 
 # --------------------------------------------------------------------------- CLI
 def main(argv: list[str] | None = None) -> None:
-    """Regenerate the frozen CSV files of this data-generating process.
-
-    Parameters
-    ----------
-    argv : list[str] | None, optional
-        Command-line arguments, by default ``None`` (``sys.argv``).
-
-    Returns
-    -------
-    None
-    """
+    """Regenerate the frozen CSV files of this data-generating process."""
     p = argparse.ArgumentParser(description="Generate the CAREFL benchmark data.")
     p.add_argument("--out", type=Path, default=Path("data/carefl"))
     p.add_argument("--seed", type=int, default=42)

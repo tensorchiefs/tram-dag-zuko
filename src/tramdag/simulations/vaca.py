@@ -30,6 +30,8 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
+from ._common import resolve_latents
+
 DO_X2_VALUES = (-3.0, -1.0, 0.0)  # the paper's Fig. 5 interventions
 
 
@@ -89,12 +91,7 @@ class VacaTriangle:
             One column per variable.
         """
         do = do or {}
-        if latents is None:
-            if n is None:
-                raise ValueError("provide either n or latents")
-            rng = rng or np.random.default_rng(self.seed)
-            latents = self.draw_latents(n, rng)
-        n = len(latents["x2"])
+        latents, n = resolve_latents(self, n, rng, latents)
 
         if "x1" in do:
             x1 = np.full(n, float(do["x1"]))
@@ -192,17 +189,7 @@ class VacaTriangle:
 
 # --------------------------------------------------------------------------- CLI
 def main(argv: list[str] | None = None) -> None:
-    """Regenerate the frozen CSV files of this data-generating process.
-
-    Parameters
-    ----------
-    argv : list[str] | None, optional
-        Command-line arguments, by default ``None`` (``sys.argv``).
-
-    Returns
-    -------
-    None
-    """
+    """Regenerate the frozen CSV files of this data-generating process."""
     p = argparse.ArgumentParser(description="Generate the VACA benchmark data.")
     p.add_argument("--out", type=Path, default=Path("data/vaca"))
     p.add_argument("--seed", type=int, default=42)
