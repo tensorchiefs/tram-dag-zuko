@@ -17,32 +17,41 @@ from tramdag.spec import spec_from_dict, spec_to_dict, validate_and_sort
 def test_sum_list_and_mixed_forms_are_identical():
     reference = ContinuousNode([I("x1"), LS("x2")])
     assert ContinuousNode(I("x1") + LS("x2")) == reference
-    assert ContinuousNode([I("x1") + LS("x2")]) == reference
-    assert ContinuousNode(transformation=[I("x1"), LS("x2")]) == reference
+    assert ContinuousNode(terms=[I("x1"), LS("x2")]) == reference
 
 
 def test_sum_chains_flatten_in_order():
     node = ContinuousNode(I("a") + CS("b") + LS("c") + VC("b", t="t"))
-    assert [t.effect for t in node.transformation] == ["I", "CS", "LS", "VC"]
+    assert [t.effect for t in node.terms] == ["I", "CS", "LS", "VC"]
 
 
 def test_bare_i_and_single_term():
-    assert ContinuousNode([I]).transformation == [I()]
-    assert ContinuousNode(I).transformation == [I()]
-    assert ContinuousNode(LS("x1")).transformation == [LS("x1")]
+    assert ContinuousNode([I]).terms == [I()]
+    assert ContinuousNode(I).terms == [I()]
+    assert ContinuousNode(LS("x1")).terms == [LS("x1")]
 
 
 def test_ordinal_takes_transformation_positionally():
     node = OrdinalNode(4, I("x1") + LS("x2"))
     assert node.levels == 4
-    assert node.transformation == [I("x1"), LS("x2")]
+    assert node.terms == [I("x1"), LS("x2")]
 
 
 def test_junk_entries_are_rejected():
-    with pytest.raises(TypeError, match="must be a Term"):
-        ContinuousNode("LS(x)")
-    with pytest.raises(TypeError, match="entries must be terms"):
-        ContinuousNode([I("a"), "x"])
+    for bad in ("LS(x)", [I("a"), "x"]):
+        with pytest.raises(TypeError, match="built from terms"):
+            ContinuousNode(bad)
+
+
+def test_a_sum_nested_in_a_list_is_rejected():
+    """A ``+`` sum is already flat, so a list of lists is a mistake.
+
+    Both spellings on their own are fine; mixing them is what the error
+    names, since it usually means someone expected ``+`` to combine list
+    entries.
+    """
+    with pytest.raises(TypeError, match="do not nest"):
+        ContinuousNode([I("x1") + LS("x2")])
 
 
 # ------------------------------------------------------- allow_interaction
@@ -56,7 +65,7 @@ def test_several_parented_i_terms_are_rejected():
 
 
 def test_multi_parent_i_stays_joint_by_default():
-    assert ContinuousNode([I("a", "b")]).transformation == [I("a", "b")]
+    assert ContinuousNode([I("a", "b")]).terms == [I("a", "b")]
 
 
 # ---------------------------------------------------------- transform on I
@@ -156,7 +165,7 @@ def test_roundtrip_keeps_hoisted_transform_and_terms():
     spec["x2"] = ContinuousNode(I("x1"))
     back = spec_from_dict(spec_to_dict(spec))
     assert back["x1"].transform == "spline"
-    assert back["x2"].transformation == [I("x1")]
+    assert back["x2"].terms == [I("x1")]
 
 
 def test_saved_checkpoint_of_new_syntax_loads(tmp_path):
@@ -167,7 +176,7 @@ def test_saved_checkpoint_of_new_syntax_loads(tmp_path):
     flow = CausalFlowDAG(spec, seed=1)
     flow.save(tmp_path / "m.pt")
     loaded = CausalFlowDAG.load(tmp_path / "m.pt")
-    assert loaded.spec["y"].transformation == [I("x")]
+    assert loaded.spec["y"].terms == [I("x")]
 
 
 def test_every_option_survives_the_roundtrip():
@@ -185,7 +194,7 @@ def test_every_option_survives_the_roundtrip():
     }
     back = spec_from_dict(spec_to_dict(spec))
     assert back == spec
-    i_term, vc_term = back["y"].transformation
+    i_term, vc_term = back["y"].terms
     assert (i_term.allow_interaction, i_term.units) == (False, (4, 4))
     assert (vc_term.penalty, vc_term.center, vc_term.center_folds) == (2.5, True, 3)
     assert back["a"].transform_kwargs == {"bins": 6}
@@ -238,7 +247,7 @@ def test_short_aliases_are_the_definitions():
         + td.complex_shift("z")
         + td.varying_coefficient("z", t="y")
     )
-    assert short.transformation == long.transformation
+    assert short.terms == long.terms
 
 
 # ------------------------------------------------------------------ units
@@ -262,7 +271,7 @@ def test_units_survive_the_roundtrip():
         "b": ContinuousNode(CS("a", units=[16])),
     }
     back = spec_from_dict(spec_to_dict(spec))
-    assert back["b"].transformation[0].units == (16,)
+    assert back["b"].terms[0].units == (16,)
 
 
 def test_vc_modifiers_are_positional_t_is_keyword():

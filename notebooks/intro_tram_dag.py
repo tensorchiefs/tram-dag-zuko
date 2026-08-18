@@ -670,7 +670,7 @@ plt.show()
 # ## 9. Where to go from here
 #
 # * **Complex intercepts (`I(...)`)** — this is the one component not exercised
-#   here. Declare `transformation=[I("Age")]`, and the *parameters* of the
+#   here. Declare `terms=[I("Age")]`, and the *parameters* of the
 #   Bernstein transform become a function of the parent. Several `I(...)` parents
 #   feed one joint network, that is, they can interact. The stroke experiments in
 #   `experiments/` use `I(...)` heavily. Run

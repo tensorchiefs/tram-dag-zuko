@@ -16,12 +16,12 @@ are the same object, so `LS is linear_shift`.
 | `linear_shift()` / `LS` | Linear shift `beta * x` — the interpretable log-odds coefficient. Exactly one parent. |
 | `complex_shift()` / `CS` | Complex shift: an MLP `g(x)`, additive on the latent scale. Several parents form one joint network. |
 | `varying_coefficient()` / `VC` | Varying-coefficient shift `(beta0 + b_theta(mods)) * x_t` — the penalized treatment-effect head (issue #28). `center=` adds propensity centering (issue #30). |
-| `ContinuousNode` | Continuous variable: monotone 1-D transform plus shifts. The transformation is the first positional argument. |
+| `ContinuousNode` | Continuous variable: monotone 1-D transform plus shifts. `terms` is the first positional argument. |
 | `OrdinalNode` | Ordinal variable with `levels` classes: ordered logit (cutpoints) plus shifts. |
 | `node_terms()` / `node_parents()` | Canonical term list / ordered de-duplicated parent names of a node. |
 | `validate_and_sort()` | Edge-ownership validation plus Kahn topological sort. The returned order makes the flow triangular. |
 | `spec_to_dict()` / `spec_from_dict()` | Checkpoint (de)serialization. A term serializes as `{effect, parents, options}` and nothing else, since `options` is already canonical. No compatibility shims, and `spec_from_dict` builds `Term` directly — so `validate_and_sort` is the only guard on that path. |
-| (`_normalize_transformation`, `_check_single_intercept`, `_hoist_transform`, `_options`, `_OPTION_DEFAULTS`) | Input normalization, the one-parented-`I` rule, basis hoisting onto the node, canonical option storage. |
+| (`_normalize_terms`, `_as_term`, `_check_intercepts`, `_options`, `_OPTION_DEFAULTS`) | Formula flattening and per-entry validation (a `+` sum nested in a list is rejected), the one-parented-`I` rule plus basis hoisting in one pass, canonical option storage. |
 
 ## `transforms.py` — the monotone map h and the ordinal transform
 

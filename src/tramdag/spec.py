@@ -36,7 +36,7 @@ additive on the latent scale.
 What ``h`` looks like per transformation, for a continuous ``x3``:
 
 ======================================== =======================================
-``transformation=``                      ``u_3 = h(x_3 | pa)``
+``terms=``                               ``u_3 = h(x_3 | pa)``
 ======================================== =======================================
 ``None`` / ``[I]``                       ``h_theta(x3)``
 ``[LS("X1")]``                           ``h_theta(x3) + beta*x1``
@@ -347,38 +347,48 @@ def varying_coefficient(
     )
 
 
-def _normalize_transformation(value):
-    """Flatten a transformation into a plain term list.
+def _as_term(value) -> Term:
+    """Take one entry of a formula to a :class:`Term`.
 
-    Accepted: ``None``, a single :class:`Term`, a ``+`` sum, the bare name
-    ``I``, or a list/tuple that mixes all of these.
+    The bare name ``I`` stands for ``I()``, the simple-intercept baseline.
+
+    Raises
+    ------
+    TypeError
+        If the entry is neither a term nor the bare ``I``.
+    """
+    if value is intercept:
+        return intercept()
+    if isinstance(value, Term):
+        return value
+    raise TypeError(
+        "a transformation is built from terms (I/LS/CS/VC) — got "
+        f"{type(value).__name__}. A '+' sum is already a flat list, so do "
+        "not nest one inside another list: write either a list or a sum."
+    )
+
+
+def _normalize_terms(value):
+    """Flatten a node's formula into a plain term list.
+
+    Accepted: ``None`` (a source node), one term, a ``+`` sum, the bare
+    name ``I``, or a list of any of those. A ``+`` sum is already flat, so
+    a list of lists is a mistake rather than a shape to flatten.
+
+    Parameters
+    ----------
+    value : Term | list[Term] | None
+        The formula as written.
+
+    Returns
+    -------
+    list[Term] | None
+        The term list, or ``None`` for a source node.
     """
     if value is None:
         return None
-    if value is intercept:
-        value = [intercept()]
-    elif isinstance(value, Term):
-        value = [value]
-    if not isinstance(value, (list, tuple)):
-        raise TypeError(
-            "transformation must be a Term, a sum of terms, the bare I, or a "
-            f"list of these — got {type(value).__name__}."
-        )
-    out: list[Term] = []
-    for element in value:
-        if element is intercept:
-            element = intercept()
-        if isinstance(element, (list, tuple)):  # a nested `+` sum
-            out.extend(_normalize_transformation(element))
-        elif isinstance(element, Term):
-            out.append(element)
-        else:
-            raise TypeError(
-                "transformation entries must be terms (I/LS/CS/VC) — got "
-                f"{type(element).__name__}. A '+' between list entries "
-                "does not combine them; write either a list or a sum."
-            )
-    return out
+    items = value if isinstance(value, (list, tuple)) else [value]
+    return [_as_term(element) for element in items]
 
 
 def _check_intercepts(terms, *, ordinal: bool):
@@ -437,32 +447,32 @@ class ContinuousNode:
 
     Parameters
     ----------
-    transformation : Term | list[Term] | None, optional
-        The additive formula for ``h``: a list of terms, a ``+`` sum, a single
-        term, or the bare ``I``. ``None`` (default) is a source node. The
+    terms : Term | list[Term] | None, optional
+        The additive formula for ``h``: a list of terms, a ``+`` sum, a
+        single term, or the bare ``I``. ``None`` (default) is a source node. The
         basis of the monotone transform is chosen on the intercept term,
         ``I(..., transform="spline")``; the default is ``"bernstein"``.
     """
 
     kind = "continuous"
 
-    def __init__(self, transformation=None):
-        self.transformation = _normalize_transformation(transformation)
+    def __init__(self, terms=None):
+        self.terms = _normalize_terms(terms)
         self.transform, self.transform_kwargs = _check_intercepts(
-            self.transformation, ordinal=False
+            self.terms, ordinal=False
         )
 
     def __repr__(self):
-        """Show the transformation and the basis."""
-        return f"ContinuousNode({self.transformation!r}, transform={self.transform!r})"
+        """Show the terms and the basis."""
+        return f"ContinuousNode({self.terms!r}, transform={self.transform!r})"
 
     def __eq__(self, other):
-        """Compare transformation, basis and basis kwargs."""
-        # transform/transform_kwargs are derived from transformation, so
-        # equal transformations already imply an equal basis
+        """Compare the terms; the basis is derived from them."""
+        # transform/transform_kwargs are derived from the terms, so equal
+        # term lists already imply an equal basis
         return (
             isinstance(other, ContinuousNode)
-            and self.transformation == other.transformation
+            and self.terms == other.terms
         )
 
 
@@ -475,28 +485,28 @@ class OrdinalNode:
     ----------
     levels : int
         Number of ordered classes.
-    transformation : Term | list[Term] | None, optional
+    terms : Term | list[Term] | None, optional
         The additive formula, as for :class:`ContinuousNode`, by default
         ``None``.
     """
 
     kind = "ordinal"
 
-    def __init__(self, levels: int, transformation=None):
+    def __init__(self, levels: int, terms=None):
         self.levels = int(levels)
-        self.transformation = _normalize_transformation(transformation)
-        _check_intercepts(self.transformation, ordinal=True)
+        self.terms = _normalize_terms(terms)
+        _check_intercepts(self.terms, ordinal=True)
 
     def __repr__(self):
-        """Show the levels and the transformation."""
-        return f"OrdinalNode({self.levels}, {self.transformation!r})"
+        """Show the levels and the terms."""
+        return f"OrdinalNode({self.levels}, {self.terms!r})"
 
     def __eq__(self, other):
-        """Compare levels and transformation."""
+        """Compare levels and terms."""
         return (
             isinstance(other, OrdinalNode)
             and self.levels == other.levels
-            and self.transformation == other.transformation
+            and self.terms == other.terms
         )
 
 
@@ -516,9 +526,9 @@ def node_terms(node: NodeSpec) -> list[Term]:
     list[Term]
         The terms. Empty for a source node.
     """
-    if node.transformation is None:
+    if node.terms is None:
         return []
-    return list(node.transformation)
+    return list(node.terms)
 
 
 def node_parents(node: NodeSpec) -> list[str]:

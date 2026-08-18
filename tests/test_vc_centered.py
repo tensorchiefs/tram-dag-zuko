@@ -74,7 +74,7 @@ def test_center_serialization_roundtrip():
         "T": OrdinalNode(2, [LS("X")]),
         "Y": ContinuousNode([VC("X", center=True, center_folds=3, t="T")]),
     }
-    t = spec_from_dict(spec_to_dict(spec))["Y"].transformation[0]
+    t = spec_from_dict(spec_to_dict(spec))["Y"].terms[0]
     assert (t.center, t.center_folds) == (True, 3)
 
 
@@ -257,7 +257,7 @@ def test_centered_roundtrip_after_load(tmp_path):
     p = tmp_path / "c.pt"
     flow.save(p)
     flow2 = CausalFlowDAG.load(p)
-    t = flow2.spec["Y"].transformation[1]
+    t = flow2.spec["Y"].terms[1]
     assert t.center is True
     with torch.no_grad():
         np.testing.assert_allclose(

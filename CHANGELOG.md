@@ -78,6 +78,20 @@
   `{"Age": I, "NIHSSa": CS}` then `t["Age"]("Age")` (see
   `experiments/common.py::build_spec`).
 
+### Changed (breaking)
+
+- **The node formula argument is `terms`, not `transformation`.**
+  `ContinuousNode(terms=...)` / `OrdinalNode(levels, terms=...)`, and the
+  attribute is `node.terms`. It is still the first positional argument, so
+  positional calls are unaffected; the word now matches what it holds and
+  what `Term`/`node_terms` already say.
+
+- **A `+` sum nested inside a list is rejected.** `+` already returns a
+  flat list, so `[I("x1") + LS("x2")]` was a list of lists that the
+  normalizer silently flattened. Write either a list or a sum; the error
+  says so, because the usual cause is expecting `+` to combine list
+  entries.
+
 ### Changed (internal, no API surface)
 
 - **The serialized term is `{effect, parents, options}`.** `Term.options`
