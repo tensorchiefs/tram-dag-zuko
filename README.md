@@ -211,7 +211,8 @@ data/                   frozen synthetic CSVs + truth.json — a test contract
 experiments/            stroke pipeline + paper replications
 notebooks/              intro (didactic) + Colab demo   (jupytext .py — see README there)
 tests/                  unit, known-truth recovery, R regression
-docs/                   fitting.md, notation.md, training-speed.md,
+docs/                   code-map.md (every class/function + all knobs),
+                        fitting.md, notation.md, training-speed.md,
                         stroke-case-study.md, varying-coefficients.md, scores.md
 ```
 
