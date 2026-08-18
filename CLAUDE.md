@@ -58,8 +58,9 @@ Experiments default to the synthetic data (`magic-mrclean/nl`). The `magic` sour
   `log_prob`, `save/load`, `varying_coef` (VC read-out), `scores` /
   `effect_modifier_scan` (analytic per-row ∂ℓᵢ/∂θ + CUSUM modifier scan,
   `scores.py`). NLL decomposes per node → one Adam fits all nodes jointly.
-- `simulations/` — numpy-only SCM generators with known ground truth, looked up via
-  `REGISTRY`; each module has a CLI that regenerates its frozen `data/<name>/` CSVs:
+- `simulations/` — numpy-only SCM generators with known ground truth
+  (`REGISTRY` maps name → class; experiments import the classes directly);
+  each module has a CLI that regenerates its frozen `data/<name>/` CSVs:
   `magic_mrclean.py` (stroke SCM, `ls`/`nl`), `triangle.py` (paper §6 continuous +
   ordinal triangles, f variants linear/cubic/exp/atan/sin), `vaca.py` (App. C.1
   bimodal L1/L2 benchmark), `carefl.py` (App. C.2 Laplace SCM, **analytic**

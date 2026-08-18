@@ -88,11 +88,11 @@ Kept deliberately (checked, not dead):
 1. ~~**`notebooks/intro_tram_dag.py`** prose labels~~ — done: the six
    informal lowercase `ls`/`cs`/`ci` mentions now use the constructor
    names (`LS`, `CS`, `I`), which the notebook actually teaches.
-2. **pyproject classifiers**: add `Programming Language :: Python :: 3.10`
-   to `3.12` before the next PyPI release (release-flow decision).
-3. **`simulations.REGISTRY`** is only consumed by one test; experiments
-   import the classes directly. Either route experiments through it or
-   demote it in CLAUDE.md.
+2. ~~**pyproject classifiers**~~ — done: explicit 3.10–3.13 classifiers
+   added (matches `requires-python >= 3.10`).
+3. ~~**`simulations.REGISTRY`**~~ — done: CLAUDE.md no longer claims
+   experiments look generators up via the registry; it maps name → class
+   and experiments import the classes directly.
 4. **Pre-0.3 checkpoints** (`parents={...}` layout) no longer load anywhere.
    If any survive outside the paper monorepo, they need a one-off converter;
    otherwise declare them unsupported in the CHANGELOG at release.
