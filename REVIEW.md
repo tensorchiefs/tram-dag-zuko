@@ -93,12 +93,38 @@ Kept deliberately (checked, not dead):
 3. ~~**`simulations.REGISTRY`**~~ — done: CLAUDE.md no longer claims
    experiments look generators up via the registry; it maps name → class
    and experiments import the classes directly.
-4. **Pre-0.3 checkpoints** (`parents={...}` layout) no longer load anywhere.
-   The CHANGELOG 0.4.0 Removed section already declares the loader gone.
-   Open owner question: do any pre-0.3 checkpoints survive outside the
-   paper monorepo? If yes, they need a one-off converter.
+4. **Pre-0.3 checkpoints** (`parents={...}` layout) no longer load anywhere,
+   and since the 0.4 cleanup neither do 0.3 ones — the CHANGELOG says so.
+   Open owner question: do any survive outside the paper monorepo? If yes,
+   they need a one-off converter.
 5. **`docs/research/` mission**: the autoresearch mission needs a real
    migration of the parked benchmark scripts before a next run — the path
    fixes here only make the docs honest.
 6. **Full-suite timing** in `tests/README.md` should be re-measured on CI
    once this branch merges (nightly job already reports it).
+
+## 8. Open after the simplification pass (2026-08-18)
+
+1. **Intercept unification** — the three-branch intercept
+   (`intercept` / `intercept_nets` / `None`) can become one `ModuleList`
+   now that checkpoint compatibility is gone (about −30 lines in
+   `flow.py`). Deferred deliberately: 20 references in `flow.py`, ~14 test
+   assertions that pin the three shapes, and two intro-notebook cells that
+   call `node.intercept(n)`. Its own change, not a tail-end cleanup.
+2. **Tests-tree reductions (~−180 lines)** — out of scope by request so
+   far. Biggest: the stroke all-`ls` spec defined four times *provably
+   identically*; 25 sites reaching into `.shifts[p].weight` where
+   `ls_coefficients()` is the public API; duplicate tests
+   (`test_additive_vs_joint_intercept_structure`, `test_cycle_detection`,
+   `_fit_x3_nll`).
+3. **`nl` flexible reference number** — the storyline's flexible model
+   gives +0.086 where CLAUDE.md documents ≈ +0.10. Reproducible, inside
+   the documented `[+0.03, +0.14]` band, unrelated to any refactor.
+   Re-pin the number or investigate the early-stopping trajectory.
+4. **Rejected, with evidence** — dropping `validate_and_sort`'s duplicate
+   checks (they are the only guard on the load path since `spec_from_dict`
+   builds `Term` directly), `pd.get_dummies` in `validate_ls.py` (makes
+   the column set data-dependent on a pinned path), removing `load_magic`
+   (dead here, documented monorepo path), and dropping `scikit-learn`
+   (re-rolls the pinned 80/10/10 split).
+5. **Naming** — decided: the prose descriptor `all-`ls`` stays as it is.
