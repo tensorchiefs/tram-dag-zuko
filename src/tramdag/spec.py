@@ -384,14 +384,12 @@ def term(effect: str, *parents: str, penalty: float | None = None) -> Term:
     if effect == "CS":
         return complex_shift(*parents)
     if effect == "VC":
-        t, mods = parents[0], parents[1:]
-        if penalty is None:
-            return varying_coefficient(*mods, t=t)
-        return varying_coefficient(*mods, t=t, penalty=penalty)
+        kw = {} if penalty is None else {"penalty": penalty}
+        return varying_coefficient(*parents[1:], t=parents[0], **kw)
     raise ValueError(f"unknown term effect '{effect}'.")
 
 
-def _normalize_transformation(value, *, name: str = "transformation"):
+def _normalize_transformation(value):
     """Flatten a transformation into a plain term list.
 
     Accepted: ``None``, a single :class:`Term`, a ``+`` sum, the bare name
@@ -405,20 +403,20 @@ def _normalize_transformation(value, *, name: str = "transformation"):
         value = [value]
     if not isinstance(value, (list, tuple)):
         raise TypeError(
-            f"{name} must be a Term, a sum of terms, the bare I, or a list "
-            f"of these — got {type(value).__name__}."
+            "transformation must be a Term, a sum of terms, the bare I, or a "
+            f"list of these — got {type(value).__name__}."
         )
     out: list[Term] = []
     for element in value:
         if element is intercept:
             element = intercept()
         if isinstance(element, (list, tuple)):  # a nested `+` sum
-            out.extend(_normalize_transformation(element, name=name))
+            out.extend(_normalize_transformation(element))
         elif isinstance(element, Term):
             out.append(element)
         else:
             raise TypeError(
-                f"{name} entries must be terms (I/LS/CS/VC) — got "
+                "transformation entries must be terms (I/LS/CS/VC) — got "
                 f"{type(element).__name__}. A '+' between list entries "
                 "does not combine them; write either a list or a sum."
             )
@@ -502,11 +500,11 @@ class ContinuousNode:
 
     def __eq__(self, other):
         """Compare transformation, basis and basis kwargs."""
+        # transform/transform_kwargs are derived from transformation, so
+        # equal transformations already imply an equal basis
         return (
             isinstance(other, ContinuousNode)
             and self.transformation == other.transformation
-            and self.transform == other.transform
-            and self.transform_kwargs == other.transform_kwargs
         )
 
 

@@ -81,8 +81,7 @@ class StandardLogistic:
         Tensor
             The samples.
         """
-        u = torch.rand(shape, device=device).clamp(eps, 1.0 - eps)
-        return torch.log(u) - torch.log1p(-u)
+        return StandardLogistic.icdf(torch.rand(shape, device=device), eps)
 
     @staticmethod
     def icdf(u: Tensor, eps: float = 1e-7) -> Tensor:
