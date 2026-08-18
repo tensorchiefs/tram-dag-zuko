@@ -1712,10 +1712,15 @@ class CausalFlowDAG(nn.Module):
         """
         ckpt = torch.load(path, map_location=device, weights_only=False)
         flow = cls(spec_from_dict(ckpt["spec"]), device=device)
-        for name in flow.order:  # mark transforms as fitted before loading buffers
+        # A loaded model carries trained parameters, so both first-fit guards
+        # must already be closed: re-fitting with marginal_init=True would
+        # otherwise reset the intercept to the data marginal.
+        for name in flow.order:
             node = flow.nodes[name]
             if node.kind == "continuous":
                 node.ut._fitted = True
+            elif isinstance(node.intercept, SimpleIntercept):
+                node.intercept._marginal_inited = True
         flow.load_state_dict(ckpt["state_dict"])
         flow.history = ckpt["history"]
         flow.meta = ckpt["meta"]
