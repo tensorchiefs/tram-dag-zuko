@@ -35,12 +35,19 @@ repos:
 - repo: https://github.com/codespell-project/codespell
   rev: v2.4.3
   hooks:
+  # nd: the _Node variable in flow.py; continous: quotes the upstream
+  # R script's filename (tensorchiefs/tram-dag), typo and all
   - id: codespell
-    # nd: the _Node variable in flow.py; continous: quotes the upstream
-    # R script's filename (tensorchiefs/tram-dag), typo and all
+    name: codespell (tracked files)
     args: [-L, 'nd,continous']
-    # TODO: find a way to exclude diff and only check msg
-    exclude: ^(data/|uv\.lock|.*\.ipynb$|.*texfrag/|notebooks/stale/|experiments/stale/|.git/COMMIT_EDITMSG)
+    exclude: ^(data/|uv\.lock|.*\.ipynb$|.*texfrag/|notebooks/stale/|experiments/stale/)
+  # a commit-msg-stage hook is handed ONLY the message file, so the message is
+  # spell-checked without the file excludes above applying to it
+  - id: codespell
+    alias: codespell-commit-msg
+    name: codespell (commit message)
+    args: [-L, 'nd,continous']
+    stages: [commit-msg]
 
 - repo: https://github.com/astral-sh/uv-pre-commit
   rev: 0.12.5
