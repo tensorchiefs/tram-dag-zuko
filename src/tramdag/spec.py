@@ -108,19 +108,11 @@ class Term:
         ``units`` (hidden layers of the term's network);
         ``allow_interaction`` (multi-parent I: one joint net or one net
         per parent).
-    slot : str
-        Derived from the effect: ``"intercept"`` for ``I``, ``"shift"``
-        for ``LS``/``CS``/``VC``.
     """
 
     effect: str
     parents: tuple[str, ...]
     options: tuple = ()  # canonical (key, value) pairs, see _OPTION_DEFAULTS
-
-    @property
-    def slot(self) -> str:
-        """str: the slot the term sums in."""
-        return "intercept" if self.effect == "I" else "shift"
 
     def __getattr__(self, name: str):
         """Serve the effect-specific options, with their defaults."""
@@ -433,24 +425,20 @@ def _normalize_transformation(value, *, name: str = "transformation"):
     return out
 
 
-def _check_single_intercept(terms):
-    """Reject several intercept terms with parents.
+def _check_intercepts(terms, *, ordinal: bool):
+    """Validate the intercept slot and read the basis choice off it.
 
-    Additive intercepts are said with ``allow_interaction=False`` on one
-    ``I`` term, not by listing several.
-    """
-    parented = [t for t in terms or [] if t.effect == "I" and t.parents]
-    if len(parented) > 1:
-        raise ValueError(
-            "a node takes at most one I term with parents. For an additive "
-            "intercept write I("
-            + ", ".join(repr(p) for t in parented for p in t.parents)
-            + ", allow_interaction=False)."
-        )
+    A node takes at most one ``I`` term with parents — an additive
+    intercept is said with ``allow_interaction=False`` on one term, not by
+    listing several — and at most one ``I`` term may name the basis.
 
-
-def _hoist_transform(terms, *, ordinal: bool):
-    """Read the basis choice off the I terms.
+    Parameters
+    ----------
+    terms : list[Term] | None
+        The node's normalized term list.
+    ordinal : bool
+        ``True`` for an ordinal node, whose intercept is the cutpoint
+        vector and therefore has no basis to choose.
 
     Returns
     -------
@@ -460,9 +448,19 @@ def _hoist_transform(terms, *, ordinal: bool):
     Raises
     ------
     ValueError
-        If several ``I`` terms set a basis, or an ordinal node gets one.
+        If several ``I`` terms carry parents, if several set a basis, or if
+        an ordinal node sets one.
     """
-    carriers = [t for t in terms or [] if t.effect == "I" and t.transform]
+    i_terms = [t for t in terms or [] if t.effect == "I"]
+    parented = [t for t in i_terms if t.parents]
+    if len(parented) > 1:
+        raise ValueError(
+            "a node takes at most one I term with parents. For an additive "
+            "intercept write I("
+            + ", ".join(repr(p) for t in parented for p in t.parents)
+            + ", allow_interaction=False)."
+        )
+    carriers = [t for t in i_terms if t.transform]
     if len(carriers) > 1:
         raise ValueError(
             "only one I term per node may set transform=, got "
@@ -474,8 +472,7 @@ def _hoist_transform(terms, *, ordinal: bool):
             "intercept is the cutpoint vector, it has no basis to choose."
         )
     if carriers:
-        t = carriers[0]
-        return t.transform, dict(t.transform_kwargs or ())
+        return carriers[0].transform, dict(carriers[0].transform_kwargs or ())
     return "bernstein", {}
 
 
@@ -495,8 +492,7 @@ class ContinuousNode:
 
     def __init__(self, transformation=None):
         self.transformation = _normalize_transformation(transformation)
-        _check_single_intercept(self.transformation)
-        self.transform, self.transform_kwargs = _hoist_transform(
+        self.transform, self.transform_kwargs = _check_intercepts(
             self.transformation, ordinal=False
         )
 
@@ -533,8 +529,7 @@ class OrdinalNode:
     def __init__(self, levels: int, transformation=None):
         self.levels = int(levels)
         self.transformation = _normalize_transformation(transformation)
-        _check_single_intercept(self.transformation)
-        _hoist_transform(self.transformation, ordinal=True)
+        _check_intercepts(self.transformation, ordinal=True)
 
     def __repr__(self):
         """Show the levels and the transformation."""

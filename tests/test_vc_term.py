@@ -41,12 +41,7 @@ def _vc_spec(penalty: float = 1.0) -> dict:
 # ------------------------------------------------------------ spec / validation
 def test_vc_constructor_and_term_factory():
     t = VC("X2", "X3", penalty=2.5, t="T")
-    assert (t.effect, t.slot, t.parents, t.penalty) == (
-        "VC",
-        "shift",
-        ("T", "X2", "X3"),
-        2.5,
-    )
+    assert (t.effect, t.parents, t.penalty) == ("VC", ("T", "X2", "X3"), 2.5)
     t2 = term("VC", "T", "X2", penalty=2.5)
     assert t2 == VC("X2", penalty=2.5, t="T")
     assert term("VC", "T").penalty == VC(t="T").penalty  # shared default
