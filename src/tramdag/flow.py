@@ -328,6 +328,12 @@ class CausalFlowDAG(nn.Module):
             for c in (self.order if cols is None else cols)
         }
 
+    def _node(self, name: str) -> _Node:
+        """Look a node up by name, with the same error everywhere."""
+        if name not in self.nodes:
+            raise KeyError(f"unknown node {name!r}")
+        return self.nodes[name]
+
     def _features(self, values: dict[str, Tensor]) -> dict[str, Tensor]:
         return {name: self._encode_parent(name, vals) for name, vals in values.items()}
 
@@ -1049,9 +1055,7 @@ class CausalFlowDAG(nn.Module):
             If the node has no VC term, or if ``t`` is omitted while the
             node has several VC terms.
         """
-        if node not in self.nodes:
-            raise KeyError(f"unknown node {node!r}")
-        nd = self.nodes[node]
+        nd = self._node(node)
         vcs = {g.on: g.mods for g in nd._vc_groups}
         if not vcs:
             raise ValueError(f"node {node!r} has no VC term.")
@@ -1209,9 +1213,7 @@ class CausalFlowDAG(nn.Module):
         parameters, but not, in general, an additive shift of the curve
         itself.
         """
-        if node not in self.nodes:
-            raise KeyError(f"unknown node {node!r}")
-        nd = self.nodes[node]
+        nd = self._node(node)
         groups = nd._intercept_groups
         if not groups:
             raise ValueError(

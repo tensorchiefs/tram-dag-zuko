@@ -96,9 +96,7 @@ def node_scores(flow, df: pd.DataFrame, node: str) -> pd.DataFrame:
     ValueError
         If the node has no ``LS`` or ``VC`` term.
     """
-    if node not in flow.nodes:
-        raise KeyError(f"unknown node {node!r}")
-    nd = flow.nodes[node]
+    nd = flow._node(node)
     ls_groups = [
         (key, ps)
         for key, ps in nd._shift_groups
