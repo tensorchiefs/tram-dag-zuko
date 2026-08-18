@@ -39,6 +39,7 @@ repos:
     # nd: the _Node variable in flow.py; continous: quotes the upstream
     # R script's filename (tensorchiefs/tram-dag), typo and all
     args: [-L, 'nd,continous']
+    # TODO: find a way to exclude diff and only check msg
     exclude: ^(data/|uv\.lock|.*\.ipynb$|.*texfrag/|notebooks/stale/|experiments/stale/|.git/COMMIT_EDITMSG)
 
 - repo: https://github.com/astral-sh/uv-pre-commit
