@@ -16,6 +16,7 @@ from tramdag import CS, CausalFlowDAG, ContinuousNode, I
 
 # --------------------------------------------------------------- structure
 
+
 def test_additive_ci_runs_and_finite():
     rng = np.random.default_rng(0)
     df = pd.DataFrame({c: rng.normal(size=64) for c in ["x1", "x2", "x3"]})
@@ -43,7 +44,6 @@ def _scale_df(n, seed=0):
     u3 = np.log(u) - np.log1p(-u)
     x3 = np.exp(0.5 * (x1 + x2)) * u3
     return pd.DataFrame({"x1": x1, "x2": x2, "x3": x3})
-
 
 
 @pytest.mark.slow

@@ -25,7 +25,6 @@ def _interaction_df(n, seed=0):
     return pd.DataFrame({"x1": x1, "x2": x2, "x3": x3})
 
 
-
 @pytest.mark.slow
 def test_joint_cs_beats_additive_on_interaction(fit_x3_nll):
     df = _interaction_df(4000)
