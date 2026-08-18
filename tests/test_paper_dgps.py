@@ -234,8 +234,15 @@ def test_vaca_ci_flow_matches_interventional_moments():
     assert ((samp["x1"] < -1.0).mean() > 0.25) and ((samp["x1"] > 1.0).mean() > 0.25)
     for a in (-3.0, -1.0, 0.0):
         # do(x2=-3) pairs the lower x1 mode with a ~5-sigma-off x2: genuine
-        # extrapolation beyond the observational manifold -> looser tolerance
-        tol = 0.3 if a == -3.0 else 0.2
+        # extrapolation beyond the observational manifold -> looser tolerance.
+        # Measured margins for this fit: 0.288 on linux/macos against 0.303 on
+        # the windows torch wheel (identical across python 3.10-3.14, so it is
+        # deterministic BLAS reduction order, not noise). A tolerance of 0.3 sat
+        # inside that 0.015 spread, so it passed on two platforms and failed on
+        # the third. 0.4 clears the spread and still catches the failure this
+        # assertion is for: a flow that ignored the intervention would sit at
+        # the observational -0.25, an error of ~0.75.
+        tol = 0.4 if a == -3.0 else 0.2
         ref = truth["do_x2"][str(a)]
         do_samp = flow.sample(20_000, do={"x2": a}, seed=1)
         assert abs(do_samp["x3"].mean() - ref["mean_x3_analytic"]) < tol, f"do(x2={a})"
