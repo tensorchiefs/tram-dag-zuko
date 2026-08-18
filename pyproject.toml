@@ -7,6 +7,7 @@ requires = ["hatchling"]
 dev = [
   {include-group = "docs"},
   {include-group = "experiments"},
+  {include-group = "notebooks"},
   {include-group = "test"},
   "pre-commit",
   "pylsp-rope",
