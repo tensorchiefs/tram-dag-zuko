@@ -150,8 +150,13 @@ jobs:
           --resource-path=.:docs --metadata title="tramdag documentation" \
           --toc --toc-depth=2 --css=docs/pdf.css build/pdf/README.md docs/*.md \
           -o build/pdf/docs.html
-        grep -q 'id="TOC"' build/pdf/docs.html   # fail loudly if pandoc drops it
-        ! grep -q 'href="docs/pdf.css"' build/pdf/docs.html   # css must be inlined
+        # both assertions must fail the step, so neither may use `!`:
+        # a negated command is exempt from errexit (shellcheck SC2251)
+        grep -q 'id="TOC"' build/pdf/docs.html   # pandoc must emit the TOC
+        if grep -q 'href="docs/pdf.css"' build/pdf/docs.html; then
+          echo "pdf.css stayed a link instead of being inlined" >&2
+          exit 1
+        fi
         uv run --with weasyprint weasyprint build/pdf/docs.html site/tramdag-docs.pdf
 
     - name: publish to gh-pages
