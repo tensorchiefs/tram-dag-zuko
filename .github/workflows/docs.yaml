@@ -130,10 +130,14 @@ jobs:
         DEBIAN_FRONTEND: noninteractive
       run: |
         set -euo pipefail
-        # neither pandoc nor weasyprint's pango are preinstalled. Lock::Timeout
-        # makes apt fail instead of waiting out the job on a held dpkg lock.
-        sudo apt-get -q -o DPkg::Lock::Timeout=120 update
-        sudo apt-get -q -y -o DPkg::Lock::Timeout=120 install \
+        # neither pandoc nor weasyprint's pango are preinstalled. The observed
+        # hang (runs 32226108853, 32236716397) was apt cycling Ign: retries
+        # against an unreachable azure mirror, so every apt wait is bounded:
+        # the network fetch (Timeout/Retries), the dpkg lock, and the step.
+        APT="-q -o DPkg::Lock::Timeout=120 -o Acquire::http::Timeout=15 \
+          -o Acquire::https::Timeout=15 -o Acquire::Retries=2"
+        sudo apt-get $APT update
+        sudo apt-get $APT -y --no-install-recommends install \
           pandoc libpango-1.0-0 libpangocairo-1.0-0
         # WeasyPrint fetches every remote <img> and has no fetch timeout, so one
         # slow badge host stalls the build. Strip them from a throwaway copy —
@@ -144,7 +148,7 @@ jobs:
           README.md > build/pdf/README.md
         uv run --group notebooks --group docs --with weasyprint pandoc -f gfm -s \
           --resource-path=.:docs --metadata title="tramdag documentation" \
-          build/pdf/README.md docs/*.md \
+          --css=pdf.css build/pdf/README.md docs/*.md \
           -o site/tramdag-docs.pdf --pdf-engine=weasyprint
 
     - name: publish to gh-pages
@@ -158,6 +162,14 @@ jobs:
         git fetch origin gh-pages:gh-pages 2>/dev/null || true
         git worktree add ../pages gh-pages 2>/dev/null \
           || git worktree add --orphan -b gh-pages ../pages
+
+        # the PDF step is continue-on-error: when it produced nothing, keep
+        # the previously published copy instead of shipping a 404
+        dest=../pages; [ "$REF" = main ] || dest="../pages/$REF"
+        if [ ! -f site/tramdag-docs.pdf ] && [ -f "$dest/tramdag-docs.pdf" ]; then
+          cp "$dest/tramdag-docs.pdf" site/tramdag-docs.pdf
+          echo "PDF build failed this run — republishing the previous PDF"
+        fi
 
         if [ "$REF" = main ]; then
           # replace the root, keep every dev-* version directory
