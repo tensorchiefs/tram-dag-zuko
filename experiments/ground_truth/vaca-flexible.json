@@ -1,0 +1,51 @@
+{
+  "_note": "Paper Sec. 5.1-5.2. The interventional means are analytic (E[x3|do(x2=a)] = -0.25 + 0.25a); do(x2=-3) is off-manifold extrapolation, which is why its error is the largest of the three.",
+  "val_nll_x3": {
+    "value": 1.433602213859558,
+    "atol": 0.05
+  },
+  "mean_x3_flow_do_x2_-3": {
+    "value": -1.3549649715423584,
+    "atol": 0.1
+  },
+  "mean_x3_analytic_do_x2_-3": {
+    "value": -1.0,
+    "atol": 1e-09
+  },
+  "mean_x3_abs_err_do_x2_-3": {
+    "value": 0.3549649715423584,
+    "atol": 0.1
+  },
+  "mean_x3_flow_do_x2_-1": {
+    "value": -0.6408004760742188,
+    "atol": 0.1
+  },
+  "mean_x3_analytic_do_x2_-1": {
+    "value": -0.5,
+    "atol": 1e-09
+  },
+  "mean_x3_abs_err_do_x2_-1": {
+    "value": 0.14080047607421875,
+    "atol": 0.1
+  },
+  "mean_x3_flow_do_x2_+0": {
+    "value": -0.3401479721069336,
+    "atol": 0.1
+  },
+  "mean_x3_analytic_do_x2_+0": {
+    "value": -0.25,
+    "atol": 1e-09
+  },
+  "mean_x3_abs_err_do_x2_+0": {
+    "value": 0.0901479721069336,
+    "atol": 0.1
+  },
+  "std_x1_dgp": {
+    "value": 2.068924230638997,
+    "atol": 0.1
+  },
+  "std_x1_flow": {
+    "value": 2.07426381111145,
+    "atol": 0.1
+  }
+}

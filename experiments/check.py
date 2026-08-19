@@ -3,7 +3,10 @@
 The experiments workflow calls this after each run. Ground truth lives in
 ``ground_truth/<result-dir>.json`` as one entry per metric::
 
-    {"beta12": {"value": 2.0012, "atol": 0.05}}
+    {"_note": "what these numbers mean",
+     "beta12": {"value": 2.0012, "atol": 0.05}}
+
+A key starting with an underscore is a note for the reader and is skipped.
 
 Every entry needs its own tolerance, because torch results differ slightly
 across operating systems and CPUs — a measured spread, not a hope. A metric
@@ -58,6 +61,8 @@ def compare(name: str) -> tuple[list[str], list[str]]:
 
     failures, notes = [], []
     for metric, expected in truth.items():
+        if metric.startswith("_"):
+            continue  # a note for the reader, not a metric
         if metric not in metrics:
             failures.append(f"{metric}: the run produced no such metric")
             continue

@@ -1,0 +1,27 @@
+{
+  "_note": "As triangle-mixed-linear-ls with a nonlinear f on the ordinal node.",
+  "beta12": {
+    "value": 1.9825026988983154,
+    "atol": 0.05
+  },
+  "beta13_flow": {
+    "value": -0.22230106592178345,
+    "atol": 0.05
+  },
+  "val_nll_x3": {
+    "value": 1.1988784074783325,
+    "atol": 0.05
+  },
+  "cs_curve_max_abs_err": {
+    "value": 0.19671474054254134,
+    "atol": 0.1
+  },
+  "odds_ratio_predicted": {
+    "value": 7.260892091451837,
+    "atol": 0.5
+  },
+  "odds_ratio_dgp": {
+    "value": 7.189438678974828,
+    "atol": 0.5
+  }
+}

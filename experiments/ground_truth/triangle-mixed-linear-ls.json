@@ -1,0 +1,27 @@
+{
+  "_note": "Paper Sec. 6.2 in the flow's sign convention (the paper adds the ordinal shift, the flow subtracts it): expected -0.2 and +0.3. The App. C.4 check is convention-free, theory exp(2) = 7.39.",
+  "beta12": {
+    "value": 1.9825026988983154,
+    "atol": 0.05
+  },
+  "beta13_flow": {
+    "value": -0.2684074938297272,
+    "atol": 0.05
+  },
+  "beta23_flow": {
+    "value": 0.32178035378456116,
+    "atol": 0.05
+  },
+  "val_nll_x3": {
+    "value": 1.2149730920791626,
+    "atol": 0.05
+  },
+  "odds_ratio_predicted": {
+    "value": 7.260892091451837,
+    "atol": 0.5
+  },
+  "odds_ratio_dgp": {
+    "value": 7.189438678974828,
+    "atol": 0.5
+  }
+}

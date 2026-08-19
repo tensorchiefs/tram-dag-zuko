@@ -1,0 +1,63 @@
+{
+  "_note": "Same comparison through float64 L-BFGS. It agrees on the well-identified coefficients and the ATE, but drifts on rare one-hot levels along near-zero-curvature directions, hence the looser tolerances.",
+  "coef_Age_flow": {
+    "value": 0.053949128836393356,
+    "atol": 0.05
+  },
+  "coef_Age_statsmodels": {
+    "value": 0.05255252284332864,
+    "atol": 0.0001
+  },
+  "coef_Age_r": {
+    "value": 0.0525524746811871,
+    "atol": 0.0001
+  },
+  "coef_NIHSSa_flow": {
+    "value": 0.16382162272930145,
+    "atol": 0.05
+  },
+  "coef_NIHSSa_statsmodels": {
+    "value": 0.16298912417364875,
+    "atol": 0.0001
+  },
+  "coef_NIHSSa_r": {
+    "value": 0.162988956157133,
+    "atol": 0.0001
+  },
+  "coef_T_flow": {
+    "value": -0.9397529363632202,
+    "atol": 0.05
+  },
+  "coef_T_statsmodels": {
+    "value": -0.9424177297583866,
+    "atol": 0.0001
+  },
+  "coef_T_r": {
+    "value": -0.942416795232296,
+    "atol": 0.0001
+  },
+  "max_abs_diff_flow_vs_statsmodels": {
+    "value": 0.028027521989723914,
+    "atol": 0.02
+  },
+  "ate_flow": {
+    "value": 0.14158333837985992,
+    "atol": 0.01
+  },
+  "ate_statsmodels": {
+    "value": 0.14284264382211473,
+    "atol": 0.0001
+  },
+  "ate_true": {
+    "value": 0.13212599999999997,
+    "atol": 1e-09
+  },
+  "ate_naive_observational": {
+    "value": 0.254998719108005,
+    "atol": 1e-09
+  },
+  "ate_abs_diff_flow_vs_statsmodels": {
+    "value": 0.0012593054422548045,
+    "atol": 0.005
+  }
+}
