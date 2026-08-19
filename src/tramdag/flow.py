@@ -561,16 +561,15 @@ class CausalFlowDAG(nn.Module):
             If True, snapshot each node's best-validation weights during
             training and restore them at the end. This is a mild
             early-stopping regularization and the convention of the
-            original implementation. The fit is then *not* the
-            training-data MLE, so leave it False for an exact classical
-            comparison. Default False.
+            original implementation. The snapshots persist on the model
+            across ``fit`` calls, so a multi-phase fit restores the best
+            epoch of *all* its phases; they are not saved in checkpoints.
+            The fit is then *not* the training-data MLE, so leave it False
+            for an exact classical comparison. Default False.
         schedule : str | None, optional
-            Learning-rate schedule. ``None`` (default) keeps the rate
-            constant, the classic behavior. ``"onecycle"`` is
-            ``OneCycleLR``: warmup to ``learning_rate``, then anneal,
-            stepped per batch. ``"cosine"`` is ``CosineAnnealingLR`` over
-            ``epochs``. ``"plateau"`` decays **per node**: when the
-            validation NLL of a node did not improve by ``min_delta`` for
+            ``None`` (default) keeps the learning rate constant.
+            ``"plateau"`` decays **per node**: when the validation NLL of
+            a node did not improve by ``min_delta`` for
             ``plateau_patience`` epochs, its learning rate decreases by
             ``plateau_factor``, with floor ``1e-3 * learning_rate``.
         plateau_patience : int, optional
