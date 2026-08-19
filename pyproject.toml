@@ -94,8 +94,10 @@ markers = [
 testpaths = ["tests"]
 
 [tool.ruff]
-# .claude/ is agent tooling, not package code
-exclude = [".claude"]
+# .claude/ is agent tooling, not package code. notebooks/stale/ is an archive:
+# those files predate the 0.4 syntax and do not run, so linting them only
+# reports what their README already says (see the note there).
+exclude = [".claude", "notebooks/stale"]
 indent-width = 4
 line-length = 88
 target-version = "py310"
