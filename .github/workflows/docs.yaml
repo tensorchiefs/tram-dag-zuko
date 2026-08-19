@@ -148,7 +148,7 @@ jobs:
           README.md > build/pdf/README.md
         uv run --group notebooks --group docs --with weasyprint pandoc -f gfm -s \
           --resource-path=.:docs --metadata title="tramdag documentation" \
-          --css=pdf.css build/pdf/README.md docs/*.md \
+          --toc --toc-depth=2 --css=pdf.css build/pdf/README.md docs/*.md \
           -o site/tramdag-docs.pdf --pdf-engine=weasyprint
 
     - name: publish to gh-pages
