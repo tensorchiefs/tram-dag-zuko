@@ -240,7 +240,8 @@ class MagicMrClean(DatasetDraws):
 
         The spec is part of this DGP's ground truth — it says which model
         family the data came from — which is why it lives next to
-        :meth:`true_ate` rather than in each caller. The term constructors
+        :meth:`true_ate` rather than in each caller. It moves out with the
+        whole ``simulations`` package (see the package docstring). The term constructors
         are imported here rather than at module scope so the module keeps
         its numpy-only import surface.
 

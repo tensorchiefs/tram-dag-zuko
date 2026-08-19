@@ -97,6 +97,10 @@ Each generator is independent of the flow implementation and has a CLI that
 regenerates its frozen `data/<name>/` CSVs (a test contract — never
 regenerate silently). `REGISTRY` maps name → class.
 
+**Scheduled to move** to the simulation-study companion repo
+(`tensorchiefs/tramdag-simu`) with `experiments/` and the data-contract
+tests; frozen until then.
+
 `_common.py` holds what the generators share: `logistic`, `sigmoid`,
 `resolve_latents` (the `n`/`rng`/`latents` triple), and the `DatasetDraws`
 mixin — `observational`, `interventional`, `counterfactual_pair`. Those

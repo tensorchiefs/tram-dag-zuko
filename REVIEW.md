@@ -134,3 +134,13 @@ was dropped: the `_LEGACY` labels kept in §3 are gone, the
    (dead here, documented monorepo path), and dropping `scikit-learn`
    (re-rolls the pinned 80/10/10 split).
 5. **Naming** — decided: the prose descriptor `all-`ls`` stays as it is.
+
+## 9. Marked, not yet moved (2026-08-18)
+
+`src/tramdag/simulations/` (1367 lines, five DGPs + CLIs + the frozen-CSV
+seed offsets) and `MagicMrClean.spec()` are research code inside the
+framework package. Marked for relocation to the simulation-study companion
+repo (`tensorchiefs/tramdag-simu`) together with `experiments/` and the
+tests that consume `data/` — one coordinated move, because four test files
+depend on the generators (frozen-CSV contract, known-truth recovery, the VC
+acceptance bars). Until then: frozen, no new DGPs here.
