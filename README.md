@@ -6,7 +6,8 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 > ⚠️ **Status: beta (0.x), under active development.** The API may change between
-> releases until 1.0; pin a version (`tramdag==0.4.*`) for reproducibility.
+> releases until 1.0; pin a version (`tramdag==0.3.*`, the current release)
+> for reproducibility.
 
 **TRAM-DAGs** model each variable of a structural causal model with a
 (transformation-model) flow: one triangular normalizing flow from iid
