@@ -33,9 +33,9 @@ perf_*.json
 # docs build scratch (stub modules, notebook markdown)
 build/
 
-# Emacs texfrag LaTeX-preview scratch, and the pandoc export of notation.md
+# Emacs texfrag LaTeX-preview scratch, and pandoc exports of the guides
 texfrag/
-docs/notation.html
+docs/*.html
 
 # working ledger of the 2026-08 review — local only
 REVIEW.md
