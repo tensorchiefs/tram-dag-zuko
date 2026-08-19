@@ -40,6 +40,20 @@ experiments workflow), `plots/*.png` and `flow.pt`.
 | [`paper/carefl.py`](paper/carefl.py) | CAREFL Laplace SCM | Sec. 5.3, App. C.2 | `flexible` |
 | [`misc/validate_ls.py`](misc/validate_ls.py) | frozen synthetic cohort | — (framework anchor) | `adam`, `classical` |
 
+Two benchmarks live beside them, measured rather than checked against ground
+truth, so they are run by hand and reported in the docs:
+
+| script | measures | output |
+|---|---|---|
+| [`benchmarks/bench_training.py`](benchmarks/bench_training.py) | time-to-target for lr schedules, batch size, device, L-BFGS | [`docs/training-speed.md`](../docs/training-speed.md) |
+| [`benchmarks/perf_machine.py`](benchmarks/perf_machine.py) | fixed 200-epoch throughput per machine and device | [`docs/perf/`](../docs/perf/) |
+
+`perf_machine.py` deliberately depends on nothing but the installed package —
+it is meant to be downloaded and run on a machine without a checkout — so it
+carries its own copy of the bimodal DGP. `benchmarks/tests/` pins that copy to
+the maintained generator, because a drifted copy would silently make the
+collected `final_val_nll` values incomparable.
+
 Which paper figure each variant reproduces — and what is deliberately not
 reproduced — is listed in [`paper/PAPER_COVERAGE.md`](paper/PAPER_COVERAGE.md).
 

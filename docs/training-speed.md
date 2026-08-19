@@ -2,9 +2,9 @@
 
 This document benchmarks learning-rate schedules, per-node freezing, batch sizes, devices,
 and LBFGS. The benchmark ran in June 2026 on an Apple-silicon Mac mini with torch 2.12
-(CPU unless noted). To reproduce it, use `experiments/stale/bench_training.py` (parked).
+(CPU unless noted). To reproduce it, use [`experiments/benchmarks/bench_training.py`](../experiments/benchmarks/bench_training.py).
 Migrate the script to the current API first. The grid takes ≈ 35 min. For a quick **cross-machine** comparison, use the
-self-contained `experiments/stale/perf_machine.py` (parked). It runs fixed 200-epoch
+self-contained [`experiments/benchmarks/perf_machine.py`](../experiments/benchmarks/perf_machine.py). It runs fixed 200-epoch
 workloads on all available devices and writes a machine fingerprint to JSON. After
 `pip install tramdag`, it runs on any machine. The raw CSV is a local artifact of
 the parked benchmark and is not committed.
@@ -77,8 +77,9 @@ exact-MLE-under-plateau-and-freezing property is pinned on an inline DGP by
 `tests/test_fit_schedules.py::test_plateau_freeze_preserves_exact_mle`.
 
 These numbers were measured before the experiment code moved into
-`experiments/`; the workloads themselves are unchanged (same frozen data,
-same specs), so the timings still stand.
+`experiments/benchmarks/`; the workloads are unchanged (same frozen data, same
+specs), so the timings still stand. Re-running the benchmark reproduces the
+machine-independent part exactly: the stroke-ls reference NLL 10.3042.
 
 ## Results
 
@@ -92,9 +93,9 @@ never reached the target within the budget.
 |---|---|---|---|---|---|
 | baseline two-phase (old default) | 9.0 | **21.4** | 2.1 | 2.8¹ | no (runs 40 s / 15 s) |
 | constant 1e-2 | 9.1 | 21.5² | 2.2 | 2.8¹ | no |
-| onecycle (1500 / 300 ep) | — | — | 3.5 | 4.5 | no |
-| onecycle (3000 ep) | 16.8 | — (gap 1–2e-3) | | | no |
-| cosine | — | — | 2.2 | 3.5¹ | no |
+| onecycle (1500 / 300 ep)² | — | — | 3.5 | 4.5 | no |
+| onecycle (3000 ep)² | 16.8 | — (gap 1–2e-3) | | | no |
+| cosine² | — | — | 2.2 | 3.5¹ | no |
 | **plateau + freeze** | **8.9** | — (gap 2e-3) | **2.0** | 2.9 | **yes — 13 s / 4 s total** |
 | LBFGS (full-batch) | **1.6** (2/3 seeds) | — (gap 4–8e-3) | n/a | n/a | yes |
 
@@ -102,7 +103,9 @@ never reached the target within the budget.
 the 1e-3 phase to *stay*. Vaca shows mild overfitting. Final gap for the vaca baseline is
 0.037. The old 520-epoch budget **underfits** vaca by ~0.03 nats. Plateau+freeze *stays*
 at its target.
-² constant lr at batch 512 stalls at gap 3–7e-3. Only the lr-decay phase closes the last
+² `onecycle` and `cosine` were removed from `fit()` in 0.4 — they lost to
+plateau on every workload here — so these three rows cannot be re-measured.
+³ constant lr at batch 512 stalls at gap 3–7e-3. Only the lr-decay phase closes the last
 decade. This is why the two-phase recipe existed.
 
 ## Findings

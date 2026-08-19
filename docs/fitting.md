@@ -240,7 +240,7 @@ These extensions are worth consideration as the package matures:
   why `fit_classical` refuses them).
 - **Modern first-order variants.** AdamW (decoupled weight decay), RAdam (warmup-
   free), or Lion/Sophia are drop-in alternatives to Adam. The benchmark harness
-  ([`experiments/stale/bench_training.py`](../experiments/stale/bench_training.py),
+  ([`experiments/benchmarks/bench_training.py`](../experiments/benchmarks/bench_training.py),
   parked — needs an API migration) exists to evaluate exactly such swaps on
   time-to-target.
 - **Per-node optimizer selection.** The loss decomposes, and the optimizer
