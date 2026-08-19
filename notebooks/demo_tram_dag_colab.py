@@ -378,6 +378,37 @@ plt.show()
 # any time with `I(..., transform="spline", bins=16)`.
 
 # %% [markdown]
+# ### Misspecification bends causal answers, not just the likelihood
+#
+# The transform choice propagates into the *interventional* distribution — and
+# the **mean** is forgiving. All three models get
+# $\mathbb{E}[x_3 \mid do(x_2)]$ right to a few hundredths, because the shifts
+# are right in each. What differs is the **shape**, so every query that reads the
+# shape — tail probabilities, quantiles, the spread of individual effects —
+# inherits the misfit. Compare a tail probability against the DGP:
+
+# %%
+truth_do = sample_dgp(50_000, seed=543, do={"x2": 0.0})["x3"]
+print("under do(x2=0):        E[x3]     P(x3 < -3)")
+print(
+    f"  DGP                  {truth_do.mean():+.3f}      "
+    f"{float((truth_do < -3).mean()):.4f}"
+)
+for tr in ("bernstein", "spline", "affine"):
+    drawn = fits[tr].sample(50_000, do={"x2": 0.0}, seed=4)["x3"]
+    print(
+        f"  {tr:9s}            {drawn.mean():+.3f}      "
+        f"{float((drawn < -3).mean()):.4f}"
+    )
+
+# %% [markdown]
+# The means agree while the tails do not, and the ranking changes: the
+# under-trained spline misses $P(x_3 < -3)$ by about two thirds and affine by
+# roughly a sixth, though both looked fine on the mean. A model can be "close
+# enough" on average and still be wrong about the question you actually asked —
+# which is why the transform is a modelling decision, not a default to inherit.
+
+# %% [markdown]
 # ## 7. GPU vs CPU
 #
 # The whole flow is plain PyTorch, so it runs anywhere. Same 60-epoch fit, both

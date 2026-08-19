@@ -1127,7 +1127,8 @@ class CausalFlowDAG(nn.Module):
         The parts are contributions to the transform parameters of the node.
         Use them to plot additive partial effects.
 
-        An additive complex intercept, ``[I("x1"), I("x2")]``, builds one
+        An additive complex intercept,
+        ``CI("x1", "x2", allow_interaction=False)``, builds one
         network per ``I`` term and **sums their outputs in unconstrained
         parameter space**: ``theta(pa) = net_1(x1) + net_2(x2)``. The sum is
         identified, so every L1/L2/L3 query is correct. Each term's output,

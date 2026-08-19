@@ -99,7 +99,9 @@ See `experiments/README.md`.
   outside [-5,5] regardless of θ, so the ~10% of data beyond the 5%/95% pre-scaling
   range is misweighted whenever the true tail slope differs — the structural reason
   `spline` consistently trails `bernstein` (whose linear extrapolation follows the
-  boundary derivative). Demonstrated in `notebooks/stale/transforms_tram_dag.py` (parked).
+  boundary derivative). Demonstrated in `notebooks/demo_tram_dag_colab.py` §6,
+  which also shows the consequence: the interventional *mean* survives a wrong
+  transform while tail probabilities do not.
 - **`fit(restore_best=False)` is the default** (keeps final converged weights = exact
   MLE; an all-`ls` model then matches statsmodels/R-polr to ~1e-3). `restore_best=True`
   = per-node best-validation restoration (early stopping). Key empirical finding:

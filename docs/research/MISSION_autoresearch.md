@@ -20,8 +20,8 @@ src/tramdag/flow.py. The June 2026 benchmark defines your methodology.
 > **Script status.** `bench_training.py` and `perf_machine.py` are migrated to
 > the current API and live in `experiments/benchmarks/`; both run. Note that
 > `fit()` no longer has the `onecycle` and `cosine` schedules, so those rows of
-> the June 2026 grid cannot be re-measured. `transforms_tram_dag.py` is still
-> parked in `notebooks/stale/` and uses the removed 0.3 API.
+> the June 2026 grid cannot be re-measured. The transform comparison lives in
+> `notebooks/demo_tram_dag_colab.py` §6.
 
 ## Hard limits
 
@@ -192,8 +192,9 @@ GPU · **warm-start init**: initialize Bernstein θ from the node's marginal
 quantiles instead of zeros — could delete most of early training · per-node Adam
 betas/eps · LBFGS polish phase after plateau-freeze · evaluate val less often
 (per-epoch val eval is overhead) · vectorize/fuse the Python loop over nodes ·
-one-hot caching in `_tensorize` · the RQS tail-slope fix from
-`notebooks/stale/transforms_tram_dag.py` (accuracy lever, may also help optimization) ·
+one-hot caching in `_tensorize` · the RQS tail-slope fix (its
+symptom is documented in CLAUDE.md and shown in the demo notebook's §6; an
+accuracy lever that may also help optimization) ·
 gradient accumulation vs huge batches.
 
 ## Cadence and end state

@@ -201,7 +201,24 @@ transformation model (ordered-logit / Colr). It raises on any `cs`/`ci` edge.
   the flag.
 - Read the fitted coefficients with `ls_coefficients()`.
 
-Walkthrough: [`notebooks/stale/classical_fit_tram_dag.py`](../notebooks/stale/classical_fit_tram_dag.py) (parked).
+### Warm-start handoff: classical fit, then keep training
+
+`fit_classical` leaves the model at the MLE in float32, ready for any normal
+operation — and continuing with `fit()` from there **stays put**, which is both
+a check that the classical solution really is the optimum and a way to use it as
+a fast, principled initialization:
+
+```python
+flow.fit_classical(train_df)                       # exact MLE, seconds
+before = flow.ls_coefficients()["y"]
+flow.fit(train_df, epochs=300, learning_rate=1e-3,  # a gentle Adam phase ...
+         restore_best=False, verbose=0)
+after = flow.ls_coefficients()["y"]                 # ... barely moves
+```
+
+A small drift means the classical fit was already at the optimum. The same
+handoff is what `fit(vc_warm_start=True)` uses internally to start a
+varying-coefficient term from the classical linear-shift coefficient.
 
 ## Memory and disk during fitting
 

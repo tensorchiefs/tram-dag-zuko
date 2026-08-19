@@ -9,9 +9,11 @@ truth**.
 |---|---|
 | `intro_tram_dag.py` | didactic walkthrough of the TRAM-DAG model (SI/CI/LS/CS, L1–L3, all claims checked against a hand-built SCM) |
 | `demo_tram_dag_colab.py` | 5-minute showcase on the paper's bimodal VACA benchmark, GPU-ready ([open in Colab](https://colab.research.google.com/github/tensorchiefs/tramdag/blob/main/notebooks/demo_tram_dag_colab.ipynb)) |
+| `additive_vs_joint_ci.py` | joint vs additive complex intercept, and reading per-parent effects out of the additive one with `intercept_contributions` |
 
-Further notebooks are parked in [`stale/`](stale/README.md) until they are
-migrated to the current API.
+Every notebook here is executed on each push by the docs workflow, which is
+what keeps it working against the current API. A notebook that is not in that
+workflow's `NOTEBOOKS` list does not belong in this directory.
 
 ## Rules
 
