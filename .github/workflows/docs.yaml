@@ -26,6 +26,7 @@ jobs:
     permissions:
       contents: write     # pushes gh-pages
     env:
+      UV_NO_DEFAULT_GROUPS: '1'   # dev drags in editor tooling; name groups
       # the notebooks to execute and publish; add a name to add a notebook
       # (and mirror it in .github/pdoc-templates/module.html.jinja2)
       NOTEBOOKS: demo_tram_dag_colab intro_tram_dag
@@ -43,7 +44,7 @@ jobs:
         set -euo pipefail
         mkdir -p build/nbmd
         for name in $NOTEBOOKS; do
-          uv run --group dev --group notebooks --with nbconvert bash -c "
+          uv run --group notebooks --group docs bash -c "
             jupytext --to notebook --execute \
               --output notebooks/$name.exec.ipynb notebooks/$name.py &&
             jupyter nbconvert --to markdown notebooks/$name.exec.ipynb \
@@ -71,13 +72,13 @@ jobs:
 
     - name: build the site with pdoc
       run: |
-        uv run --with pdoc env PYTHONPATH=build/stubs \
+        uv run --group notebooks --group docs env PYTHONPATH=build/stubs \
           pdoc -d numpy --template-directory .github/pdoc-templates \
             -o site tramdag guides examples
 
     - name: rewrite repo-relative links
       run: |
-        uv run python - <<'EOF'
+        uv run --group notebooks --group docs python - <<'EOF'
         """Known guide/notebook targets become site links; other repo files
         become GitHub blob URLs.
         """
@@ -123,7 +124,7 @@ jobs:
         # neither pandoc nor weasyprint's pango are preinstalled
         sudo apt-get update -qq
         sudo apt-get install -y -qq pandoc libpango-1.0-0 libpangocairo-1.0-0
-        uv run --with weasyprint pandoc -f gfm -s \
+        uv run --group notebooks --group docs --with weasyprint pandoc -f gfm -s \
           --resource-path=.:docs --metadata title="tramdag documentation" \
           README.md docs/*.md -o site/tramdag-docs.pdf --pdf-engine=weasyprint
 

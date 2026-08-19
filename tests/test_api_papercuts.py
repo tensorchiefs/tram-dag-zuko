@@ -4,6 +4,7 @@ machine-info persistence through save/load, and the machine_info() helper.
 
 import numpy as np
 import pandas as pd
+import pytest
 import torch
 
 import tramdag as td
@@ -13,8 +14,8 @@ from tramdag import LS, CausalFlowDAG, ContinuousNode, OrdinalNode
 def _spec():
     return {
         "x1": ContinuousNode(),
-        "x2": ContinuousNode(terms=[LS("x1")]),
-        "y": OrdinalNode(levels=3, terms=[LS("x1")]),
+        "x2": ContinuousNode([LS("x1")]),
+        "y": OrdinalNode(3, [LS("x1")]),
     }
 
 
@@ -91,15 +92,13 @@ def test_save_carries_machine_and_version_metadata(tmp_path):
     assert loaded.meta["machine"]["torch"] == torch.__version__
 
 
-def test_load_of_metaless_checkpoint_is_graceful(tmp_path):
-    # backward compatibility: an old checkpoint without "meta" still loads
+def test_load_requires_a_complete_checkpoint(tmp_path):
+    # save() always writes spec, weights, history and meta; a dict missing
+    # any of them is not a tramdag checkpoint and must fail loudly
     flow = CausalFlowDAG(_spec(), seed=0)
     from tramdag.spec import spec_to_dict
 
-    p = tmp_path / "old.pt"
-    torch.save(
-        {"spec": spec_to_dict(flow.spec), "state_dict": flow.state_dict()}, p
-    )  # no history, no meta
-    loaded = CausalFlowDAG.load(p)
-    assert loaded.meta == {}
-    assert set(loaded.history) == {"train", "val", "lr", "time"}
+    p = tmp_path / "partial.pt"
+    torch.save({"spec": spec_to_dict(flow.spec), "state_dict": flow.state_dict()}, p)
+    with pytest.raises(KeyError):
+        CausalFlowDAG.load(p)

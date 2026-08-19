@@ -32,3 +32,7 @@ perf_*.json
 
 # docs build scratch (stub modules, notebook markdown)
 build/
+
+# Emacs texfrag LaTeX-preview scratch, and the pandoc export of notation.md
+texfrag/
+docs/notation.html

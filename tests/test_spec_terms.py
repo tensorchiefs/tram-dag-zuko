@@ -1,9 +1,6 @@
 """Tests for the term-formula notation (I/LS/CS) — construction, validation,
-serialization, and the meta-adjacency view. (The legacy ``parents={...}`` dict
-API was removed in 0.3.0; only old *checkpoints* are still read.)
+serialization, and the meta-adjacency view.
 """
-
-import warnings
 
 import numpy as np
 import pandas as pd
@@ -26,9 +23,9 @@ def _toy_df(n=64, seed=0):
 def _terms_spec():
     return {
         "X1": ContinuousNode(),
-        "X2": ContinuousNode(terms=[LS("X1")]),
-        "X3": ContinuousNode(terms=[I("X1"), CS("X2")]),
-        "Y": OrdinalNode(levels=4, terms=[LS("X3")]),
+        "X2": ContinuousNode([LS("X1")]),
+        "X3": ContinuousNode([I("X1"), CS("X2")]),
+        "Y": OrdinalNode(4, [LS("X3")]),
     }
 
 
@@ -63,7 +60,7 @@ def test_joint_terms_build(term, n_shift, n_ci):
     spec = {
         "X1": ContinuousNode(),
         "X2": ContinuousNode(),
-        "X3": ContinuousNode(terms=[term]),
+        "X3": ContinuousNode([term]),
     }
     node = CausalFlowDAG(spec, seed=0).nodes["X3"]
     assert len(node.shifts) == n_shift  # joint CS -> a single shift module
@@ -71,14 +68,14 @@ def test_joint_terms_build(term, n_shift, n_ci):
 
 
 def test_duplicate_parent_across_terms_raises():
-    spec = {"X1": ContinuousNode(), "X3": ContinuousNode(terms=[LS("X1"), CS("X1")])}
-    with pytest.raises(ValueError):
+    spec = {"X1": ContinuousNode(), "X3": ContinuousNode([LS("X1"), CS("X1")])}
+    with pytest.raises(ValueError, match="more than one term"):
         CausalFlowDAG(spec)
 
 
 def test_cycle_detected():
-    spec = {"A": ContinuousNode(terms=[LS("B")]), "B": ContinuousNode(terms=[LS("A")])}
-    with pytest.raises(ValueError):
+    spec = {"A": ContinuousNode([LS("B")]), "B": ContinuousNode([LS("A")])}
+    with pytest.raises(ValueError, match="cycle"):
         CausalFlowDAG(spec)
 
 
@@ -94,36 +91,48 @@ def test_serialization_roundtrip_terms():
         assert torch.allclose(a[k], b[k]), k
 
 
-def test_legacy_parents_checkpoint_still_loads():
-    """A checkpoint serialized in the old ``parents``-dict layout must still
-    rebuild (no deprecation warning, since we translate to terms directly).
-    """
-    legacy = {
-        "X1": {
-            "kind": "continuous",
-            "parents": {},
-            "transform": "bernstein",
-            "transform_kwargs": {},
-        },
-        "X2": {
-            "kind": "continuous",
-            "parents": {"X1": "ci"},
-            "transform": "bernstein",
-            "transform_kwargs": {},
-        },
+# ------------------------------------------------------- meta-adjacency view
+def test_to_matrix_labels_every_effect_and_leaves_non_edges_empty():
+    """The paper's meta-adjacency view: rows are parents, columns children."""
+    spec = {
+        "a": ContinuousNode(),
+        "b": ContinuousNode(),
+        "y": OrdinalNode(3, [I("a"), CS("b"), LS("a")]),
     }
-    with warnings.catch_warnings():
-        warnings.simplefilter("error", DeprecationWarning)  # must NOT warn
-        spec = spec_from_dict(legacy)
+    spec["y"] = OrdinalNode(3, [I("a"), CS("b")])  # one edge-owning term each
+    m = CausalFlowDAG(spec, seed=0).to_matrix()
+    assert list(m.index) == list(m.columns)  # square, node-ordered
+    assert m.loc["a", "y"] == "CI"  # an I term reads as CI
+    assert m.loc["b", "y"] == "CS"
+    assert m.loc["y", "a"] == ""  # no edge -> empty, not NaN
+    assert m.loc["a", "b"] == ""
+
+    joint = CausalFlowDAG(
+        {**spec, "y": OrdinalNode(3, [CS("a", "b")])}, seed=0
+    ).to_matrix()
+    assert joint.loc["a", "y"] == "CS['a', 'b']"  # a joint term names its group
+
+
+# --------------------------------------------------- the coefficient read-out
+def test_ls_coefficients_shape_and_agreement_with_the_modules():
+    """ls_coefficients is the public spelling of the LS weights.
+
+    An ordinal parent contributes one weight per one-hot level, and only
+    differences against level 0 are identified — so the raw vector has
+    ``levels`` entries. Nodes without shift terms do not appear.
+    """
+    spec = {
+        "x": ContinuousNode(),
+        "t": OrdinalNode(3),
+        "y": ContinuousNode([LS("x"), LS("t")]),
+    }
     flow = CausalFlowDAG(spec, seed=0)
-    assert flow.nodes["X2"].ci_parents == ["X1"]
+    coefs = flow.ls_coefficients()
 
-
-# -------------------------------------------------------------------- matrix
-def test_to_matrix():
-    m = CausalFlowDAG(_terms_spec(), seed=0).to_matrix()
-    assert m.loc["X1", "X2"] == "LS"
-    assert m.loc["X1", "X3"] == "CI"  # I("X1")
-    assert m.loc["X2", "X3"] == "CS"
-    assert m.loc["X3", "Y"] == "LS"
-    assert m.loc["X1", "X1"] == ""  # no self-edge
+    assert set(coefs) == {"y"}  # sources have no shift terms
+    assert set(coefs["y"]) == {"x", "t"}
+    assert coefs["y"]["x"].shape == (1,)
+    assert coefs["y"]["t"].shape == (3,)  # one per ordinal level
+    for parent, w in coefs["y"].items():
+        expected = flow.nodes["y"].shifts[parent].weight.detach().numpy().ravel()
+        np.testing.assert_allclose(w, expected)

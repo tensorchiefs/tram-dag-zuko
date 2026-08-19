@@ -3,30 +3,54 @@ build-backend = "hatchling.build"
 requires = ["hatchling"]
 
 [dependency-groups]
+# dev is the default `uv sync` group: everything a working checkout needs
 dev = [
-  "pytest",
-  "scipy",
-  "statsmodels",
-  "scikit-learn",
-  "matplotlib"
+  {include-group = "docs"},
+  {include-group = "experiments"},
+  {include-group = "notebooks"},
+  {include-group = "test"},
+  "pre-commit",
+  "pylsp-rope",
+  "python-lsp-ruff",
+  "python-lsp-server[all]"
 ]
 docs = [
-  "pdoc"
+  "pdoc",
+  "nbconvert"  # notebooks -> markdown for the pdoc site
+]
+experiments = [
+  "matplotlib",
+  "scikit-learn",  # train/val/test split in experiments/common.py
+  "statsmodels"  # classical references (OrderedModel, proportion CIs)
 ]
 notebooks = [
   "jupytext",
-  "ipykernel"  # so JupyterLab / VS Code can run the generated .ipynb
+  "ipykernel",  # so JupyterLab / VS Code can run the generated .ipynb
+  "matplotlib",  # the notebooks plot ...
+  "scipy"  # ... and use scipy.stats
+]
+test = [
+  "pytest",
+  "pytest-xdist",
+  "scipy",  # scipy.stats in the generator tests
+  "statsmodels"  # exact-MLE agreement tests
 ]
 
 [project]
 authors = [
   {name = "Oliver Dürr", email = "oliver.duerr@gmail.com"},
-  {name = "Beate Sick"}
+  {name = "Beate Sick"},
+  {name = "Marcel Arpogaus"}
 ]
 classifiers = [
   "Development Status :: 4 - Beta",
   "Intended Audience :: Science/Research",
   "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: 3.14",
   "Topic :: Scientific/Engineering :: Artificial Intelligence"
 ]
 dependencies = [
@@ -56,17 +80,14 @@ Homepage = "https://github.com/tensorchiefs/tramdag"
 "Method paper (CLeaR 2025)" = "https://arxiv.org/abs/2503.16206"
 "Stroke case study" = "https://arxiv.org/abs/2606.12623"
 
-[tool.basedpyright]
-venv = ".venv"
-venvPath = "."
-
 [tool.hatch.build.targets.wheel]
 packages = ["src/tramdag"]
 
 [tool.pytest.ini_options]
 addopts = ["-v", "--tb=short"]
-# no -n auto: torch already saturates the cores (the fast subset spends
-# 32 min CPU in 2 min wall), so xdist workers only oversubscribe
+# -n auto is passed by the CI invocation, not baked into addopts, so a bare
+# local `pytest` stays serial and readable. Parallel does pay off: 16 workers
+# run the full suite in ~12 min wall against ~24 min serial (32-core box).
 markers = [
   "slow: long fit/training tests — excluded from PR CI, run in the nightly full suite"
 ]

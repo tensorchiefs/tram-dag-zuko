@@ -7,7 +7,6 @@ random_state=42; evaluation on the MR CLEAN RCT cohort (data/exp_data.csv).
 
 from __future__ import annotations
 
-import argparse
 import json
 from pathlib import Path
 
@@ -22,7 +21,8 @@ import torch
 from sklearn.model_selection import train_test_split
 from statsmodels.stats.proportion import proportion_confint
 
-from tramdag import CausalFlowDAG, ContinuousNode, OrdinalNode, term
+from tramdag import CausalFlowDAG
+from tramdag.simulations import MagicMrClean
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 RESULTS_ROOT = Path(__file__).resolve().parents[1] / "results"
@@ -30,6 +30,20 @@ SIM_DATA = Path(__file__).resolve().parents[1] / "data"
 
 NODES = ["Age", "mRS_pre", "NIHSSa", "T", "mRS_3m"]
 MRS_LEVELS = list(range(7))
+MRS_X = np.arange(len(MRS_LEVELS))  # bar positions
+
+
+def mrs_freq(values, levels=None) -> pd.Series:
+    """Give the level frequencies of an mRS-like column, zero-filled."""
+    levels = MRS_LEVELS if levels is None else levels
+    return (
+        pd.Series(values)
+        .round()
+        .astype(int)
+        .value_counts(normalize=True)
+        .reindex(levels, fill_value=0)
+    )
+
 
 # RCT benchmark (Berkhemer et al., 2015)
 RCT_ATE = 0.135
@@ -100,90 +114,14 @@ def split(df: pd.DataFrame):
     return train_df, val_df, test_df
 
 
-def source_arg(description: str | None = None) -> str:
-    """Parse the optional data-source argument shared by the runner scripts.
-
-    Parameters
-    ----------
-    description : str | None, optional
-        Help text for ``--help``, by default ``None`` (the caller's docstring
-        is the usual argument).
-
-    Returns
-    -------
-    str
-        The requested source, ``DEFAULT_SOURCE`` when none was given.
-    """
-    parser = argparse.ArgumentParser(
-        description=description, formatter_class=argparse.RawDescriptionHelpFormatter
-    )
-    parser.add_argument(
-        "source",
-        nargs="?",
-        default=DEFAULT_SOURCE,
-        help=f"data source, e.g. 'magic-mrclean/ls' or 'magic' "
-        f"(default: {DEFAULT_SOURCE})",
-    )
-    return parser.parse_args().source
-
-
-def run_name(base: str, source: str) -> str:
-    """Result-folder name: bare for the clinical cohort, suffixed otherwise.
-
-    Parameters
-    ----------
-    base : str
-        Experiment name, e.g. ``"all_ls"``.
-    source : str
-        The data source as given to :func:`run_experiment`.
-
-    Returns
-    -------
-    str
-        ``base`` for the ``"magic"`` cohort, else ``f"{base}_{variant}"``.
-    """
-    return base if source == "magic" else f"{base}_{source.split('/')[-1]}"
-
-
-# ------------------------------------------------------------------- specs
 def build_spec(style: str) -> dict:
     """DAG spec for the fully-connected stroke DAG.
 
-    style="flexible": the nihss6 configuration (Age 'ci', mRS_pre 'ls',
-    NIHSSa 'cs', T 'ls' — per-edge terms as in nihss6/configuration.json).
-    style="ls": all edges linear shift (classical proportional-odds analog).
+    The spec belongs to the DGP (it names the model family the data came
+    from), so it lives on the generator; this stays as the name the
+    experiment scripts already call.
     """
-    if style == "flexible":
-        t = {"Age": "ci", "mRS_pre": "ls", "NIHSSa": "cs", "T": "ls"}
-    elif style == "ls":
-        t = {"Age": "ls", "mRS_pre": "ls", "NIHSSa": "ls", "T": "ls"}
-    else:
-        raise ValueError(f"unknown style '{style}'")
-    return {
-        "Age": ContinuousNode(transform="bernstein"),
-        "mRS_pre": OrdinalNode(levels=6, terms=[term(t["Age"], "Age")]),
-        "NIHSSa": ContinuousNode(
-            transform="bernstein",
-            terms=[term(t["Age"], "Age"), term(t["mRS_pre"], "mRS_pre")],
-        ),
-        "T": OrdinalNode(
-            levels=2,
-            terms=[
-                term(t["Age"], "Age"),
-                term(t["mRS_pre"], "mRS_pre"),
-                term(t["NIHSSa"], "NIHSSa"),
-            ],
-        ),
-        "mRS_3m": OrdinalNode(
-            levels=7,
-            terms=[
-                term(t["Age"], "Age"),
-                term(t["mRS_pre"], "mRS_pre"),
-                term(t["NIHSSa"], "NIHSSa"),
-                term(t["T"], "T"),
-            ],
-        ),
-    }
+    return MagicMrClean().spec(style)
 
 
 # ------------------------------------------------------------------- plots
@@ -255,14 +193,7 @@ def plot_samples_vs_true(flow: CausalFlowDAG, train_df: pd.DataFrame, save, n=10
             if node in ("Age", "NIHSSa"):
                 ax.hist(data, bins=30, color="steelblue", edgecolor="white")
             else:
-                lv = range(int(train_df[node].max()) + 1)
-                counts = (
-                    pd.Series(data)
-                    .round()
-                    .astype(int)
-                    .value_counts(normalize=True)
-                    .reindex(lv, fill_value=0)
-                )
+                counts = mrs_freq(data, range(int(train_df[node].max()) + 1))
                 ax.bar(
                     counts.index, counts.values, color="steelblue", edgecolor="white"
                 )
@@ -279,15 +210,9 @@ def plot_interventional(flow: CausalFlowDAG, save, n=10_000):
     s_t1 = flow.sample(n, do={"T": 1}, seed=2)
     sets = {"Observational": s_obs, "do(T=0)": s_t0, "do(T=1)": s_t1}
     fig, axes = plt.subplots(1, 3, figsize=(15, 4), sharey=True)
-    x = np.arange(7)
+    x = MRS_X
     for ax, (name, s) in zip(axes, sets.items()):
-        counts = (
-            s["mRS_3m"]
-            .round()
-            .astype(int)
-            .value_counts(normalize=True)
-            .reindex(MRS_LEVELS, fill_value=0)
-        )
+        counts = mrs_freq(s["mRS_3m"])
         ax.bar(x, counts.values, color="steelblue", edgecolor="white")
         good = (s["mRS_3m"] <= 2).mean()
         ax.set_title(f"{name}\nP(mRS<=2) = {good:.3f}")
@@ -357,14 +282,10 @@ def evaluate_rct(
 
     # --- observed RCT arms vs predicted distribution ---
     width = 0.38
-    x = np.arange(7)
+    x = MRS_X
     fig, axes = plt.subplots(1, 2, figsize=(14, 5), sharey=True)
     for arm, color in [(0, "#e07b54"), (1, "steelblue")]:
-        obs = (
-            rct.loc[rct["T"] == arm, "mRS_3m"]
-            .value_counts(normalize=True)
-            .reindex(MRS_LEVELS, fill_value=0)
-        )
+        obs = mrs_freq(rct.loc[rct["T"] == arm, "mRS_3m"])
         axes[0].bar(
             x + (arm - 0.5) * width,
             obs.values * 100,

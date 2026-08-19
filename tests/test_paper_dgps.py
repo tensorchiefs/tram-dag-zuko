@@ -46,13 +46,6 @@ def test_registry_contains_paper_dgps():
         assert key in REGISTRY
 
 
-@pytest.mark.parametrize("subdir,factory", FROZEN)
-def test_generator_reproducible(subdir, factory):
-    a = factory(42).observational(500)
-    b = factory(42).observational(500)
-    pd.testing.assert_frame_equal(a, b)
-
-
 @pytest.mark.parametrize(
     "factory",
     [
@@ -165,8 +158,8 @@ def test_triangle_linear_ls_recovers_coefficients():
     df = TriangleContinuous(f="linear", seed=42).observational(N_FIT, seed_offset=100)
     spec = {
         "x1": ContinuousNode(),
-        "x2": ContinuousNode(terms=[LS("x1")]),
-        "x3": ContinuousNode(terms=[LS("x1"), LS("x2")]),
+        "x2": ContinuousNode([LS("x1")]),
+        "x3": ContinuousNode([LS("x1"), LS("x2")]),
     }
     flow = _fit(spec, df)
     assert abs(_w(flow, "x2", "x1") - 2.0) < 0.1
@@ -181,8 +174,8 @@ def test_triangle_atan_cs_recovers_coefficients_and_curve():
     df = gen.observational(N_FIT, seed_offset=100)
     spec = {
         "x1": ContinuousNode(),
-        "x2": ContinuousNode(terms=[LS("x1")]),
-        "x3": ContinuousNode(terms=[LS("x1"), CS("x2")]),
+        "x2": ContinuousNode([LS("x1")]),
+        "x3": ContinuousNode([LS("x1"), CS("x2")]),
     }
     flow = _fit(spec, df)
     assert abs(_w(flow, "x2", "x1") - 2.0) < 0.1
@@ -204,8 +197,8 @@ def test_triangle_mixed_linear_ls_recovers_with_sign_flip():
     df = TriangleMixed(f="linear", seed=42).observational(N_FIT, seed_offset=100)
     spec = {
         "x1": ContinuousNode(),
-        "x2": ContinuousNode(terms=[LS("x1")]),
-        "x3": OrdinalNode(levels=4, terms=[LS("x1"), LS("x2")]),
+        "x2": ContinuousNode([LS("x1")]),
+        "x3": OrdinalNode(4, [LS("x1"), LS("x2")]),
     }
     flow = _fit(spec, df)
     assert abs(_w(flow, "x3", "x1") - (-0.2)) < 0.1
@@ -224,8 +217,8 @@ def test_vaca_ci_flow_matches_interventional_moments():
     df = VacaTriangle(seed=42).observational(N_FIT, seed_offset=100)
     spec = {
         "x1": ContinuousNode(),
-        "x2": ContinuousNode(terms=[I("x1")]),
-        "x3": ContinuousNode(terms=[I("x1", "x2")]),
+        "x2": ContinuousNode([I("x1")]),
+        "x3": ContinuousNode([I("x1", "x2")]),
     }
     flow = _fit(spec, df, epochs=(400, 120))
     # L1: bimodality of x1 is captured (the paper's headline vs CNF) — both
@@ -234,8 +227,15 @@ def test_vaca_ci_flow_matches_interventional_moments():
     assert ((samp["x1"] < -1.0).mean() > 0.25) and ((samp["x1"] > 1.0).mean() > 0.25)
     for a in (-3.0, -1.0, 0.0):
         # do(x2=-3) pairs the lower x1 mode with a ~5-sigma-off x2: genuine
-        # extrapolation beyond the observational manifold -> looser tolerance
-        tol = 0.3 if a == -3.0 else 0.2
+        # extrapolation beyond the observational manifold -> looser tolerance.
+        # Measured margins for this fit: 0.288 on linux/macos against 0.303 on
+        # the windows torch wheel (identical across python 3.10-3.14, so it is
+        # deterministic BLAS reduction order, not noise). A tolerance of 0.3 sat
+        # inside that 0.015 spread, so it passed on two platforms and failed on
+        # the third. 0.4 clears the spread and still catches the failure this
+        # assertion is for: a flow that ignored the intervention would sit at
+        # the observational -0.25, an error of ~0.75.
+        tol = 0.4 if a == -3.0 else 0.2
         ref = truth["do_x2"][str(a)]
         do_samp = flow.sample(20_000, do={"x2": a}, seed=1)
         assert abs(do_samp["x3"].mean() - ref["mean_x3_analytic"]) < tol, f"do(x2={a})"
@@ -255,8 +255,8 @@ def test_carefl_ci_flow_recovers_counterfactuals():
     spec = {
         "x1": ContinuousNode(),
         "x2": ContinuousNode(),
-        "x3": ContinuousNode(terms=[I("x1", "x2")]),
-        "x4": ContinuousNode(terms=[I("x1", "x2")]),
+        "x3": ContinuousNode([I("x1", "x2")]),
+        "x4": ContinuousNode([I("x1", "x2")]),
     }
     flow = _fit(spec, df, epochs=(300, 100))
     rows = gen.observational(300, seed_offset=999)

@@ -31,32 +31,21 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
+from ._common import DatasetDraws, resolve_latents
+
 X_OBS = {"x1": 2.00, "x2": 1.50, "x3": 0.81, "x4": -0.28}  # the paper's observation
 ALPHA_GRID = np.round(np.linspace(-3.0, 3.0, 61), 4)
 _SCALE = 1.0 / np.sqrt(2.0)
 
 
 @dataclass
-class Carefl4:
+class Carefl4(DatasetDraws):
     """SCM generator for the 4-variable CAREFL benchmark."""
 
     seed: int = 42
 
     def draw_latents(self, n: int, rng: np.random.Generator) -> dict[str, np.ndarray]:
-        """Draw the latent noise of every variable.
-
-        Parameters
-        ----------
-        n : int
-            Number of rows to draw.
-        rng : np.random.Generator
-            Random source.
-
-        Returns
-        -------
-        dict[str, np.ndarray]
-            One array of length ``n`` per variable.
-        """
+        """Draw the latent noise of every variable, ``n`` rows each."""
         return {
             k: rng.laplace(loc=0.0, scale=_SCALE, size=n)
             for k in ["x1", "x2", "x3", "x4"]
@@ -89,12 +78,7 @@ class Carefl4:
             One column per variable.
         """
         do = do or {}
-        if latents is None:
-            if n is None:
-                raise ValueError("provide either n or latents")
-            rng = rng or np.random.default_rng(self.seed)
-            latents = self.draw_latents(n, rng)
-        n = len(latents["x1"])
+        latents, n = resolve_latents(self, n, rng, latents)
 
         def clamp_or(name, value):
             return np.full(n, float(do[name])) if name in do else value
@@ -105,29 +89,23 @@ class Carefl4:
         x4 = clamp_or("x4", -x2 + 0.5 * x1**2 + latents["x4"])
         return pd.DataFrame({"x1": x1, "x2": x2, "x3": x3, "x4": x4})
 
-    # ----------------------------------------------------------------- datasets
-    def observational(self, n: int, seed_offset: int = 0) -> pd.DataFrame:
-        """Draw an observational sample.
-
-        Parameters
-        ----------
-        n : int
-            Number of rows.
-        seed_offset : int, optional
-            Added to the generator seed, by default ``0``.
-
-        Returns
-        -------
-        pd.DataFrame
-            The sample.
-        """
-        rng = np.random.default_rng(self.seed + 1 + seed_offset)
-        return self.simulate(n, rng=rng)
-
     # -------------------------------------------------------------- ground truth
     @staticmethod
     def abduct_noise(obs: dict[str, float] | pd.DataFrame) -> dict[str, np.ndarray]:
-        """Exact noise values consistent with an observation (vectorized)."""
+        """Give the exact noise values consistent with an observation.
+
+        The computation is vectorized, so ``obs`` can hold arrays.
+
+        Parameters
+        ----------
+        obs : dict[str, float] | pd.DataFrame
+            Observed values of ``x1`` to ``x4``.
+
+        Returns
+        -------
+        dict[str, np.ndarray]
+            One noise array per variable.
+        """
         x1, x2 = np.asarray(obs["x1"], float), np.asarray(obs["x2"], float)
         x3, x4 = np.asarray(obs["x3"], float), np.asarray(obs["x4"], float)
         return {
@@ -140,7 +118,20 @@ class Carefl4:
     def true_counterfactual(
         self, obs: dict[str, float], do: dict[str, float]
     ) -> dict[str, float]:
-        """Analytic counterfactual of a single observation under ``do``."""
+        """Give the analytic counterfactual of one observation under ``do``.
+
+        Parameters
+        ----------
+        obs : dict[str, float]
+            The factual observation, values of ``x1`` to ``x4``.
+        do : dict[str, float]
+            Hard interventions ``{node: value}``.
+
+        Returns
+        -------
+        dict[str, float]
+            The counterfactual values of every variable.
+        """
         eps = self.abduct_noise({k: np.atleast_1d(v) for k, v in obs.items()})
         cf = self.simulate(do=do, latents=eps)
         return {k: float(cf[k].iloc[0]) for k in cf}
@@ -149,6 +140,13 @@ class Carefl4:
         self, obs: dict[str, float] = X_OBS, alphas: np.ndarray = ALPHA_GRID
     ) -> dict:
         """Compute the two analytic counterfactual curves of paper Fig. 6.
+
+        Parameters
+        ----------
+        obs : dict[str, float], optional
+            The factual observation, by default the paper's ``X_OBS``.
+        alphas : np.ndarray, optional
+            Intervention grid, by default ``ALPHA_GRID``.
 
         Returns
         -------
@@ -168,17 +166,7 @@ class Carefl4:
 
 # --------------------------------------------------------------------------- CLI
 def main(argv: list[str] | None = None) -> None:
-    """Regenerate the frozen CSV files of this data-generating process.
-
-    Parameters
-    ----------
-    argv : list[str] | None, optional
-        Command-line arguments, by default ``None`` (``sys.argv``).
-
-    Returns
-    -------
-    None
-    """
+    """Regenerate the frozen CSV files of this data-generating process."""
     p = argparse.ArgumentParser(description="Generate the CAREFL benchmark data.")
     p.add_argument("--out", type=Path, default=Path("data/carefl"))
     p.add_argument("--seed", type=int, default=42)

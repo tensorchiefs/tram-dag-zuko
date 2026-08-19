@@ -12,21 +12,14 @@ import pandas as pd
 import pytest
 import torch
 
-from tramdag import CS, LS, CausalFlowDAG, ContinuousNode, I, OrdinalNode
+from tramdag import CS, LS, CausalFlowDAG, ContinuousNode, I
+from tramdag.simulations import MagicMrClean
 
 DATA = Path(__file__).resolve().parents[1] / "data"
 
 
 def _stroke_ls_spec() -> dict:
-    return {
-        "Age": ContinuousNode(),
-        "mRS_pre": OrdinalNode(levels=6, terms=[LS("Age")]),
-        "NIHSSa": ContinuousNode(terms=[LS("Age"), LS("mRS_pre")]),
-        "T": OrdinalNode(levels=2, terms=[LS("Age"), LS("mRS_pre"), LS("NIHSSa")]),
-        "mRS_3m": OrdinalNode(
-            levels=7, terms=[LS("Age"), LS("mRS_pre"), LS("NIHSSa"), LS("T")]
-        ),
-    }
+    return MagicMrClean().spec("ls")
 
 
 def _obs() -> pd.DataFrame:
@@ -35,7 +28,7 @@ def _obs() -> pd.DataFrame:
 
 # ------------------------------------------------------------------ fast
 def test_rejects_non_all_ls():
-    spec = {"x1": ContinuousNode(), "x2": ContinuousNode(terms=[CS("x1")])}
+    spec = {"x1": ContinuousNode(), "x2": ContinuousNode([CS("x1")])}
     flow = CausalFlowDAG(spec)
     df = pd.DataFrame({"x1": np.random.randn(50), "x2": np.random.randn(50)})
     with pytest.raises(ValueError, match="all-`ls`"):
@@ -43,7 +36,7 @@ def test_rejects_non_all_ls():
 
 
 def test_rejects_ci_too():
-    spec = {"x1": ContinuousNode(), "x2": ContinuousNode(terms=[I("x1")])}
+    spec = {"x1": ContinuousNode(), "x2": ContinuousNode([I("x1")])}
     with pytest.raises(ValueError):
         CausalFlowDAG(spec).fit_classical(
             pd.DataFrame({"x1": np.random.randn(50), "x2": np.random.randn(50)})
@@ -82,8 +75,8 @@ def test_continuous_only_all_ls_runs():
     df = pd.read_csv(DATA / "vaca" / "obs.csv")
     spec = {
         "x1": ContinuousNode(),
-        "x2": ContinuousNode(terms=[LS("x1")]),
-        "x3": ContinuousNode(terms=[LS("x1"), LS("x2")]),
+        "x2": ContinuousNode([LS("x1")]),
+        "x3": ContinuousNode([LS("x1"), LS("x2")]),
     }
     torch.manual_seed(0)
     flow = CausalFlowDAG(spec)
@@ -104,19 +97,12 @@ def test_matches_statsmodels_mle():
     from statsmodels.miscmodels.ordinal_model import OrderedModel
 
     obs = _obs()
-    X = pd.DataFrame(index=obs.index)
-    X["Age"] = obs["Age"].values
-    for k in range(6):
-        X[f"mRS_pre_{k}"] = (obs["mRS_pre"].values == k).astype(float)
-    X["NIHSSa"] = obs["NIHSSa"].values
-    X["T"] = obs["T"].values
-    X = X.drop(columns=["mRS_pre_0"])
+    torch.manual_seed(7)
+    flow = CausalFlowDAG(_stroke_ls_spec())
+    X = flow.design_matrix(obs, "mRS_3m", drop_first=True)
     res = OrderedModel(obs["mRS_3m"].astype(int), X, distr="logit").fit(
         method="bfgs", disp=False
     )
-
-    torch.manual_seed(7)
-    flow = CausalFlowDAG(_stroke_ls_spec())
     flow.fit_classical(obs, verbose=False)
     n = flow.nodes["mRS_3m"]
     w_age = float(n.shifts["Age"].weight.detach())
@@ -124,7 +110,7 @@ def test_matches_statsmodels_mle():
     w_t = n.shifts["T"].weight.detach().numpy().ravel()
     assert w_age == pytest.approx(res.params["Age"], abs=0.01)
     assert w_nih == pytest.approx(res.params["NIHSSa"], abs=0.01)
-    assert (w_t[1] - w_t[0]) == pytest.approx(res.params["T"], abs=0.06)
+    assert (w_t[1] - w_t[0]) == pytest.approx(res.params["T[1]"], abs=0.06)
 
 
 @pytest.mark.slow
@@ -149,3 +135,14 @@ def test_agrees_with_adam_mle():
         a = float(fa.nodes[name].shifts[parent].weight.detach())
         c = float(fc.nodes[name].shifts[parent].weight.detach())
         assert a == pytest.approx(c, abs=0.02), f"{name}<-{parent}: {a} vs {c}"
+
+
+def test_chunk_and_history_size_reach_the_solver():
+    """Chunk sets the L-BFGS round length that n_iter counts in."""
+    obs = _obs()
+    rep = CausalFlowDAG(_stroke_ls_spec(), seed=0).fit_classical(
+        obs, max_iter=10, chunk=5, history_size=7, verbose=False
+    )
+    assert rep["n_iter"] % 5 == 0 and 0 < rep["n_iter"] <= 10
+    with pytest.raises(TypeError):
+        CausalFlowDAG(_stroke_ls_spec(), seed=0).fit_classical(obs, not_a_kwarg=1)

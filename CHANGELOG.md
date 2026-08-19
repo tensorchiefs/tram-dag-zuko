@@ -1,8 +1,142 @@
 # Changelog
 
-## 0.3.1 (unreleased)
+## 0.4.0 (unreleased)
 
 ### Added
+
+- **Transformation syntax**: a node's additive formula is now its first
+  positional argument and can be written as a `+` sum — the formula reads
+  like the math (`ContinuousNode(I("x1") + CS("x2"))`,
+  `OrdinalNode(4, [I, LS("x1")])`). New on `I`:
+  `allow_interaction=False` (multi-parent intercept becomes additive,
+  `I("a","b", allow_interaction=False) == I("a") + I("b")`) and
+  `transform=`/`transform_kwargs=` (the monotone basis moves onto the
+  intercept term, e.g. `I("x1", transform="spline")`). Everything
+  normalizes to the same internal term list, and equivalence is pinned by
+  state-dict-identical tests (`tests/test_transformation_syntax.py`).
+
+- **Transparent training internals**: the previously hardcoded training
+  knobs are optional kwargs with unchanged defaults —
+  `fit(plateau_factor=0.3)` (per-node plateau decay multiplier) and
+  `fit(vc_oof_fit={...})` (settings of the stage-1 out-of-fold proxy fits
+  behind `VC(center=True)`, default
+  `{"epochs": 300, "learning_rate": 1e-2, "batch_size": 512}`), plus
+  `fit_classical(chunk=25, history_size=50)` (L-BFGS round length and
+  memory). The plateau lr floor (`1e-3 * learning_rate`) and the freeze
+  guard (`1e-2 * learning_rate`) are documented in the `fit` docstring.
+
+- **Pythonic names for every term constructor**, with the short
+  notation kept as an alias of the same object: `intercept`/`I`,
+  `linear_shift`/`LS`, `complex_shift`/`CS` and
+  `varying_coefficient`/`VC`. Both spellings are exported, so
+  `LS is linear_shift` and existing code reads unchanged.
+
+- **`units=` on `I`, `CS` and `VC`** sizes the term's network directly,
+  e.g. `units=[16]` for one hidden layer (defaults: I `[8, 8]`,
+  CS `[64, 128, 64]`, VC `[16]`); serialized per term. All conditioner
+  networks now build through one `_mlp()` helper.
+
+### Fixed
+
+- **`marginal_init` no longer resets a loaded model.** The calibration is
+  first-fit-only. A continuous node's guard is the transform's `_fitted`
+  flag, which `load` restores; an ordinal node's guard lived on the
+  intercept and `save`/`load` dropped it, so loading a trained model and
+  continuing with `fit(marginal_init=True)` silently reset the cutpoints
+  to the data marginal. `load` now closes both guards
+  (`tests/test_marginal_init.py`).
+
+### Removed (breaking)
+
+- **`fit(schedule=)` keeps `None` and `"plateau"` only.** `"onecycle"`
+  and `"cosine"` had no caller outside one parametrized test, and the
+  June 2026 benchmark measured both behind plateau on every workload
+  (`docs/training-speed.md` keeps the numbers).
+
+- **The `bound` knob on the univariate transforms.** Nothing ever set it;
+  the pre-scaled domain is fixed at `[-5, 5]` (`transforms.BOUND`).
+
+- **`VC(center=)` is a plain bool.** The `center="colname"` variant
+  (user-supplied cross-fitted propensities) had a self-test and no other
+  caller; it was staged-unreleased, so its Added entry is corrected in
+  place.
+
+- **All backward compatibility.** Pre-1.0, one API and one checkpoint
+  format: `term()` takes the current labels only (`"I"`, `"LS"`, `"CS"`,
+  `"VC"` — the lowercase `"ls"`/`"cs"`/`"ci"` aliases are gone), the two
+  0.3-checkpoint shims in `spec_from_dict` (the multi-`I` merge and the
+  node-level-basis carry) are gone with the redundant node-level
+  `transform`/`transform_kwargs` keys that fed them, VC terms read
+  `center`/`center_folds` directly, and `load` requires a complete
+  checkpoint (spec, weights, history, meta) instead of tolerating missing
+  blocks. Checkpoints and specs written by earlier versions no longer
+  load; regenerate them.
+
+- **`Term.slot`** — derived from `effect`, and its only user in the repo
+  was a test assertion.
+
+- The `terms=` keyword (use the first positional argument), node-level
+  `ContinuousNode(transform=/transform_kwargs=)` (choose the basis on the
+  intercept term, `I(..., transform="spline")`), the unused
+  `Intercept`/`LinShift`/`CShift` aliases, and the `parents={...}`
+  checkpoint loader.
+- The unmaintained notebooks and experiment scripts moved to
+  `notebooks/stale/` and `experiments/stale/`; the maintained set is
+  the intro and Colab demo notebooks plus `sim_flow.py` and
+  `validate_ls.py`.
+
+- **`term(effect, *parents)`** — the string-label term factory. It was a
+  second, weaker way to build a term, its `VC` branch and `penalty=`
+  keyword were exercised only by its own tests, and a generic dispatcher
+  carrying one effect's parameter is the shape this release removed from
+  `Term` itself. When the effect type comes from config or the CLI, hold
+  the constructor in the table instead of a label to dispatch on:
+  `{"Age": I, "NIHSSa": CS}` then `t["Age"]("Age")` (see
+  `experiments/common.py::build_spec`).
+
+### Changed (breaking)
+
+- **`VC(*modifiers, t=...)`**: the positional arguments are the
+  covariates that enter `b_theta`; the treatment `t` is a required
+  keyword. `VC("X2", "X3", t="T")` reads as
+  `(beta0 + b_theta(x2, x3)) * x_t`. (0.3 wrote `VC("T", "X2", "X3")`.)
+
+- **Progress goes through `logging`, not `print`.** `fit`,
+  `fit_classical` and the all-frozen notice emit INFO records on the
+  `tramdag.flow` module logger, still gated by `verbose=`. Scripts and
+  notebooks that relied on stdout add one line:
+  `logging.basicConfig(level=logging.INFO, format="%(message)s")`.
+
+- **The node formula argument is `terms`, not `transformation`.**
+  `ContinuousNode(terms=...)` / `OrdinalNode(levels, terms=...)`, and the
+  attribute is `node.terms`. It is still the first positional argument, so
+  positional calls are unaffected; the word now matches what it holds and
+  what `Term`/`node_terms` already say.
+
+- **A `+` sum nested inside a list is rejected.** `+` already returns a
+  flat list, so `[I("x1") + LS("x2")]` was a list of lists that the
+  normalizer silently flattened. Write either a list or a sum; the error
+  says so, because the usual cause is expecting `+` to combine list
+  entries.
+
+### Changed (internal, no API surface)
+
+- **The serialized term is `{effect, parents, options}`.** `Term.options`
+  is already canonical (sorted, defaults dropped), so `spec_to_dict` emits
+  it whole and the per-key reader disappears. `spec_from_dict` now builds
+  `Term` directly, which makes `validate_and_sort` the only guard on the
+  load path — a malformed checkpoint is rejected there
+  (`tests/test_transformation_syntax.py`).
+
+- **The five SCM generators share one layer.** `simulations/_common.py`
+  holds `logistic`, `sigmoid`, `resolve_latents`, and the `DatasetDraws`
+  mixin (`observational`, `interventional`, `counterfactual_pair`) — with
+  it the seed offsets behind the frozen CSVs in `data/` (`+1`, `+501`,
+  `+2`) are defined once instead of five times. Every generator now
+  exposes the same three named draws. `simulations/` drops from 1663 to
+  1377 lines with the frozen-CSV contract unchanged.
+
+### Added (staged earlier as an unreleased 0.3.1)
 
 - **Propensity-centered VC: `VC(..., center=True, center_folds=5)`** (issue
   #30): the R-learner orthogonalization `beta(x)·(t − ê(x))` inside the
@@ -12,15 +146,14 @@
   fails CI), frozen as data (zero gradient into the treatment node from the
   outcome loss — tested); inference recomputes ê from the flow's own fitted
   treatment node and re-derives `t − ê(x)` under `do` (never cached — tested
-  on fresh rows). `center="colname"` supplies user cross-fitted propensities;
-  binary ordinal treatments only; `center=False` (default) is bit-identical
+  on fresh rows). binary ordinal treatments only; `center=False` (default) is bit-identical
   to the uncentered term (tested). Measured (the Dandl et al. 2024
   reproduction, `tests/test_vc_centered.py`): under strong confounding + an
   under-specified prognostic part, centering cuts β̂ bias **5–10×**
   (1.10–1.24 → 0.11–0.27 over 3 seeds). Docs:
   `docs/varying-coefficients.md`.
 
-- **`flow.scores(df, node)` + `flow.effect_modifier_scan(df, node, on)`**
+- **`flow.scores(df, node)` + `flow.effect_modifier_scan(df, node, t)`**
   (issue #29): per-observation scores ψᵢ = ∂ℓᵢ/∂θ for every `LS` weight and
   `VC` `beta0` — **analytic and exact** (shifts enter the latent additively, so
   ∂ℓᵢ/∂β = (∂ℓᵢ/∂sᵢ)·xᵢ with the latent derivative in closed form; pinned by a
@@ -54,7 +187,7 @@
 
 - **`flow.intercept_contributions(node, data)`** (issue #20, Option A) — post-hoc,
   mean-centered decomposition of an **additive complex intercept**
-  (`terms=[I("x1"), I("x2")]`). The per-term networks are summed in unconstrained
+  (`[I("x1"), I("x2")]`). The per-term networks are summed in unconstrained
   parameter space, so the sum is identified but each term's contribution only up to
   a constant; this returns each term's **sum-to-zero** (GAM-style mean-centered over
   `data`) contribution to the transform parameters plus the absorbed `baseline`, for

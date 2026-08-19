@@ -5,8 +5,9 @@ This file gives an overview of the tests and how to run them.
 ## Running the tests
 
 ```bash
-uv run pytest tests/ -q            # everything (~12 min: the slow fits dominate)
-uv run pytest tests/ -q -m "not slow"   # fast subset (~30 s) — unit + contracts
+uv run pytest tests/ -q            # everything (the slow fits dominate; ~25-40
+                                   #   min on 2-core CI, less on a workstation)
+uv run pytest tests/ -q -m "not slow"   # fast subset (~2-3 min) — unit + contracts
 uv run pytest tests/test_flow.py -q     # one file
 ```
 
@@ -102,6 +103,12 @@ decreasing order of exactness:
 
 ## The test files
 
+`conftest.py` holds only helpers that are provably identical across
+modules (currently one: the `x1 -> x3 <- x2` fit whose validation NLL the
+joint-vs-additive comparisons read). Per-module DGP builders and specs stay
+where they are — each pins the one SCM or syntax variant its property
+needs, and sharing them would couple unrelated acceptance bars.
+
 | file | what it covers |
 |---|---|
 | [`test_flow.py`](test_flow.py) | core unit tests — transforms, ordinal log-prob, DAG validation, abduction/counterfactual mechanics, `save`/`load`, the proportional-odds identity |
@@ -109,6 +116,16 @@ decreasing order of exactness:
 | [`test_paper_dgps.py`](test_paper_dgps.py) | the paper DGPs — generator pinning (KS identities, frozen-CSV contract, analytic ground truth) + flow recovery of each family's truth |
 | [`test_fit_schedules.py`](test_fit_schedules.py) | lr schedules and per-node freezing, incl. the guard that plateau+freeze still lands on the MLE |
 | [`test_fit_classical.py`](test_fit_classical.py) | `fit_classical` — guard on non-`ls` specs, determinism, float64 round-trip, agreement with `statsmodels` and Adam |
+| [`test_spec_terms.py`](test_spec_terms.py) | term constructors, edge ownership, the meta-adjacency view |
+| [`test_transformation_syntax.py`](test_transformation_syntax.py) | the formula syntax — every spelling normalizes identically, the constructor aliases, `units=`, round-trips, and rejection of a malformed serialized spec |
+| [`test_joint_terms.py`](test_joint_terms.py) | joint multi-parent CS/I terms |
+| [`test_additive_ci.py`](test_additive_ci.py) | the additive intercept (`allow_interaction=False`) |
+| [`test_intercept_contributions.py`](test_intercept_contributions.py) | the post-hoc GAM decomposition of complex intercepts |
+| [`test_vc_term.py`](test_vc_term.py) | the VC effect head — spec, penalty, warm start, recovery of `beta(x)` |
+| [`test_vc_centered.py`](test_vc_centered.py) | propensity-centered VC — out-of-fold structure, zero-gradient freeze, bias reduction |
+| [`test_scores.py`](test_scores.py) | analytic scores vs finite differences, the effect-modifier scan |
+| [`test_marginal_init.py`](test_marginal_init.py) | calibrated marginal initialization — pure-init property |
+| [`test_api_papercuts.py`](test_api_papercuts.py) | error messages, `save`/`load` meta, small API contracts |
 
 ## Adding tests
 

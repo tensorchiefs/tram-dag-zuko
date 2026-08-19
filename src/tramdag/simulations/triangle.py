@@ -42,6 +42,8 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
+from ._common import DatasetDraws, logistic, resolve_latents
+
 F_VARIANTS = {
     "linear": (lambda x: -0.3 * x, "-0.3*x"),
     "cubic": (lambda x: 2.0 * x**3 + x, "2*x^3 + x"),
@@ -56,10 +58,6 @@ THETA_MIXED = np.array([-2.0, 0.42, 1.02])  # ordinal cutpoints (4 levels)
 PAPER_VARIANTS = {"continuous": ("linear", "atan", "sin"), "mixed": ("linear", "exp")}
 
 
-def _logistic(rng: np.random.Generator, size: int) -> np.ndarray:
-    return rng.logistic(loc=0.0, size=size)
-
-
 def _clamp(value, n: int) -> np.ndarray:
     """Broadcast a ``do`` value to shape ``(n,)``.
 
@@ -70,8 +68,17 @@ def _clamp(value, n: int) -> np.ndarray:
 
 
 @dataclass
-class _TriangleBase:
-    """Shared x1 (GMM source) and x2 (Colr-type TRAM) mechanisms."""
+class _TriangleBase(DatasetDraws):
+    """Shared x1 (GMM source) and x2 (Colr-type TRAM) mechanisms.
+
+    Parameters
+    ----------
+    f : str, optional
+        Name of the x2 -> x3 effect function, one of ``F_VARIANTS``, by
+        default ``"linear"``.
+    seed : int, optional
+        Master seed, by default 42.
+    """
 
     f: str = "linear"
     seed: int = 42
@@ -83,13 +90,17 @@ class _TriangleBase:
 
     # ------------------------------------------------------------------ latents
     def draw_latents(self, n: int, rng: np.random.Generator) -> dict[str, np.ndarray]:
-        """All noise of the SCM: the GMM source's primitives + the TRAM latents."""
+        """Draw all noise of the SCM, ``n`` rows each.
+
+        The GMM source gets its primitives (component indicator plus two
+        normal branches). x2 and x3 get their TRAM latents.
+        """
         return {
             "x1_mix": rng.uniform(size=n),  # component indicator
             "x1_a": rng.normal(size=n),  # N(0.25, 0.1) branch
             "x1_b": rng.normal(size=n),  # N(0.73, 0.05) branch
-            "x2": _logistic(rng, n),
-            "x3": _logistic(rng, n),
+            "x2": logistic(rng, n),
+            "x3": logistic(rng, n),
         }
 
     # --------------------------------------------------------------------- SCM
@@ -117,13 +128,34 @@ class _TriangleBase:
         do: dict[str, float] | None = None,
         latents: dict[str, np.ndarray] | None = None,
     ) -> pd.DataFrame:
-        """Forward-sample the SCM (``do`` clamps nodes; ``latents`` reuses noise)."""
+        """Forward-sample the SCM.
+
+        Parameters
+        ----------
+        n : int | None, optional
+            Number of rows. Required unless ``latents`` is given.
+        rng : np.random.Generator | None, optional
+            Random source. Defaults to a generator seeded with
+            ``self.seed``.
+        do : dict[str, float] | None, optional
+            Hard interventions ``{node: value}``. A per-row array is also
+            accepted, for the soft intervention of paper appendix C.4.
+        latents : dict[str, np.ndarray] | None, optional
+            Reuse a fixed latent draw. If given, ``n`` and ``rng`` are
+            ignored.
+
+        Returns
+        -------
+        pd.DataFrame
+            The sample, columns ``x1``, ``x2``, ``x3``.
+
+        Raises
+        ------
+        ValueError
+            If both ``n`` and ``latents`` are omitted.
+        """
         do = do or {}
-        if latents is None:
-            if n is None:
-                raise ValueError("provide either n or latents")
-            rng = rng or np.random.default_rng(self.seed)
-            latents = self.draw_latents(n, rng)
+        latents, n = resolve_latents(self, n, rng, latents)
         x1, x2 = self._x1_x2(do, latents)
         x3 = self._x3(x1, x2, do, latents)
         return pd.DataFrame({"x1": x1, "x2": x2, "x3": x3})
@@ -131,43 +163,33 @@ class _TriangleBase:
     def _x3(self, x1, x2, do, latents):  # pragma: no cover - abstract
         raise NotImplementedError
 
-    # ----------------------------------------------------------------- datasets
-    def observational(self, n: int, seed_offset: int = 0) -> pd.DataFrame:
-        rng = np.random.default_rng(self.seed + 1 + seed_offset)
-        return self.simulate(n, rng=rng)
-
-    def interventional(
-        self, n: int, do: dict[str, float], seed_offset: int = 0
-    ) -> pd.DataFrame:
-        """Fresh draw from the mutilated SCM (the L2 ground truth)."""
-        rng = np.random.default_rng(self.seed + 501 + seed_offset)
-        return self.simulate(n, rng=rng, do=do)
-
-    def counterfactual_pair(
-        self, n: int, do: dict[str, float], seed_offset: int = 0
-    ) -> tuple[pd.DataFrame, pd.DataFrame]:
-        """Draw a factual sample and its counterfactual under ``do``.
-
-        Both share the same latents, so the pair gives true individual
-        counterfactuals. They are exact for the continuous family. For the mixed
-        family the ordinal x3 is still well defined inside the generator, because
-        the latent is shared, even though no model can identify it from data.
-        """
-        rng = np.random.default_rng(self.seed + 2 + seed_offset)
-        latents = self.draw_latents(n, rng)
-        return self.simulate(latents=latents), self.simulate(latents=latents, do=do)
-
     # -------------------------------------------------------------- ground truth
     def true_shift_curve(self, x2_grid: np.ndarray) -> np.ndarray:
         """Give the limit of a fitted ``cs`` module on the x2 to x3 edge.
 
-        The module converges to ``-f(x2)`` up to an additive constant, in both
-        families. See the module docstring.
+        The module converges to ``-f(x2)`` up to an additive constant, in
+        both families. See the module docstring.
+
+        Parameters
+        ----------
+        x2_grid : np.ndarray
+            Evaluation points.
+
+        Returns
+        -------
+        np.ndarray
+            ``-f(x2)`` at the grid points.
         """
         return -self.f_callable(np.asarray(x2_grid, dtype=float))
 
     def zuko_expectations(self) -> dict:
-        """Give the expected parameter values in the conventions of the flow."""
+        """Give the expected parameter values in the conventions of the flow.
+
+        Returns
+        -------
+        dict
+            Expected fitted values, keyed by parameter name.
+        """
         exp = {"w_x2_from_x1": 2.0, "w_x3_from_x1": -0.2, "cs_curve": "-f(x2) + const"}
         if self.f == "linear":
             exp["w_x3_from_x2"] = 0.3
@@ -225,7 +247,18 @@ class TriangleMixed(_TriangleBase):
         return (latents["x3"][:, None] > cuts).sum(axis=1).astype(float)
 
     def true_pmf(self, x1: np.ndarray, x2: np.ndarray) -> np.ndarray:
-        """Analytic (n, 4) class probabilities given parents."""
+        """Give the analytic class probabilities of x3 given its parents.
+
+        Parameters
+        ----------
+        x1, x2 : np.ndarray
+            Parent values, each shape ``(n,)``.
+
+        Returns
+        -------
+        np.ndarray
+            The class probabilities, shape ``(n, 4)``.
+        """
         shift = 0.2 * np.asarray(x1, float) + self.f_callable(np.asarray(x2, float))
         cuts = self.theta[None, :] + shift[:, None]
         cdf = 1.0 / (1.0 + np.exp(-cuts))
@@ -311,17 +344,7 @@ def _write_variant(cls, out_dir: Path, f: str, seed: int, n_obs: int) -> None:
 
 
 def main(argv: list[str] | None = None) -> None:
-    """Regenerate the frozen CSV files of this data-generating process.
-
-    Parameters
-    ----------
-    argv : list[str] | None, optional
-        Command-line arguments, by default ``None`` (``sys.argv``).
-
-    Returns
-    -------
-    None
-    """
+    """Regenerate the frozen CSV files of this data-generating process."""
     p = argparse.ArgumentParser(
         description="Generate the TRAM-DAG paper triangle data."
     )

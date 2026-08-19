@@ -15,7 +15,7 @@ Writes to ``results/paper-carefl/``.
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-from paper_common import fit_chunked, results_dir, save_json
+from paper_common import finish, fit_chunked, results_dir, save_json
 
 from tramdag import ContinuousNode, I
 from tramdag.simulations import Carefl4
@@ -30,8 +30,8 @@ out = results_dir("paper-carefl")
 spec = {
     "x1": ContinuousNode(),
     "x2": ContinuousNode(),
-    "x3": ContinuousNode(terms=[I("x1", "x2")]),
-    "x4": ContinuousNode(terms=[I("x1", "x2")]),
+    "x3": ContinuousNode([I("x1", "x2")]),
+    "x4": ContinuousNode([I("x1", "x2")]),
 }
 
 print(f"fitting all-ci flow on the CAREFL SCM, n={N} ...")
@@ -68,8 +68,7 @@ for ax, fl, tr, xlab, ylab in [
 fig.suptitle(
     "CAREFL counterfactual queries at $x_{obs}$ = (2.00, 1.50, 0.81, -0.28) (Fig. 6)"
 )
-fig.tight_layout(), fig.savefig(out / "plots" / "cf_curves.png", dpi=150)
-plt.close(fig)
+finish(fig, out / "plots" / "cf_curves.png")
 
 # --- robust metric: counterfactual MAE over held-out rows
 rows = gen.observational(300, seed_offset=999)

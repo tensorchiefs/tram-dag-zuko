@@ -17,27 +17,27 @@
 # [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/tensorchiefs/tramdag/blob/main/notebooks/demo_tram_dag_colab.ipynb)
 #
 # **TRAM-DAGs** ([Sick & Dürr, CLeaR 2025](https://arxiv.org/abs/2503.16206)) are
-# *interpretable neural causal models*: one normalizing flow wired exactly like
-# the **adjacency matrix of your causal DAG** — each variable is transformed
-# conditional on its parents. Fit it **once** on observational
-# data and you can
+# *interpretable neural causal models*: one normalizing flow, wired exactly like
+# the **adjacency matrix of your causal DAG**. The flow transforms each variable
+# conditional on its parents. Fit it **once** on observational data. Then you can
 #
-# 1. **L1** sample / score the observational distribution,
-# 2. **L2** answer interventional queries — `do(...)` — by graph mutilation,
+# 1. **L1** sample and score the observational distribution,
+# 2. **L2** answer interventional queries (`do(...)`) by graph mutilation,
 # 3. **L3** compute **individual counterfactuals** ("what would have happened to
-#    *this* unit?") via Pearl's abduction–action–prediction.
+#    *this* unit?") with Pearl's abduction–action–prediction.
 #
-# This demo uses the benchmark the paper leads with: a 3-variable SCM whose
-# source is **bimodal** — the example where a default causal normalizing flow
-# visibly fails (paper, Fig. 4) and TRAM-DAG doesn't. Ground truth is known
-# analytically, so every claim below is *checked*, not asserted.
+# This demo uses the first benchmark of the paper: a 3-variable SCM with a
+# **bimodal** source. On this example, a default causal normalizing flow visibly
+# fails (paper, Fig. 4) and TRAM-DAG does not. The ground truth is known
+# analytically. Thus every claim below is *checked*, not asserted.
 #
-# Runs on CPU; on a Colab **GPU runtime** (Runtime → Change runtime type →
-# any GPU, e.g. the free T4)
-# the final section races the two.
+# The demo runs on CPU. On a Colab **GPU runtime** (Runtime → Change runtime
+# type → any GPU, for example the free T4), the final section compares the
+# speed of the two devices.
 
 # %%
 import importlib.util
+import logging
 import subprocess
 import sys
 import time
@@ -55,6 +55,9 @@ import torch
 from tramdag import CausalFlowDAG, ContinuousNode, I
 from tramdag.simulations import VacaTriangle
 
+# tramdag reports fit() progress on its module logger
+logging.basicConfig(level=logging.INFO, format="%(message)s")
+
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 plt.rcParams["figure.dpi"] = 110
 print(f"torch {torch.__version__}  device: {DEVICE}")
@@ -62,7 +65,7 @@ print(f"torch {torch.__version__}  device: {DEVICE}")
 # %% [markdown]
 # ## 1. The challenge: a bimodal structural causal model
 #
-# The DGP (Sánchez-Martín et al. 2022, App. E.1; TRAM-DAG paper App. C.1):
+# The DGP (Sánchez-Martín et al. 2022, App. E.1, and TRAM-DAG paper App. C.1):
 #
 # $$
 # \begin{aligned}
@@ -91,18 +94,18 @@ plt.show()
 # %% [markdown]
 # ## 2. Fit the TRAM-DAG — the spec *is* the DAG
 #
-# Each node gets a monotone Bernstein transform; the edge labels say how parents
-# enter (`ci` = the transform's parameters depend on the parents — maximal
-# flexibility). Training maximizes the exact joint likelihood with one Adam;
-# the new `schedule="plateau"` + `freeze_patience` lets every node decay its
-# learning rate **independently** and drop out of training once converged —
-# the fit stops itself.
+# Each node gets a monotone Bernstein transform. The terms say how parents
+# enter (`I(...)` = the parents control the transform parameters, for maximal
+# flexibility). Training maximizes the exact joint likelihood with one Adam.
+# `schedule="plateau"` + `freeze_patience` lets each node decay its
+# learning rate **independently** and leave training after it converges.
+# The fit stops itself.
 
 # %%
 spec = {
     "x1": ContinuousNode(),  # source
-    "x2": ContinuousNode(terms=[I("x1")]),
-    "x3": ContinuousNode(terms=[I("x1", "x2")]),
+    "x2": ContinuousNode(I("x1")),
+    "x3": ContinuousNode(I("x1", "x2")),
 }
 
 torch.manual_seed(0)
@@ -127,9 +130,9 @@ print(
 )
 
 # %% [markdown]
-# Training diagnostics come for free — `fit` records per-node train/val NLL,
-# learning rates, wall-clock time and the freeze epochs. Watch the nodes drop
-# out of training one by one:
+# Training diagnostics come for free. `fit` records per-node train/val NLL,
+# learning rates, wall-clock time, and the freeze epochs. Watch the nodes leave
+# training one by one:
 
 # %%
 hist = flow.history
@@ -191,9 +194,9 @@ plt.show()
 # ## 4. Rung 2 — interventions: `do(x2 = a)`
 #
 # Graph mutilation: clamp $x_2$, cut its incoming edge, resample. Under the DGP,
-# $x_3\,|\,do(x_2{=}a) = x_1 + 0.25a + \mathcal N(0,1)$, so
-# $\mathbb E[x_3] = -0.25 + 0.25a$ **analytically** — a hard number to be wrong
-# about.
+# $x_3\,|\,do(x_2{=}a) = x_1 + 0.25a + \mathcal N(0,1)$. Thus
+# $\mathbb E[x_3] = -0.25 + 0.25a$ **analytically**. This is a hard number to be
+# wrong about.
 
 # %%
 fig, axes = plt.subplots(1, 3, figsize=(11, 3.2), sharey=True)
@@ -220,15 +223,16 @@ plt.show()
 # ## 5. Rung 3 — the counterfactual magic trick
 #
 # Take 1,000 **held-out** individuals. Step 1 (*abduction*): invert the flow to
-# recover each individual's latent noise $u$ — everything about them the model
-# doesn't attribute to their parents. Sanity check: pushing $u$ back through the
-# flow must reproduce the observed data *exactly*.
+# recover the latent noise $u$ of each individual. This noise is everything
+# about them that the model does not attribute to their parents. Sanity check:
+# when we push $u$ back through the flow, it must reproduce the observed data
+# *exactly*.
 #
-# Step 2+3 (*action* + *prediction*): rerun history with $do(x_1 = 0)$ — same
-# $u$, mutilated graph. Because the DGP is fully continuous, the **true**
-# individual counterfactuals are known (the simulator keeps its noise), so we
-# can score the flow *per individual* — the strictest test in causal inference,
-# impossible with real data.
+# Step 2+3 (*action* + *prediction*): rerun history with $do(x_1 = 0)$, that is,
+# the same $u$ on a mutilated graph. Because the DGP is fully continuous, the
+# **true** individual counterfactuals are known (the simulator keeps its noise).
+# Thus we can score the flow *per individual*. This is the strictest test in
+# causal inference, and it is impossible with real data.
 
 # %%
 rng = np.random.default_rng(7)
@@ -259,20 +263,20 @@ plt.show()
 # %% [markdown]
 # ## 6. Swapping the transform: Bernstein vs spline vs affine
 #
-# Each continuous node owns a **monotone 1-D transform** — that's where the
-# distributional flexibility lives. One constructor argument switches it:
+# Each continuous node owns a **monotone 1-D transform**. That transform holds
+# all of the distributional flexibility. One constructor argument switches it:
 # `"bernstein"` (default, TRAM-faithful polynomial), `"spline"` (monotone
 # rational-quadratic, the neural-spline-flow building block), or `"affine"`
-# (location–scale only → every node-conditional is forced to be a logistic —
-# essentially a classical GLM). Same DAG, same training, three model families:
+# (location–scale only, which forces every node-conditional to be a logistic,
+# in effect a classical GLM). Same DAG, same training, three model families:
 
 
 # %%
 def make_spec(transform):
     return {
-        "x1": ContinuousNode(transform=transform),
-        "x2": ContinuousNode(transform=transform, terms=[I("x1")]),
-        "x3": ContinuousNode(transform=transform, terms=[I("x1", "x2")]),
+        "x1": ContinuousNode([I(transform=transform)]),
+        "x2": ContinuousNode(I("x1", transform=transform)),
+        "x3": ContinuousNode(I("x1", "x2", transform=transform)),
     }
 
 
@@ -316,21 +320,21 @@ fig.tight_layout()
 plt.show()
 
 # %% [markdown]
-# Reading the table: **affine** pays exactly where you'd expect — a
+# Reading the table: **affine** pays exactly where you expect it to pay. A
 # location–scale transform *cannot* produce a bimodal $x_1$ (the same failure
-# mode as the inflexible CNF in the paper's Fig. 4). The **RQ-spline** is
-# expressive enough *in principle*, but with the small TRAM-DAG parameter heads
+# mode as the inflexible CNF in Fig. 4 of the paper). The **RQ-spline** is
+# expressive enough *in principle*. But with the small TRAM-DAG parameter heads,
 # it consistently trains to a worse optimum on this target (same result for
-# 8–32 bins, lr 0.01–0.1, up to 2000 epochs) — an honest empirical reason why
-# **Bernstein** (whose monotone softplus-cumsum parametrization is easier to
-# optimize) is the TRAM-faithful default. Swap per node any time via
-# `ContinuousNode(transform="spline", transform_kwargs={"bins": 16})`.
+# 8–32 bins, lr 0.01–0.1, up to 2000 epochs). This is an honest empirical reason
+# why **Bernstein** is the TRAM-faithful default: its monotone softplus-cumsum
+# parametrization is easier to optimize. You can swap the transform per node at
+# any time with `I(..., transform="spline", transform_kwargs={"bins": 16})`.
 
 # %% [markdown]
 # ## 7. GPU vs CPU
 #
 # The whole flow is plain PyTorch, so it runs anywhere. Same 60-epoch fit, both
-# devices (on a CPU-only runtime this just reports CPU):
+# devices (a CPU-only runtime reports only CPU):
 
 
 # %%
@@ -339,8 +343,8 @@ def timed_fit(device, epochs=60):
     f = CausalFlowDAG(
         {
             "x1": ContinuousNode(),
-            "x2": ContinuousNode(terms=[I("x1")]),
-            "x3": ContinuousNode(terms=[I("x1", "x2")]),
+            "x2": ContinuousNode(I("x1")),
+            "x3": ContinuousNode(I("x1", "x2")),
         },
         device=device,
     )
@@ -371,9 +375,10 @@ if len(timings) > 1:
 # | L2 | $p(x_3 \mid do(x_2{=}a))$ | `flow.sample(n, do=...)` | analytic $\mathbb E[x_3] = -0.25 + 0.25a$ |
 # | L3 | individual counterfactuals | `flow.abduct(df)` + `flow.sample(do=..., u=u)` | per-unit DGP truth, r ≈ 0.99+ |
 #
-# And the same model family stays **interpretable** when you want it to be:
-# declare an edge `"ls"` instead of `"ci"` and its coefficient is a log-odds
-# ratio you can read off after training (that's the actual point of the paper).
+# And the same model family stays **interpretable** when you want it to be.
+# Write an edge as `LS("parent")` instead of `I("parent")`. Then its
+# coefficient is a log-odds ratio that you can read after training (this is
+# the actual point of the paper).
 #
 # **More:** [repo](https://github.com/tensorchiefs/tramdag) ·
 # [paper](https://arxiv.org/abs/2503.16206) ·

@@ -21,7 +21,8 @@ uv run pytest tests/ -q          # full suite; -m "not slow" is ~2 min
 cd experiments
 uv run python sim_flow.py nl     # headline storyline (all-ls vs flexible vs known truth)
 uv run python validate_ls.py     # spot-on flow == statsmodels == R polr check
-uv run python paper_triangle.py atan cs   # TRAM-DAG paper replications (paper_*.py)
+uv run python paper_triangle.py atan cs  # CLeaR replications (paper_*.py);
+                                 # also pinned by tests/test_paper_dgps.py
 ```
 
 Experiments default to the synthetic data (`magic-mrclean/nl`). The `magic` source
@@ -30,34 +31,42 @@ Experiments default to the synthetic data (`magic-mrclean/nl`). The `magic` sour
 ## Architecture (src/tramdag/)
 
 - `spec.py` — user-facing DAG spec: `{name: ContinuousNode|OrdinalNode}`, each node
-  declares `terms=[...]` (term-formula notation, since 0.3.0; the legacy
-  `parents={parent: term}` dict was removed). Term constructors: `LS(parent)`
+  declares its transformation as the first positional argument — a list of terms
+  or a `+` sum (`I("a") + LS("b")`). Term constructors: `LS(parent)`
   (linear shift), `CS(*parents)` (complex shift MLP), `I(*parents)` (complex
-  intercept — transform params from parents), `VC(on, *modifiers, penalty=)`
-  (varying-coefficient effect head `beta(modifiers)·x_on`, small penalized
+  intercept — transform params from parents), `VC(*modifiers, t=, penalty=)`
+  (varying-coefficient effect head `beta(modifiers)·x_t`, small penalized
   zero-init net; read out with `flow.varying_coef` — see
-  docs/varying-coefficients.md). A **multi-parent** term is one
-  *joint* network over the group (`CS("a","b")`, `I("a","b")`); **separate** terms
-  are *additive* (`CS("a")+CS("b")`; `I("a")+I("b")` = per-parent intercept nets
-  summed in unconstrained coeff space). `term(effect, *parents)` builds a term from
-  a data-driven label. No intercept term → `SimpleIntercept` baseline. Every
+  docs/varying-coefficients.md). `I(..., transform=)` picks the monotone basis,
+  `units=[...]` on I/CS/VC sizes the term's network. A node takes at most ONE
+  I term with parents; a **multi-parent** `I("a","b")` is one *joint* network
+  (interaction on the thetas, the default), and
+  `I("a","b", allow_interaction=False)` is the *additive* intercept (one net
+  per parent, coefficient vectors summed). For shifts, grouping decides:
+  `CS("a","b")` is joint, `CS("a")+CS("b")` additive. When the effect type
+  comes from config or the CLI, put the constructor itself in the table
+  (`{"Age": I, "NIHSSa": CS}`) — see `experiments/common.py::build_spec`.
+  No intercept term → `SimpleIntercept` baseline. Every
   parent enters through exactly one edge-owning term (VC modifiers exempt — they
   may also appear prognostically).
 - `transforms.py` — monotone 1-D transforms wrapping zuko (`BernsteinUT`, `SplineUT`,
   `AffineUT`; pre-scaled from train 5%/95% quantiles to [-5,5], expanding-bracket
   bisection inverse) + the ordinal ordered-logit transform
   (`P(Y<=k) = sigmoid(theta_k - shift)`, cutpoints `[t0, t0+cumsum(exp(...))]`).
-- `conditioners.py` — ls/cs/ci networks (widths replicate the original Keras/TF implementation).
-- `flow.py` — `CausalFlowDAG`: `fit`, `sample(n, do=, u=)`, `abduct`, `pmf`,
+- `conditioners.py` — the LS/CS/I networks (widths replicate the reference Keras implementation).
+- `flow.py` — `CausalFlowDAG`: `fit`, `fit_classical` (float64 full-batch
+  L-BFGS, exact MLE for all-`ls` specs), `sample(n, do=, u=)`, `abduct`, `pmf`,
   `log_prob`, `save/load`, `varying_coef` (VC read-out), `scores` /
   `effect_modifier_scan` (analytic per-row ∂ℓᵢ/∂θ + CUSUM modifier scan,
   `scores.py`). NLL decomposes per node → one Adam fits all nodes jointly.
-- `simulations/` — numpy-only SCM generators with known ground truth, looked up via
-  `REGISTRY`; each module has a CLI that regenerates its frozen `data/<name>/` CSVs:
+- `simulations/` — numpy-only SCM generators with known ground truth
+  (`REGISTRY` maps name → class; experiments import the classes directly);
+  each module has a CLI that regenerates its frozen `data/<name>/` CSVs:
   `magic_mrclean.py` (stroke SCM, `ls`/`nl`), `triangle.py` (paper §6 continuous +
   ordinal triangles, f variants linear/cubic/exp/atan/sin), `vaca.py` (App. C.1
   bimodal L1/L2 benchmark), `carefl.py` (App. C.2 Laplace SCM, **analytic**
-  counterfactuals).
+  counterfactuals), `vc_shift.py` (issue #28 heterogeneous-effect DGP with
+  known `beta(x)`).
 
 ## Conventions that matter (easy to get wrong)
 
@@ -78,11 +87,11 @@ Experiments default to the synthetic data (`magic-mrclean/nl`). The `magic` sour
   outside [-5,5] regardless of θ, so the ~10% of data beyond the 5%/95% pre-scaling
   range is misweighted whenever the true tail slope differs — the structural reason
   `spline` consistently trails `bernstein` (whose linear extrapolation follows the
-  boundary derivative). Demonstrated in `notebooks/transforms_tram_dag.py`.
+  boundary derivative). Demonstrated in `notebooks/stale/transforms_tram_dag.py` (parked).
 - **`fit(restore_best=False)` is the default** (keeps final converged weights = exact
   MLE; an all-`ls` model then matches statsmodels/R-polr to ~1e-3). `restore_best=True`
   = per-node best-validation restoration (early stopping). Key empirical finding:
-  **flexible (ci/cs) models overfit observational confounding at the MLE and need
+  **flexible (I/CS) models overfit observational confounding at the MLE and need
   `restore_best=True` to recover the causal effect; all-`ls` models don't.**
   `run_experiment` defaults per style. See CHANGELOG.md.
 
@@ -109,7 +118,8 @@ Experiments default to the synthetic data (`magic-mrclean/nl`). The `magic` sour
 
 ## Testing policy
 
-- Frozen CSVs in `data/` (`magic-mrclean`, `triangle*`, `vaca`, `carefl`) are a
+- Frozen CSVs in `data/` (`magic-mrclean`, `triangle*`, `vaca`, `carefl`,
+  `vc-shift`) are a
   contract — **never regenerate silently**; a new seed/equations → new folder
   (sim2-style), regenerate `ref_ls/` with R where applicable, update
   truth-dependent tests. `test_paper_dgps.py::test_frozen_csv_contract` pins the
@@ -126,7 +136,8 @@ Experiments default to the synthetic data (`magic-mrclean/nl`). The `magic` sour
 - ~~Generalize `simulations/` registry beyond the stroke DAG~~ — done for the
   TRAM-DAG paper's DGPs (triangle/triangle-mixed/vaca/carefl, June 2026). Still
   open: hidden confounding à la DeCaFlow.
-- ~~Package for PyPI~~ — published as `tramdag` 0.2.0 (June 2026); release flow:
+- ~~Package for PyPI~~ — published as `tramdag` (latest 0.3.0, June 2026);
+  release flow:
   bump `version` in pyproject (`__init__` now reads it back from the installed
   metadata, so there is only one place to edit), `uv build`, `uv publish`
   (Oliver's PyPI token), CHANGELOG section.

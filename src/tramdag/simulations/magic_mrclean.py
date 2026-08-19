@@ -40,6 +40,8 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
+from ._common import DatasetDraws, logistic, resolve_latents, sigmoid
+
 COLUMNS = ["Age", "mRS_pre", "NIHSSa", "T", "mRS_3m"]
 
 # Ordered-logit cutpoints, P(Y <= k) = sigmoid(theta_k - shift); chosen so the
@@ -47,11 +49,6 @@ COLUMNS = ["Age", "mRS_pre", "NIHSSa", "T", "mRS_3m"]
 # mRS_3m spread across all 7 levels). See data/magic-mrclean/README.md.
 CUTS_PRE = np.array([0.20, 1.15, 2.05, 3.20, 5.20])  # 6 levels (0..5)
 CUTS_Y = np.array([-1.85, -0.75, 0.05, 0.80, 1.55, 2.35])  # 7 levels (0..6)
-
-
-def _logistic(rng: np.random.Generator, size: int) -> np.ndarray:
-    """Draw the standard logistic latent, the TRAM base distribution."""
-    return rng.logistic(loc=0.0, size=size)
 
 
 def _ordinal(shift: np.ndarray, cuts: np.ndarray, u: np.ndarray) -> np.ndarray:
@@ -63,17 +60,18 @@ def _ordinal(shift: np.ndarray, cuts: np.ndarray, u: np.ndarray) -> np.ndarray:
     return (u[:, None] > (cuts[None, :] - shift[:, None])).sum(axis=1)
 
 
-def _sigmoid(x: np.ndarray) -> np.ndarray:
-    return 1.0 / (1.0 + np.exp(-x))
-
-
 @dataclass
-class MagicMrClean:
+class MagicMrClean(DatasetDraws):
     """SCM generator for the synthetic stroke cohort.
 
-    Args:
-        variant: ``"ls"`` (all linear shifts) or ``"nl"`` (mild non-linearities).
-        seed: master seed; each draw uses an independent child stream.
+    Parameters
+    ----------
+    variant : str, optional
+        ``"ls"`` (all linear shifts) or ``"nl"`` (mild non-linearities),
+        by default ``"nl"``.
+    seed : int, optional
+        Master seed, by default 7. Each draw uses an independent child
+        stream.
     """
 
     variant: str = "nl"
@@ -97,21 +95,8 @@ class MagicMrClean:
 
     # ------------------------------------------------------------------ latents
     def draw_latents(self, n: int, rng: np.random.Generator) -> dict[str, np.ndarray]:
-        """Draw the latent noise of every variable.
-
-        Parameters
-        ----------
-        n : int
-            Number of rows to draw.
-        rng : np.random.Generator
-            Random source.
-
-        Returns
-        -------
-        dict[str, np.ndarray]
-            One array of length ``n`` per variable.
-        """
-        return {k: _logistic(rng, n) for k in COLUMNS}
+        """Draw the latent noise of every variable, ``n`` rows each."""
+        return {k: logistic(rng, n) for k in COLUMNS}
 
     # --------------------------------------------------------------------- SCM
     def simulate(
@@ -126,31 +111,46 @@ class MagicMrClean:
     ) -> pd.DataFrame:
         """Forward-sample the SCM.
 
-        Args:
-            randomize_T: if True, assign T ~ Bernoulli(0.5) independently of its
-                parents (the RCT design); otherwise T follows the confounded
-                observational mechanism.
-            population: covariate population. ``"obs"`` is the full observational
-                cohort; ``"rct"`` mimics trial inclusion — a **younger** enrolled
-                population (age location shifted down). Only the ``Age`` source
-                marginal differs; all structural equations are unchanged. With the
-                heterogeneous ``nl`` treatment effect this fit-vs-eval shift is
-                what biases an all-``ls`` model (it cannot extrapolate ``tau(Age)``
-                from the older obs cohort to the younger trial). The ``ls`` DGP has
-                constant ``tau`` and is therefore unaffected.
-            do: hard interventions {node: value} (graph mutilation); the node is
-                clamped and its structural equation skipped.
-            latents: reuse a fixed latent draw (for counterfactuals / paired
-                interventions). If given, ``n`` and ``rng`` are ignored.
+        Parameters
+        ----------
+        n : int | None, optional
+            Number of rows. Required unless ``latents`` is given.
+        rng : np.random.Generator | None, optional
+            Random source. Defaults to a generator seeded with
+            ``self.seed``.
+        randomize_T : bool, optional
+            If True, assign ``T ~ Bernoulli(0.5)`` independently of its
+            parents (the RCT design). Otherwise ``T`` follows the
+            confounded observational mechanism. Default False.
+        population : str, optional
+            Covariate population, by default ``"obs"``. ``"obs"`` is the
+            full observational cohort. ``"rct"`` mimics trial inclusion —
+            a **younger** enrolled population (age location shifted down).
+            Only the ``Age`` source marginal differs; all structural
+            equations are unchanged. With the heterogeneous ``nl``
+            treatment effect this fit-vs-eval shift is what biases an
+            all-``ls`` model: it cannot extrapolate ``tau(Age)`` from the
+            older observational cohort to the younger trial. The ``ls``
+            DGP has constant ``tau`` and is therefore unaffected.
+        do : dict[str, float] | None, optional
+            Hard interventions ``{node: value}`` (graph mutilation). The
+            node is clamped and its structural equation skipped.
+        latents : dict[str, np.ndarray] | None, optional
+            Reuse a fixed latent draw, for counterfactuals and paired
+            interventions. If given, ``n`` and ``rng`` are ignored.
+
+        Returns
+        -------
+        pd.DataFrame
+            The sample, one column per variable.
+
+        Raises
+        ------
+        ValueError
+            If both ``n`` and ``latents`` are omitted.
         """
         do = do or {}
-        if latents is None:
-            if n is None:
-                raise ValueError("provide either n or latents")
-            rng = rng or np.random.default_rng(self.seed)
-            latents = self.draw_latents(n, rng)
-        else:
-            n = len(next(iter(latents.values())))
+        latents, n = resolve_latents(self, n, rng, latents)
         nl = self.nl
         age_loc = 73.0 - (9.0 if population == "rct" else 0.0)  # trial enrolls younger
 
@@ -176,7 +176,7 @@ class MagicMrClean:
         else:
             shift_nih = 0.45 * a + 0.25 * mRS_pre + nl * (0.20 * relu_a**2)
             lat_nih = shift_nih + 0.85 * latents["NIHSSa"]
-            NIHSSa = np.clip(6.0 + 36.0 * _sigmoid((lat_nih - 1.75) / 1.5), 6.0, 42.0)
+            NIHSSa = np.clip(6.0 + 36.0 * sigmoid((lat_nih - 1.75) / 1.5), 6.0, 42.0)
         s = (NIHSSa - 15.0) / 6.0  # standardized severity
 
         # --- T: thrombectomy assignment. Observational mechanism is confounded by
@@ -190,7 +190,7 @@ class MagicMrClean:
                 1.9
                 - 0.45 * np.maximum(a + 0.5, 0.0)
                 - 0.30 * np.maximum(s - 1.0, 0.0)
-                + nl * (-1.3 * _sigmoid((Age - 82.0) / 4.0))
+                + nl * (-1.3 * sigmoid((Age - 82.0) / 4.0))
             )
             T = (latents["T"] > -logit_T).astype(float)  # P(T=1) = sigmoid(logit_T)
 
@@ -199,32 +199,13 @@ class MagicMrClean:
         if "mRS_3m" in do:
             mRS_3m = np.full(n, float(do["mRS_3m"]))
         else:
-            tau = -0.85 + nl * (0.85 - 0.85 * _sigmoid((78.0 - Age) / 6.0))
+            tau = -0.85 + nl * (0.85 - 0.85 * sigmoid((78.0 - Age) / 6.0))
             zeta = 0.85 * s + 0.55 * a + 0.45 * mRS_pre + tau * T
             mRS_3m = _ordinal(zeta, CUTS_Y, latents["mRS_3m"]).astype(float)
 
         return pd.DataFrame(
             {"Age": Age, "mRS_pre": mRS_pre, "NIHSSa": NIHSSa, "T": T, "mRS_3m": mRS_3m}
         )
-
-    # ----------------------------------------------------------------- datasets
-    def observational(self, n: int, seed_offset: int = 0) -> pd.DataFrame:
-        """Draw an observational sample.
-
-        Parameters
-        ----------
-        n : int
-            Number of rows.
-        seed_offset : int, optional
-            Added to the generator seed, by default ``0``.
-
-        Returns
-        -------
-        pd.DataFrame
-            The sample.
-        """
-        rng = np.random.default_rng(self.seed + 1 + seed_offset)
-        return self.simulate(n, rng=rng)
 
     def rct(self, n: int, seed_offset: int = 0) -> pd.DataFrame:
         """Draw a randomized-trial sample.
@@ -247,17 +228,93 @@ class MagicMrClean:
         rng = np.random.default_rng(self.seed + 1001 + seed_offset)
         return self.simulate(n, rng=rng, randomize_T=True, population="rct")
 
+    # ---------------------------------------------------------------- the model
+    def spec(self, style: str = "ls") -> dict:
+        """Give the DAG spec for fitting this cohort.
+
+        ``style="ls"`` makes every edge a linear shift, so each
+        node-conditional is a classical transformation model and the flow,
+        ``statsmodels`` and R ``polr`` coincide. ``style="flexible"`` is the
+        paper's nihss6 configuration: Age enters the intercept, NIHSSa
+        through a complex shift, the rest linearly.
+
+        The spec is part of this DGP's ground truth — it says which model
+        family the data came from — which is why it lives next to
+        :meth:`true_ate` rather than in each caller. It moves out with the
+        whole ``simulations`` package (see the package docstring). The term constructors
+        are imported here rather than at module scope so the module keeps
+        its numpy-only import surface.
+
+        Parameters
+        ----------
+        style : str, optional
+            ``"ls"`` (default) or ``"flexible"``.
+
+        Returns
+        -------
+        dict
+            The node specification, keyed by node name.
+
+        Raises
+        ------
+        ValueError
+            If ``style`` is neither of the two.
+        """
+        from ..spec import CS, LS, ContinuousNode, I, OrdinalNode
+
+        if style == "flexible":
+            t = {"Age": I, "mRS_pre": LS, "NIHSSa": CS, "T": LS}
+        elif style == "ls":
+            t = dict.fromkeys(("Age", "mRS_pre", "NIHSSa", "T"), LS)
+        else:
+            raise ValueError(f"unknown style '{style}'")
+        return {
+            "Age": ContinuousNode(),
+            "mRS_pre": OrdinalNode(6, [t["Age"]("Age")]),
+            "NIHSSa": ContinuousNode(
+                [t["Age"]("Age"), t["mRS_pre"]("mRS_pre")],
+            ),
+            "T": OrdinalNode(
+                2,
+                [
+                    t["Age"]("Age"),
+                    t["mRS_pre"]("mRS_pre"),
+                    t["NIHSSa"]("NIHSSa"),
+                ],
+            ),
+            "mRS_3m": OrdinalNode(
+                7,
+                [
+                    t["Age"]("Age"),
+                    t["mRS_pre"]("mRS_pre"),
+                    t["NIHSSa"]("NIHSSa"),
+                    t["T"]("T"),
+                ],
+            ),
+        }
+
     # -------------------------------------------------------------- ground truth
     def true_ate(self, n: int = 500_000, on: str = "rct") -> dict:
         """Estimate the true ATE of T on ``P(mRS_3m <= 2)`` by Monte Carlo.
 
-        Both arms use the same latent draw, so the result is the do-effect and
-        carries none of the confounding in T.
+        Both arms use the same latent draw, so the result is the do-effect
+        and carries none of the confounding in T.
 
-        ``on`` selects the covariate population the ATE is averaged over:
-        ``"rct"`` (default) mirrors the **younger trial** population that
-        :meth:`rct` enrols and that ``evaluate_rct`` scores on; ``"obs"`` the
-        observational cohort.
+        Parameters
+        ----------
+        n : int, optional
+            Monte Carlo sample size, by default 500_000.
+        on : str, optional
+            Covariate population the ATE is averaged over, by default
+            ``"rct"``. ``"rct"`` mirrors the **younger trial** population
+            that :meth:`rct` enrolls. ``"obs"`` is the observational
+            cohort.
+
+        Returns
+        -------
+        dict
+            ``p_good_do_T0``, ``p_good_do_T1``, ``ate_population``,
+            ``true_ate``, the confounded ``naive_obs_diff``, and ``mc_n``.
         """
         rng = np.random.default_rng(self.seed + 9001)
         latents = self.draw_latents(n, rng)
@@ -278,21 +335,6 @@ class MagicMrClean:
             "naive_obs_diff": naive,
             "mc_n": n,
         }
-
-    def counterfactual_pair(
-        self, n: int, do: dict[str, float], seed_offset: int = 0
-    ) -> tuple[pd.DataFrame, pd.DataFrame]:
-        """Draw a factual sample and its counterfactual under ``do``.
-
-        Both share the same latents, so the pair gives true individual
-        counterfactuals. Real data cannot supply these. Use them to score the
-        abduction of the flow.
-        """
-        rng = np.random.default_rng(self.seed + 2 + seed_offset)
-        latents = self.draw_latents(n, rng)
-        factual = self.simulate(latents=latents)
-        cf = self.simulate(latents=latents, do=do)
-        return factual, cf
 
 
 # --------------------------------------------------------------------------- CLI
@@ -332,17 +374,7 @@ def _write_variant(
 
 
 def main(argv: list[str] | None = None) -> None:
-    """Regenerate the frozen CSV files of this data-generating process.
-
-    Parameters
-    ----------
-    argv : list[str] | None, optional
-        Command-line arguments, by default ``None`` (``sys.argv``).
-
-    Returns
-    -------
-    None
-    """
+    """Regenerate the frozen CSV files of this data-generating process."""
     p = argparse.ArgumentParser(
         description="Generate the magic-mrclean synthetic cohort."
     )

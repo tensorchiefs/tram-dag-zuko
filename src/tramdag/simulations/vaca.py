@@ -30,30 +30,19 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
+from ._common import DatasetDraws, resolve_latents
+
 DO_X2_VALUES = (-3.0, -1.0, 0.0)  # the paper's Fig. 5 interventions
 
 
 @dataclass
-class VacaTriangle:
+class VacaTriangle(DatasetDraws):
     """SCM generator for the VACA bimodal triangle."""
 
     seed: int = 42
 
     def draw_latents(self, n: int, rng: np.random.Generator) -> dict[str, np.ndarray]:
-        """Draw the latent noise of every variable.
-
-        Parameters
-        ----------
-        n : int
-            Number of rows to draw.
-        rng : np.random.Generator
-            Random source.
-
-        Returns
-        -------
-        dict[str, np.ndarray]
-            One array of length ``n`` per variable.
-        """
+        """Draw the latent noise of every variable, ``n`` rows each."""
         return {
             "x1_mix": rng.uniform(size=n),
             "x1_a": rng.normal(size=n),  # N(-2, sqrt(1.5)) branch
@@ -89,12 +78,7 @@ class VacaTriangle:
             One column per variable.
         """
         do = do or {}
-        if latents is None:
-            if n is None:
-                raise ValueError("provide either n or latents")
-            rng = rng or np.random.default_rng(self.seed)
-            latents = self.draw_latents(n, rng)
-        n = len(latents["x2"])
+        latents, n = resolve_latents(self, n, rng, latents)
 
         if "x1" in do:
             x1 = np.full(n, float(do["x1"]))
@@ -112,54 +96,25 @@ class VacaTriangle:
         )
         return pd.DataFrame({"x1": x1, "x2": x2, "x3": x3})
 
-    # ----------------------------------------------------------------- datasets
-    def observational(self, n: int, seed_offset: int = 0) -> pd.DataFrame:
-        """Draw an observational sample.
-
-        Parameters
-        ----------
-        n : int
-            Number of rows.
-        seed_offset : int, optional
-            Added to the generator seed, by default ``0``.
-
-        Returns
-        -------
-        pd.DataFrame
-            The sample.
-        """
-        rng = np.random.default_rng(self.seed + 1 + seed_offset)
-        return self.simulate(n, rng=rng)
-
-    def interventional(
-        self, n: int, do: dict[str, float], seed_offset: int = 0
-    ) -> pd.DataFrame:
-        """Draw a sample under an intervention.
-
-        Parameters
-        ----------
-        n : int
-            Number of rows.
-        do : dict[str, float]
-            Variables to hold at a fixed value.
-        seed_offset : int, optional
-            Added to the generator seed, by default ``0``.
-
-        Returns
-        -------
-        pd.DataFrame
-            The sample.
-        """
-        rng = np.random.default_rng(self.seed + 501 + seed_offset)
-        return self.simulate(n, rng=rng, do=do)
-
     # -------------------------------------------------------------- ground truth
     def true_moments(self, mc_n: int = 1_000_000) -> dict:
-        """Observational moments + the analytic moments of x3 under do(x2 = a).
+        """Give the observational and interventional ground-truth moments.
 
-        Under do(x2=a): x3 = x1 + 0.25 a + N(0,1), so E = E[x1] + 0.25 a and
-        Var = Var[x1] + 1 — exact, but MC values are stored too (same estimator
-        a test would use).
+        Under ``do(x2=a)``: ``x3 = x1 + 0.25 a + N(0,1)``, so
+        ``E = E[x1] + 0.25 a`` and ``Var = Var[x1] + 1``. These are exact.
+        Monte Carlo values for the observational moments are stored too,
+        with the same estimator a test uses.
+
+        Parameters
+        ----------
+        mc_n : int, optional
+            Monte Carlo sample size, by default 1_000_000.
+
+        Returns
+        -------
+        dict
+            ``mc_n``, the observational ``obs_mean`` and ``obs_std`` per
+            column, and the analytic x3 moments per ``do(x2)`` value.
         """
         mu1 = 0.5 * (-2.0) + 0.5 * 1.5
         var1 = 0.5 * (1.5 + (-2.0 - mu1) ** 2) + 0.5 * (1.0 + (1.5 - mu1) ** 2)
@@ -180,17 +135,7 @@ class VacaTriangle:
 
 # --------------------------------------------------------------------------- CLI
 def main(argv: list[str] | None = None) -> None:
-    """Regenerate the frozen CSV files of this data-generating process.
-
-    Parameters
-    ----------
-    argv : list[str] | None, optional
-        Command-line arguments, by default ``None`` (``sys.argv``).
-
-    Returns
-    -------
-    None
-    """
+    """Regenerate the frozen CSV files of this data-generating process."""
     p = argparse.ArgumentParser(description="Generate the VACA benchmark data.")
     p.add_argument("--out", type=Path, default=Path("data/vaca"))
     p.add_argument("--seed", type=int, default=42)

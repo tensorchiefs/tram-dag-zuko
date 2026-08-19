@@ -39,9 +39,8 @@ from .transforms import _bounds
 
 __all__ = ["node_scores", "effect_modifier_scan", "sup_bb_pvalue"]
 
-# 5% / 1% critical values of sup |Brownian bridge| (Kolmogorov distribution)
+# 5% critical value of sup |Brownian bridge| (Kolmogorov distribution)
 CRIT_5PCT = 1.3581
-CRIT_1PCT = 1.6276
 
 
 def _dl_ds(
@@ -64,20 +63,40 @@ def _dl_ds(
 def node_scores(flow, df: pd.DataFrame, node: str) -> pd.DataFrame:
     """Compute the per-observation scores of the interpretable coefficients.
 
-    The result has shape ``(n, k)`` and covers every ``LS`` weight and the
-    ``beta0`` of every ``VC`` term.
+    The scores cover every ``LS`` weight and the ``beta0`` of every ``VC``
+    term. ``CS`` terms carry no interpretable coefficient, so this function
+    skips them.
 
-    One column comes from each coefficient. A continuous ``LS`` parent gives one
-    column, named after the parent. An ordinal ``LS`` parent gives one column
-    per one-hot level, named ``"{parent}[{k}]"``. A ``VC`` term gives one column
-    named after its treatment, which holds the ``beta0`` score. For a binary
-    ordinal treatment that score belongs to the identified contrast of level 1
-    against level 0. ``CS`` terms carry no interpretable coefficient, so this
-    function skips them.
+    Parameters
+    ----------
+    flow : CausalFlowDAG
+        The fitted flow.
+    df : pd.DataFrame
+        Observations. Must contain the node, its parents, and the
+        propensity inputs of centered VC terms.
+    node : str
+        Name of the node whose coefficients are scored.
+
+    Returns
+    -------
+    pd.DataFrame
+        One column per coefficient, shape ``(n, k)``, indexed like ``df``.
+        A continuous ``LS`` parent gives one column, named after the
+        parent. An ordinal ``LS`` parent gives one column per one-hot
+        level, named ``"{parent}[{k}]"``. A ``VC`` term gives one column
+        named after its treatment, which holds the ``beta0`` score. For a
+        binary ordinal treatment that score belongs to the identified
+        contrast of level 1 against level 0.
+
+    Raises
+    ------
+    KeyError
+        If ``node`` is unknown, or if a needed column is missing from
+        ``df``.
+    ValueError
+        If the node has no ``LS`` or ``VC`` term.
     """
-    if node not in flow.nodes:
-        raise KeyError(f"unknown node {node!r}")
-    nd = flow.nodes[node]
+    nd = flow._node(node)
     ls_groups = [
         (key, ps)
         for key, ps in nd._shift_groups
@@ -89,19 +108,12 @@ def node_scores(flow, df: pd.DataFrame, node: str) -> pd.DataFrame:
             "at least one interpretable shift coefficient."
         )
 
-    needed = (
-        list(nd.parents)
-        + [node]  # scores are NOT y-free: l_i needs x
-        + flow._vc_ehat_columns(nd)
-    )  # + e_hat inputs of centered terms
+    # not y-free: l_i needs x. Plus the e_hat inputs of centered terms.
+    needed = [*nd.parents, node, *flow._vc_ehat_columns(nd)]
     missing = [c for c in needed if c not in df.columns]
     if missing:
         raise KeyError(f"data is missing column(s): {missing}")
-    np_dtype = np.float64 if flow._dtype == torch.float64 else np.float32
-    values = {
-        c: torch.as_tensor(df[c].to_numpy(dtype=np_dtype), device=flow.device)
-        for c in needed
-    }
+    values = flow._tensorize(df, needed)
     feats = flow._features({p: values[p] for p in nd.parents})
     ehat = flow._vc_ehat_live(nd, values, len(df))
     dlds = _dl_ds(nd, feats, values[node], len(df), vc_ehat=ehat)
@@ -115,11 +127,8 @@ def node_scores(flow, df: pd.DataFrame, node: str) -> pd.DataFrame:
         if len(ps) == 1 and isinstance(flow.spec[ps[0]], OrdinalNode):
             for k in range(psi.shape[1]):
                 cols[f"{ps[0]}[{k}]"] = psi[:, k]
-        elif psi.shape[1] == 1:
+        else:  # LS is single-parent, so a non-ordinal parent is one column
             cols[key] = psi[:, 0]
-        else:  # joint LS cannot occur (LS is
-            for k in range(psi.shape[1]):  # single-parent); keep generic
-                cols[f"{key}[{k}]"] = psi[:, k]
     for g in nd._vc_groups:
         t = feats[g.on][:, -1:] if g.on_is_ord else feats[g.on]
         if g.center:  # d s / d beta0 = t - e_hat(x)
@@ -129,7 +138,20 @@ def node_scores(flow, df: pd.DataFrame, node: str) -> pd.DataFrame:
 
 
 def sup_bb_pvalue(stat: float, terms: int = 100) -> float:
-    """P(sup |Brownian bridge| > stat) — the Kolmogorov series."""
+    """Give ``P(sup |Brownian bridge| > stat)``, the Kolmogorov series.
+
+    Parameters
+    ----------
+    stat : float
+        Observed supremum statistic.
+    terms : int, optional
+        Number of series terms, by default 100.
+
+    Returns
+    -------
+    float
+        The p-value, clipped to [0, 1].
+    """
     if stat <= 0:
         return 1.0
     s = sum(
@@ -140,37 +162,61 @@ def sup_bb_pvalue(stat: float, terms: int = 100) -> float:
 
 
 def effect_modifier_scan(
-    flow, df: pd.DataFrame, node: str, on: str, candidates: list[str] | None = None
+    flow, df: pd.DataFrame, node: str, t: str, candidates: list[str] | None = None
 ) -> pd.DataFrame:
-    """Zeileis–Hornik fluctuation scan of the ``on``-coefficient scores.
+    """Scan the ``t``-coefficient scores for effect-modifier drift.
 
-    For each candidate covariate ``c``: order the per-observation scores of the
-    treatment coefficient by ``c`` and form the scaled cumulative-sum process
+    For each candidate covariate ``c``, the scan orders the
+    per-observation scores of the treatment coefficient by ``c`` and forms
+    the scaled cumulative-sum process
     ``B_j = sum_{i<=j} psi_(i) / (sd(psi) * sqrt(n))``. Under parameter
-    stability ``B`` converges to a Brownian bridge, so ``sup_j |B_j|`` has the
-    Kolmogorov distribution (5% critical value 1.3581); a systematic drift —
-    the true effect varying with ``c`` — inflates it. Covariates flagged here
-    are the measured candidates for ``VC`` modifiers.
+    stability ``B`` converges to a Brownian bridge, so ``sup_j |B_j|`` has
+    the Kolmogorov distribution (5% critical value 1.3581). A systematic
+    drift — the true effect varying with ``c`` — inflates it. Covariates
+    flagged here are the measured candidates for ``VC`` modifiers
+    (Zeileis-Hornik fluctuation test).
 
-    ``on`` names the treatment: its scores column is ``on`` itself for a
-    continuous parent or a VC term, the identified level-1 column ``"{on}[1]"``
-    for a binary ordinal LS parent. ``candidates`` defaults to every column of
-    ``df`` except ``node`` and ``on``. For heavily tied (few-level) candidates
-    the ordering is only partial — read the scan as a ranking diagnostic, not
-    an exact-size test.
+    For heavily tied (few-level) candidates the ordering is only partial.
+    Read the scan as a ranking diagnostic, not as an exact-size test.
 
-    Returns a DataFrame indexed by candidate, sorted by ``stat`` descending,
-    with columns ``stat``, ``p_value``, ``crit_5pct`` and ``flag``
-    (``stat > crit_5pct``).
+    Parameters
+    ----------
+    flow : CausalFlowDAG
+        The fitted flow.
+    df : pd.DataFrame
+        Observations, as for :func:`node_scores`.
+    node : str
+        Name of the outcome node.
+    t : str
+        Name of the treatment. Its scores column is ``t`` itself for a
+        continuous parent or a VC term, and the identified level-1 column
+        ``"{t}[1]"`` for a binary ordinal LS parent.
+    candidates : list[str] | None, optional
+        Candidate covariates. Defaults to every column of ``df`` except
+        ``node`` and ``t``.
+
+    Returns
+    -------
+    pd.DataFrame
+        Indexed by candidate, sorted by ``stat`` descending, with columns
+        ``stat``, ``p_value``, ``crit_5pct`` and ``flag``
+        (``stat > crit_5pct``).
+
+    Raises
+    ------
+    KeyError
+        If no score column exists for ``t`` on ``node``.
+    ValueError
+        If the score column is constant.
     """
     psi_df = node_scores(flow, df, node)
-    if on in psi_df.columns:
-        col = on
-    elif f"{on}[1]" in psi_df.columns and f"{on}[2]" not in psi_df.columns:
-        col = f"{on}[1]"  # binary ordinal LS: the contrast
+    if t in psi_df.columns:
+        col = t
+    elif f"{t}[1]" in psi_df.columns and f"{t}[2]" not in psi_df.columns:
+        col = f"{t}[1]"  # binary ordinal LS: the contrast
     else:
         raise KeyError(
-            f"no score column for treatment {on!r} on node {node!r} "
+            f"no score column for treatment {t!r} on node {node!r} "
             f"(have {list(psi_df.columns)})."
         )
     psi = psi_df[col].to_numpy()
@@ -180,7 +226,7 @@ def effect_modifier_scan(
         raise ValueError(f"score column {col!r} is constant. There is nothing to scan.")
 
     if candidates is None:
-        candidates = [c for c in df.columns if c not in (node, on)]
+        candidates = [c for c in df.columns if c not in (node, t)]
     rows = {}
     for c in candidates:
         order = np.argsort(df[c].to_numpy(), kind="stable")

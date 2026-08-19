@@ -13,7 +13,7 @@ stopping — identical work on every machine), on every available device
 Usage on any machine (no repo clone needed)::
 
     pip install tramdag                    # torch comes as a dependency
-    curl -O https://raw.githubusercontent.com/tensorchiefs/tramdag/main/experiments/perf_machine.py
+    curl -O https://raw.githubusercontent.com/tensorchiefs/tramdag/main/experiments/stale/perf_machine.py
     python perf_machine.py                 # -> <YYYY-MM-DD-HHMM>_<host>.json + summary
     python perf_machine.py --devices cpu   # restrict devices
 
@@ -199,7 +199,7 @@ def report(directory: str) -> None:
     md = Path(directory) / "REPORT.md"
     md.write_text(
         "# tramdag cross-machine benchmark\n\n"
-        f"Fixed {EPOCHS}-epoch workloads (see `experiments/perf_machine.py`); "
+        f"Fixed {EPOCHS}-epoch workloads (see `experiments/stale/perf_machine.py`); "
         "`final_val_nll` must agree across machines (same seed & data).\n\n"
         + "\n".join(lines)
         + "\n\n"
@@ -208,14 +208,14 @@ def report(directory: str) -> None:
         "# on the new machine (no repo clone needed; GPU optional)\n"
         "pip install tramdag\n"
         "curl -O https://raw.githubusercontent.com/tensorchiefs/tramdag/main/"
-        "experiments/perf_machine.py\n"
+        "experiments/stale/perf_machine.py\n"
         "python perf_machine.py            "
         "# ~2-5 min -> <YYYY-MM-DD-HHMM>_<host>.json\n"
         "```\n\n"
         "Then copy the JSON into `docs/perf/` in the repo, commit it, and\n"
         "regenerate this file (or ask Claude to do it):\n\n"
         "```bash\n"
-        "python experiments/perf_machine.py --report docs/perf\n"
+        "python experiments/stale/perf_machine.py --report docs/perf\n"
         "```\n\n"
         "Sanity check before committing: the new row's `final_val_nll` should\n"
         "match the existing rows to ~1e-3 — same seed and data everywhere.\n"

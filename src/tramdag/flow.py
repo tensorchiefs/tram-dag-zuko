@@ -15,6 +15,7 @@ Causal queries:
 from __future__ import annotations
 
 import copy
+import logging
 import time
 from pathlib import Path
 from typing import NamedTuple
@@ -34,6 +35,7 @@ from .conditioners import (
 from .spec import (
     LS,
     ContinuousNode,
+    I,
     NodeSpec,
     OrdinalNode,
     node_parents,
@@ -53,24 +55,50 @@ from .transforms import (
 
 __all__ = ["CausalFlowDAG"]
 
+logger = logging.getLogger(__name__)
+
 
 class _VCGroup(NamedTuple):
-    """One VC term of a node.
+    """Bookkeeping for one VC term of a node.
 
-    The fields hold the treatment name, the modifier names, and whether the
-    treatment is binary ordinal. ``center`` is ``False``, ``True``, or the name
-    of a column in the training DataFrame. ``folds`` is the out-of-fold count.
+    Attributes
+    ----------
+    on : str
+        Name of the treatment node. The VC term owns this edge.
+    mods : tuple[str, ...]
+        Names of the effect-modifier nodes. Empty for a constant effect.
+    on_is_ord : bool
+        ``True`` when the treatment is a binary ordinal node. The raw
+        treatment column is then the level-1 one-hot indicator.
+    center : bool
+        ``True`` centers the regressor with out-of-fold propensities from
+        refits of the treatment node.
+    folds : int
+        Number of folds for those refits.
     """
 
     on: str
     mods: tuple[str, ...]
     on_is_ord: bool
-    center: bool | str
+    center: bool
     folds: int
 
 
 class _Node(nn.Module):
-    """One dimension of the flow: intercept (transform params) + additive shifts."""
+    """One dimension of the flow: an intercept plus additive shift terms.
+
+    The intercept produces the transform parameters ``theta``. The shift
+    terms add up on the latent scale.
+
+    Parameters
+    ----------
+    name : str
+        Name of the node.
+    node : NodeSpec
+        Specification of the node.
+    spec : dict[str, NodeSpec]
+        The full DAG specification. Needed for the parent feature widths.
+    """
 
     def __init__(self, name: str, node: NodeSpec, spec: dict[str, NodeSpec]):
         super().__init__()
@@ -78,7 +106,14 @@ class _Node(nn.Module):
         self.kind = node.kind
         terms = node_terms(node)
         self.parents = tuple(node_parents(node))  # ordered parent names
-        i_groups = [tuple(t.parents) for t in terms if t.effect == "I" and t.parents]
+        i_term = next((t for t in terms if t.effect == "I" and t.parents), None)
+        if i_term is None:
+            i_groups, i_units = [], []
+        elif i_term.allow_interaction:
+            i_groups, i_units = [tuple(i_term.parents)], [i_term.units]
+        else:  # additive intercept: one net per parent, coefficients summed
+            i_groups = [(p,) for p in i_term.parents]
+            i_units = [i_term.units] * len(i_groups)
         self._intercept_groups = i_groups
         self.ci_parents = [
             p for grp in i_groups for p in grp
@@ -106,14 +141,14 @@ class _Node(nn.Module):
             self.intercept_nets = None
         elif len(i_groups) == 1:
             self.intercept = ComplexIntercept(
-                sum(width(p) for p in i_groups[0]), n_params
+                sum(width(p) for p in i_groups[0]), n_params, units=i_units[0]
             )
             self.intercept_nets = None
         else:
             self.intercept = None
             self.intercept_nets = nn.ModuleList(
-                ComplexIntercept(sum(width(p) for p in grp), n_params)
-                for grp in i_groups
+                ComplexIntercept(sum(width(p) for p in grp), n_params, units=u)
+                for grp, u in zip(i_groups, i_units, strict=True)
             )
 
         # shift terms: one network per term, over the term's (possibly joint)
@@ -129,7 +164,9 @@ class _Node(nn.Module):
             if term.effect == "VC":
                 on, mods = term.parents[0], tuple(term.parents[1:])
                 self.shifts[on] = VaryingCoef(
-                    sum(width(p) for p in mods), penalty=term.penalty
+                    sum(width(p) for p in mods),
+                    penalty=term.penalty,
+                    units=term.units,
                 )
                 self._vc_groups.append(
                     _VCGroup(
@@ -149,23 +186,44 @@ class _Node(nn.Module):
             self.shifts[key] = (
                 LinearShift(feat_width)
                 if term.effect == "LS"
-                else ComplexShift(feat_width)
+                else ComplexShift(feat_width, units=term.units)
             )
             self._shift_groups.append((key, ps))
 
     def theta_shift(
         self, feats: dict[str, Tensor], n: int, vc_ehat: dict[str, Tensor] | None = None
     ) -> tuple[Tensor, Tensor]:
-        """Transform parameters (n, P) and total shift (n,) from parent features.
+        """Compute the transform parameters and the total shift of the node.
 
-        ``vc_ehat`` supplies the propensity ``e_hat(pa_on)`` per centered VC
-        treatment (required whenever a term has ``center``): training passes the
-        frozen out-of-fold values, inference paths the live full-fit ones.
+        Parameters
+        ----------
+        feats : dict[str, Tensor]
+            Encoded parent features, keyed by parent name.
+        n : int
+            Batch size.
+        vc_ehat : dict[str, Tensor] | None, optional
+            Propensity ``e_hat(pa_on)`` per centered VC treatment, keyed by
+            treatment name. Required whenever a term has ``center``.
+            Training passes the frozen out-of-fold values. Inference passes
+            the live full-fit values.
+
+        Returns
+        -------
+        tuple[Tensor, Tensor]
+            The transform parameters, shape ``(n, P)``, and the total
+            shift, shape ``(n,)``.
+
+        Raises
+        ------
+        RuntimeError
+            If a centered VC term is evaluated without its propensity.
         """
         if self.intercept_nets is not None:  # additive complex intercept
             theta = sum(
                 net(torch.cat([feats[p] for p in grp], dim=1))
-                for net, grp in zip(self.intercept_nets, self._intercept_groups)
+                for net, grp in zip(
+                    self.intercept_nets, self._intercept_groups, strict=True
+                )
             )
         elif self.ci_parents:  # single or joint complex intercept
             theta = self.intercept(
@@ -199,20 +257,25 @@ class _Node(nn.Module):
 
 
 class CausalFlowDAG(nn.Module):
-    """A causal normalizing flow defined by ``spec = {name: NodeSpec}``."""
+    """A causal normalizing flow defined by a DAG specification.
+
+    Parameters
+    ----------
+    spec : dict[str, NodeSpec]
+        The DAG specification, ``{name: ContinuousNode | OrdinalNode}``.
+    device : str, optional
+        Torch device, by default ``"cpu"``.
+    seed : int | None, optional
+        If given, seeds the weight initialization deterministically
+        (``torch.manual_seed`` runs before the nodes are built). Weight
+        initialization happens at construction, so this is the one knob
+        for a reproducible model. ``fit(seed=...)`` only seeds the
+        minibatch shuffling.
+    """
 
     def __init__(
         self, spec: dict[str, NodeSpec], device: str = "cpu", seed: int | None = None
     ):
-        """Build the flow from ``spec``.
-
-        Args:
-            seed: if given, seeds weight initialisation deterministically
-                (``torch.manual_seed`` is called before the nodes are
-                constructed). Because init happens here, this is the single
-                obvious knob for a reproducible model — ``fit(seed=...)`` only
-                controls minibatch shuffling.
-        """
         super().__init__()
         if seed is not None:
             torch.manual_seed(seed)
@@ -247,15 +310,29 @@ class CausalFlowDAG(nn.Module):
         """Current model dtype (float32 normally; float64 inside fit_classical)."""
         return next(self.parameters()).dtype
 
-    def _tensorize(self, df: pd.DataFrame) -> dict[str, Tensor]:
-        np_dtype = np.float64 if self._dtype == torch.float64 else np.float32
-        out = {}
-        for name in self.order:
-            vals = torch.as_tensor(
-                df[name].to_numpy(dtype=np_dtype), device=self.device
-            )
-            out[name] = vals
-        return out
+    @property
+    def _np_dtype(self) -> type:
+        """Numpy dtype that matches the current model dtype."""
+        return np.float64 if self._dtype == torch.float64 else np.float32
+
+    def _tensorize(
+        self, df: pd.DataFrame, cols: list[str] | tuple[str, ...] | None = None
+    ) -> dict[str, Tensor]:
+        """DataFrame columns -> one ``(n,)`` tensor each, in the model dtype.
+
+        ``cols=None`` takes every node, in topological order.
+        """
+        dtype = self._np_dtype
+        return {
+            c: torch.as_tensor(df[c].to_numpy(dtype=dtype), device=self.device)
+            for c in (self.order if cols is None else cols)
+        }
+
+    def _node(self, name: str) -> _Node:
+        """Look a node up by name, with the same error everywhere."""
+        if name not in self.nodes:
+            raise KeyError(f"unknown node {name!r}")
+        return self.nodes[name]
 
     def _features(self, values: dict[str, Tensor]) -> dict[str, Tensor]:
         return {name: self._encode_parent(name, vals) for name, vals in values.items()}
@@ -283,9 +360,9 @@ class CausalFlowDAG(nn.Module):
                 continue
             on_nd = self.nodes[g.on]
             feats = self._features({p: values[p] for p in on_nd.parents})
-            theta, shift = on_nd.theta_shift(
-                feats, n, vc_ehat=self._vc_ehat_live(on_nd, values, n)
-            )
+            # chained centering is refused at fit time, so the treatment node
+            # itself never has a centered term and needs no e_hat of its own
+            theta, shift = on_nd.theta_shift(feats, n)
             # binary ordinal on: P(on <= 0) = sigmoid(theta_0 - s),
             # so e = sigmoid(s - theta_0)
             out[g.on] = torch.sigmoid(shift - theta[:, 0]).detach()
@@ -294,15 +371,11 @@ class CausalFlowDAG(nn.Module):
     def _vc_ehat_columns(self, nd: _Node) -> list[str]:
         """List the extra columns needed for the centered VC terms of ``nd``.
 
-        These are the columns beyond ``nd.parents``, namely the parents of the
-        treatment nodes, found recursively.
+        These are the columns beyond ``nd.parents``: the parents of the
+        treatment nodes (which cannot be centered themselves, so one level
+        is all there is).
         """
-        cols: list[str] = []
-        for g in nd._vc_groups:
-            if not g.center:
-                continue
-            on_nd = self.nodes[g.on]
-            cols += [p for p in on_nd.parents] + self._vc_ehat_columns(on_nd)
+        cols = [p for g in nd._vc_groups if g.center for p in self.nodes[g.on].parents]
         return [c for c in dict.fromkeys(cols) if c not in nd.parents]
 
     # ------------------------------------------------------------- likelihood
@@ -312,14 +385,27 @@ class CausalFlowDAG(nn.Module):
         nodes: list[str] | None = None,
         vc_ehat: dict[str, dict[str, Tensor]] | None = None,
     ) -> dict[str, Tensor]:
-        """Per-node log-likelihood contributions, each (n,).
+        """Compute the per-node log-likelihood contributions.
 
-        ``nodes`` restricts computation to a subset (used to skip frozen nodes
-        during training — valid because the per-node losses are independent).
-        ``vc_ehat`` ({node: {on: e_hat}}) overrides the propensity used by
-        centered VC terms — ``fit`` passes the frozen **out-of-fold** values for
-        the training rows; when omitted, the live full-fit propensity is
-        recomputed from the flow's own treatment node.
+        Parameters
+        ----------
+        values : dict[str, Tensor]
+            Raw node values, keyed by node name, each shape ``(n,)``.
+        nodes : list[str] | None, optional
+            Restrict the computation to these nodes. ``fit`` uses this to
+            skip frozen nodes. That is valid because the per-node losses
+            are independent. ``None`` (default) computes every node.
+        vc_ehat : dict[str, dict[str, Tensor]] | None, optional
+            Propensity override for centered VC terms, as
+            ``{node: {on: e_hat}}``. ``fit`` passes the frozen
+            **out-of-fold** values for the training rows. When omitted,
+            the live full-fit propensity is recomputed from the flow's
+            own treatment node.
+
+        Returns
+        -------
+        dict[str, Tensor]
+            One log-likelihood tensor per node, each shape ``(n,)``.
         """
         feats = self._features(values)
         n = next(iter(values.values())).shape[0]
@@ -342,12 +428,34 @@ class CausalFlowDAG(nn.Module):
         return out
 
     def log_prob(self, df: pd.DataFrame) -> Tensor:
-        """Joint log-likelihood log p(x) per row, shape (n,)."""
+        """Compute the joint log-likelihood per row.
+
+        Parameters
+        ----------
+        df : pd.DataFrame
+            Observations, one column per node.
+
+        Returns
+        -------
+        Tensor
+            ``log p(x)`` per row, shape ``(n,)``.
+        """
         per_node = self.node_log_prob(self._tensorize(df))
         return torch.stack(list(per_node.values()), dim=0).sum(dim=0)
 
     def nll(self, df: pd.DataFrame) -> dict[str, float]:
-        """Mean negative log-likelihood per node (diagnostic)."""
+        """Compute the mean negative log-likelihood per node (a diagnostic).
+
+        Parameters
+        ----------
+        df : pd.DataFrame
+            Observations, one column per node.
+
+        Returns
+        -------
+        dict[str, float]
+            The mean NLL, keyed by node name.
+        """
         with torch.no_grad():
             per_node = self.node_log_prob(self._tensorize(df))
         return {k: float(-v.mean()) for k, v in per_node.items()}
@@ -407,73 +515,134 @@ class CausalFlowDAG(nn.Module):
         min_delta: float = 1e-4,
         marginal_init: bool = False,
         vc_warm_start: bool = True,
+        plateau_factor: float = 0.3,
+        vc_oof_fit: dict | None = None,
     ) -> CausalFlowDAG:
-        """Jointly fit all nodes by maximum likelihood.
+        """Fit all nodes jointly by maximum likelihood.
 
-        By default training keeps the **final** (converged) weights, so an
-        all-``ls`` model trained to convergence reproduces the classical maximum
-        likelihood estimate exactly (e.g. matches ``statsmodels``/``polr``).
+        By default training keeps the **final** (converged) weights. An
+        all-``ls`` model trained to convergence then reproduces the classical
+        maximum-likelihood estimate exactly, and matches ``statsmodels`` and
+        R ``polr``.
 
-        The optimizer holds one parameter group per node. Because the joint NLL
-        decomposes per node with independent gradients, per-node learning rates
-        and freezing are exactly equivalent to independent per-node training.
+        The optimizer holds one parameter group per node. The joint NLL
+        decomposes per node with independent gradients. Per-node learning
+        rates and freezing are therefore exactly equivalent to independent
+        per-node training.
 
-        Args:
-            val_df: optional held-out set, used only for monitoring (and for
-                ``restore_best``, ``schedule="plateau"`` and ``freeze_patience``).
-                If omitted, the training set is used for the validation metric.
-            restore_best: if True, snapshot each node's best-validation weights
-                during training and restore them at the end. This is a mild
-                early-stopping regularization and the convention of the original
-                implementation. The fit is then *not* the training-data MLE, so
-                leave it False for an exact classical comparison. Default False.
-            schedule: learning-rate schedule. ``None`` = constant (the classic
-                behavior); ``"onecycle"`` = ``OneCycleLR`` (warmup to
-                ``learning_rate``, then anneal; stepped per batch);
-                ``"cosine"`` = ``CosineAnnealingLR`` over ``epochs``;
-                ``"plateau"`` = **per-node** decay: a node's lr is multiplied by
-                0.3 whenever its own validation NLL hasn't improved by
-                ``min_delta`` for ``plateau_patience`` epochs (floor 1e-3 ×
-                ``learning_rate``).
-            freeze_patience: if set, a node whose validation NLL hasn't improved
-                by ``min_delta`` for this many epochs is **frozen** — excluded
-                from the loss and backward pass (a real compute saving, since
-                per-node losses are independent). When every node is frozen the
-                fit returns early. Freeze epochs are recorded in
-                ``history["frozen"]``.
-            marginal_init: if True, calibrate each *unconditional* node's intercept
-                to its marginal at init, instead of zuko's default zero init.
-                Bernstein continuous nodes -> the linear map of the pre-scaled
-                domain onto the standard-logistic 5%/95% quantiles (default is
-                ~2.5x too steep); ordinal nodes -> cutpoints set to the empirical
-                class log-odds (default zeros = near-uniform). Pure init — the
-                converged MLE is unchanged — applied once (first fit only).
-                Opt-in; default off. Affects only ``SimpleIntercept`` nodes
-                (conditional ci intercepts are left untouched).
-            vc_warm_start: if True (default), each ``VC`` term's ``beta0`` is
-                initialised from the classical all-``ls`` solution of its node's
-                conditional (deterministic L-BFGS on a throwaway proxy) before
-                training, so the penalized head starts at the classical answer
-                and only learns deviations. Applied once per term (a buffer that
-                survives ``save``/``load`` guards re-runs). No-op without VC terms.
+        A second ``fit`` call continues the training, for example a second
+        phase with a lower learning rate. Freezing state does not carry
+        across calls.
 
+        Parameters
+        ----------
+        train_df : pd.DataFrame
+            Training data, one column per node.
+        val_df : pd.DataFrame | None, optional
+            Held-out set, used only for monitoring and for
+            ``restore_best``, ``schedule="plateau"`` and
+            ``freeze_patience``. If omitted, the training set supplies the
+            validation metric.
+        epochs : int, optional
+            Number of training epochs, by default 500.
+        learning_rate : float, optional
+            Adam learning rate, by default 1e-2.
+        batch_size : int, optional
+            Minibatch size, by default 512.
+        verbose : int, optional
+            Print progress every ``verbose`` epochs, by default 50.
+            0 turns the output off.
+        seed : int | None, optional
+            Seeds the minibatch shuffling only. Weight initialization
+            happens at construction, see the class docstring.
+        restore_best : bool, optional
+            If True, snapshot each node's best-validation weights during
+            training and restore them at the end. This is a mild
+            early-stopping regularization and the convention of the
+            original implementation. The snapshots persist on the model
+            across ``fit`` calls, so a multi-phase fit restores the best
+            epoch of *all* its phases; they are not saved in checkpoints.
+            The fit is then *not* the training-data MLE, so leave it False
+            for an exact classical comparison. Default False.
+        schedule : str | None, optional
+            ``None`` (default) keeps the learning rate constant.
+            ``"plateau"`` decays **per node**: when the validation NLL of
+            a node did not improve by ``min_delta`` for
+            ``plateau_patience`` epochs, its learning rate decreases by
+            ``plateau_factor``, with floor ``1e-3 * learning_rate``.
+        plateau_patience : int, optional
+            Epochs without improvement before one plateau decay step,
+            by default 15.
+        freeze_patience : int | None, optional
+            If set, a node whose validation NLL did not improve by
+            ``min_delta`` for this many epochs is **frozen** — excluded
+            from the loss and the backward pass. This is a real compute
+            saving, because the per-node losses are independent. When
+            every node is frozen the fit returns early. Freeze epochs are
+            recorded in ``history["frozen"]``. Under ``schedule="plateau"``
+            a node freezes only after its learning rate decayed to
+            ``1e-2 * learning_rate`` or below.
+        min_delta : float, optional
+            Smallest validation improvement that counts, by default 1e-4.
+        marginal_init : bool, optional
+            If True, calibrate the intercept of each *unconditional* node
+            to its marginal at initialization, instead of zuko's default
+            zero initialization. A Bernstein continuous node gets the
+            linear map of the pre-scaled domain onto the standard-logistic
+            5%/95% quantiles (the default is about 2.5x too steep). An
+            ordinal node gets cutpoints at the empirical class log-odds
+            (the default zeros are near-uniform). This is a pure
+            initialization: the converged MLE is unchanged. Applied on the
+            first fit only. Affects only ``SimpleIntercept`` nodes;
+            conditional ``ci`` intercepts stay untouched. Default False.
+        vc_warm_start : bool, optional
+            If True (default), the ``beta0`` of each ``VC`` term is
+            initialized from the classical all-``ls`` solution of its
+            node's conditional (deterministic L-BFGS on a throwaway
+            proxy). The penalized head then starts at the classical answer
+            and only learns deviations. Applied once per term — a buffer
+            that survives ``save``/``load`` guards against re-runs. Does
+            nothing without VC terms.
+        plateau_factor : float, optional
+            Multiplier of one per-node plateau decay step, by default 0.3.
+            Read only under ``schedule="plateau"``.
+        vc_oof_fit : dict | None, optional
+            Keyword overrides for the stage-1 out-of-fold proxy fits of
+            centered VC terms, merged over the default
+            ``{"epochs": 300, "learning_rate": 1e-2, "batch_size": 512}``.
+            Ignored when the treatment node is all-``ls`` — the
+            deterministic :meth:`fit_classical` runs instead.
+
+        Returns
+        -------
+        CausalFlowDAG
+            ``self``, fitted.
+
+        Raises
+        ------
+        ValueError
+            If ``schedule`` is not one of the four options.
+
+        Notes
+        -----
         For ``VC`` terms the objective is the **penalized** NLL on the
-        total-likelihood scale — each term adds ``penalty * ||b_theta weights||^2``
-        to the summed NLL, i.e. ``penalty * ||w||^2 / n_train`` to the mean loss
-        (a fixed Gaussian prior: the shrinkage vanishes as n grows, the classical
-        penalized-likelihood convention; ``beta0`` unpenalized). The recorded
-        ``history`` NLLs stay pure likelihoods. After training, each ``b_theta``
-        is re-centered to mean zero over the training data (function-preserving;
-        the constant moves into ``beta0``). ``VC(center=...)`` terms run a
-        stage-1 out-of-fold propensity computation before the loop
-        (:meth:`_vc_oof_stage`); the training loss uses those frozen OOF values,
-        while the epoch-level validation monitor (and every post-fit query)
-        uses the live full-fit treatment node.
+        total-likelihood scale. Each term adds
+        ``penalty * ||b_theta weights||^2`` to the summed NLL, that is
+        ``penalty * ||w||^2 / n_train`` to the mean loss. This is a fixed
+        Gaussian prior: the shrinkage vanishes as n grows, the classical
+        penalized-likelihood convention. ``beta0`` is not penalized. The
+        recorded ``history`` NLLs stay pure likelihoods. After training,
+        each ``b_theta`` is re-centered to mean zero over the training
+        data. That preserves the function: the constant moves into
+        ``beta0``.
 
-        Calling ``fit`` again continues training (e.g. a second phase with a
-        lower learning rate); freezing state does not carry across calls.
+        ``VC(center=...)`` terms run a stage-1 out-of-fold propensity
+        computation before the loop (:meth:`_vc_oof_stage`). The training
+        loss uses those frozen out-of-fold values. The epoch-level
+        validation monitor, and every post-fit query, uses the live
+        full-fit treatment node.
         """
-        if schedule not in (None, "onecycle", "cosine", "plateau"):
+        if schedule not in (None, "plateau"):
             raise ValueError(f"unknown schedule {schedule!r}")
         if seed is not None:
             torch.manual_seed(seed)
@@ -492,12 +661,11 @@ class CausalFlowDAG(nn.Module):
         # stage 1 for centered VC terms (issue #30): frozen OUT-OF-FOLD e_hat
         # for the training rows — a plain tensor, so the Y-node loss has no
         # gradient path into the treatment node (per-node factorization intact).
-        vc_ehat_train = self._vc_oof_stage(train_df)
+        vc_ehat_train = self._vc_oof_stage(train_df, vc_oof_fit)
 
         train_vals = self._tensorize(train_df)
         val_vals = self._tensorize(val_df) if val_df is not None else train_vals
         n = len(train_df)
-        steps_per_epoch = (n + batch_size - 1) // batch_size
 
         opt = torch.optim.Adam(
             [
@@ -509,22 +677,12 @@ class CausalFlowDAG(nn.Module):
                 for name in self.order
             ]
         )
-        sched = None
-        if schedule == "onecycle":
-            sched = torch.optim.lr_scheduler.OneCycleLR(
-                opt, max_lr=learning_rate, total_steps=epochs * steps_per_epoch
-            )
-        elif schedule == "cosine":
-            sched = torch.optim.lr_scheduler.CosineAnnealingLR(
-                opt, T_max=epochs, eta_min=learning_rate * 1e-3
-            )
-
         if restore_best and not hasattr(self, "_best"):
             self._best = {name: (float("inf"), None) for name in self.order}
         best = self._best if restore_best else None
         # per-node plateau/freeze bookkeeping (local to this fit call)
         node_best = {name: float("inf") for name in self.order}
-        node_bad = {name: 0 for name in self.order}
+        node_bad = dict.fromkeys(self.order, 0)
         frozen: set[str] = set()
         t0 = time.perf_counter()
         t_offset = self.history["time"][-1] if self.history.get("time") else 0.0
@@ -535,7 +693,7 @@ class CausalFlowDAG(nn.Module):
             active = [name for name in self.order if name not in frozen]
             perm = torch.randperm(n, device=self.device)
             train_acc = {name: prev_train.get(name, float("nan")) for name in frozen}
-            train_acc.update({name: 0.0 for name in active})
+            train_acc.update(dict.fromkeys(active, 0.0))
             for start in range(0, n, batch_size):
                 idx = perm[start : start + batch_size]
                 batch = {k: v[idx] for k, v in train_vals.items()}
@@ -556,13 +714,9 @@ class CausalFlowDAG(nn.Module):
                 opt.zero_grad()
                 loss.backward()
                 opt.step()
-                if schedule == "onecycle":
-                    sched.step()
                 w = len(idx) / n
                 for k, v in node_nlls.items():
                     train_acc[k] += float(v.detach()) * w
-            if schedule == "cosine":
-                sched.step()
             prev_train = train_acc
 
             self.eval()
@@ -572,12 +726,8 @@ class CausalFlowDAG(nn.Module):
                 }
             self.history["train"].append(train_acc)
             self.history["val"].append(val_per_node)
-            self.history.setdefault("lr", []).append(
-                max(g["lr"] for g in opt.param_groups)
-            )
-            self.history.setdefault("time", []).append(
-                t_offset + time.perf_counter() - t0
-            )
+            self.history["lr"].append(max(g["lr"] for g in opt.param_groups))
+            self.history["time"].append(t_offset + time.perf_counter() - t0)
 
             # per-node improvement tracking (plateau decay + freezing)
             for g in opt.param_groups:
@@ -594,7 +744,7 @@ class CausalFlowDAG(nn.Module):
                     and node_bad[name] > 0
                     and node_bad[name] % plateau_patience == 0
                 ):
-                    g["lr"] = max(g["lr"] * 0.3, learning_rate * 1e-3)
+                    g["lr"] = max(g["lr"] * plateau_factor, learning_rate * 1e-3)
                 # under "plateau", only freeze nodes whose lr has already been
                 # decayed substantially — otherwise a node can freeze while a
                 # smaller lr would still make progress toward the optimum
@@ -622,15 +772,18 @@ class CausalFlowDAG(nn.Module):
             if verbose and (epoch % verbose == 0 or epoch == epochs - 1):
                 tot_t = sum(train_acc.values())
                 tot_v = sum(val_per_node.values())
-                print(
-                    f"[epoch {epoch + 1:5d}/{epochs}] train NLL {tot_t:.4f}  "
-                    f"val NLL {tot_v:.4f}"
-                    + (f"  frozen {sorted(frozen)}" if frozen else "")
+                logger.info(
+                    "[epoch %5d/%d] train NLL %.4f  val NLL %.4f%s",
+                    epoch + 1,
+                    epochs,
+                    tot_t,
+                    tot_v,
+                    f"  frozen {sorted(frozen)}" if frozen else "",
                 )
 
             if len(frozen) == len(self.order):  # everything converged
                 if verbose:
-                    print(f"[epoch {epoch + 1:5d}] all nodes frozen — stopping.")
+                    logger.info("[epoch %5d] all nodes frozen — stopping.", epoch + 1)
                 break
 
         if restore_best:  # restore per-node best-validation weights
@@ -642,8 +795,25 @@ class CausalFlowDAG(nn.Module):
         return self
 
     # ------------------------------------------------- varying-coefficient (VC)
+    def _source_proxies(self, parents) -> dict[str, NodeSpec]:
+        """Give a proxy spec whose parents are sources.
+
+        A single-node proxy only has to reproduce one conditional, which the
+        parent marginals cannot influence — so each parent collapses to a
+        source node of the right kind.
+        """
+        out: dict[str, NodeSpec] = {}
+        for p in parents:
+            pn = self.spec[p]
+            out[p] = (
+                OrdinalNode(pn.levels)
+                if isinstance(pn, OrdinalNode)
+                else ContinuousNode([I(transform="affine")])
+            )
+        return out
+
     def _vc_warm_start(self, train_df: pd.DataFrame) -> None:
-        """Initialise every VC term's ``beta0`` from the classical solution.
+        """Initialize every VC term's ``beta0`` from the classical solution.
 
         The value comes from the all-``ls`` solution of the node's conditional.
         Issue #28 recommends this warm start.
@@ -654,7 +824,7 @@ class CausalFlowDAG(nn.Module):
         :meth:`fit_classical`, and the ``on`` coefficient copied into ``beta0``
         (for a binary ordinal treatment, the identified one-hot difference
         ``w[1] - w[0]``). ``b_theta`` already starts at the zero function
-        (zero-initialised output layer). Runs once per term — the
+        (zero-initialized output layer). Runs once per term — the
         ``warm_started`` buffer survives ``save``/``load``.
         """
         for name in self.order:
@@ -663,25 +833,22 @@ class CausalFlowDAG(nn.Module):
             if not todo:
                 continue
             node_spec = self.spec[name]
-            proxy_spec: dict[str, NodeSpec] = {}
-            for p in nd.parents:
-                pn = self.spec[p]
-                proxy_spec[p] = (
-                    OrdinalNode(levels=pn.levels)
-                    if isinstance(pn, OrdinalNode)
-                    else ContinuousNode(transform="affine")
-                )
+            proxy_spec = self._source_proxies(nd.parents)
             ls_terms = [LS(p) for p in nd.parents]
             if isinstance(node_spec, OrdinalNode):
-                proxy_spec[name] = OrdinalNode(levels=node_spec.levels, terms=ls_terms)
+                proxy_spec[name] = OrdinalNode(node_spec.levels, ls_terms)
             else:
                 proxy_spec[name] = ContinuousNode(
-                    transform=node_spec.transform,
-                    transform_kwargs=dict(node_spec.transform_kwargs),
-                    terms=ls_terms,
+                    [
+                        I(
+                            transform=node_spec.transform,
+                            transform_kwargs=dict(node_spec.transform_kwargs),
+                        ),
+                        *ls_terms,
+                    ]
                 )
             proxy = CausalFlowDAG(proxy_spec, device=str(self.device))
-            proxy.fit_classical(train_df[list(nd.parents) + [name]], verbose=False)
+            proxy.fit_classical(train_df[[*nd.parents, name]], verbose=False)
             for g in todo:
                 w = proxy.nodes[name].shifts[g.on].weight.detach()
                 b0 = float(w[-1] - w[0]) if g.on_is_ord else float(w[0])
@@ -698,11 +865,7 @@ class CausalFlowDAG(nn.Module):
         ``sigmoid(shift - theta_0)``.
         """
         nd = self.nodes[on]
-        np_dtype = np.float64 if self._dtype == torch.float64 else np.float32
-        values = {
-            p: torch.as_tensor(df[p].to_numpy(dtype=np_dtype), device=self.device)
-            for p in nd.parents
-        }
+        values = self._tensorize(df, nd.parents)
         feats = self._features(values)
         theta, shift = nd.theta_shift(
             feats, len(df), vc_ehat=self._vc_ehat_live(nd, values, len(df))
@@ -710,21 +873,20 @@ class CausalFlowDAG(nn.Module):
         return torch.sigmoid(shift - theta[:, 0]).cpu().numpy()
 
     def _vc_oof_stage(
-        self, train_df: pd.DataFrame
+        self, train_df: pd.DataFrame, vc_oof_fit: dict | None = None
     ) -> dict[str, dict[str, Tensor]] | None:
         """Compute stage 1 of the two-stage centered-VC design, issue #30.
 
         The result holds the frozen training-time propensities, as
         ``{node: {on: (n,) tensor}}``.
 
-        For ``center=True`` the values are **out-of-fold** — K refits of the
-        treatment node only, each predicting its held-out fold (the DML
-        cross-fitting requirement; in-sample e_hat reintroduces the
-        own-observation bias and can be worse than no centering). For
-        ``center="col"`` the user-supplied cross-fitted column is taken as-is.
-        Bookkeeping lands in ``self.vc_center_info[(node, on)]`` (``e_oof``,
-        ``fold_id``, ``folds``, ``source``) so tests can assert the fold
-        structure — a later "simplification" to in-sample e_hat fails CI.
+        The values are **out-of-fold** — K refits of the treatment node
+        only, each predicting its held-out fold (the DML cross-fitting
+        requirement; in-sample e_hat reintroduces the own-observation bias
+        and can be worse than no centering). Bookkeeping lands in
+        ``self.vc_center_info[(node, on)]`` (``e_oof``, ``fold_id``,
+        ``folds``, ``n``) so tests can assert the fold structure — a later
+        "simplification" to in-sample e_hat fails CI.
         """
         jobs = [
             (name, g)
@@ -735,29 +897,19 @@ class CausalFlowDAG(nn.Module):
         if not jobs:
             return None
         self.vc_center_info = {}
-        np_dtype = np.float64 if self._dtype == torch.float64 else np.float32
+        np_dtype = self._np_dtype
         out: dict[str, dict[str, Tensor]] = {}
         rng_state = torch.get_rng_state()  # proxies reseed; keep fit reproducible
         try:
             for name, g in jobs:
-                if isinstance(g.center, str):  # user-supplied cross-fitted col
-                    if g.center not in train_df.columns:
-                        raise KeyError(f"center column {g.center!r} not in train_df.")
-                    e = train_df[g.center].to_numpy(dtype=np.float64)
-                    if not ((e > 0.0) & (e < 1.0)).all():
-                        raise ValueError(
-                            f"center column {g.center!r} must hold propensities "
-                            "strictly inside (0, 1)."
-                        )
-                    fold_id = None
-                else:
-                    e, fold_id = self._vc_oof_propensity(g.on, train_df, g.folds)
+                e, fold_id = self._vc_oof_propensity(
+                    g.on, train_df, g.folds, vc_oof_fit
+                )
                 out.setdefault(name, {})[g.on] = torch.as_tensor(
                     e.astype(np_dtype), device=self.device
                 )
                 self.vc_center_info[(name, g.on)] = {
-                    "source": g.center if isinstance(g.center, str) else "oof-refit",
-                    "folds": None if fold_id is None else int(g.folds),
+                    "folds": int(g.folds),
                     "fold_id": fold_id,
                     "e_oof": e.copy(),
                     "n": len(train_df),
@@ -767,7 +919,7 @@ class CausalFlowDAG(nn.Module):
         return out
 
     def _vc_oof_propensity(
-        self, on: str, train_df: pd.DataFrame, k: int
+        self, on: str, train_df: pd.DataFrame, k: int, vc_oof_fit: dict | None = None
     ) -> tuple[np.ndarray, np.ndarray]:
         """Compute the out-of-fold ``P(on=1|pa_on)``.
 
@@ -778,7 +930,8 @@ class CausalFlowDAG(nn.Module):
 
         A treatment with all-``ls`` terms uses :meth:`fit_classical`, which is
         deterministic and takes seconds. Any other treatment uses a
-        fixed-budget Adam fit.
+        fixed-budget Adam fit — ``vc_oof_fit`` overrides its keywords, see
+        :meth:`fit`.
         """
         on_nd = self.nodes[on]
         if any(g.center for g in on_nd._vc_groups):
@@ -787,18 +940,11 @@ class CausalFlowDAG(nn.Module):
                 "Chained centering is not supported."
             )
         node_spec = self.spec[on]
-        proxy_spec: dict[str, NodeSpec] = {}
-        for p in on_nd.parents:
-            pn = self.spec[p]
-            proxy_spec[p] = (
-                OrdinalNode(levels=pn.levels)
-                if isinstance(pn, OrdinalNode)
-                else ContinuousNode(transform="affine")
-            )
-        terms = list(node_spec.terms) if node_spec.terms else None
-        proxy_spec[on] = OrdinalNode(levels=2, terms=terms)
+        proxy_spec = self._source_proxies(on_nd.parents)
+        terms = node_terms(node_spec) or None
+        proxy_spec[on] = OrdinalNode(2, terms)
         all_ls = all(t.effect == "LS" for t in (terms or []))
-        cols = list(on_nd.parents) + [on]
+        cols = [*on_nd.parents, on]
 
         n = len(train_df)
         fold_id = np.random.default_rng(0).permutation(n) % k
@@ -809,14 +955,9 @@ class CausalFlowDAG(nn.Module):
             if all_ls:
                 proxy.fit_classical(held_in, verbose=False)
             else:
-                proxy.fit(
-                    held_in,
-                    epochs=300,
-                    learning_rate=1e-2,
-                    verbose=0,
-                    seed=0,
-                    restore_best=False,
-                )
+                fit_kw = {"epochs": 300, "learning_rate": 1e-2, "batch_size": 512}
+                fit_kw.update(vc_oof_fit or {})
+                proxy.fit(held_in, verbose=0, seed=0, restore_best=False, **fit_kw)
             e[fold_id == j] = proxy._predict_p1(on, train_df.iloc[fold_id == j])
         return e, fold_id
 
@@ -839,79 +980,97 @@ class CausalFlowDAG(nn.Module):
 
     @torch.no_grad()
     def varying_coef(
-        self, node: str, data: pd.DataFrame, on: str | None = None
+        self, node: str, data: pd.DataFrame, t: str | None = None
     ) -> np.ndarray:
         """Evaluate the fitted effect function ``beta(x)`` of a ``VC`` term.
 
-        The function reads the rows of ``data``. It is the first-class read-out
-        of issue #28.
+        This is the first-class read-out of issue #28. The value comes in
+        closed form from the fitted term, as ``beta0 + b_theta(modifiers)``.
+        It is deterministic and needs no abduction. It is free of ``y``,
+        because only the modifier columns of ``data`` are read. For a binary
+        treatment it is identical to the abduction difference
+        ``u(x, t=1, y) - u(x, t=0, y)``.
 
-        The value comes in closed form from the fitted term, as
-        ``beta0 + b_theta(modifiers)``. It is deterministic, it is free of ``y``
-        because only the modifier columns of ``data`` are read, and it needs no
-        abduction. For a binary treatment it is identical to the abduction
-        difference ``u(x, t=1, y) - u(x, t=0, y)``.
+        The value lives on the latent, log-odds scale of the node. A
+        continuous node adds it. An ordinal node subtracts it from the
+        cutpoints.
 
-        The value lives on the latent, log-odds scale of the node. A continuous
-        node adds it. An ordinal node subtracts it from the cutpoints.
-
-        For a centered term, that is ``center=...``, the form of the returned
-        ``beta`` does not change, but ``beta0`` then reads as the effect at the
+        For a centered term (``center=...``) the form of the returned
+        ``beta`` does not change. ``beta0`` then reads as the effect at the
         treatment margin, which is the observed propensities.
 
-        Args:
-            node: name of the node carrying the VC term.
-            on: the VC term's treatment name; optional when the node has exactly
-                one VC term.
+        Parameters
+        ----------
+        node : str
+            Name of the node that carries the VC term.
+        data : pd.DataFrame
+            Rows at which to evaluate ``beta``. Must contain every modifier
+            column of the term.
+        t : str | None, optional
+            Treatment name of the VC term. Optional when the node has
+            exactly one VC term.
 
-        Returns an ``(n,)`` array of ``beta`` values (constant when the term has
-        no modifiers).
+        Returns
+        -------
+        np.ndarray
+            The ``beta`` values, shape ``(n,)``. Constant when the term has
+            no modifiers.
+
+        Raises
+        ------
+        KeyError
+            If ``node`` is unknown, if the node has no VC term on ``t``, or
+            if a modifier column is missing from ``data``.
+        ValueError
+            If the node has no VC term, or if ``t`` is omitted while the
+            node has several VC terms.
         """
-        if node not in self.nodes:
-            raise KeyError(f"unknown node {node!r}")
-        nd = self.nodes[node]
+        nd = self._node(node)
         vcs = {g.on: g.mods for g in nd._vc_groups}
         if not vcs:
             raise ValueError(f"node {node!r} has no VC term.")
-        if on is None:
+        if t is None:
             if len(vcs) > 1:
                 raise ValueError(
                     f"node {node!r} has several VC terms ({sorted(vcs)}). "
                     "Pass on=<treatment name>."
                 )
-            on = next(iter(vcs))
-        if on not in vcs:
+            t = next(iter(vcs))
+        if t not in vcs:
             raise KeyError(
-                f"node {node!r} has no VC term on {on!r} (has {sorted(vcs)})."
+                f"node {node!r} has no VC term on {t!r} (has {sorted(vcs)})."
             )
-        mods = vcs[on]
+        mods = vcs[t]
         missing = [p for p in mods if p not in data.columns]
         if missing:
             raise KeyError(f"data is missing modifier column(s): {missing}")
         mod_feat = None
         if mods:
-            np_dtype = np.float64 if self._dtype == torch.float64 else np.float32
-            vals = {
-                p: torch.as_tensor(data[p].to_numpy(dtype=np_dtype), device=self.device)
-                for p in mods
-            }
-            feats = self._features(vals)
+            feats = self._features(self._tensorize(data, mods))
             mod_feat = torch.cat([feats[p] for p in mods], dim=1)
-        return nd.shifts[on].beta(mod_feat, len(data)).cpu().numpy()
+        return nd.shifts[t].beta(mod_feat, len(data)).cpu().numpy()
 
     # --------------------------------------------------------- classical fit
     def _is_all_ls(self) -> bool:
+        # a parentless I() is the simple-intercept baseline made explicit
+        # (e.g. as the carrier of transform=) -- classical fitting covers it
         return all(
-            term.effect == "LS"
+            term.effect == "LS" or (term.effect == "I" and not term.parents)
             for node in self.spec.values()
             for term in node_terms(node)
         )
 
     def ls_coefficients(self) -> dict[str, dict[str, np.ndarray]]:
-        """Give the per-node linear-shift weights, as ``{node: {parent: array}}``.
+        """Give the per-node linear-shift weights.
 
         For an all-``ls`` model these are the interpretable log-odds-ratio
         coefficients.
+
+        Returns
+        -------
+        dict[str, dict[str, np.ndarray]]
+            The weights, as ``{node: {parent: array}}``. A node without
+            shift terms is absent.
         """
         out: dict[str, dict[str, np.ndarray]] = {}
         for name in self.order:
@@ -924,12 +1083,19 @@ class CausalFlowDAG(nn.Module):
         return out
 
     def to_matrix(self) -> pd.DataFrame:
-        """Give the labelled adjacency matrix of term effects.
+        """Give the labeled adjacency matrix of term effects.
 
-        Rows are parents and columns are children. This is the meta-adjacency
-        view of the paper. A cell holds ``"LS"``, ``"CS"`` or ``"CI"``, and an
-        empty cell means there is no edge. A multi-parent term carries its parent
-        group as a suffix.
+        This is the meta-adjacency view of the paper.
+
+        Returns
+        -------
+        pd.DataFrame
+            Rows are parents and columns are children. A cell holds the
+            term tag: ``"LS"``, ``"CS"``, ``"CI"``, ``"VC"`` for a VC
+            treatment, or ``"VCm"`` for a VC modifier. An empty cell means
+            there is no edge. A multi-parent term carries its parent group
+            as a suffix. When several terms share a cell, their tags join
+            with ``"+"``.
         """
         labels = {"I": "CI", "LS": "LS", "CS": "CS"}
         m = pd.DataFrame("", index=list(self.order), columns=list(self.order))
@@ -953,55 +1119,71 @@ class CausalFlowDAG(nn.Module):
     def intercept_contributions(self, node: str, data: pd.DataFrame) -> dict:
         """Decompose a complex intercept into mean-centered per-term parts.
 
-        The parts are contributions to the transform parameters of the node. Use
-        them to plot additive partial effects.
+        The parts are contributions to the transform parameters of the node.
+        Use them to plot additive partial effects.
 
-        An additive complex intercept ``terms=[I("x1"), I("x2")]`` builds one
-        network per ``I``-term and **sums their outputs in unconstrained
+        An additive complex intercept, ``[I("x1"), I("x2")]``, builds one
+        network per ``I`` term and **sums their outputs in unconstrained
         parameter space**: ``theta(pa) = net_1(x1) + net_2(x2)``. The sum is
-        identified (so every L1/L2/L3 query is correct), but each term's output is
-        identified only up to a constant — a constant moves freely between the
-        nets. This makes the *raw* per-term outputs not directly comparable.
+        identified, so every L1/L2/L3 query is correct. Each term's output,
+        however, is identified only up to a constant — a constant moves
+        freely between the nets. The *raw* per-term outputs are therefore
+        not directly comparable.
 
-        Following the usual additive-model / GAM convention, this resolves the
-        ambiguity by a **sum-to-zero (mean-centering) constraint applied over the
-        rows of** ``data``: each term's contribution is centered to mean zero
-        (per parameter), and the removed constants are collected into a single
-        ``baseline``. The decomposition is exact —
+        This method resolves the ambiguity with the usual additive-model
+        (GAM) convention: a **sum-to-zero (mean-centering) constraint over
+        the rows of** ``data``. Each term's contribution is centered to mean
+        zero per parameter. The removed constants collect into a single
+        ``baseline``. The decomposition is exact:
 
             ``theta(pa) = baseline + sum_terms contribution_term(pa)``
 
-        — so ``baseline`` plus the (uncentered) row sum of the contributions
-        reproduces the model's transform parameters. This is **post-hoc only**:
-        it reads the fitted weights and changes nothing about the model or any
-        frozen number (issue #20, Option A). Shift terms (``LS``/``CS``) are a
-        separate, already-interpretable slot — see :meth:`ls_coefficients`.
+        ``baseline`` plus the uncentered row sum of the contributions
+        reproduces the model's transform parameters. This is **post-hoc
+        only**: it reads the fitted weights and changes nothing about the
+        model or any frozen number (issue #20, Option A). Shift terms
+        (``LS``/``CS``) are a separate, already-interpretable slot — see
+        :meth:`ls_coefficients`.
 
-        Args:
-            node: name of a node with at least one complex-intercept (``I``) term
-                that has parents.
-            data: rows over which to center (and at which to evaluate the
-                contributions); must contain every intercept-parent column.
+        Parameters
+        ----------
+        node : str
+            Name of a node with at least one complex-intercept (``I``) term
+            that has parents.
+        data : pd.DataFrame
+            Rows over which to center and at which to evaluate the
+            contributions. Must contain every intercept-parent column.
 
-        Returns a dict with:
-            ``"baseline"``: ``(P,)`` array — the absorbed constant (sum of the
-                per-term means), where ``P`` is the node's transform-parameter
-                count: ``ut.n_params`` for a continuous node (e.g. Bernstein
-                coefficients, the [widths|heights|derivatives] block of an RQ
-                spline, or the 2 affine parameters), ``levels - 1`` cutpoint
-                parameters for an ordinal node. The contributions live in the
-                transform's **unconstrained** parameter space (where the model
-                sums the additive terms, before the monotonicity constraint), so
-                they are exact partial effects on those parameters but not, in
-                general, an additive shift of the curve itself.
-            ``"contributions"``: ``{term_label: (n, P) array}`` — each term's
-                mean-centered contribution at each row (columns sum to ~0 over
-                rows). ``term_label`` is the term's parents joined by ``"+"``.
-            ``"parents"``: ``{term_label: tuple(parent_names)}``.
+        Returns
+        -------
+        dict
+            Three keys. ``"baseline"`` is the absorbed constant, a ``(P,)``
+            array — the sum of the per-term means. ``P`` is the node's
+            transform-parameter count: ``ut.n_params`` for a continuous
+            node, ``levels - 1`` cutpoint parameters for an ordinal node.
+            ``"contributions"`` is ``{term_label: (n, P) array}`` — each
+            term's mean-centered contribution at each row, columns summing
+            to about zero over the rows. ``term_label`` is the term's
+            parents joined by ``"+"``. ``"parents"`` is
+            ``{term_label: tuple(parent_names)}``.
+
+        Raises
+        ------
+        KeyError
+            If ``node`` is unknown, or if an intercept-parent column is
+            missing from ``data``.
+        ValueError
+            If the node has no complex-intercept term with parents.
+
+        Notes
+        -----
+        The contributions live in the transform's **unconstrained**
+        parameter space, where the model sums the additive terms before the
+        monotonicity constraint. They are exact partial effects on those
+        parameters, but not, in general, an additive shift of the curve
+        itself.
         """
-        if node not in self.nodes:
-            raise KeyError(f"unknown node {node!r}")
-        nd = self.nodes[node]
+        nd = self._node(node)
         groups = nd._intercept_groups
         if not groups:
             raise ValueError(
@@ -1012,12 +1194,7 @@ class CausalFlowDAG(nn.Module):
         if missing:
             raise KeyError(f"data is missing intercept-parent column(s): {missing}")
 
-        np_dtype = np.float64 if self._dtype == torch.float64 else np.float32
-        vals = {
-            p: torch.as_tensor(data[p].to_numpy(dtype=np_dtype), device=self.device)
-            for p in nd.ci_parents
-        }
-        feats = self._features(vals)
+        feats = self._features(self._tensorize(data, nd.ci_parents))
         # one net per group: the additive case stores them in intercept_nets;
         # a single (possibly joint) I-term is the lone `intercept` network.
         nets = (
@@ -1027,7 +1204,7 @@ class CausalFlowDAG(nn.Module):
         contributions: dict[str, np.ndarray] = {}
         parents: dict[str, tuple] = {}
         baseline = None
-        for net, grp in zip(nets, groups):
+        for net, grp in zip(nets, groups, strict=True):
             raw = net(torch.cat([feats[p] for p in grp], dim=1))  # (n, P)
             mean = raw.mean(dim=0, keepdim=True)  # (1, P)
             label = "+".join(grp)
@@ -1040,46 +1217,121 @@ class CausalFlowDAG(nn.Module):
             "parents": parents,
         }
 
+    @torch.no_grad()
+    def design_matrix(
+        self, df: pd.DataFrame, node: str, *, drop_first: bool = False
+    ) -> pd.DataFrame:
+        """Encode a node's parents the way the flow feeds them to its shifts.
+
+        A continuous parent stays raw in one column named after it. An
+        ordinal parent becomes one column per level, named
+        ``"{parent}[{k}]"`` — the same one-hot the flow builds internally.
+
+        Use ``drop_first=True`` to get the design a classical reference
+        expects (``statsmodels`` ``OrderedModel``, R ``polr``): with
+        cutpoints the full one-hot is unidentified, so each ordinal parent's
+        level-0 column drops out and its remaining coefficients read as
+        differences against level 0 — exactly what ``w[k] - w[0]`` gives on
+        the flow side.
+
+        Parameters
+        ----------
+        df : pd.DataFrame
+            Rows to encode. Must contain every parent column of ``node``.
+        node : str
+            Name of the node whose parents are encoded.
+        drop_first : bool, optional
+            Drop each ordinal parent's level-0 column, by default ``False``.
+
+        Returns
+        -------
+        pd.DataFrame
+            One column per encoded feature, indexed like ``df``.
+        """
+        nd = self._node(node)
+        feats = self._features(self._tensorize(df, nd.parents))
+        cols: dict[str, np.ndarray] = {}
+        for p in nd.parents:
+            arr = feats[p].cpu().numpy()
+            if arr.shape[1] == 1:  # continuous parent: raw
+                cols[p] = arr[:, 0]
+            else:
+                for k in range(1 if drop_first else 0, arr.shape[1]):
+                    cols[f"{p}[{k}]"] = arr[:, k]
+        return pd.DataFrame(cols, index=df.index)
+
     def fit_classical(
         self,
         train_df: pd.DataFrame,
         *,
         max_iter: int = 400,
         tol: float = 1e-6,
+        chunk: int = 25,
+        history_size: int = 50,
         verbose: bool = True,
     ) -> dict:
         """Fit an all-``ls`` model the classical way.
 
-        The fit uses full batches, float64, and L-BFGS with a strong-Wolfe line
-        search. There are no minibatches, no schedule and no early stopping, so
-        the fit is deterministic and bit-reproducible. It lands on the exact
-        maximum-likelihood estimate and matches classical software, that is
-        ``statsmodels`` ``OrderedModel`` and R ``polr`` or ``Colr``. It is much
-        faster than minibatch Adam.
+        The fit uses full batches, float64, and L-BFGS with a strong-Wolfe
+        line search. There are no minibatches, no schedule and no early
+        stopping, so the fit is deterministic and bit-reproducible. It lands
+        on the exact maximum-likelihood estimate and matches classical
+        software, that is ``statsmodels`` ``OrderedModel`` and R ``polr`` or
+        ``Colr``. It is much faster than minibatch Adam.
 
         This method is valid only when every edge is ``ls``, because each
         node-conditional is then a classical transformation model. Any other
-        model raises. For a ``cs`` or ``ci`` model use :meth:`fit`, where the
-        minibatch noise also regularizes the MLPs.
+        model raises. For a ``cs`` or ``ci`` model use :meth:`fit`, where
+        the minibatch noise also regularizes the MLPs.
 
-        float64 is a transient compute mode. The model is upcast for the fit,
-        and ``self.double()`` converts the parameters and the range buffers of
-        the transforms in one call. Afterwards the model returns to float32, so
-        the stored model and ``save``/``load`` stay float32. Double precision is
-        what lets the line search resolve the optimum cleanly.
+        Parameters
+        ----------
+        train_df : pd.DataFrame
+            Training data, one column per node.
+        max_iter : int, optional
+            Upper limit on L-BFGS iterations, by default 400.
+        tol : float, optional
+            Relative NLL change between L-BFGS rounds that counts as
+            converged, by default 1e-6.
+        chunk : int, optional
+            Inner L-BFGS iterations per round, by default 25. Convergence
+            is checked between rounds.
+        history_size : int, optional
+            L-BFGS memory, by default 50.
+        verbose : bool, optional
+            Print a one-line summary, by default True.
 
-        Convergence is judged by **NLL flatness** (relative change < ``tol``
-        between L-BFGS rounds). Note that ``|grad|`` and individual coefficients
-        do *not* settle to machine precision: a continuous node's Bernstein
-        intercept, and weakly-identified directions like rare one-hot levels or a
-        flat treatment-effect ridge, keep drifting along near-zero-curvature
-        valleys long after the likelihood (and the well-identified coefficients)
-        have reached the MLE. Correctness is therefore verified by comparison to
-        classical software (see ``experiments/validate_ls.py``), not by this flag.
+        Returns
+        -------
+        dict
+            A convergence report: ``converged``, ``n_iter``, ``final_nll``,
+            ``grad_norm``, ``coef_delta`` (largest coefficient change at
+            the last round), ``seconds``, and the fitted ``coefficients``
+            from :meth:`ls_coefficients`.
 
-        Returns a convergence report (iterations, final NLL, gradient norm,
-        max coefficient change at the last round, wall-time, and the fitted
-        :meth:`ls_coefficients`).
+        Raises
+        ------
+        ValueError
+            If the spec has ``cs``, ``ci`` or ``vc`` terms.
+
+        Notes
+        -----
+        float64 is a transient compute mode. The model is upcast for the
+        fit, and ``self.double()`` converts the parameters and the range
+        buffers of the transforms in one call. Afterwards the model returns
+        to float32, so the stored model and ``save``/``load`` stay float32.
+        Double precision is what lets the line search resolve the optimum
+        cleanly.
+
+        Convergence is judged by **NLL flatness**: a relative change below
+        ``tol`` between L-BFGS rounds. ``|grad|`` and individual
+        coefficients do *not* settle to machine precision. A continuous
+        node's Bernstein intercept, and weakly-identified directions such
+        as rare one-hot levels or a flat treatment-effect ridge, keep
+        drifting along near-zero-curvature valleys long after the
+        likelihood and the well-identified coefficients reach the MLE.
+        Correctness is therefore verified by comparison to classical
+        software (see ``experiments/validate_ls.py``), not by this flag.
         """
         if not self._is_all_ls():
             raise ValueError(
@@ -1092,7 +1344,7 @@ class CausalFlowDAG(nn.Module):
         self.double()  # parameters + buffers (xmin/xmax) -> float64, one call
         assert next(self.parameters()).dtype == torch.float64
         t0 = time.perf_counter()
-        chunk = 25  # inner L-BFGS iterations per round; we stop on NLL change
+        # chunk: inner L-BFGS iterations per round; we stop on NLL change
         try:
             vals = self._tensorize(train_df)
             self.train()
@@ -1100,7 +1352,7 @@ class CausalFlowDAG(nn.Module):
                 self.parameters(),
                 lr=1.0,
                 max_iter=chunk,
-                history_size=50,
+                history_size=history_size,
                 tolerance_grad=0.0,
                 tolerance_change=0.0,
                 line_search_fn="strong_wolfe",
@@ -1164,10 +1416,12 @@ class CausalFlowDAG(nn.Module):
             "coefficients": coefs,
         }
         if verbose:
-            print(
-                f"fit_classical: {n_iter} L-BFGS iters, NLL {final_nll:.6f}, "
-                f"{report['seconds']:.2f}s"
-                + ("" if converged else f"  (NLL still moving at {max_iter} iters)")
+            logger.info(
+                "fit_classical: %d L-BFGS iters, NLL %.6f, %.2fs%s",
+                n_iter,
+                final_nll,
+                report["seconds"],
+                "" if converged else f"  (NLL still moving at {max_iter} iters)",
             )
         return report
 
@@ -1181,22 +1435,40 @@ class CausalFlowDAG(nn.Module):
         u: pd.DataFrame | None = None,
         seed: int | None = None,
     ) -> pd.DataFrame:
-        """Sample from the (optionally mutilated) flow.
+        """Sample from the flow, with optional interventions.
 
-        Args:
-            n: number of samples (ignored if ``u`` is given).
-            do: interventions {node: value}; intervened nodes are clamped and
-                their parent dependence removed (graph mutilation).
-            u: latent variables (as returned by :meth:`abduct`). If given, they
-                are pushed through the flow — together with ``do`` this yields
-                counterfactuals (Pearl's abduction -> action -> prediction).
+        Parameters
+        ----------
+        n : int | None, optional
+            Number of samples. Ignored if ``u`` is given.
+        do : dict[str, float] | None, optional
+            Interventions, as ``{node: value}``. An intervened node is
+            clamped and its parent dependence removed (graph mutilation).
+        u : pd.DataFrame | None, optional
+            Latent variables, as returned by :meth:`abduct`. If given,
+            they are pushed through the flow. Together with ``do`` this
+            yields counterfactuals: Pearl's abduction, action, prediction.
+        seed : int | None, optional
+            If given, seeds the latent draw. Ignored if ``u`` is given.
+
+        Returns
+        -------
+        pd.DataFrame
+            The samples, one column per node.
+
+        Raises
+        ------
+        ValueError
+            If both ``n`` and ``u`` are omitted.
         """
         do = do or {}
-        gen = None
-        if seed is not None:
-            gen = torch.Generator(device=self.device).manual_seed(seed)
+        gen = (
+            None
+            if seed is None
+            else torch.Generator(device=self.device).manual_seed(seed)
+        )
 
-        np_dtype = np.float64 if self._dtype == torch.float64 else np.float32
+        np_dtype = self._np_dtype
         if u is not None:
             n = len(u)
             u_vals = {
@@ -1207,11 +1479,7 @@ class CausalFlowDAG(nn.Module):
             }
         elif n is not None:
             u_vals = {
-                name: StandardLogistic.sample((n,), device=self.device)
-                if gen is None
-                else StandardLogistic.icdf(
-                    torch.rand((n,), device=self.device, generator=gen)
-                )
+                name: StandardLogistic.sample((n,), device=self.device, generator=gen)
                 for name in self.order
             }
         else:
@@ -1241,15 +1509,31 @@ class CausalFlowDAG(nn.Module):
 
     @torch.no_grad()
     def abduct(self, df: pd.DataFrame, seed: int | None = None) -> pd.DataFrame:
-        """Pearl abduction: recover the latent variables ``u`` from observations.
+        """Recover the latent variables ``u`` from observations (Pearl step 1).
 
-        Continuous nodes are inverted exactly (``u = h(x) + shift``); for ordinal
-        nodes the latent is only interval-identified, so it is sampled from the
-        standard logistic truncated to the observed level's interval.
+        A continuous node inverts exactly: ``u = h(x) + shift``. For an
+        ordinal node the latent is only interval-identified, so it is
+        sampled from the standard logistic truncated to the observed
+        level's interval.
+
+        Parameters
+        ----------
+        df : pd.DataFrame
+            Observations, one column per node.
+        seed : int | None, optional
+            If given, seeds the truncated draw for the ordinal nodes.
+
+        Returns
+        -------
+        pd.DataFrame
+            The latents, one column per node, aligned with the rows of
+            ``df``.
         """
-        gen = None
-        if seed is not None:
-            gen = torch.Generator(device=self.device).manual_seed(seed)
+        gen = (
+            None
+            if seed is None
+            else torch.Generator(device=self.device).manual_seed(seed)
+        )
         values = self._tensorize(df)
         feats = self._features(values)
         n = len(df)
@@ -1273,8 +1557,24 @@ class CausalFlowDAG(nn.Module):
     ) -> np.ndarray:
         """Give the analytic class probabilities of an ordinal node.
 
-        The result has shape ``(n, levels)``. The parents of the node come from
-        ``df``, after the ``do`` overrides are applied.
+        Parameters
+        ----------
+        df : pd.DataFrame
+            Rows that supply the parent values of the node.
+        node : str
+            Name of the ordinal node.
+        do : dict[str, float] | None, optional
+            Column overrides, applied to ``df`` before the evaluation.
+
+        Returns
+        -------
+        np.ndarray
+            The class probabilities, shape ``(n, levels)``.
+
+        Raises
+        ------
+        ValueError
+            If ``node`` is continuous.
         """
         if not isinstance(self.spec[node], OrdinalNode):
             raise ValueError(f"pmf() requires an ordinal node, '{node}' is continuous.")
@@ -1282,12 +1582,8 @@ class CausalFlowDAG(nn.Module):
         for col, val in (do or {}).items():
             df_local[col] = val
         nd = self.nodes[node]
-        np_dtype = np.float64 if self._dtype == torch.float64 else np.float32
         cols = list(nd.parents) + self._vc_ehat_columns(nd)  # + e_hat inputs
-        values = {
-            p: torch.as_tensor(df_local[p].to_numpy(dtype=np_dtype), device=self.device)
-            for p in cols
-        }
+        values = self._tensorize(df_local, cols)
         feats = self._features({p: values[p] for p in nd.parents})
         theta, shift = nd.theta_shift(
             feats, len(df_local), vc_ehat=self._vc_ehat_live(nd, values, len(df_local))
@@ -1299,19 +1595,40 @@ class CausalFlowDAG(nn.Module):
     def scores(
         self, df: pd.DataFrame, node: str, params: str = "shift"
     ) -> pd.DataFrame:
-        """Give the per-observation scores ``psi_i = d l_i / d theta``, issue #29.
+        """Give the per-observation scores ``psi_i = d l_i / d theta``.
 
-        The scores belong to the interpretable shift coefficients of a node and
-        are analytic and exact, see ``tramdag.scores``. ``params="shift"`` is the
-        only option and covers every ``LS`` weight and the ``beta0`` of every
-        ``VC`` term.
+        The scores belong to the interpretable shift coefficients of a node
+        and are analytic and exact, see ``tramdag.scores`` (issue #29).
 
         At a fitted MLE each column sums to about zero. Order the rows by a
-        covariate that truly modifies the treatment effect and the cumulative sum
-        of the treatment column drifts. :meth:`effect_modifier_scan` measures
-        that drift.
+        covariate that truly modifies the treatment effect, and the
+        cumulative sum of the treatment column drifts.
+        :meth:`effect_modifier_scan` measures that drift.
 
-        This is a pure read-out. It touches no fitting or sampling code path.
+        This is a pure read-out. It touches no fitting or sampling code
+        path.
+
+        Parameters
+        ----------
+        df : pd.DataFrame
+            Observations. Must contain the node, its parents, and the
+            propensity inputs of centered VC terms.
+        node : str
+            Name of the node whose coefficients are scored.
+        params : str, optional
+            ``"shift"`` is the only option. It covers every ``LS`` weight
+            and the ``beta0`` of every ``VC`` term.
+
+        Returns
+        -------
+        pd.DataFrame
+            One column per coefficient, one row per observation. See
+            :func:`tramdag.scores.node_scores` for the column naming.
+
+        Raises
+        ------
+        ValueError
+            If ``params`` is not ``"shift"``.
         """
         if params != "shift":
             raise ValueError(f"params='shift' is the only option, got {params!r}.")
@@ -1321,34 +1638,53 @@ class CausalFlowDAG(nn.Module):
 
     @torch.no_grad()
     def effect_modifier_scan(
-        self, df: pd.DataFrame, node: str, on: str, candidates: list[str] | None = None
+        self, df: pd.DataFrame, node: str, t: str, candidates: list[str] | None = None
     ) -> pd.DataFrame:
-        """Rank candidate effect modifiers with a Zeileis-Hornik fluctuation scan.
+        """Rank candidate effect modifiers with a fluctuation scan.
 
-        Issue #29 describes the method. Each candidate covariate is ranked by how
-        strongly the scores of the ``on`` coefficient drift when the rows are
-        ordered by it. A cheap all-``ls`` fit is enough, so this gives a measured
-        shortlist for ``VC`` modifiers.
+        Issue #29 describes the Zeileis-Hornik method. Each candidate
+        covariate is ranked by how strongly the scores of the ``t``
+        coefficient drift when the rows are ordered by it. A cheap
+        all-``ls`` fit is enough, so this gives a measured shortlist for
+        ``VC`` modifiers.
+
+        Parameters
+        ----------
+        df : pd.DataFrame
+            Observations, as for :meth:`scores`.
+        node : str
+            Name of the outcome node.
+        t : str
+            Name of the treatment whose coefficient is scanned.
+        candidates : list[str] | None, optional
+            Candidate covariates. Defaults to every column of ``df``
+            except ``node`` and ``t``.
 
         Returns
         -------
         pd.DataFrame
-            One row per candidate, with ``stat``, ``p_value``, ``crit_5pct`` and
-            ``flag``. See ``tramdag.scores.effect_modifier_scan``.
+            One row per candidate, sorted by ``stat`` descending, with
+            columns ``stat``, ``p_value``, ``crit_5pct`` and ``flag``. See
+            :func:`tramdag.scores.effect_modifier_scan`.
         """
         from .scores import effect_modifier_scan
 
-        return effect_modifier_scan(self, df, node, on, candidates=candidates)
+        return effect_modifier_scan(self, df, node, t, candidates=candidates)
 
     # ------------------------------------------------------------------- io
     def save(self, path: str | Path) -> None:
         """Write the model, its history and its provenance to a checkpoint.
 
-        The file holds the spec and the weights, the training ``history``, and a
-        ``meta`` block with the tramdag version, the save time, the device, and
-        the machine that trained the model. A cached run therefore stays
-        self-describing: the file alone is enough to rebuild a training-curve
-        plot or to compare timings.
+        The file holds the spec and the weights, the training ``history``,
+        and a ``meta`` block with the tramdag version, the save time, the
+        device, and the machine that trained the model. A cached run
+        therefore stays self-describing: the file alone is enough to
+        rebuild a training-curve plot or to compare timings.
+
+        Parameters
+        ----------
+        path : str | Path
+            Target file. Parent directories are created when missing.
         """
         from datetime import datetime, timezone
 
@@ -1377,20 +1713,35 @@ class CausalFlowDAG(nn.Module):
     def load(cls, path: str | Path, device: str = "cpu") -> CausalFlowDAG:
         """Restore a model from a checkpoint.
 
-        ``flow.history`` and ``flow.meta`` are refilled, so a cached model can
-        still produce training and diagnostic plots, and can report the machine
-        that trained it.
+        ``flow.history`` and ``flow.meta`` are refilled. A cached model can
+        therefore still produce training and diagnostic plots, and can
+        report the machine that trained it.
+
+        Parameters
+        ----------
+        path : str | Path
+            Checkpoint file written by :meth:`save`.
+        device : str, optional
+            Torch device to load onto, by default ``"cpu"``.
+
+        Returns
+        -------
+        CausalFlowDAG
+            The restored model, in eval mode.
         """
         ckpt = torch.load(path, map_location=device, weights_only=False)
         flow = cls(spec_from_dict(ckpt["spec"]), device=device)
-        for name in flow.order:  # mark transforms as fitted before loading buffers
+        # A loaded model carries trained parameters, so both first-fit guards
+        # must already be closed: re-fitting with marginal_init=True would
+        # otherwise reset the intercept to the data marginal.
+        for name in flow.order:
             node = flow.nodes[name]
             if node.kind == "continuous":
                 node.ut._fitted = True
+            elif isinstance(node.intercept, SimpleIntercept):
+                node.intercept._marginal_inited = True
         flow.load_state_dict(ckpt["state_dict"])
-        flow.history = ckpt.get(
-            "history", {"train": [], "val": [], "lr": [], "time": []}
-        )
-        flow.meta = ckpt.get("meta", {})
+        flow.history = ckpt["history"]
+        flow.meta = ckpt["meta"]
         flow.eval()
         return flow

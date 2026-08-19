@@ -6,12 +6,12 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 > ⚠️ **Status: beta (0.x), under active development.** The API may change between
-> releases until 1.0; pin a version (`tramdag==0.2.*`) for reproducibility.
+> releases until 1.0; pin a version (`tramdag==0.3.*`) for reproducibility.
 
 **TRAM-DAGs** model each variable of a structural causal model with a
 (transformation-model) flow: one triangular normalizing flow from iid
-standard-logistic latents to the observed variables. The structure is of the triangular
-Adjacency Matrix is exactly your causal DAG. Fit it **once** on observational data and answer all
+standard-logistic latents to the observed variables. The triangular adjacency
+structure is exactly your causal DAG. Fit it **once** on observational data and answer all
 three rungs of Pearl's causal hierarchy — observational (L1), interventional
 (L2, the do-operator), and counterfactual (L3, Pearl abduction) — while keeping
 **interpretable effects**: every linear-shift coefficient is a log-odds ratio,
@@ -46,12 +46,10 @@ from tramdag import CausalFlowDAG, ContinuousNode, OrdinalNode, I, LS, CS
 
 spec = {  # the spec IS the labelled DAG
     "Age": ContinuousNode(),
-    "mRS_pre": OrdinalNode(levels=6, terms=[I("Age")]),
-    "NIHSSa": ContinuousNode(terms=[I("Age"), LS("mRS_pre")]),
-    "T": OrdinalNode(levels=2, terms=[I("Age"), LS("mRS_pre"), CS("NIHSSa")]),
-    "mRS_3m": OrdinalNode(
-        levels=7, terms=[I("Age"), LS("mRS_pre"), CS("NIHSSa"), LS("T")]
-    ),
+    "mRS_pre": OrdinalNode(6, I("Age")),
+    "NIHSSa": ContinuousNode(I("Age") + LS("mRS_pre")),
+    "T": OrdinalNode(2, I("Age") + LS("mRS_pre") + CS("NIHSSa")),
+    "mRS_3m": OrdinalNode(7, I("Age") + LS("mRS_pre") + CS("NIHSSa") + LS("T")),
 }
 flow = CausalFlowDAG(spec)  # validates acyclicity, builds the flow
 
@@ -63,13 +61,14 @@ flow.fit(
     val_df,
     epochs=4000,
     learning_rate=1e-2,
+    batch_size=512,
     schedule="plateau",
     plateau_patience=30,
     freeze_patience=120,
 )
 
 # all-`ls` model? fit it classically instead: deterministic float64 L-BFGS,
-# exact MLE matching statsmodels/R (see notebooks/classical_fit_tram_dag.py)
+# exact MLE matching statsmodels/R (see docs/fitting.md)
 flow.fit_classical(train_df)  # raises on cs/ci specs
 
 flow.log_prob(df)  # L1: joint log-likelihood per row
@@ -86,11 +85,11 @@ flow.intercept_contributions("NIHSSa", df)  # interpret: per-parent partial effe
 
 # heterogeneous treatment effects: a small, penalized effect head beta(x)*T
 # (VC term) with a first-class read-out — see docs/varying-coefficients.md
-# e.g. terms=[CS("Age", "NIHSSa"), VC("T", "Age")] ->
+# e.g. CS("Age", "NIHSSa") + VC("Age", t="T") ->
 # flow.varying_coef("mRS_3m", df)          # beta(x): deterministic, y-free
 
 flow.scores(df, node="mRS_3m")  # per-observation scores dl_i/dtheta
-flow.effect_modifier_scan(df, "mRS_3m", on="T")  # which VC modifiers? (CUSUM
+flow.effect_modifier_scan(df, "mRS_3m", t="T")  # which VC modifiers? (CUSUM
 # scan from a cheap all-ls fit) — docs/scores.md
 
 flow.save("flow.pt")
@@ -99,23 +98,47 @@ flow = CausalFlowDAG.load("flow.pt")
 td.simulations.REGISTRY  # synthetic DGPs with known ground truth
 ```
 
-## The model in one table
+## The model in detail: spec → math → networks
 
-Per node, the transformation is additive on the latent (log-odds) scale —
-`u = h(x; θ) + Σ β·x_pa + Σ g(x_pa)` — and each parent edge declares how it enters:
+Per node, the transformation is additive on the latent (log-odds) scale — one
+intercept term `I` plus any number of shifts (notation:
+[`docs/notation.md`](docs/notation.md)):
 
-| term | meaning | interpretability |
-|---|---|---|
-| `LS(pa)` | linear shift `β·x_pa` | `exp(β)` is an odds ratio — one number per edge |
-| `CS(pa)` | complex shift `g(x_pa)` (MLP), still additive | plot `g` |
-| `I(pa)` | complex intercept: the transform's parameters depend on the parents (several parents in one `I(...)` feed one joint network) | maximal flexibility, interactions not interpretable |
-| `VC(on, *mods)` | varying-coefficient shift `β(mods)·x_on` | read out with `flow.varying_coef` |
+`u = h_ϑ(x) + Σ β·x_pa + Σ g(x_pa) + (β₀ + b_Θ(x_mod))·x_t`
 
-Continuous nodes carry a monotone 1-D transform (`bernstein` — TRAM-faithful
-default, `spline`, `affine`; `ContinuousNode(transform=..., transform_kwargs=...)`);
-ordinal nodes an ordered-logit head `P(x ≤ k) = σ(θ_k − shift)`. Abduction is exact
-for continuous nodes and truncated-logistic for ordinal ones, so
-`flow.sample(u=flow.abduct(df))` reproduces `df` exactly / level-exactly.
+| term | math | what gets built | interpretability |
+|---|---|---|---|
+| `I()` / bare `I` / omitted | `h_ϑ(x)` — constant ϑ | `SimpleIntercept`: one free parameter vector, no network | the baseline transform |
+| `I("A")` | `h_ϑ(a)(x)` — ϑ bends with the parent | `ComplexIntercept`: MLP `[8, 8] → n_params` | the parent reshapes the whole distribution; no single coefficient |
+| `I("A","B")` (default `allow_interaction=True`) | `h_ϑ(a,b)(x)` | **one joint** MLP over both parents — they interact in ϑ | maximal flexibility |
+| `I("A","B", allow_interaction=False)` | `h_ϑ(a)+ϑ(b)(x)` | one MLP **per parent**, parameter vectors summed in coefficient space | per-parent partial effects via `flow.intercept_contributions` |
+| `LS("A")` | `β·a` | `Linear(width, 1)`, no bias — **one parameter** | `exp(β)` is an odds ratio |
+| `CS("A")` | `g(a)`, additive | `ComplexShift`: MLP `[64, 128, 64] → 1` | plot `g` |
+| `CS("A","B")` | `g(a,b)` — joint | one MLP over the concatenated features | interaction *in the shift* |
+| `CS("A") + CS("B")` | `g₁(a) + g₂(b)` | two MLPs, scalars added | GAM-style, each effect plottable |
+| `VC("A","B", t="T")` | `(β₀ + b_Θ(a,b))·x_t` | scalar `β₀` + zero-initialised penalized MLP `[16] → 1`; the treatment value multiplies, it never enters the net | `β₀` ≈ constant effect, `flow.varying_coef` reads `β(x)` |
+
+A node takes **at most one `I` term with parents** — a term list is therefore
+always purely additive on the latent scale, and interactions exist only
+*inside* a term. Lists and `+` sums are interchangeable:
+`[LS("A"), CS("B")]` ≡ `LS("A") + CS("B")`.
+
+Two knobs on the terms:
+
+- **`transform=` on `I`** picks the basis of `h_ϑ` for a continuous node —
+  `"bernstein"` (default, 20 coefficients, tails extrapolate with the boundary
+  slope), `"spline"` (monotone RQ spline, 23 params at `bins=8`, fixed tail
+  slope) or `"affine"` (2 params: the latent is exactly logistic). Ordinal
+  nodes have no basis: their intercept is the cutpoint vector,
+  `P(x ≤ k) = σ(ϑ_k − shift)`.
+- **`units=` on `I`/`CS`/`VC`** sizes the term's network, e.g. `units=[16]`
+  for one hidden layer of 16 neurons (defaults above match the original
+  Keras implementation, so fits stay comparable).
+
+Feature widths: a continuous parent enters raw (1 column), an ordinal parent
+one-hot (`levels` columns). Abduction is exact for continuous nodes and
+truncated-logistic for ordinal ones, so `flow.sample(u=flow.abduct(df))`
+reproduces `df` exactly / level-exactly.
 
 There are two ways to fit the model: a stochastic deep learning optimizer (`fit`) and a 2nd order optimization like in the classical statistical models (`fit_classical`). The latter is more efficient for all-`ls` models (each node-conditional is then a classical transformation model). For more details, see the [`docs/fitting.md`](docs/fitting.md) file.
 
@@ -131,10 +154,6 @@ There are two ways to fit the model: a stochastic deep learning optimizer (`fit`
   | `triangle-mixed` (`linear`,`exp`) | §6.2 | mixed data L1/L2 + the C.4 odds-ratio check (OR ≈ 7.4) |
   | `vaca` | §5.1–5.2 | the bimodal L1 case a default CNF misses; L2 `p(x₃ \| do(x₂))` |
   | `carefl` | §5.3 | L3 counterfactual curves vs **analytic** truth |
-
-  ```bash
-  cd experiments && uv run python paper_triangle.py atan cs   # etc., see paper_*.py
-  ```
 
   Sign note: ordinal shifts are *subtracted* here but *added* in the paper, so
   fitted ordinal weights are the paper's with flipped sign (`truth.json` records
@@ -185,14 +204,16 @@ See the [`tests/README.md`](tests/README.md) file for more details.
 
 ```
 src/tramdag/            spec.py transforms.py conditioners.py flow.py
+                        scores.py env.py
                         simulations/   (magic_mrclean, triangle, vaca, carefl,
                                         vc_shift + CLIs)
 data/                   frozen synthetic CSVs + truth.json — a test contract
-experiments/            stroke pipeline, paper replications, training benchmark
+experiments/            stroke pipeline + paper replications
 notebooks/              intro (didactic) + Colab demo   (jupytext .py — see README there)
 tests/                  unit, known-truth recovery, R regression
-docs/                   training-speed.md, stroke-case-study.md,
-                        varying-coefficients.md, scores.md
+docs/                   code-map.md (every class/function + all knobs),
+                        fitting.md, notation.md, training-speed.md,
+                        stroke-case-study.md, varying-coefficients.md, scores.md
 ```
 
 Implementation conventions (latent-scale signs, raw/one-hot parent encoding,

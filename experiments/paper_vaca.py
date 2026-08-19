@@ -12,7 +12,7 @@ a in {-3, -1, 0} (Fig. 5), to ``results/paper-vaca/``.
 
 import matplotlib.pyplot as plt
 import numpy as np
-from paper_common import fit_chunked, results_dir, save_json
+from paper_common import finish, fit_chunked, hist_overlay, results_dir, save_json
 
 from tramdag import ContinuousNode, I
 from tramdag.simulations import VacaTriangle
@@ -26,8 +26,8 @@ out = results_dir("paper-vaca")
 
 spec = {
     "x1": ContinuousNode(),
-    "x2": ContinuousNode(terms=[I("x1")]),
-    "x3": ContinuousNode(terms=[I("x1", "x2")]),
+    "x2": ContinuousNode([I("x1")]),
+    "x3": ContinuousNode([I("x1", "x2")]),
 }
 
 print(f"fitting all-ci flow on the VACA triangle, n={N} ...")
@@ -44,16 +44,7 @@ for i, ci in enumerate(cols):
         ax = axes[i][j]
         if i == j:
             bins = np.linspace(df[ci].quantile(0.001), df[ci].quantile(0.999), 60)
-            ax.hist(df[ci], bins=bins, density=True, alpha=0.45, label="DGP")
-            ax.hist(
-                samp[ci],
-                bins=bins,
-                density=True,
-                histtype="step",
-                lw=1.8,
-                color="C3",
-                label="flow",
-            )
+            hist_overlay(ax, df[ci], samp[ci], bins)
         else:
             ax.scatter(df[cj][:2000], df[ci][:2000], s=2, alpha=0.3, label="DGP")
             ax.scatter(
@@ -70,8 +61,7 @@ for i, ci in enumerate(cols):
             ax.set_ylabel(ci)
 axes[0][0].legend(fontsize=8)
 fig.suptitle("VACA triangle — observational joint, DGP vs flow (Fig. 4)")
-fig.tight_layout(), fig.savefig(out / "plots" / "pairs.png", dpi=150)
-plt.close(fig)
+finish(fig, out / "plots" / "pairs.png")
 
 # --- Fig. 5: interventional densities p(x3 | do(x2 = a))
 fig, axes = plt.subplots(1, 3, figsize=(11, 3.2), sharey=True)
@@ -103,8 +93,7 @@ for ax, a in zip(axes, DO_X2_VALUES):
     )
 axes[0].legend(), axes[0].set_ylabel("$p(x_3\\,|\\,do(x_2))$")
 fig.suptitle("VACA triangle — interventional distributions (Fig. 5)")
-fig.tight_layout(), fig.savefig(out / "plots" / "interventional.png", dpi=150)
-plt.close(fig)
+finish(fig, out / "plots" / "interventional.png")
 
 save_json(out / "summary.json", {"n": N, "do_x2": moments, "val_nll": flow.nll(val)})
 print(f"-> {out}")

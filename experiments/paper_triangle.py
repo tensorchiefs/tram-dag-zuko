@@ -19,6 +19,7 @@ import numpy as np
 from paper_common import (
     PAPER_N,
     cs_curve,
+    finish,
     fit_chunked,
     ls_weight,
     plot_hist_grid,
@@ -27,12 +28,13 @@ from paper_common import (
     save_json,
 )
 
-from tramdag import LS, ContinuousNode, term
+from tramdag import CS, LS, ContinuousNode
 from tramdag.simulations import TriangleContinuous
 
 f_name = sys.argv[1] if len(sys.argv) > 1 else "atan"
 model = sys.argv[2] if len(sys.argv) > 2 else "cs"
 assert model in ("ls", "cs")
+SHIFT = {"ls": LS, "cs": CS}  # the x2 -> x3 term, chosen on the CLI
 
 gen = TriangleContinuous(f=f_name, seed=42)
 df = gen.observational(PAPER_N)
@@ -41,8 +43,8 @@ out = results_dir(f"paper-triangle-{f_name}-{model}")
 
 spec = {
     "x1": ContinuousNode(),
-    "x2": ContinuousNode(terms=[LS("x1")]),
-    "x3": ContinuousNode(terms=[term("ls", "x1"), term(model, "x2")]),
+    "x2": ContinuousNode([LS("x1")]),
+    "x3": ContinuousNode([LS("x1"), SHIFT[model]("x2")]),
 }
 
 truths = {"beta12": 2.0, "beta13": -0.2}
@@ -80,8 +82,7 @@ if model == "cs":  # CS-curve overlay (Fig. 7 right): both anchored at x2 = 0
     ax.plot(grid, fitted, "o", ms=3, color="C0", label="fitted CS")
     ax.set_xlabel("$x_2$"), ax.set_ylabel("$-f(x_2)$"), ax.legend()
     ax.set_title(f"complex shift, DGP f = {f_name} (Fig. 7)")
-    fig.tight_layout(), fig.savefig(out / "plots" / "cs_curve.png", dpi=150)
-    plt.close(fig)
+    finish(fig, out / "plots" / "cs_curve.png")
 
 # L1 + L2: observational and do(x1 = -1) distributions (Fig. 16/17)
 n_show = 10_000

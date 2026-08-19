@@ -11,9 +11,7 @@ import pandas as pd
 import pytest
 import torch
 
-from tramdag import CS, LS, VC, CausalFlowDAG, ContinuousNode, OrdinalNode
-
-RNG = np.random.default_rng(11)
+from tramdag import CS, LS, VC, CausalFlowDAG, ContinuousNode, I, OrdinalNode
 
 
 def _hetero_df(n: int, seed: int = 11) -> pd.DataFrame:
@@ -32,11 +30,11 @@ def _hetero_df(n: int, seed: int = 11) -> pd.DataFrame:
 
 def _ls_spec() -> dict:
     return {
-        "X1": ContinuousNode(transform="affine"),
-        "X2": ContinuousNode(transform="affine"),
-        "X3": ContinuousNode(transform="affine"),
+        "X1": ContinuousNode([I(transform="affine")]),
+        "X2": ContinuousNode([I(transform="affine")]),
+        "X3": ContinuousNode([I(transform="affine")]),
         "T": OrdinalNode(levels=2),
-        "Y": ContinuousNode(terms=[LS("X1"), LS("X2"), LS("X3"), LS("T")]),
+        "Y": ContinuousNode([LS("X1"), LS("X2"), LS("X3"), LS("T")]),
     }
 
 
@@ -68,8 +66,8 @@ def test_score_sums_vanish_at_mle_ordinal_outcome():
     y = np.digitize(lat, [-1.0, 0.8]).astype(float)
     df = pd.DataFrame({"X": x, "Y": y})
     spec = {
-        "X": ContinuousNode(transform="affine"),
-        "Y": OrdinalNode(levels=3, terms=[LS("X")]),
+        "X": ContinuousNode([I(transform="affine")]),
+        "Y": OrdinalNode(3, [LS("X")]),
     }
     flow = CausalFlowDAG(spec, seed=0)
     flow.fit_classical(df, verbose=False)
@@ -85,11 +83,11 @@ def test_scores_match_finite_differences():
     """
     df = _hetero_df(200, seed=5)
     spec = {
-        "X1": ContinuousNode(transform="affine"),
-        "X2": ContinuousNode(transform="affine"),
-        "X3": ContinuousNode(transform="affine"),
-        "T": OrdinalNode(levels=2, terms=[LS("X1")]),
-        "Y": ContinuousNode(terms=[LS("X1"), CS("X3"), VC("T", "X2", "X3")]),
+        "X1": ContinuousNode([I(transform="affine")]),
+        "X2": ContinuousNode([I(transform="affine")]),
+        "X3": ContinuousNode([I(transform="affine")]),
+        "T": OrdinalNode(2, [LS("X1")]),
+        "Y": ContinuousNode([LS("X1"), CS("X3"), VC("X2", "X3", t="T")]),
     }
     flow = CausalFlowDAG(spec, seed=1)
     flow.fit(df, epochs=5, verbose=0, seed=1)  # any point works; move off init
@@ -134,7 +132,7 @@ def test_effect_modifier_scan_flags_true_modifiers(mle_flow):
     the true modifiers X2 and X3 and NOT the inert X1 (issue #29).
     """
     flow, df = mle_flow
-    scan = flow.effect_modifier_scan(df, node="Y", on="T")
+    scan = flow.effect_modifier_scan(df, node="Y", t="T")
     assert set(scan.index) == {"X1", "X2", "X3"}, scan.to_string()  # default cands
     assert bool(scan.loc["X2", "flag"]) and bool(scan.loc["X3", "flag"]), (
         scan.to_string()
@@ -153,14 +151,14 @@ def test_scan_null_is_quiet():
     y = (rng.logistic(size=n) - (x1 - 0.5 * x2) + 0.9 * t) / 2.0
     df = pd.DataFrame({"X1": x1, "X2": x2, "T": t, "Y": y})
     spec = {
-        "X1": ContinuousNode(transform="affine"),
-        "X2": ContinuousNode(transform="affine"),
+        "X1": ContinuousNode([I(transform="affine")]),
+        "X2": ContinuousNode([I(transform="affine")]),
         "T": OrdinalNode(levels=2),
-        "Y": ContinuousNode(terms=[LS("X1"), LS("X2"), LS("T")]),
+        "Y": ContinuousNode([LS("X1"), LS("X2"), LS("T")]),
     }
     flow = CausalFlowDAG(spec, seed=0)
     flow.fit_classical(df, verbose=False)
-    scan = flow.effect_modifier_scan(df, node="Y", on="T", candidates=["X1", "X2"])
+    scan = flow.effect_modifier_scan(df, node="Y", t="T", candidates=["X1", "X2"])
     assert not scan["flag"].any(), scan.to_dict()
 
 
@@ -171,13 +169,13 @@ def test_scores_on_vc_model_and_scan_column_resolution():
     df = _hetero_df(1500, seed=8)
     spec = {
         **_ls_spec(),
-        "Y": ContinuousNode(terms=[LS("X1"), LS("X2"), LS("X3"), VC("T", "X2")]),
+        "Y": ContinuousNode([LS("X1"), LS("X2"), LS("X3"), VC("X2", t="T")]),
     }
     flow = CausalFlowDAG(spec, seed=0)
     flow.fit(df, epochs=40, verbose=0, seed=0)
     psi = flow.scores(df, node="Y")
     assert "T" in psi.columns  # beta0 score, not one-hot columns
-    scan = flow.effect_modifier_scan(df, node="Y", on="T", candidates=["X2"])
+    scan = flow.effect_modifier_scan(df, node="Y", t="T", candidates=["X2"])
     assert list(scan.index) == ["X2"]
 
 
@@ -193,4 +191,4 @@ def test_scores_error_paths(mle_flow):
     with pytest.raises(ValueError, match="no LS or VC"):
         flow.scores(df, node="T")  # T is a source: no shift terms
     with pytest.raises(KeyError, match="no score column"):
-        flow.effect_modifier_scan(df, node="Y", on="X9")
+        flow.effect_modifier_scan(df, node="Y", t="X9")

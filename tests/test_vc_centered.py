@@ -15,7 +15,7 @@ import pandas as pd
 import pytest
 import torch
 
-from tramdag import CS, LS, VC, CausalFlowDAG, ContinuousNode, OrdinalNode
+from tramdag import CS, LS, VC, CausalFlowDAG, ContinuousNode, I, OrdinalNode
 from tramdag.simulations import VCLogisticShift
 from tramdag.spec import spec_from_dict, spec_to_dict, validate_and_sort
 
@@ -37,10 +37,10 @@ def _confounded_df(n: int, seed: int) -> pd.DataFrame:
 
 def _misspecified_spec(center) -> dict:
     return {
-        "X": ContinuousNode(transform="affine"),
-        "T": OrdinalNode(levels=2, terms=[LS("X")]),
+        "X": ContinuousNode([I(transform="affine")]),
+        "T": OrdinalNode(2, [LS("X")]),
         # prognostic part deliberately under-specified (linear vs true x^2)
-        "Y": ContinuousNode(terms=[LS("X"), VC("T", "X", center=center)]),
+        "Y": ContinuousNode([LS("X"), VC("X", center=center, t="T")]),
     }
 
 
@@ -62,8 +62,8 @@ def _fit(spec, df, epochs=250):
 # ------------------------------------------------------- validation / spec
 def test_center_validation():
     with pytest.raises(ValueError, match="center_folds"):
-        VC("T", "X", center=True, center_folds=1)
-    spec = {"D": ContinuousNode(), "Y": ContinuousNode(terms=[VC("D", center=True)])}
+        VC("X", center=True, center_folds=1, t="T")
+    spec = {"D": ContinuousNode(), "Y": ContinuousNode([VC(center=True, t="D")])}
     with pytest.raises(ValueError, match="binary ordinal"):
         validate_and_sort(spec)  # continuous treatment cannot center
 
@@ -71,16 +71,11 @@ def test_center_validation():
 def test_center_serialization_roundtrip():
     spec = {
         "X": ContinuousNode(),
-        "T": OrdinalNode(levels=2, terms=[LS("X")]),
-        "Y": ContinuousNode(terms=[VC("T", "X", center=True, center_folds=3)]),
+        "T": OrdinalNode(2, [LS("X")]),
+        "Y": ContinuousNode([VC("X", center=True, center_folds=3, t="T")]),
     }
     t = spec_from_dict(spec_to_dict(spec))["Y"].terms[0]
     assert (t.center, t.center_folds) == (True, 3)
-    # pre-#30 checkpoints (no center key) load as uncentered
-    d = spec_to_dict(spec)
-    del d["Y"]["terms"][0]["center"], d["Y"]["terms"][0]["center_folds"]
-    t2 = spec_from_dict(d)["Y"].terms[0]
-    assert (t2.center, t2.center_folds) == (False, 5)
 
 
 # ---------------------------------------- acceptance: center=False regression
@@ -93,19 +88,19 @@ def test_center_false_is_bit_identical_to_plain_vc():
 
     def fit_with(term):
         spec = {
-            "X1": ContinuousNode(transform="affine"),
-            "X2": ContinuousNode(transform="affine"),
-            "X3": ContinuousNode(transform="affine"),
-            "T": OrdinalNode(levels=2, terms=[LS("X1"), LS("X2")]),
-            "Y": ContinuousNode(terms=[CS("X1", "X2", "X3"), term]),
+            "X1": ContinuousNode([I(transform="affine")]),
+            "X2": ContinuousNode([I(transform="affine")]),
+            "X3": ContinuousNode([I(transform="affine")]),
+            "T": OrdinalNode(2, [LS("X1"), LS("X2")]),
+            "Y": ContinuousNode([CS("X1", "X2", "X3"), term]),
         }
         flow = CausalFlowDAG(spec, seed=3)
         flow.fit(df.iloc[:1000], df.iloc[1000:], epochs=15, verbose=0, seed=3)
         return flow
 
-    a = fit_with(VC("T", "X2", "X3"))
-    b = fit_with(VC("T", "X2", "X3", center=False))
-    assert VC("T", "X2") == VC("T", "X2", center=False)  # Term equality
+    a = fit_with(VC("X2", "X3", t="T"))
+    b = fit_with(VC("X2", "X3", center=False, t="T"))
+    assert VC("X2", t="T") == VC("X2", center=False, t="T")  # Term equality
     for (ka, pa), (kb, pb) in zip(a.state_dict().items(), b.state_dict().items()):
         assert ka == kb
         assert torch.equal(pa, pb), ka
@@ -144,14 +139,14 @@ def test_training_ehat_is_out_of_fold():
     flow = CausalFlowDAG(_misspecified_spec(True), seed=0)
     flow.fit(df, epochs=2, verbose=0, seed=0)
     info = flow.vc_center_info[("Y", "T")]
-    assert info["source"] == "oof-refit" and info["folds"] == 5
+    assert info["folds"] == 5
     fold_id, e_oof = info["fold_id"], info["e_oof"]
     assert fold_id.shape == (len(df),) and set(fold_id) == set(range(5))
 
     # (a) fold-0 values equal an independent refit WITHOUT fold 0 (deterministic)
     proxy_spec = {
-        "X": ContinuousNode(transform="affine"),
-        "T": OrdinalNode(levels=2, terms=[LS("X")]),
+        "X": ContinuousNode([I(transform="affine")]),
+        "T": OrdinalNode(2, [LS("X")]),
     }
     proxy = CausalFlowDAG(proxy_spec, seed=0)
     proxy.fit_classical(df.iloc[fold_id != 0][["X", "T"]], verbose=False)
@@ -164,20 +159,6 @@ def test_training_ehat_is_out_of_fold():
     full.fit_classical(df[["X", "T"]], verbose=False)
     e_in = full._predict_p1("T", df)
     assert np.abs(e_oof - e_in).max() > 1e-4
-
-
-def test_user_supplied_center_column():
-    """center='colname' takes the training propensity from that column."""
-    df = _confounded_df(900, seed=3)
-    df["my_e"] = 1.0 / (1.0 + np.exp(-2.0 * df["X"]))  # oracle propensity
-    spec = {**_misspecified_spec("my_e")}
-    flow = CausalFlowDAG(spec, seed=0)
-    flow.fit(df, epochs=2, verbose=0, seed=0)
-    info = flow.vc_center_info[("Y", "T")]
-    assert info["source"] == "my_e" and info["fold_id"] is None
-    np.testing.assert_allclose(info["e_oof"], df["my_e"].to_numpy(), atol=1e-12)
-    with pytest.raises(KeyError, match="my_e"):
-        CausalFlowDAG(spec, seed=0).fit(df.drop(columns=["my_e"]), epochs=1, verbose=0)
 
 
 # ------------------------------------- acceptance: do() recomputes t - e_hat
@@ -270,3 +251,30 @@ def test_centered_roundtrip_after_load(tmp_path):
             flow.log_prob(df.head(50)).detach().numpy(),
             atol=1e-6,
         )
+
+
+def test_vc_oof_fit_reaches_the_stage_one_proxy():
+    """vc_oof_fit is forwarded to the stage-1 out-of-fold proxy fits.
+
+    The proxy uses Adam only when the treatment node is not all-``ls``
+    (an all-``ls`` treatment takes the deterministic fit_classical path),
+    so the treatment here carries a CS term. An unknown keyword must
+    surface as a TypeError from that fit, which is what proves the
+    forwarding rather than a silently ignored argument.
+    """
+    df = _confounded_df(200, seed=0)
+    spec = {
+        "X": ContinuousNode(),
+        "T": OrdinalNode(2, [CS("X")]),  # not all-ls -> the Adam proxy path
+        "Y": ContinuousNode([LS("X"), VC(t="T", center=True, center_folds=2)]),
+    }
+    kw = dict(epochs=1, learning_rate=1e-2, batch_size=200, verbose=0)
+
+    flow = CausalFlowDAG(spec, seed=0)
+    flow.fit(df, **kw, vc_oof_fit={"epochs": 1, "batch_size": 64})
+    info = flow.vc_center_info[("Y", "T")]
+    assert info["folds"] == 2
+    assert len(np.unique(info["fold_id"])) == 2
+
+    with pytest.raises(TypeError):
+        CausalFlowDAG(spec, seed=0).fit(df, **kw, vc_oof_fit={"not_a_kwarg": 1})

@@ -17,6 +17,7 @@ Usage: uv run python validate_ls.py [source] [--classical]
                     instead of the multi-phase Adam schedule
 """
 
+import logging
 import sys
 
 import pandas as pd
@@ -24,54 +25,29 @@ import torch
 from common import DATA_R_REF, load_data
 from statsmodels.miscmodels.ordinal_model import OrderedModel
 
-from tramdag import LS, CausalFlowDAG, ContinuousNode, OrdinalNode
+from tramdag import CausalFlowDAG
+from tramdag.simulations import MagicMrClean
 
 PHASES = [(4000, 1e-2), (2000, 1e-3), (1000, 1e-4)]  # to tight convergence
 
 
-def design(df: pd.DataFrame) -> pd.DataFrame:
-    """Encode the parents exactly as the flow does.
-
-    A continuous parent stays raw. An ordinal parent is one-hot encoded with
-    level 0 dropped: with cutpoints the full one-hot is unidentified, so only
-    the differences against level 0 are comparable.
-    """
-    X = pd.DataFrame(index=df.index)
-    X["Age"] = df["Age"].values
-    for k in range(6):
-        X[f"mRS_pre_{k}"] = (df["mRS_pre"].values == k).astype(float)
-    X["NIHSSa"] = df["NIHSSa"].values
-    X["T"] = df["T"].values
-    return X.drop(columns=["mRS_pre_0"])
-
-
-def all_ls_spec() -> dict:
-    return {
-        "Age": ContinuousNode(transform="bernstein"),
-        "mRS_pre": OrdinalNode(levels=6, terms=[LS("Age")]),
-        "NIHSSa": ContinuousNode(
-            transform="bernstein", terms=[LS("Age"), LS("mRS_pre")]
-        ),
-        "T": OrdinalNode(levels=2, terms=[LS("Age"), LS("mRS_pre"), LS("NIHSSa")]),
-        "mRS_3m": OrdinalNode(
-            levels=7, terms=[LS("Age"), LS("mRS_pre"), LS("NIHSSa"), LS("T")]
-        ),
-    }
-
-
 def main(source: str = "magic-mrclean/ls", classical: bool = False):
+    logging.basicConfig(level=logging.INFO, format="%(message)s")  # fit progress
     obs, rct, truth = load_data(source)
     fitter = "fit_classical (float64 L-BFGS)" if classical else "Adam (multi-phase)"
     print(f"=== spot-on all-ls comparison on '{source}' (N={len(obs)}) — {fitter} ===")
 
-    # --- classical MLE (statsmodels), full data ---
-    res = OrderedModel(obs["mRS_3m"].astype(int), design(obs), distr="logit").fit(
-        method="bfgs", disp=False
-    )
-
     # --- flow: full data, no early stopping, train to the MLE ---
     torch.manual_seed(0)
-    flow = CausalFlowDAG(all_ls_spec())
+    flow = CausalFlowDAG(MagicMrClean().spec("ls"))
+
+    # --- classical MLE (statsmodels), full data. The flow encodes the design:
+    #     drop_first gives the identified columns a cutpoint model expects. ---
+    res = OrderedModel(
+        obs["mRS_3m"].astype(int),
+        flow.design_matrix(obs, "mRS_3m", drop_first=True),
+        distr="logit",
+    ).fit(method="bfgs", disp=False)
     if classical:
         flow.fit_classical(obs)
     else:
@@ -86,20 +62,18 @@ def main(source: str = "magic-mrclean/ls", classical: bool = False):
                 restore_best=False,
             )
 
-    node = flow.nodes["mRS_3m"]
-    w_age = float(node.shifts["Age"].weight.detach())
-    w_nih = float(node.shifts["NIHSSa"].weight.detach())
-    w_pre = node.shifts["mRS_pre"].weight.detach().numpy().ravel()
-    w_t = node.shifts["T"].weight.detach().numpy().ravel()
+    coefs = flow.ls_coefficients()["mRS_3m"]
+    w_age, w_nih = float(coefs["Age"][0]), float(coefs["NIHSSa"][0])
+    w_pre, w_t = coefs["mRS_pre"], coefs["T"]
 
     rows = [
         ("Age", w_age, res.params["Age"]),
         ("NIHSSa", w_nih, res.params["NIHSSa"]),
-        ("T (=1 vs 0)", w_t[1] - w_t[0], res.params["T"]),
+        ("T (=1 vs 0)", w_t[1] - w_t[0], res.params["T[1]"]),
     ]
     for k in range(1, 6):
         rows.append(
-            (f"mRS_pre_{k} (vs 0)", w_pre[k] - w_pre[0], res.params[f"mRS_pre_{k}"])
+            (f"mRS_pre_{k} (vs 0)", w_pre[k] - w_pre[0], res.params[f"mRS_pre[{k}]"])
         )
 
     print(f"\n{'coefficient':<20}{'flow':>10}{'statsmodels':>13}{'|diff|':>9}")
@@ -121,10 +95,14 @@ def main(source: str = "magic-mrclean/ls", classical: bool = False):
 
     # --- ATE on the RCT covariates ---
     p0 = res.model.predict(
-        res.params, exog=design(rct.assign(T=0)).values, which="prob"
+        res.params,
+        exog=flow.design_matrix(rct.assign(T=0), "mRS_3m", drop_first=True).values,
+        which="prob",
     )
     p1 = res.model.predict(
-        res.params, exog=design(rct.assign(T=1)).values, which="prob"
+        res.params,
+        exog=flow.design_matrix(rct.assign(T=1), "mRS_3m", drop_first=True).values,
+        which="prob",
     )
     ate_mle = float((p1[:, :3].sum(axis=1) - p0[:, :3].sum(axis=1)).mean())
     pf0 = flow.pmf(rct, node="mRS_3m", do={"T": 0})

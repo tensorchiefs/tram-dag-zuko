@@ -12,7 +12,7 @@ model with a heterogeneous treatment effect on the latent scale::
 
 so ``Y = (U_Y - g(x) - beta(x) T) / 2``. The DGP is exactly in-class for::
 
-    "Y": ContinuousNode(terms=[CS("X1", "X2", "X3"), VC("T", "X2", "X3")])
+    "Y": ContinuousNode([CS("X1", "X2", "X3"), VC("X2", "X3", t="T")])
 
 ``X2`` is deliberately both a confounder (enters the propensity) *and* an
 effect modifier — the configuration where the unregularized ``CS(on, x...)``
@@ -38,33 +38,28 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-COLUMNS = ["X1", "X2", "X3", "T", "Y"]
+from ._common import DatasetDraws, logistic, resolve_latents
 
 B0, B2, B3 = -1.0, 0.8, -0.6  # beta(x) = B0 + B2*X2 + B3*X3
 H_SCALE = 2.0  # h(y) = H_SCALE * y
 
 
-def _logistic(rng: np.random.Generator, size: int) -> np.ndarray:
-    return rng.logistic(loc=0.0, size=size)
-
-
-def _sigmoid(x: np.ndarray) -> np.ndarray:
-    return 1.0 / (1.0 + np.exp(-x))
-
-
 @dataclass
-class VCLogisticShift:
+class VCLogisticShift(DatasetDraws):
     """SCM generator for the VC validation cohort (issue #28).
 
-    Args:
-        seed: master seed; each dataset draw uses an independent child stream.
+    Parameters
+    ----------
+    seed : int, optional
+        Master seed, by default 42. Each dataset draw uses an independent
+        child stream.
     """
 
     seed: int = 42
 
     # ------------------------------------------------------------------ latents
     def draw_latents(self, n: int, rng: np.random.Generator) -> dict[str, np.ndarray]:
-        """Draw all noise of the SCM.
+        """Draw all noise of the SCM, ``n`` rows each.
 
         The sources get Gaussian primitives. T gets a logistic assignment
         latent and Y gets the logistic TRAM latent.
@@ -73,8 +68,8 @@ class VCLogisticShift:
             "X1": rng.normal(size=n),
             "X2": rng.normal(size=n),
             "X3": rng.normal(size=n),
-            "T": _logistic(rng, n),
-            "Y": _logistic(rng, n),
+            "T": logistic(rng, n),
+            "Y": logistic(rng, n),
         }
 
     # --------------------------------------------------------------------- SCM
@@ -86,14 +81,34 @@ class VCLogisticShift:
         do: dict[str, float] | None = None,
         latents: dict[str, np.ndarray] | None = None,
     ) -> pd.DataFrame:
-        """Forward-sample the SCM (``do`` clamps nodes; ``latents`` reuses noise)."""
+        """Forward-sample the SCM.
+
+        Parameters
+        ----------
+        n : int | None, optional
+            Number of rows. Required unless ``latents`` is given.
+        rng : np.random.Generator | None, optional
+            Random source. Defaults to a generator seeded with
+            ``self.seed``.
+        do : dict[str, float] | None, optional
+            Hard interventions ``{node: value}``. The node is clamped and
+            its structural equation skipped.
+        latents : dict[str, np.ndarray] | None, optional
+            Reuse a fixed latent draw. If given, ``n`` and ``rng`` are
+            ignored.
+
+        Returns
+        -------
+        pd.DataFrame
+            The sample, one column per variable.
+
+        Raises
+        ------
+        ValueError
+            If both ``n`` and ``latents`` are omitted.
+        """
         do = do or {}
-        if latents is None:
-            if n is None:
-                raise ValueError("provide either n or latents")
-            rng = rng or np.random.default_rng(self.seed)
-            latents = self.draw_latents(n, rng)
-        n = len(next(iter(latents.values())))
+        latents, n = resolve_latents(self, n, rng, latents)
 
         x = {}
         for name in ("X1", "X2", "X3"):
@@ -113,32 +128,23 @@ class VCLogisticShift:
             {"X1": x["X1"], "X2": x["X2"], "X3": x["X3"], "T": T, "Y": Y}
         )
 
-    # ----------------------------------------------------------------- datasets
-    def observational(self, n: int, seed_offset: int = 0) -> pd.DataFrame:
-        """Draw an observational sample.
-
-        Parameters
-        ----------
-        n : int
-            Number of rows.
-        seed_offset : int, optional
-            Added to the generator seed, by default ``0``.
-
-        Returns
-        -------
-        pd.DataFrame
-            The sample.
-        """
-        rng = np.random.default_rng(self.seed + 1 + seed_offset)
-        return self.simulate(n, rng=rng)
-
     # -------------------------------------------------------------- ground truth
     def true_beta(self, x) -> np.ndarray:
         """Give the true effect function ``beta(x)`` on the latent scale.
 
         The scale is log-odds. A fitted VC term must recover this function
-        through :meth:`~tramdag.CausalFlowDAG.varying_coef`. ``x`` is a
-        DataFrame with X2 and X3 columns. Other columns are ignored.
+        through :meth:`~tramdag.CausalFlowDAG.varying_coef`.
+
+        Parameters
+        ----------
+        x : pd.DataFrame
+            Rows with ``X2`` and ``X3`` columns. Other columns are
+            ignored.
+
+        Returns
+        -------
+        np.ndarray
+            The effect values, shape ``(n,)``.
         """
         return (
             B0
@@ -146,32 +152,10 @@ class VCLogisticShift:
             + B3 * np.asarray(x["X3"], dtype=float)
         )
 
-    def counterfactual_pair(
-        self, n: int, do: dict[str, float], seed_offset: int = 0
-    ) -> tuple[pd.DataFrame, pd.DataFrame]:
-        """Draw a factual sample and its counterfactual under ``do``.
-
-        Both share the same latents, so the pair gives true individual
-        counterfactuals.
-        """
-        rng = np.random.default_rng(self.seed + 2 + seed_offset)
-        latents = self.draw_latents(n, rng)
-        return self.simulate(latents=latents), self.simulate(latents=latents, do=do)
-
 
 # --------------------------------------------------------------------------- CLI
 def main(argv: list[str] | None = None) -> None:
-    """Regenerate the frozen CSV files of this data-generating process.
-
-    Parameters
-    ----------
-    argv : list[str] | None, optional
-        Command-line arguments, by default ``None`` (``sys.argv``).
-
-    Returns
-    -------
-    None
-    """
+    """Regenerate the frozen CSV files of this data-generating process."""
     p = argparse.ArgumentParser(description="Generate the VC validation cohort.")
     p.add_argument("--out", type=Path, default=Path("data/vc-shift"))
     p.add_argument("--seed", type=int, default=42)

@@ -13,13 +13,13 @@ from .spec import (
     LS,
     VC,
     ContinuousNode,
-    CShift,
     I,
-    Intercept,
-    LinShift,
     OrdinalNode,
     Term,
-    term,
+    complex_shift,
+    intercept,
+    linear_shift,
+    varying_coefficient,
 )
 
 __all__ = [
@@ -28,15 +28,15 @@ __all__ = [
     "OrdinalNode",
     "machine_info",
     "simulations",
-    # term-formula notation
+    # term-formula notation: short aliases and their definitions
     "Term",
     "I",
+    "intercept",
     "LS",
+    "linear_shift",
     "CS",
+    "complex_shift",
     "VC",
-    "term",
-    "Intercept",
-    "LinShift",
-    "CShift",
+    "varying_coefficient",
 ]
 __version__ = version("tramdag")

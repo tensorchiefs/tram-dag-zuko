@@ -68,8 +68,30 @@ def fit_chunked(
     return flow, traj
 
 
+def hist_overlay(ax, dgp, flow_samp, bins) -> None:
+    """Draw the DGP histogram filled and the flow histogram stepped."""
+    ax.hist(dgp, bins=bins, density=True, alpha=0.45, label="DGP")
+    ax.hist(
+        flow_samp,
+        bins=bins,
+        density=True,
+        histtype="step",
+        lw=1.8,
+        color="C3",
+        label="flow",
+    )
+
+
+def finish(fig, path: Path) -> None:
+    """Lay out, save at 150 dpi, and close."""
+    fig.tight_layout()
+    fig.savefig(path, dpi=150)
+    plt.close(fig)
+
+
 def ls_weight(flow: CausalFlowDAG, node: str, parent: str) -> float:
-    return float(flow.nodes[node].shifts[parent].weight.detach())
+    """Give the node's linear-shift weight on that parent."""
+    return float(flow.ls_coefficients()[node][parent][0])
 
 
 def cs_curve(
@@ -91,7 +113,7 @@ def plot_trajectories(
         ax.axhline(truths[key], color=f"C{i}", ls="--", lw=1)
     ax.set_xlabel("epoch"), ax.set_ylabel("coefficient")
     ax.set_title(title), ax.legend()
-    fig.tight_layout(), fig.savefig(path, dpi=150), plt.close(fig)
+    finish(fig, path)
 
 
 def plot_hist_grid(
@@ -133,21 +155,11 @@ def plot_hist_grid(
                 lo, hi = np.quantile(d, [0.001, 0.999])
                 if hi - lo < 1e-9:  # do-clamped column: constant value
                     lo, hi = lo - 1.0, hi + 1.0
-                bins = np.linspace(lo, hi, 50)
-                ax.hist(d, bins=bins, density=True, alpha=0.45, label="DGP")
-                ax.hist(
-                    m,
-                    bins=bins,
-                    density=True,
-                    histtype="step",
-                    lw=1.8,
-                    color="C3",
-                    label="flow",
-                )
+                hist_overlay(ax, d, m, np.linspace(lo, hi, 50))
             if r == 0:
                 ax.set_title(col)
             if c == 0:
                 ax.set_ylabel(scen)
     axes[0][0].legend(fontsize=8)
     fig.suptitle(title)
-    fig.tight_layout(), fig.savefig(path, dpi=150), plt.close(fig)
+    finish(fig, path)

@@ -29,6 +29,41 @@ import torch
 from torch import Tensor, nn
 
 
+def _mlp(
+    n_in: int, units: tuple[int, ...], n_out: int, *, zero_init_last: bool = False
+) -> nn.Sequential:
+    """Build the one MLP shape every conditioner uses.
+
+    Hidden layers of the given ``units`` with ReLU, then a bias-free output
+    layer.
+
+    Parameters
+    ----------
+    n_in : int
+        Input width.
+    units : tuple[int, ...]
+        Hidden layer widths.
+    n_out : int
+        Output width.
+    zero_init_last : bool, optional
+        Zero the output layer, by default ``False``.
+
+    Returns
+    -------
+    nn.Sequential
+        The network.
+    """
+    layers: list[nn.Module] = []
+    width = n_in
+    for u in units:
+        layers += [nn.Linear(width, u), nn.ReLU()]
+        width = u
+    out = nn.Linear(width, n_out, bias=False)
+    if zero_init_last:
+        nn.init.zeros_(out.weight)
+    return nn.Sequential(*layers, out)
+
+
 class SimpleIntercept(nn.Module):
     """Free transform parameters that do not depend on the data.
 
@@ -69,17 +104,15 @@ class ComplexIntercept(nn.Module):
         Width of the encoded parent features.
     n_params : int
         Number of transform parameters to produce.
+    units : tuple[int, ...] | None, optional
+        Hidden layers of the network, by default ``(8, 8)``.
     """
 
-    def __init__(self, n_features: int, n_params: int):
+    def __init__(
+        self, n_features: int, n_params: int, units: tuple[int, ...] | None = None
+    ):
         super().__init__()
-        self.net = nn.Sequential(
-            nn.Linear(n_features, 8),
-            nn.ReLU(),
-            nn.Linear(8, 8),
-            nn.ReLU(),
-            nn.Linear(8, n_params, bias=False),
-        )
+        self.net = _mlp(n_features, units or (8, 8), n_params)
 
     def forward(self, x: Tensor) -> Tensor:
         """Map parent features to transform parameters.
@@ -140,19 +173,13 @@ class ComplexShift(nn.Module):
     ----------
     n_features : int
         Width of the encoded parent features.
+    units : tuple[int, ...] | None, optional
+        Hidden layers of the network, by default ``(64, 128, 64)``.
     """
 
-    def __init__(self, n_features: int):
+    def __init__(self, n_features: int, units: tuple[int, ...] | None = None):
         super().__init__()
-        self.net = nn.Sequential(
-            nn.Linear(n_features, 64),
-            nn.ReLU(),
-            nn.Linear(64, 128),
-            nn.ReLU(),
-            nn.Linear(128, 64),
-            nn.ReLU(),
-            nn.Linear(64, 1, bias=False),
-        )
+        self.net = _mlp(n_features, units or (64, 128, 64), 1)
 
     def forward(self, x: Tensor) -> Tensor:
         """Compute the shift contribution.
@@ -173,16 +200,17 @@ class ComplexShift(nn.Module):
 class VaryingCoef(nn.Module):
     """Varying-coefficient effect head ``beta(x) = beta0 + b_theta(x)``.
 
-    ``b_theta`` is deliberately small: one hidden layer of ``hidden`` units. Its
-    weights carry an L2 ``penalty`` in the fitting objective (see :meth:`l2`;
-    ``fit`` adds ``penalty * l2()`` on the total-NLL scale). ``beta0`` is not
-    penalized.
+    ``b_theta`` is deliberately small: one hidden layer by default. Its
+    weights carry an L2 ``penalty`` in the fitting objective (see
+    :meth:`l2`; ``fit`` adds ``penalty * l2()`` on the total-NLL scale).
+    ``beta0`` is not penalized.
 
-    The output layer starts at zero, so ``beta(x)`` equals ``beta0`` exactly at
-    construction. The head therefore learns only the deviation from a constant
-    effect, which makes the arm difference an estimate instead of a by-product.
-    The unpenalized reduced form ``CS(on, x...)`` reaches a correlation of only
-    about 0.5 against the true effect function (issue #28).
+    The output layer starts at zero, so ``beta(x)`` equals ``beta0``
+    exactly at construction. The head therefore learns only the deviation
+    from a constant effect, which makes the arm difference an estimate
+    instead of a by-product. The unpenalized reduced form ``CS(on, x...)``
+    reaches a correlation of only about 0.5 against the true effect
+    function (issue #28).
 
     With ``n_features == 0`` there are no modifiers, there is no network, and the
     term is exactly ``LS(on)``.
@@ -193,8 +221,8 @@ class VaryingCoef(nn.Module):
         Width of the encoded modifier features. Use 0 for no modifiers.
     penalty : float, optional
         L2 weight on ``b_theta``, by default ``1.0``.
-    hidden : int, optional
-        Hidden units in ``b_theta``, by default ``16``.
+    units : tuple[int, ...] | None, optional
+        Hidden layers of ``b_theta``, by default ``(16,)``.
 
     Notes
     -----
@@ -207,16 +235,20 @@ class VaryingCoef(nn.Module):
     through the ``center`` buffer and leaves the modelled function unchanged.
     """
 
-    def __init__(self, n_features: int, penalty: float = 1.0, hidden: int = 16):
+    def __init__(
+        self,
+        n_features: int,
+        penalty: float = 1.0,
+        units: tuple[int, ...] | None = None,
+    ):
         super().__init__()
         self.penalty = float(penalty)
         self.beta0 = nn.Parameter(torch.zeros(()))
         self.register_buffer("center", torch.zeros(()))
         self.register_buffer("warm_started", torch.tensor(False))
         if n_features > 0:
-            out = nn.Linear(hidden, 1, bias=False)
-            nn.init.zeros_(out.weight)  # beta(x) == beta0 at init
-            self.net = nn.Sequential(nn.Linear(n_features, hidden), nn.ReLU(), out)
+            # zero-initialised output: beta(x) == beta0 at init
+            self.net = _mlp(n_features, units or (16,), 1, zero_init_last=True)
         else:
             self.net = None
 
