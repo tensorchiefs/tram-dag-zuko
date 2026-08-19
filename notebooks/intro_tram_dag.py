@@ -677,18 +677,19 @@ plt.show()
 # * **Complex intercepts (`I(...)`)** — this is the one component not exercised
 #   here. Declare `terms=[I("Age")]`, and the *parameters* of the
 #   Bernstein transform become a function of the parent. Several `I(...)` parents
-#   feed one joint network, that is, they can interact. The stroke experiments in
+#   feed one joint network, that is, they can interact. The paper replications in
 #   `experiments/` use `I(...)` heavily. Run
-#   `uv run python experiments/sim_flow.py nl` for the full storyline on the
-#   synthetic cohort with known ground truth.
+#   `uv run python experiments/vaca.py flexible` for an all-intercept flow on a
+#   bimodal benchmark with analytic interventional truth.
 # * **Early stopping vs. exact MLE** — this notebook's DGP has no unobserved
 #   confounding, so the MLE (`restore_best=False`, the default) is the right
-#   target. On the synthetic stroke cohort, flexible (`I`/`CS`) models *overfit
-#   observational confounding* at the MLE and need `restore_best=True` to recover
-#   the causal effect. See `CHANGELOG.md` and the README's "Results" notes.
+#   target. Under observational confounding, flexible (`I`/`CS`) models can
+#   *overfit the confounding* at the MLE and need `restore_best=True` to recover
+#   the causal effect. See `CHANGELOG.md`.
 # * **Validation against classical models** — an all-`LS` flow trained to
 #   convergence *is* the classical proportional-odds MLE
-#   (`experiments/validate_ls.py` pins flow ≡ `statsmodels` ≡ R `polr`).
+#   (`experiments/validate_ls.py` pins flow ≡ `statsmodels` ≡ R `polr`, and the
+#   framework tests check the same identity on an inline DGP).
 # * **Joint terms** — write several parents inside one term to model an
 #   *interaction*. `CS("x1", "x2")` is a single shift network $g(x_1, x_2)$, and
 #   `I("x1", "x2")` is a single intercept network over both parents. Separate

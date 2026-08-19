@@ -49,11 +49,11 @@ if importlib.util.find_spec("tramdag") is None:  # Colab: install from PyPI
 
 import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd
 import scipy.stats as st  # for KDE plots only (preinstalled on Colab)
 import torch
 
 from tramdag import CausalFlowDAG, ContinuousNode, I
-from tramdag.simulations import VacaTriangle
 
 # tramdag reports fit() progress on its module logger
 logging.basicConfig(level=logging.INFO, format="%(message)s")
@@ -79,8 +79,56 @@ print(f"torch {torch.__version__}  device: {DEVICE}")
 # The DAG is $x_1 \to x_2$, $x_1 \to x_3$, $x_2 \to x_3$.
 
 # %%
-gen = VacaTriangle(seed=42)
-df = gen.observational(50_000)
+# The DGP, written out here so this notebook needs nothing but tramdag.
+# draw_latents/simulate are separate on purpose: keeping the noise lets us
+# intervene on the SAME individuals later, which is what makes the
+# counterfactual check in section 5 possible.
+
+
+def draw_latents(n, rng):
+    """Draw every noise variable of the SCM, n rows each."""
+    return {
+        "x1_mix": rng.uniform(size=n),  # which mixture component
+        "x1_a": rng.normal(size=n),  # N(-2, 1.5) branch
+        "x1_b": rng.normal(size=n),  # N(1.5, 1) branch
+        "x2": rng.normal(size=n),
+        "x3": rng.normal(size=n),
+    }
+
+
+def simulate(latents, do=None):
+    """Run the SCM forward; a variable named in `do` is clamped instead."""
+    do = do or {}
+    n = len(latents["x2"])
+
+    if "x1" in do:
+        x1 = np.full(n, float(do["x1"]))
+    else:
+        x1 = np.where(
+            latents["x1_mix"] < 0.5,
+            -2.0 + np.sqrt(1.5) * latents["x1_a"],
+            1.5 + latents["x1_b"],
+        )
+
+    if "x2" in do:
+        x2 = np.full(n, float(do["x2"]))
+    else:
+        x2 = -x1 + latents["x2"]
+
+    if "x3" in do:
+        x3 = np.full(n, float(do["x3"]))
+    else:
+        x3 = x1 + 0.25 * x2 + latents["x3"]
+
+    return pd.DataFrame({"x1": x1, "x2": x2, "x3": x3})
+
+
+def sample_dgp(n, seed, do=None):
+    """Draw n fresh rows from the SCM, optionally under an intervention."""
+    return simulate(draw_latents(n, np.random.default_rng(seed)), do)
+
+
+df = sample_dgp(50_000, seed=43)
 train, val = df.iloc[:45_000], df.iloc[45_000:]
 
 fig, axes = plt.subplots(1, 3, figsize=(11, 3))
@@ -202,7 +250,7 @@ plt.show()
 fig, axes = plt.subplots(1, 3, figsize=(11, 3.2), sharey=True)
 print("E[x3 | do(x2=a)]:   analytic    TRAM-DAG")
 for ax, a in zip(axes, (-3.0, -1.0, 0.0)):
-    truth = gen.interventional(50_000, {"x2": a})
+    truth = sample_dgp(50_000, seed=543, do={"x2": a})
     fl = flow.sample(50_000, do={"x2": a}, seed=2)
     bins = np.linspace(truth["x3"].quantile(0.001), truth["x3"].quantile(0.999), 70)
     # DGP histogram
@@ -235,10 +283,9 @@ plt.show()
 # causal inference, and it is impossible with real data.
 
 # %%
-rng = np.random.default_rng(7)
-lat = gen.draw_latents(1_000, rng)
-factual = gen.simulate(latents=lat)
-cf_true = gen.simulate(latents=lat, do={"x1": 0.0})
+lat = draw_latents(1_000, np.random.default_rng(7))
+factual = simulate(lat)  # the same noise on both sides ...
+cf_true = simulate(lat, do={"x1": 0.0})  # ... so these are true counterfactuals
 
 u = flow.abduct(factual)
 recon = flow.sample(u=u)
