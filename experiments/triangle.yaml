@@ -30,6 +30,14 @@ variants:
     f: linear
     shift: ls
 
+  # the misspecified case (paper App. C.3.3, Fig. 17): the DGP's x2 -> x3
+  # effect is linear, but it is fitted with a complex shift, which must
+  # recover that straight line instead of bending to noise
+  linear-cs:
+    <<: *paper_protocol
+    f: linear
+    shift: cs
+
   # the headline complex-shift experiment (Fig. 7/15/16)
   atan-cs:
     <<: *paper_protocol

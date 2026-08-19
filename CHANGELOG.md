@@ -4,6 +4,33 @@
 
 ### Added
 
+- **Paper-aligned intercept constructors**: `simple_intercept`/`SI` (the
+  parentless baseline) and `complex_intercept`/`CI` (needs at least one
+  parent), matching the paper's SI/CI notation. `intercept`/`I` stays as
+  the fallback and dispatches on its arguments, so every existing spelling
+  keeps working, and both `I` and `SI` work as bare names in a term list.
+
+- **The experiments are self-contained and configuration-driven.** One
+  script per dataset (`triangle`, `triangle_mixed`, `vaca`, `carefl`,
+  `validate_ls`), each with the same shape — imports, function
+  definitions, a `run(variant)` function, a `__main__` block whose
+  argparse call selects the variant — and each reading **every**
+  hyperparameter from a sibling `<script>.yaml`. The loader rejects a
+  variant with a missing or unknown key, so a value cannot quietly become
+  a default. `experiments/PAPER_COVERAGE.md` maps every figure of
+  arXiv:2503.16206 to the variant that reproduces it, including the
+  paper's misspecified case (Fig. 17, new variant `triangle linear-cs`)
+  and the two competing baselines that are deliberately not reimplemented.
+
+- **An experiments workflow** (`.github/workflows/experiments.yaml`) runs
+  all replication variants as a matrix on pull requests into `main` and on
+  demand, compares each run's `metrics.json` against the committed
+  `experiments/ground_truth/<name>.json` (a `{value, atol}` entry per
+  metric), and posts the run's report — metrics table plus figures — as a
+  commit comment through CML. `experiments/check_data.py` additionally
+  verifies that every frozen dataset still regenerates from its stored
+  seed, at 1e-9 rather than bit equality.
+
 - **Transformation syntax**: a node's additive formula is now its first
   positional argument and can be written as a `+` sum — the formula reads
   like the math (`ContinuousNode(I("x1") + CS("x2"))`,
@@ -44,6 +71,15 @@
 
 ### Fixed
 
+- **`ls_coefficients()` crashed on a node mixing `LS` and `CS` terms.** It
+  read `.weight` off every shift module, but a `CS` shift is a network and
+  a `VC` shift is an effect head — neither has one, so any such node raised
+  `AttributeError`. That broke the paper's headline complex-shift
+  replication (the old `paper_triangle.py`'s documented default was
+  `atan cs`). The method now returns the linear-shift weights it is named
+  for and skips network shifts; a node with no `LS` term is absent from the
+  result. The bug predates 0.4 (`tests/test_api_papercuts.py`).
+
 - **`marginal_init` no longer resets a loaded model.** The calibration is
   first-fit-only. A continuous node's guard is the transform's `_fitted`
   flag, which `load` restores; an ordinal node's guard lived on the
@@ -53,6 +89,23 @@
   (`tests/test_marginal_init.py`).
 
 ### Removed (breaking)
+
+- **`tramdag.simulations` is no longer part of the package.** The SCM
+  generators are research code and moved to `experiments/simulations/`,
+  together with the frozen datasets (`data/` → `experiments/data/`). The
+  wheel now contains framework code only, and `import tramdag.simulations`
+  fails. The stroke storyline left with them: the `magic_mrclean` generator,
+  the `magic-mrclean/nl` cohort, `sim_flow.py`, the `vc_shift` DGP,
+  `experiments/stale/` and `docs/stroke-case-study.md` are deleted, and the
+  clinical case study lives in its own repository.
+  `experiments/data/magic-mrclean/ls` stays as the frozen input of
+  `validate_ls`. **Everything deleted is recoverable at the
+  `pre-experiments-cut` tag**: `git checkout pre-experiments-cut -- <path>`.
+
+- **`transform_kwargs=`** on the intercept constructors. Extra keyword
+  arguments now pass straight to the transform class:
+  `I("x1", transform="spline", bins=6)`. The canonical storage inside
+  `Term.options` is unchanged, so serialized specs are unaffected.
 
 - **`fit(schedule=)` keeps `None` and `"plateau"` only.** `"onecycle"`
   and `"cosine"` had no caller outside one parametrized test, and the
@@ -126,6 +179,22 @@
   entries.
 
 ### Changed (internal, no API surface)
+
+- **The framework tests carry their own data.** Three inline numpy DGPs in
+  `tests/conftest.py` (an all-`ls` chain, a heterogeneous-effect DGP and a
+  confounded DGP with a prognostic misfit) replace the generator package the
+  suite used to import. The external-software anchor is unchanged in
+  substance — an all-`ls` outcome node is an ordered-logit model, so the
+  flow's MLE must equal `statsmodels` on the same design matrix — but it is
+  now measured on inline data at test time instead of against a committed R
+  reference; the R comparison lives on in `experiments/validate_ls.py`. The
+  generator-pinning and frozen-CSV tests moved to the experiments workflow.
+
+- **The stacked ternaries in the `vaca` and `carefl` generators' `simulate`
+  became one if/else per variable** (readability of experiment code).
+  Verified behaviour-neutral: `vaca` regenerates bit-identically and
+  `carefl` within 7e-15, the same machine-epsilon drift the untouched
+  `triangle` generator shows after the dependency bump.
 
 - **The serialized term is `{effect, parents, options}`.** `Term.options`
   is already canonical (sorted, defaults dropped), so `spec_to_dict` emits

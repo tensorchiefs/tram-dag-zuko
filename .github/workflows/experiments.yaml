@@ -31,6 +31,8 @@ jobs:
         - script: triangle
           variant: linear-ls
         - script: triangle
+          variant: linear-cs
+        - script: triangle
           variant: atan-cs
         - script: triangle
           variant: sin-cs

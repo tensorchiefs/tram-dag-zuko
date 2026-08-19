@@ -158,7 +158,7 @@ dedicated workflow runs them and compares.
 
 | experiment | paper | demonstrates |
 |---|---|---|
-| `triangle.py` (`linear-ls`, `atan-cs`, `sin-cs`) | §6.1 | LS coefficient recovery (β = 2, −0.2, +0.3), CS curve ≡ −f(x₂) for non-monotone f |
+| `triangle.py` (`linear-ls`, `linear-cs`, `atan-cs`, `sin-cs`) | §6.1, C.3 | LS coefficient recovery (β = 2, −0.2, +0.3), CS curve ≡ −f(x₂) for non-monotone f |
 | `triangle_mixed.py` (`linear-ls`, `exp-cs`) | §6.2 | mixed data L1/L2 + the C.4 odds-ratio check (OR ≈ 7.4) |
 | `vaca.py` | §5.1–5.2 | the bimodal L1 case a default CNF misses; L2 `p(x₃ \| do(x₂))` against analytic means |
 | `carefl.py` | §5.3 | L3 counterfactual curves vs **analytic** truth |
@@ -166,7 +166,9 @@ dedicated workflow runs them and compares.
 
 Sign note: ordinal shifts are *subtracted* here but *added* in the paper, so
 fitted ordinal weights are the paper's with flipped sign (each `truth.json`
-records both conventions).
+records both conventions). A figure-by-figure account of what is reproduced,
+and what is not (the competing CNF/NSF baselines), is in
+[`experiments/PAPER_COVERAGE.md`](experiments/PAPER_COVERAGE.md).
 
 **Training speed** — schedules, per-node freezing, L-BFGS and device benchmarks:
 [`docs/training-speed.md`](docs/training-speed.md).

@@ -25,11 +25,14 @@ the experiments workflow), `plots/*.png` and `flow.pt`.
 
 | script | dataset | paper | variants |
 |---|---|---|---|
-| [`triangle.py`](triangle.py) | continuous triangle | Sec. 6.1, App. C.3 | `linear-ls`, `atan-cs`, `sin-cs` |
+| [`triangle.py`](triangle.py) | continuous triangle | Sec. 6.1, App. C.3 | `linear-ls`, `linear-cs`, `atan-cs`, `sin-cs` |
 | [`triangle_mixed.py`](triangle_mixed.py) | triangle with an ordinal x3 | Sec. 6.2, App. C.4 | `linear-ls`, `exp-cs` |
 | [`vaca.py`](vaca.py) | VACA/CNF bimodal benchmark | Sec. 5.1–5.2, App. C.1 | `flexible` |
 | [`carefl.py`](carefl.py) | CAREFL Laplace SCM | Sec. 5.3, App. C.2 | `flexible` |
 | [`validate_ls.py`](validate_ls.py) | synthetic stroke cohort | — (framework anchor) | `adam`, `classical` |
+
+Which paper figure each variant reproduces — and what is deliberately not
+reproduced — is listed in [`PAPER_COVERAGE.md`](PAPER_COVERAGE.md).
 
 All five have the same shape: imports, function definitions, a `run(variant)`
 function holding the whole experiment, and a `__main__` block whose argparse
