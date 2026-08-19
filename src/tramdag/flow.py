@@ -1066,20 +1066,25 @@ class CausalFlowDAG(nn.Module):
         For an all-``ls`` model these are the interpretable log-odds-ratio
         coefficients.
 
+        Only ``LS`` terms have a weight to give. A node's ``CS`` and ``VC``
+        shifts are networks, so they are skipped — reading them needs
+        :meth:`varying_coef` or an evaluation of the network itself.
+
         Returns
         -------
         dict[str, dict[str, np.ndarray]]
             The weights, as ``{node: {parent: array}}``. A node without
-            shift terms is absent.
+            linear-shift terms is absent.
         """
         out: dict[str, dict[str, np.ndarray]] = {}
         for name in self.order:
-            shifts = self.nodes[name].shifts
-            if shifts:
-                out[name] = {
-                    p: m.weight.detach().cpu().numpy().ravel().copy()
-                    for p, m in shifts.items()
-                }
+            linear = {
+                parent: module.weight.detach().cpu().numpy().ravel().copy()
+                for parent, module in self.nodes[name].shifts.items()
+                if isinstance(module, LinearShift)
+            }
+            if linear:
+                out[name] = linear
         return out
 
     def to_matrix(self) -> pd.DataFrame:

@@ -102,3 +102,31 @@ def test_load_requires_a_complete_checkpoint(tmp_path):
     torch.save({"spec": spec_to_dict(flow.spec), "state_dict": flow.state_dict()}, p)
     with pytest.raises(KeyError):
         CausalFlowDAG.load(p)
+
+
+def test_ls_coefficients_skips_network_shifts():
+    """A node mixing LS and CS terms gives only its linear-shift weights.
+
+    Reading `.weight` off every shift module used to raise an
+    AttributeError on a ComplexShift, which broke the paper's headline
+    complex-shift replication (`experiments/triangle.py atan-cs`).
+    """
+    from tramdag import CS, LS, VC, CausalFlowDAG, ContinuousNode, OrdinalNode
+
+    spec = {
+        "x1": ContinuousNode(),
+        "x2": ContinuousNode([LS("x1")]),
+        "t": OrdinalNode(2, [LS("x1")]),
+        "x3": ContinuousNode([LS("x1"), CS("x2"), VC("x2", t="t")]),
+    }
+    coefficients = CausalFlowDAG(spec, seed=0).ls_coefficients()
+    assert set(coefficients["x3"]) == {"x1"}  # CS and VC carry no weight
+    assert set(coefficients["x2"]) == {"x1"}
+    assert coefficients["x3"]["x1"].shape == (1,)
+
+
+def test_ls_coefficients_omits_a_node_without_linear_shifts():
+    from tramdag import CS, CausalFlowDAG, ContinuousNode
+
+    spec = {"x1": ContinuousNode(), "x2": ContinuousNode([CS("x1")])}
+    assert CausalFlowDAG(spec, seed=0).ls_coefficients() == {}
