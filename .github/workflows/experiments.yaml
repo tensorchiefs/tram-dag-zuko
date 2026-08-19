@@ -10,7 +10,8 @@ name: experiments
 # server, so no branch in this repository holds generated images.
 on:
   pull_request:
-    branches: [main]
+    branches: [main, dev-*]
+    types: [opened, synchronize, reopened, labeled]
   workflow_dispatch:
     inputs:
       script:
@@ -34,6 +35,15 @@ jobs:
   # variant added to <script>.yaml is picked up here automatically, and the two
   # can never disagree. A dispatch may narrow it to one script+variant.
   plan:
+    # These jobs train real models. A pull request into main always runs them;
+    # a pull request into a dev branch runs them only when it carries the
+    # 'run-experiments' label, so integration PRs cost nothing by default.
+    # (workflow_dispatch needs the workflow on the default branch, so before
+    # this file reaches main the label is the only way to trigger a run.)
+    if: >-
+      ${{ github.event_name != 'pull_request'
+          || github.base_ref == 'main'
+          || contains(github.event.pull_request.labels.*.name, 'run-experiments') }}
     runs-on: ubuntu-latest
     outputs:
       include: ${{ steps.pick.outputs.include }}
