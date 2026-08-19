@@ -214,7 +214,7 @@ The fit stops itself.</p>
 
 
 
-fitted on cpu in 21.4s (90 epochs, then froze itself)
+fitted on cpu in 20.6s (90 epochs, then froze itself)
 </code></pre>
 
 <p>Training diagnostics come for free. <code>fit</code> records per-node train/val NLL,
@@ -452,7 +452,7 @@ it consistently trains to a worse optimum on this target (same result for
 8–32 bins, lr 0.01–0.1, up to 2000 epochs). This is an honest empirical reason
 why <strong>Bernstein</strong> is the TRAM-faithful default: its monotone softplus-cumsum
 parametrization is easier to optimize. You can swap the transform per node at
-any time with <code>I(..., transform="spline", transform_kwargs={"bins": 16})</code>.</p>
+any time with <code>I(..., transform="spline", bins=16)</code>.</p>
 
 <h2 id="7-gpu-vs-cpu">7. GPU vs CPU</h2>
 
@@ -490,7 +490,7 @@ devices (a CPU-only runtime reports only CPU):</p>
 </code></pre>
 </div>
 
-<pre><code>cpu  :   14.1s for 60 epochs @ n=45,000
+<pre><code>cpu  :   13.5s for 60 epochs @ n=45,000
 </code></pre>
 
 <h2 id="what-you-just-saw">What you just saw</h2>

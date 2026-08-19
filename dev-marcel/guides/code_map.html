@@ -501,7 +501,7 @@ default you can read at the call site. Nothing numeric is buried.</p>
 </tr>
 <tr>
   <td>transform basis</td>
-  <td><code>I(transform=, transform_kwargs=)</code></td>
+  <td><code>I(transform=, **kwargs)</code> (extra kwargs go to the transform class)</td>
   <td><code>"bernstein"</code>, <code>n_coeffs=20</code>; spline <code>bins=8</code> (the domain is fixed at [-5, 5], <code>transforms.BOUND</code>)</td>
 </tr>
 <tr>
