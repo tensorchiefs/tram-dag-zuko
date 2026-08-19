@@ -141,10 +141,18 @@ jobs:
         sed -E -e 's#\[!\[[^]]*\]\([^)]*\)\]\([^)]*\)##g' \
                -e 's#!\[[^]]*\]\(https?://[^)]*\)##g' \
           README.md > build/pdf/README.md
-        uv run --group notebooks --group docs --with weasyprint pandoc -f gfm -s --embed-resources \
+        # Two steps on purpose. Going straight to PDF leaves the stylesheet
+        # and the guides' images as file:// links that WeasyPrint resolves
+        # against the CWD and fails to find (--embed-resources only inlines
+        # for HTML output). Rendering HTML first makes the page genuinely
+        # self-contained: CSS in a <style> block, images as data: URIs.
+        uv run --group notebooks --group docs pandoc -f gfm -s --embed-resources \
           --resource-path=.:docs --metadata title="tramdag documentation" \
-          --toc --toc-depth=2 --css=pdf.css build/pdf/README.md docs/*.md \
-          -o site/tramdag-docs.pdf --pdf-engine=weasyprint
+          --toc --toc-depth=2 --css=docs/pdf.css build/pdf/README.md docs/*.md \
+          -o build/pdf/docs.html
+        grep -q 'id="TOC"' build/pdf/docs.html   # fail loudly if pandoc drops it
+        ! grep -q 'href="docs/pdf.css"' build/pdf/docs.html   # css must be inlined
+        uv run --with weasyprint weasyprint build/pdf/docs.html site/tramdag-docs.pdf
 
     - name: publish to gh-pages
       env:
