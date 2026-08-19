@@ -25,6 +25,7 @@
 
 <h2>Guides</h2>
 <ul class="memberlist">
+  <li><a href="../guides/notation.html">Notation</a></li>
   <li><a href="../guides/fitting.html">Fitting</a></li>
   <li><a href="../guides/training_speed.html">Training speed</a></li>
   <li><a href="../guides/scores.html">Scores &amp; modifier scan</a></li>
@@ -70,28 +71,31 @@
 
                         <div class="docstring"><h1 id="per-observation-scores-the-effect-modifier-scan">Per-observation scores &amp; the effect-modifier scan</h1>
 
-<p><code>flow.scores(df, node)</code> returns each observation's score ψᵢ = ∂ℓᵢ/∂θ for the
-node's interpretable shift coefficients — every <code>LS</code> weight (one column per
-continuous parent, one per one-hot level for an ordinal parent) and every <code>VC</code>
-term's <code>beta0</code> (column named after the treatment). The computation is
-<strong>analytic and exact</strong> (no autograd): shifts enter the latent additively, so
-∂ℓᵢ/∂β = (∂ℓᵢ/∂sᵢ)·xᵢ with ∂ℓᵢ/∂s in closed form (<code>src/tramdag/scores.py</code>).
-Pure read-out — no fitting or sampling code path is touched. At a fitted MLE
-the per-column sums are ≈ 0 (pinned by tests, incl. a float64
-finite-difference check).</p>
+<p><code>flow.scores(df, node)</code> returns the score ψᵢ = ∂ℓᵢ/∂θ of each observation
+for the node's interpretable shift coefficients. These coefficients are every
+<code>LS</code> weight and every <code>VC</code> term's <code>beta0</code>. An <code>LS</code> weight gives one column per
+continuous parent and one column per one-hot level of an ordinal parent. The
+<code>beta0</code> column is named after the treatment.</p>
+
+<p>The computation is <strong>analytic and exact</strong>, with no autograd. Shifts enter the
+latent additively. Thus ∂ℓᵢ/∂β = (∂ℓᵢ/∂sᵢ)·xᵢ, with ∂ℓᵢ/∂s in closed form
+(<code>src/tramdag/scores.py</code>). The function is a pure read-out. It does not touch
+the fitting or sampling code paths. At a fitted MLE, the sum of each column is
+≈ 0. Tests pin this behavior and include a float64 finite-difference check.</p>
 
 <h2 id="worked-example-where-does-βx-need-to-bend">Worked example: where does β(x) need to bend?</h2>
 
-<p>The score is the cheapest effect-modifier detector there is (model-based
-recursive partitioning / structural-change logic — Zeileis &amp; Hornik; Dandl et
-al. 2024). Before fitting anything expensive: fit the <strong>cheap all-<code>LS</code> model</strong>
-(seconds, deterministic), and scan the treatment-coefficient scores —</p>
+<p>The score is the cheapest effect-modifier detector available. It uses the
+structural-change logic of model-based recursive partitioning (Zeileis &amp;
+Hornik; Dandl et al. 2024). Before you fit an expensive model, fit the
+<strong>cheap all-<code>LS</code> model</strong>. This fit takes seconds and is deterministic. Then
+scan the treatment-coefficient scores:</p>
 
 <div class="pdoc-code codehilite">
 <pre><span></span><code><span class="n">flow</span> <span class="o">=</span> <span class="n">td</span><span class="o">.</span><span class="n">CausalFlowDAG</span><span class="p">(</span><span class="n">all_ls_spec</span><span class="p">,</span> <span class="n">seed</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
 <span class="n">flow</span><span class="o">.</span><span class="n">fit_classical</span><span class="p">(</span><span class="n">df</span><span class="p">)</span>  <span class="c1"># seconds, exact MLE</span>
 
-<span class="n">scan</span> <span class="o">=</span> <span class="n">flow</span><span class="o">.</span><span class="n">effect_modifier_scan</span><span class="p">(</span><span class="n">df</span><span class="p">,</span> <span class="n">node</span><span class="o">=</span><span class="s2">&quot;Y&quot;</span><span class="p">,</span> <span class="n">on</span><span class="o">=</span><span class="s2">&quot;T&quot;</span><span class="p">)</span>
+<span class="n">scan</span> <span class="o">=</span> <span class="n">flow</span><span class="o">.</span><span class="n">effect_modifier_scan</span><span class="p">(</span><span class="n">df</span><span class="p">,</span> <span class="n">node</span><span class="o">=</span><span class="s2">"Y"</span><span class="p">,</span> <span class="n">t</span><span class="o">=</span><span class="s2">"T"</span><span class="p">)</span>
 <span class="c1">#         stat   p_value  crit_5pct   flag</span>
 <span class="c1"># X2      4.21    &lt;0.001     1.3581   True     &lt;- true modifier</span>
 <span class="c1"># X3      3.05    &lt;0.001     1.3581   True     &lt;- true modifier</span>
@@ -99,33 +103,35 @@ al. 2024). Before fitting anything expensive: fit the <strong>cheap all-<code>LS
 </code></pre>
 </div>
 
-<p>For each candidate covariate the scores are ordered by it and the scaled
-cumulative sum <code>B_j = Σ_{i≤j} ψ_(i) / (sd(ψ)·√n)</code> is formed; under a stable
-coefficient <code>B</code> is a Brownian bridge, so <code>sup|B|</code> has the Kolmogorov
-distribution (5% critical value 1.358). A coefficient that truly varies with
-the covariate makes the ordered scores drift — flagged covariates are the
-measured shortlist of <code>VC</code> modifiers (<code>docs/varying-coefficients.md</code>):</p>
+<p>For each candidate covariate, the scan orders the scores by that covariate
+and forms the scaled cumulative sum <code>B_j = Σ_{i≤j} ψ_(i) / (sd(ψ)·√n)</code>. Under
+a stable coefficient, <code>B</code> is a Brownian bridge. Thus <code>sup|B|</code> has the
+Kolmogorov distribution (5% critical value 1.358). A coefficient that truly
+varies with the covariate makes the ordered scores drift. The flagged
+covariates are the measured shortlist of <code>VC</code> modifiers
+(<code>docs/varying-coefficients.md</code>):</p>
 
 <div class="pdoc-code codehilite">
-<pre><span></span><code><span class="n">spec</span><span class="p">[</span><span class="s2">&quot;Y&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">td</span><span class="o">.</span><span class="n">ContinuousNode</span><span class="p">(</span>
-    <span class="n">terms</span><span class="o">=</span><span class="p">[</span><span class="n">td</span><span class="o">.</span><span class="n">CS</span><span class="p">(</span><span class="s2">&quot;X1&quot;</span><span class="p">,</span> <span class="s2">&quot;X2&quot;</span><span class="p">,</span> <span class="s2">&quot;X3&quot;</span><span class="p">),</span> <span class="n">td</span><span class="o">.</span><span class="n">VC</span><span class="p">(</span><span class="s2">&quot;T&quot;</span><span class="p">,</span> <span class="s2">&quot;X2&quot;</span><span class="p">,</span> <span class="s2">&quot;X3&quot;</span><span class="p">)]</span>
+<pre><span></span><code><span class="n">spec</span><span class="p">[</span><span class="s2">"Y"</span><span class="p">]</span> <span class="o">=</span> <span class="n">td</span><span class="o">.</span><span class="n">ContinuousNode</span><span class="p">(</span>
+    <span class="n">td</span><span class="o">.</span><span class="n">CS</span><span class="p">(</span><span class="s2">"X1"</span><span class="p">,</span> <span class="s2">"X2"</span><span class="p">,</span> <span class="s2">"X3"</span><span class="p">)</span> <span class="o">+</span> <span class="n">td</span><span class="o">.</span><span class="n">VC</span><span class="p">(</span><span class="s2">"X2"</span><span class="p">,</span> <span class="s2">"X3"</span><span class="p">,</span> <span class="n">t</span><span class="o">=</span><span class="s2">"T"</span><span class="p">)</span>
 <span class="p">)</span>  <span class="c1"># scan-informed</span>
 </code></pre>
 </div>
 
-<p>Notes: <code>on</code> resolves to the identified level-1-vs-0 contrast for a binary
-ordinal <code>LS</code> treatment and to <code>beta0</code> for a <code>VC</code> treatment. Candidates default
-to every column of <code>df</code> except the node and <code>on</code> — modifiers need not be
-parents. For few-level (heavily tied) candidates the ordering is only partial:
-read the scan as a ranking diagnostic rather than an exact-size test. Scores
-also enable influence-function analyses and robust standard errors later.</p>
+<p>Notes: For a binary ordinal <code>LS</code> treatment, <code>t</code> resolves to the identified
+level-1-vs-0 contrast. For a <code>VC</code> treatment, <code>t</code> resolves to <code>beta0</code>.
+Candidates default to every column of <code>df</code> except the node and <code>t</code>.
+Modifiers do not need to be parents. For few-level (heavily tied) candidates,
+the ordering is only partial. Then read the scan as a ranking diagnostic, not
+as an exact-size test. You can also use the scores later for
+influence-function analyses and robust standard errors.</p>
 </div>
 
                         <input id="mod-scores-view-source" class="view-source-toggle-state" type="checkbox" aria-hidden="true" tabindex="-1">
 
                         <label class="view-source-button" for="mod-scores-view-source"><span>View Source</span></label>
 
-                        <div class="pdoc-code codehilite"><pre><span></span><span id="L-1"><a href="#L-1"><span class="linenos">1</span></a><span class="sd">&quot;&quot;&quot;.. include:: ../../../docs/scores.md&quot;&quot;&quot;</span>
+                        <div class="pdoc-code codehilite"><pre><span></span><span id="L-1"><a href="#L-1"><span class="linenos">1</span></a><span class="sd">""".. include:: ../../../docs/scores.md"""</span>
 </span></pre></div>
 
 

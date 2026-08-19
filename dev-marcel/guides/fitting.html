@@ -25,6 +25,7 @@
 
 <h2>Guides</h2>
 <ul class="memberlist">
+  <li><a href="../guides/notation.html">Notation</a></li>
   <li><a href="../guides/fitting.html">Fitting</a></li>
   <li><a href="../guides/training_speed.html">Training speed</a></li>
   <li><a href="../guides/scores.html">Scores &amp; modifier scan</a></li>
@@ -75,52 +76,53 @@
 
                         <div class="docstring"><h1 id="fitting-a-tram-dag-how-training-works">Fitting a TRAM-DAG: how training works</h1>
 
-<p>Technical reference for <a href="https://github.com/tensorchiefs/tramdag/blob/main/docs/../src/tramdag/flow.py"><code>CausalFlowDAG</code></a>: how the flow is
-built, how the likelihood is computed, and the two fitting paths — the stochastic
-optimizer (<a href="https://github.com/tensorchiefs/tramdag/blob/main/docs/../src/tramdag/flow.py"><code>fit</code></a>) and the classical one
-(<a href="https://github.com/tensorchiefs/tramdag/blob/main/docs/../src/tramdag/flow.py"><code>fit_classical</code></a>) — plus per-node freezing, the memory
-model, and where optimizer choice could go next.</p>
+<p>This page is the technical reference for <a href="https://github.com/tensorchiefs/tramdag/blob/main/docs/../src/tramdag/flow.py"><code>CausalFlowDAG</code></a>.
+It explains how the module builds the flow and how it computes the likelihood. It
+describes the two fitting paths: the stochastic optimizer
+(<a href="https://github.com/tensorchiefs/tramdag/blob/main/docs/../src/tramdag/flow.py"><code>fit</code></a>) and the classical optimizer
+(<a href="https://github.com/tensorchiefs/tramdag/blob/main/docs/../src/tramdag/flow.py"><code>fit_classical</code></a>). It also covers per-node freezing, the
+memory model, and future directions for optimizer choice.</p>
 
 <h2 id="how-the-flow-is-built-one-module-one-sub-model-per-node">How the flow is built: one module, one sub-model per node</h2>
 
 <p>A <code>CausalFlowDAG</code> is a single <code>torch.nn.Module</code>, but it is <strong>not one monolithic
-network</strong>. At construction (<a href="https://github.com/tensorchiefs/tramdag/blob/main/docs/../src/tramdag/flow.py"><code>CausalFlowDAG.__init__</code></a>) it
-topologically sorts the DAG and builds an <code>nn.ModuleDict</code> with <strong>one
+network</strong>. At construction (<a href="https://github.com/tensorchiefs/tramdag/blob/main/docs/../src/tramdag/flow.py"><code>CausalFlowDAG.__init__</code></a>), it
+topologically sorts the DAG. It then builds an <code>nn.ModuleDict</code> with <strong>one
 <a href="https://github.com/tensorchiefs/tramdag/blob/main/docs/../src/tramdag/flow.py"><code>_Node</code></a> sub-module per variable</strong>. The nodes share <em>no
-parameters</em>; each owns the pieces for its own conditional <code>p(x_i | pa(x_i))</code>:</p>
+parameters</em>. Each node owns the pieces for its own conditional <code>p(x_i | pa(x_i))</code>:</p>
 
 <ul>
-<li>an <strong>intercept</strong> producing the transform parameters <code>θ</code>:
-<a href="https://github.com/tensorchiefs/tramdag/blob/main/docs/../src/tramdag/conditioners.py"><code>SimpleIntercept</code></a> (a free parameter vector,
-data-independent) — or, if the node has <code>ci</code> parents,
-<a href="https://github.com/tensorchiefs/tramdag/blob/main/docs/../src/tramdag/conditioners.py"><code>ComplexIntercept</code></a> (a small MLP whose output
-<code>θ</code> depends on those parents);</li>
+<li>an <strong>intercept</strong> that produces the transform parameters <code>θ</code>. This is
+<a href="https://github.com/tensorchiefs/tramdag/blob/main/docs/../src/tramdag/conditioners.py"><code>SimpleIntercept</code></a>, a free parameter vector that
+is data-independent. If the node has <code>ci</code> parents, it is
+<a href="https://github.com/tensorchiefs/tramdag/blob/main/docs/../src/tramdag/conditioners.py"><code>ComplexIntercept</code></a> instead, a small MLP whose
+output <code>θ</code> depends on those parents.</li>
 <li>a <strong>monotone 1-D transform</strong> <code>h</code>
-(<a href="https://github.com/tensorchiefs/tramdag/blob/main/docs/../src/tramdag/transforms.py"><code>BernsteinUT</code> / <code>SplineUT</code> / <code>AffineUT</code></a>) —
-note the transform itself carries <strong>no learnable weights</strong>, only the fitted
-range buffers <code>xmin</code>/<code>xmax</code>; its shape is set entirely by <code>θ</code> from the
-intercept;</li>
+(<a href="https://github.com/tensorchiefs/tramdag/blob/main/docs/../src/tramdag/transforms.py"><code>BernsteinUT</code> / <code>SplineUT</code> / <code>AffineUT</code></a>).
+The transform itself carries <strong>no learnable weights</strong>, only the fitted
+range buffers <code>xmin</code>/<code>xmax</code>. The <code>θ</code> from the intercept sets its shape
+entirely.</li>
 <li>a <code>ModuleDict</code> of <strong>shift modules</strong>, one per parent edge:
 <a href="https://github.com/tensorchiefs/tramdag/blob/main/docs/../src/tramdag/conditioners.py"><code>LinearShift</code></a> (<code>ls</code>, a single weight) or
 <a href="https://github.com/tensorchiefs/tramdag/blob/main/docs/../src/tramdag/conditioners.py"><code>ComplexShift</code></a> (<code>cs</code>, an MLP).</li>
 </ul>
 
-<p>So "one network or several?" — <strong>one module, several independent per-node
-sub-models</strong> (each itself a small intercept + shifts assembly). They are bundled
-into one module and trained by one optimizer, but their parameters are disjoint.
-The DAG structure lives entirely in <em>which parents each node reads</em>; there is no
-edge weight matrix or shared trunk.</p>
+<p>So is this one network or several? It is <strong>one module, several independent per-node
+sub-models</strong> (each itself a small intercept + shifts assembly). One module bundles
+them, and one optimizer trains them, but their parameters are disjoint. The DAG
+structure lives entirely in <em>which parents each node reads</em>. There is no edge
+weight matrix or shared trunk.</p>
 
-<p><code>_Node.theta_shift</code> assembles a node's <code>θ</code> (from the intercept) and total <code>shift</code>
-(sum of its shift modules over the parent features) for a batch; parent features
-are encoded by <code>_encode_parent</code> — continuous parents raw, ordinal parents one-hot.</p>
+<p>For a batch, <code>_Node.theta_shift</code> assembles a node's <code>θ</code> (from the intercept) and
+total <code>shift</code> (sum of its shift modules over the parent features). <code>_encode_parent</code>
+encodes the parent features: continuous parents raw, ordinal parents one-hot.</p>
 
 <h2 id="how-the-likelihood-is-computed">How the likelihood is computed</h2>
 
 <p>A TRAM-DAG maps iid standard-logistic latents <code>U</code> to the observed <code>X</code> in causal
-order; because node <code>i</code> reads only its parents (earlier variables, as <em>data</em>), the
-Jacobian of <code>U → X</code> is <strong>triangular</strong>, so its log-determinant is the sum of the
-per-node 1-D terms. The joint log-likelihood therefore <strong>decomposes per node</strong>:</p>
+order. Node <code>i</code> reads only its parents (earlier variables, as <em>data</em>). Therefore
+the Jacobian of <code>U → X</code> is <strong>triangular</strong>, and its log-determinant is the sum of
+the per-node 1-D terms. The joint log-likelihood therefore <strong>decomposes per node</strong>:</p>
 
 <pre><code>log p(x) = Σ_i log p(x_i | pa(x_i))
 </code></pre>
@@ -135,103 +137,122 @@ and <code>log_prob</code> sums them. For a node, given <code>θ, shift</code> fr
 log p(x | pa) = log f_logistic(z) + log |dz/dx|
 </code></pre>
 
-<p>i.e. the standard-logistic density at the latent <code>z</code>
+<p>That is, the term is the standard-logistic density at the latent <code>z</code>
 (<a href="https://github.com/tensorchiefs/tramdag/blob/main/docs/../src/tramdag/transforms.py"><code>StandardLogistic.log_prob</code></a>) plus the
-transform's log-derivative (<code>ladj</code>, returned by <code>ut.forward</code> — the 1-D Jacobian
-term that makes it a proper density, not just a score).</p></li>
+transform's log-derivative. <code>ut.forward</code> returns this log-derivative as <code>ladj</code>.
+This is the 1-D Jacobian term that makes the result a proper density, not only
+a score.</p></li>
 <li><strong>ordinal</strong> — an ordered-logit / proportional-odds head,
-<code>P(x ≤ k) = σ(θ_k − shift)</code>, evaluated as the log of the cutpoint-interval
-probability by <a href="https://github.com/tensorchiefs/tramdag/blob/main/docs/../src/tramdag/transforms.py"><code>ordinal_log_prob</code></a> (done in
-log-space via <code>logsigmoid</code>/<code>log1mexp</code>, because the naive sigmoid difference
-underflows to exactly-zero gradients in float32).</li>
+<code>P(x ≤ k) = σ(θ_k − shift)</code>. <a href="https://github.com/tensorchiefs/tramdag/blob/main/docs/../src/tramdag/transforms.py"><code>ordinal_log_prob</code></a>
+evaluates it as the log of the cutpoint-interval probability. The computation
+runs in log-space via <code>logsigmoid</code>/<code>log1mexp</code>, because the naive sigmoid
+difference underflows to exactly-zero gradients in float32.</li>
 </ul>
 
 <p>The training loss is the summed per-node <strong>mean</strong> NLL over the batch
-(<code>Σ_i mean_rows(−log p(x_i | pa))</code>); <code>log_prob</code> instead returns the per-row joint
-for scoring whole observations.</p>
+(<code>Σ_i mean_rows(−log p(x_i | pa))</code>). In contrast, <code>log_prob</code> returns the per-row
+joint, which scores whole observations.</p>
 
 <p><strong>Consequence used by both optimizers:</strong> because parents enter as data, the
-per-node gradients are independent — optimizing the summed loss jointly is
-identical to optimizing each node separately. This is what licenses per-node
+per-node gradients are independent. Therefore a joint fit of the summed loss is
+identical to a separate fit of each node. This independence licenses per-node
 learning rates, per-node freezing (below), and the all-<code>ls</code> classical fit.</p>
 
 <h2 id="path-a-stochastic-optimization-fit">Path A — stochastic optimization (<code>fit</code>)</h2>
 
-<p><a href="https://github.com/tensorchiefs/tramdag/blob/main/docs/../src/tramdag/flow.py"><code>CausalFlowDAG.fit</code></a> is the general-purpose trainer
-(required for any <code>cs</code>/<code>ci</code> edge). Mechanics:</p>
+<p><a href="https://github.com/tensorchiefs/tramdag/blob/main/docs/../src/tramdag/flow.py"><code>CausalFlowDAG.fit</code></a> is the general-purpose trainer. Any
+<code>cs</code>/<code>ci</code> edge requires it. Mechanics:</p>
 
 <ul>
-<li><strong>Adam</strong> with <strong>one parameter group per node</strong> — built from
+<li><strong>Adam</strong> with <strong>one parameter group per node</strong>. <code>fit</code> builds each group from
 <code>self.nodes[name].parameters()</code>, so each node can carry its own learning rate.</li>
-<li><strong>Minibatches</strong>: a fresh <code>torch.randperm</code> shuffle each epoch; the loss is the
-summed per-node mean NLL on the batch.</li>
-<li><strong>Transform ranges</strong> are set once at the start from the train 5%/95% quantiles
-(<code>_set_ranges</code>), defining each Bernstein/spline domain.</li>
-<li><strong>Learning-rate schedules</strong> (<code>schedule=</code>): <code>None</code> (constant), <code>"onecycle"</code>,
-<code>"cosine"</code>, or <code>"plateau"</code> — the last decays each node's lr off <em>its own</em>
-validation NLL.</li>
+<li><strong>Minibatches</strong>: a fresh <code>torch.randperm</code> shuffle occurs each epoch. The loss is
+the summed per-node mean NLL on the batch.</li>
+<li><strong>Transform ranges</strong>: <code>_set_ranges</code> sets them once at the start from the train
+5%/95% quantiles. These ranges define each Bernstein/spline domain.</li>
+<li><strong>Learning-rate schedules</strong> (<code>schedule=</code>): <code>None</code> (constant) or
+<code>"plateau"</code>, which decays each node's lr off <em>its own</em> validation NLL.
+(<code>"onecycle"</code> and <code>"cosine"</code> lost to plateau in the June 2026 benchmark
+and were removed in 0.4.0.)</li>
 <li><strong>Per-node freezing</strong> (<code>freeze_patience=</code>, see below).</li>
-<li><strong><code>restore_best</code></strong>: optionally snapshots each node's best-validation weights and
-restores them at the end (early-stopping regularization). Default <code>False</code> so the
-fit sits at the training-data MLE.</li>
+<li><strong><code>restore_best</code></strong>: when enabled, <code>fit</code> snapshots each node's best-validation
+weights and restores them at the end (early-stopping regularization). The
+default is <code>False</code>, so the fit sits at the training-data MLE.</li>
+<li><strong><code>marginal_init=</code></strong>: opt-in calibrated initialization of the unconditional
+intercepts — Bernstein nodes start at the linear map onto the latent
+5%/95% quantiles, ordinal cutpoints at the empirical class log-odds. A pure
+init; the converged MLE is unchanged.</li>
+<li><strong><code>vc_warm_start=</code></strong> (default on): each <code>VC</code> term's <code>beta0</code> starts at the
+classical all-<code>ls</code> solution of its node's conditional, so the penalized
+head only learns deviations.</li>
+<li><strong><code>plateau_factor=</code></strong> (default 0.3): the multiplier of one per-node
+plateau decay step. Read only under <code>schedule="plateau"</code>; the floor is
+<code>1e-3 × learning_rate</code>, and under this schedule a node may only freeze
+once its lr has decayed to <code>1e-2 × learning_rate</code>.</li>
+<li><strong><code>vc_oof_fit=</code></strong>: keyword overrides for the stage-1 out-of-fold
+propensity fits behind <code>VC(center=True)</code>, merged over
+<code>{"epochs": 300, "learning_rate": 1e-2, "batch_size": 512}</code>. Ignored
+when the treatment node is all-<code>ls</code>, which takes the deterministic
+<code>fit_classical</code> path instead.</li>
 </ul>
 
 <h3 id="how-per-node-freezing-works">How per-node freezing works</h3>
 
-<p>Set <code>freeze_patience=N</code> to let converged nodes drop out of training. Each epoch,
-<code>fit</code> tracks every node's own validation NLL and counts epochs since its last
-improvement (by more than <code>min_delta</code>). A node is <strong>frozen</strong> once that counter
-reaches <code>N</code> (under <code>schedule="plateau"</code>, only after its learning rate has already
-been decayed, so a node isn't frozen while a smaller step would still help).</p>
+<p>Set <code>freeze_patience=N</code> to remove converged nodes from training. Each epoch, <code>fit</code>
+tracks every node's own validation NLL and counts epochs since its last
+improvement (by more than <code>min_delta</code>). When that counter reaches <code>N</code>, <code>fit</code>
+<strong>freezes</strong> the node. Under <code>schedule="plateau"</code>, the freeze occurs only after the
+schedule decays the node's learning rate. This order prevents a freeze while a
+smaller step can still help.</p>
 
-<p>Freezing is not just "stop updating" — the frozen node is <strong>excluded from the
-computation entirely</strong>: <code>node_log_prob(values, nodes=active)</code> is called with only
+<p>A freeze does more than stop updates. <code>fit</code> <strong>excludes the frozen node from the
+computation entirely</strong>: it calls <code>node_log_prob(values, nodes=active)</code> with only
 the still-active nodes, so a frozen node runs no forward and no backward pass.
-That is a real FLOP saving, and it is <em>correct</em> precisely because the per-node
-gradients are independent (above): removing a converged node's term from the loss
-does not change any other node's gradient. The slowest node sets the total
-training time; the rest stop costing anything once they have converged.</p>
+That is a real FLOP saving. It is also <em>correct</em>, precisely because the per-node
+gradients are independent (above): removal of a converged node's term from the
+loss does not change any other node's gradient. The slowest node sets the total
+training time. Once the other nodes converge, they cost nothing.</p>
 
-<p>When <strong>every</strong> node is frozen the fit returns early (the self-stopping behavior).
-Freeze epochs are recorded in <code>flow.history["frozen"]</code>; the freeze state is local
-to a single <code>fit</code> call (a later <code>fit</code> call trains all nodes again). This composes
-with <code>restore_best</code>, which still restores each node's best-validation snapshot at
-the end.</p>
+<p>When <strong>every</strong> node is frozen, the fit returns early (the self-stopping behavior).
+<code>fit</code> records the freeze epochs in <code>flow.history["frozen"]</code>. The freeze state is
+local to a single <code>fit</code> call (a later <code>fit</code> call trains all nodes again). This
+composes with <code>restore_best</code>, which still restores each node's best-validation
+snapshot at the end.</p>
 
-<h4 id="freezing-vs-parallelism-why-one-helps-and-the-other-usually-doesnt">Freezing vs. parallelism (why one helps and the other usually doesn't)</h4>
+<h4 id="freezing-vs-parallelism-why-one-helps-and-the-other-usually-does-not">Freezing vs. parallelism (why one helps and the other usually does not)</h4>
 
-<p>It is tempting to reason "freezing a node speeds things up, so node computation
-costs time, so computing nodes <em>in parallel</em> should also speed things up." The
-premise is right but the conclusion doesn't follow, because the two act through
-different mechanisms:</p>
+<p>A tempting argument says: "freezing a node saves time, so node computation costs
+time, so parallel computation of nodes will also save time." The premise is
+correct, but the conclusion does not follow. The two act through different
+mechanisms:</p>
 
 <ul>
-<li><strong>Freezing removes work</strong> — the frozen node's forward/backward simply never
-runs again. Removing work is an <em>unconditional</em> win, and most of its payoff is
-structural: once <em>all</em> nodes freeze the fit stops, deleting whole epochs —
-something parallelism can never do (it can shrink time-per-epoch, not the number
-of epochs).</li>
-<li><strong>Parallelism only overlaps work</strong> — it runs the same computations
-concurrently, which helps <em>only if the hardware is sitting idle</em> during the
-sequential node loop. It usually isn't: parallelism is already extracted one
-level down, where each node's batched tensor ops run across all rows and the
-BLAS/GPU backend already uses all cores. While node A's matmul runs the cores
-are busy, so doing node B "at the same time" just time-slices the same cores —
+<li><strong>Freezing removes work.</strong> The frozen node's forward/backward never runs again.
+Removal of work is an <em>unconditional</em> win, and most of its payoff is
+structural. Once <em>all</em> nodes freeze, the fit stops and deletes whole epochs.
+Parallelism can never do that (it can shrink time-per-epoch, not the number of
+epochs).</li>
+<li><strong>Parallelism only overlaps work.</strong> It runs the same computations concurrently,
+and this helps <em>only if the hardware sits idle</em> during the sequential node
+loop. The hardware usually is not idle. Parallelism already exists one level
+down: each node's batched tensor ops run across all rows, and the BLAS/GPU
+backend already uses all cores. While node A's matmul runs, the cores are busy,
+so node B "at the same time" only time-slices the same cores. The result is
 contention, often slightly slower.</li>
 </ul>
 
-<p>So freezing speeding things up does <strong>not</strong> imply spare capacity to parallelize
-across nodes. The exception is the regime where per-node ops <em>under-utilize</em> the
-hardware — small batches, tiny models, or many small nodes on a big GPU where each
-kernel leaves it mostly idle. There, overlapping nodes can help, but the right
-tool is <strong>fusion</strong> (batch same-shaped nodes into one larger tensor op, or CUDA
-streams), not threading the Python loop (which the GIL fights). That is the
+<p>So the speed gain from freezing does <strong>not</strong> imply spare capacity for parallel
+work across nodes. The exception is the regime where per-node ops <em>under-utilize</em>
+the hardware: small batches, tiny models, or many small nodes on a big GPU where
+each kernel leaves it mostly idle. In that regime, node overlap can help. But the
+right tool is <strong>fusion</strong> (batch same-shaped nodes into one larger tensor op, or
+CUDA streams), not a threaded Python loop (which the GIL fights). That is the
 "vectorize/fuse the per-node loop" direction in
-<a href="#optimizer-choice--current-and-future">Optimizer choice</a> below — a conditional
-win in that regime, distinct from freezing's unconditional one.</p>
+<a href="#optimizer-choice--current-and-future">Optimizer choice</a> below. It is a
+conditional win in that regime, distinct from the unconditional win of freezing.</p>
 
 <p>Benchmarks, schedule trade-offs, and the recommended self-stopping recipe are in
-<a href="../guides/training_speed.html">training-speed.md</a>; the worked walkthrough is
+<a href="../guides/training_speed.html">training-speed.md</a>. The worked walkthrough is
 <a href="https://github.com/tensorchiefs/tramdag/blob/main/docs/../notebooks/intro_tram_dag.py"><code>notebooks/intro_tram_dag.py</code></a>.</p>
 
 <h2 id="path-b-classical-optimization-fit_classical">Path B — classical optimization (<code>fit_classical</code>)</h2>
@@ -241,24 +262,30 @@ for <strong>all-<code>ls</code></strong> models, where every node-conditional is
 transformation model (ordered-logit / Colr). It raises on any <code>cs</code>/<code>ci</code> edge.</p>
 
 <ul>
-<li><strong>Full-batch, float64, L-BFGS</strong> (strong-Wolfe line search) — no minibatches, no
-schedule, no early stopping ⇒ <strong>deterministic</strong> (same init → bit-identical) and
-on the <strong>exact MLE</strong> (matches <code>statsmodels</code>/R to ~1e-3 on well-identified
-coefficients).</li>
+<li><strong>Full-batch, float64, L-BFGS</strong> (strong-Wolfe line search). There are no
+minibatches, no schedule, and no early stopping. Therefore the fit is
+<strong>deterministic</strong> (same init → bit-identical) and lands on the <strong>exact MLE</strong>
+(matches <code>statsmodels</code>/R to ~1e-3 on well-identified coefficients).</li>
+<li><strong>Solver budget</strong> (<code>max_iter=400</code>, <code>tol=1e-6</code>, <code>chunk=25</code>,
+<code>history_size=50</code>): the fit runs in rounds of <code>chunk</code> inner L-BFGS
+iterations and checks NLL flatness between them, so <code>n_iter</code> in the
+report counts in multiples of <code>chunk</code>. <code>history_size</code> is the L-BFGS
+memory.</li>
 <li><strong>float64 is a transient compute mode</strong>: <code>self.double()</code> upcasts parameters
-<em>and</em> the transforms' range buffers in one call; the fit runs in double; a
-<code>finally: self.float()</code> restores float32. The stored model — and
-<code>save</code>/<code>load</code> — stay float32. The data path (<code>_tensorize</code>, <code>sample</code>, <code>pmf</code>)
-reads the model dtype so it follows along.</li>
-<li><strong>Convergence</strong> is judged by NLL flatness and is <em>advisory</em>: a Bernstein
-intercept and weakly-identified directions (rare one-hot levels, a flat
-treatment-effect ridge) keep drifting along zero-curvature valleys after the
-likelihood is at the optimum. Correctness is verified against classical software
-(<code>experiments/validate_ls.py --classical</code>), not the flag.</li>
+<em>and</em> the transforms' range buffers in one call. The fit runs in double. A
+<code>finally: self.float()</code> restores float32. The stored model stays float32, and
+so do <code>save</code>/<code>load</code>. The data path (<code>_tensorize</code>, <code>sample</code>, <code>pmf</code>) reads the
+model dtype, so it follows along.</li>
+<li><strong>Convergence</strong>: the flag comes from NLL flatness and is <em>advisory</em>. A
+Bernstein intercept and weakly-identified directions (rare one-hot levels, a
+flat treatment-effect ridge) continue to drift along zero-curvature valleys
+after the likelihood is at the optimum. Correctness comes from a comparison
+with classical software (<code>experiments/validate_ls.py --classical</code>), not from
+the flag.</li>
 <li>Read the fitted coefficients with <code>ls_coefficients()</code>.</li>
 </ul>
 
-<p>Walkthrough: <a href="https://github.com/tensorchiefs/tramdag/blob/main/docs/../notebooks/classical_fit_tram_dag.py"><code>notebooks/classical_fit_tram_dag.py</code></a>.</p>
+<p>Walkthrough: <a href="https://github.com/tensorchiefs/tramdag/blob/main/docs/../notebooks/stale/classical_fit_tram_dag.py"><code>notebooks/stale/classical_fit_tram_dag.py</code></a> (parked).</p>
 
 <h2 id="memory-and-disk-during-fitting">Memory and disk during fitting</h2>
 
@@ -266,61 +293,62 @@ likelihood is at the optimum. Correctness is verified against classical software
 lives in RAM:</p>
 
 <ul>
-<li>model parameters and (for <code>fit</code>) the per-node Adam optimizer state;</li>
-<li>the <code>history</code> dict (per-epoch train/val NLL, lr, wall-clock) — an in-memory
-attribute, not a file;</li>
-<li><code>restore_best</code> snapshots — <code>copy.deepcopy</code> of node <code>state_dict</code>s held in memory
-(<code>flow.py</code>), never serialized.</li>
+<li>model parameters and (for <code>fit</code>) the per-node Adam optimizer state</li>
+<li>the <code>history</code> dict (per-epoch train/val NLL, lr, wall-clock), which is an
+in-memory attribute and not a file</li>
+<li><code>restore_best</code> snapshots: <code>copy.deepcopy</code> of node <code>state_dict</code>s held in memory
+(<code>flow.py</code>), never serialized</li>
 </ul>
 
 <p>The <strong>only</strong> disk I/O in the module is the explicit, user-called
 <a href="https://github.com/tensorchiefs/tramdag/blob/main/docs/../src/tramdag/flow.py"><code>save</code></a> (<code>torch.save</code> of spec + state_dict + history) and
-its counterpart <code>load</code>. So a fit produces no temp files, no checkpoints, no
-scratch directory; persistence is opt-in via <code>flow.save(path)</code>. (The <code>results/</code>
-and <code>docs/perf/</code> artifacts in this repo are written by the <em>experiment scripts</em>,
-not by the library's fitting code.)</p>
+its counterpart <code>load</code>. So a fit produces no temp files, no checkpoints, and no
+scratch directory. Persistence is opt-in via <code>flow.save(path)</code>. (The <em>experiment
+scripts</em> write the <code>results/</code> and <code>docs/perf/</code> artifacts in this repo, not the
+library's fitting code.)</p>
 
 <h2 id="optimizer-choice-current-and-future">Optimizer choice — current and future</h2>
 
 <p>Today: <strong>Adam</strong> for flexible models, <strong>L-BFGS</strong> (float64) for all-<code>ls</code>. The
-per-node-param-group structure already in <code>fit</code> makes several extensions cheap,
-and worth considering as the package matures:</p>
+per-node-param-group structure already in <code>fit</code> makes several extensions cheap.
+These extensions are worth consideration as the package matures:</p>
 
 <ul>
-<li><strong>IRLS / Fisher scoring for the all-<code>ls</code> path.</strong> The classical fitting algorithm
-for proportional-odds / GLM-type models is iteratively reweighted least squares
-(Newton with the expected information). For the <code>ls</code> case it would likely reach
-the MLE in <em>fewer, more stable</em> steps than L-BFGS — and the Fisher information it
-computes is exactly the ingredient for the planned <strong>standard-error table</strong>
-(currently flagged as next in the CHANGELOG). Strong candidate to back
-<code>fit_classical</code> in a future version.</li>
+<li><strong>IRLS / Fisher scoring for the all-<code>ls</code> path.</strong> The classical fitting
+algorithm for proportional-odds / GLM-type models is iteratively reweighted
+least squares (Newton with the expected information). For the <code>ls</code> case, it
+will likely reach the MLE in <em>fewer, more stable</em> steps than L-BFGS. Also, the
+Fisher information that it computes is exactly the ingredient for the planned
+<strong>standard-error table</strong> (currently flagged as next in the CHANGELOG). It is a
+strong candidate to back <code>fit_classical</code> in a future version.</li>
 <li><strong>Second-order / curvature-aware methods for flexible nodes.</strong> K-FAC or a
-Gauss-Newton approximation could help the <code>ci</code>/<code>cs</code> MLPs, though full-batch
-quasi-Newton is a poor fit for them (minibatch noise also regularizes — see why
-<code>fit_classical</code> refuses them).</li>
+Gauss-Newton approximation can help the <code>ci</code>/<code>cs</code> MLPs. However, full-batch
+quasi-Newton is a poor fit for them (minibatch noise also regularizes, which is
+why <code>fit_classical</code> refuses them).</li>
 <li><strong>Modern first-order variants.</strong> AdamW (decoupled weight decay), RAdam (warmup-
-free), or Lion/Sophia are drop-in alternatives to Adam; the benchmark harness
-(<a href="https://github.com/tensorchiefs/tramdag/blob/main/docs/../experiments/bench_training.py"><code>experiments/bench_training.py</code></a>) is built to
-evaluate exactly such swaps on time-to-target.</li>
-<li><strong>Per-node optimizer selection.</strong> Because the loss decomposes and the optimizer
-already holds one group per node, different nodes could in principle use
-different optimizers (e.g. L-BFGS for the <code>ls</code> nodes, Adam for an MLP node in a
-mixed model) — an interesting direction for mixed-flexibility DAGs.</li>
+free), or Lion/Sophia are drop-in alternatives to Adam. The benchmark harness
+(<a href="https://github.com/tensorchiefs/tramdag/blob/main/docs/../experiments/stale/bench_training.py"><code>experiments/stale/bench_training.py</code></a>,
+parked — needs an API migration) exists to evaluate exactly such swaps on
+time-to-target.</li>
+<li><strong>Per-node optimizer selection.</strong> The loss decomposes, and the optimizer
+already holds one group per node. Therefore different nodes can in principle
+use different optimizers (for example, L-BFGS for the <code>ls</code> nodes and Adam for
+an MLP node in a mixed model). This is a direction for mixed-flexibility DAGs.</li>
 <li><strong>Warm-start handoffs.</strong> <code>fit_classical → fit</code> already works (the classical MLE
-as a fast, principled initialization); the reverse (Adam to escape, L-BFGS to
+as a fast, principled initialization). The reverse (Adam to escape, L-BFGS to
 polish) is a natural pattern to formalize.</li>
 </ul>
 
 <p>These are <em>directions</em>, not commitments. The autoresearch loop
 (<a href="https://github.com/tensorchiefs/tramdag/blob/main/docs/research/MISSION_autoresearch.md"><code>docs/research/MISSION_autoresearch.md</code></a>) is a
-good venue to test the speed-oriented ones empirically before adopting any.</p>
+good venue to test the speed-oriented ones empirically before any adoption.</p>
 </div>
 
                         <input id="mod-fitting-view-source" class="view-source-toggle-state" type="checkbox" aria-hidden="true" tabindex="-1">
 
                         <label class="view-source-button" for="mod-fitting-view-source"><span>View Source</span></label>
 
-                        <div class="pdoc-code codehilite"><pre><span></span><span id="L-1"><a href="#L-1"><span class="linenos">1</span></a><span class="sd">&quot;&quot;&quot;.. include:: ../../../docs/fitting.md&quot;&quot;&quot;</span>
+                        <div class="pdoc-code codehilite"><pre><span></span><span id="L-1"><a href="#L-1"><span class="linenos">1</span></a><span class="sd">""".. include:: ../../../docs/fitting.md"""</span>
 </span></pre></div>
 
 

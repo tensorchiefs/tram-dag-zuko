@@ -25,6 +25,7 @@
 
 <h2>Guides</h2>
 <ul class="memberlist">
+  <li><a href="../guides/notation.html">Notation</a></li>
   <li><a href="../guides/fitting.html">Fitting</a></li>
   <li><a href="../guides/training_speed.html">Training speed</a></li>
   <li><a href="../guides/scores.html">Scores &amp; modifier scan</a></li>
@@ -73,60 +74,64 @@
 
                         <div class="docstring"><h1 id="case-study-the-stroke-ite-analysis">Case study: the stroke ITE analysis</h1>
 
-<p>Background and full detail for the <code>magic-mrclean</code> experiments — the public,
-synthetic counterpart of the clinical analysis in Dürr, Herzog, Bühler, Wegener
-&amp; Sick, <em>Estimating Individualized Treatment Effects in Acute Ischemic Stroke
-with Causal Transformation Models (TRAM-DAG)</em>
+<p>This document gives the background and the full detail for the <code>magic-mrclean</code>
+experiments. These experiments are the public, synthetic counterpart of the
+clinical analysis in Dürr, Herzog, Bühler, Wegener &amp; Sick, <em>Estimating
+Individualized Treatment Effects in Acute Ischemic Stroke with Causal
+Transformation Models (TRAM-DAG)</em>
 (<a href="https://arxiv.org/abs/2606.12623">arXiv:2606.12623</a>). The clinical MAGIC /
-MR CLEAN data is private and never part of this repo.</p>
+MR CLEAN data is private. It is never part of this repo.</p>
 
 <h2 id="the-dag-and-the-pipeline">The DAG and the pipeline</h2>
 
-<p>Five nodes with all forward edges: <code>Age → mRS_pre → NIHSSa → T → mRS_3m</code>.
-Treatment <code>T</code> (thrombectomy) is confounded by age and stroke severity in the
-observational cohort; the estimand is the ATE of <code>T</code> on a good outcome,
-<code>P(mRS_3m ≤ 2 | do(T))</code>, averaged over the (younger) trial population — computed
-analytically from the outcome node's interventional PMF, no Monte Carlo.</p>
+<p>The DAG has five nodes with all forward edges: <code>Age → mRS_pre → NIHSSa → T → mRS_3m</code>.
+In the observational cohort, age and stroke severity confound the treatment
+<code>T</code> (thrombectomy). The estimand is the ATE of <code>T</code> on a good outcome,
+<code>P(mRS_3m ≤ 2 | do(T))</code>, averaged over the (younger) trial population. The
+pipeline computes this ATE analytically from the interventional PMF of the
+outcome node. It does not use Monte Carlo.</p>
 
 <div class="pdoc-code codehilite">
 <pre><span></span><code><span class="nb">cd</span><span class="w"> </span>experiments
-uv<span class="w"> </span>run<span class="w"> </span>python<span class="w"> </span>sim_flow.py<span class="w"> </span>nl<span class="w">                  </span><span class="c1"># headline storyline (synthetic, default)</span>
-uv<span class="w"> </span>run<span class="w"> </span>python<span class="w"> </span>all_ls_flow.py<span class="w">                  </span><span class="c1"># all-edges-ls flow</span>
-uv<span class="w"> </span>run<span class="w"> </span>python<span class="w"> </span>nihss6_flow.py<span class="w">                  </span><span class="c1"># flexible nihss6 config</span>
+uv<span class="w"> </span>run<span class="w"> </span>python<span class="w"> </span>sim_flow.py<span class="w"> </span>nl<span class="w">                  </span><span class="c1"># headline storyline: all-ls vs</span>
+<span class="w">                                              </span><span class="c1"># flexible vs known truth</span>
 uv<span class="w"> </span>run<span class="w"> </span>python<span class="w"> </span>validate_ls.py<span class="w">                  </span><span class="c1"># all-ls flow vs statsmodels MLE</span>
-uv<span class="w"> </span>run<span class="w"> </span>python<span class="w"> </span>counterfactual_demo.py<span class="w"> </span>all_ls<span class="w">   </span><span class="c1"># Pearl abduction showcase</span>
-uv<span class="w"> </span>run<span class="w"> </span>python<span class="w"> </span>all_ls_long.py<span class="w">                  </span><span class="c1"># 4x-longer convergence check</span>
+<span class="c1"># parked in stale/ (need an API migration before use): the single-config</span>
+<span class="c1"># runners (all_ls_flow, nihss6_flow), counterfactual_demo.py, and the</span>
+<span class="c1"># 4x-longer convergence check all_ls_long.py</span>
 </code></pre>
 </div>
 
-<p>Experiments default to the public synthetic source <code>magic-mrclean/nl</code>; passing
-<code>magic</code> (clinical cohort, NIHSSa ≥ 6, N = 1275) only works inside the original
-paper monorepo. Every run uses the same 80/10/10 split (<code>random_state=42</code>) and
-writes plots, per-patient interventional PMFs (<code>rct_predicted_proba.csv</code>) and a
-checkpoint to <code>results/&lt;name&gt;/</code>.</p>
+<p>Experiments default to the public synthetic source <code>magic-mrclean/nl</code>. The
+<code>magic</code> source (clinical cohort, NIHSSa ≥ 6, N = 1275) works only inside the
+original paper monorepo. Every run uses the same 80/10/10 split
+(<code>random_state=42</code>). Each run writes plots, per-patient interventional PMFs
+(<code>rct_predicted_proba.csv</code>), and a checkpoint to <code>results/&lt;name&gt;/</code>.</p>
 
 <h2 id="the-synthetic-cohort-magic-mrclean">The synthetic cohort (<code>magic-mrclean</code>)</h2>
 
-<p>A hand-specified SCM in the flow's own model family (logistic latents) shaped
-like the stroke study — same schema, realistic marginals, and <strong>known ground
-truth</strong> the real data cannot provide: the true ATE, true individual
-counterfactuals (shared-latent pairs), and a provably misspecified baseline.
-Two variants:</p>
+<p>This cohort is a hand-specified SCM in the model family of the flow itself
+(logistic latents). It has the same schema as the stroke study and realistic
+marginals. It also has <strong>known ground truth</strong> that the real data cannot
+provide: the true ATE, true individual counterfactuals (shared-latent pairs),
+and a provably misspecified baseline. The cohort has two variants:</p>
 
 <ul>
-<li><strong><code>ls</code></strong> — every parent effect is a linear shift: each node-conditional is
-exactly a classical proportional-odds model, so flow, R reference and truth
-must coincide. The clean equivalence baseline.</li>
-<li><strong><code>nl</code></strong> — adds an accelerating age effect on disability, a heterogeneous
-treatment effect <code>tau(Age)</code> that fades in the elderly, and reduced treatment
-probability for the very old. An all-<code>ls</code> model must collapse <code>tau(Age)</code> to a
-constant and is therefore biased; a flexible (<code>ci</code>/<code>cs</code>) flow can recover the
-truth. The trial cohort (<code>rct.csv</code>) enrolls younger than the observational
-cohort, as real trials do — exactly the extrapolation that breaks the
-misspecified model.</li>
+<li><strong><code>ls</code></strong> — every parent effect is a linear shift. Each node-conditional is
+exactly a classical proportional-odds model. Therefore the flow, the R
+reference, and the truth must coincide. This variant is the clean
+equivalence baseline.</li>
+<li><strong><code>nl</code></strong> — this variant adds an accelerating age effect on disability and a
+heterogeneous treatment effect <code>tau(Age)</code> that fades in the elderly. It also
+reduces the treatment probability for the very old. An all-<code>ls</code> model must
+collapse <code>tau(Age)</code> to a constant and is therefore biased. A flexible
+(<code>ci</code>/<code>cs</code>) flow can recover the truth. The trial cohort (<code>rct.csv</code>) enrolls
+younger patients than the observational cohort, as real trials do. This
+extrapolation is exactly what breaks the misspecified model.</li>
 </ul>
 
-<p>Known-truth recovery (seed 7), ATE on P(good) over the trial population:</p>
+<p>The table shows the known-truth recovery (seed 7), the ATE on P(good) over the
+trial population:</p>
 
 <table>
 <thead>
@@ -155,12 +160,12 @@ misspecified model.</li>
 </tbody>
 </table>
 
-<p>This reproduces the clinical-data finding in miniature (flexible +0.108 vs
-all-<code>ls</code> +0.054) but against a <em>known</em> answer.</p>
+<p>This result reproduces the clinical-data finding in miniature (flexible +0.108
+vs all-<code>ls</code> +0.054), but against a <em>known</em> answer.</p>
 
 <p><strong>R cross-check.</strong> <a href="https://github.com/tensorchiefs/tramdag/blob/main/docs/../data/magic-mrclean/fit_ls.R"><code>data/magic-mrclean/fit_ls.R</code></a>
 refits the all-<code>ls</code> DAG node-by-node in classical R (<code>MASS::polr</code> / <code>tram::Colr</code>
-/ <code>glm</code>); its committed <code>ref_ls/</code> outputs let <code>tests/test_simulations.py</code> assert
+/ <code>glm</code>). Its committed <code>ref_ls/</code> outputs let <code>tests/test_simulations.py</code> assert
 flow ≡ R fit (outcome-node coefficients and ATE) without an R installation.</p>
 
 <h2 id="clinical-data-results-context-not-reproducible-from-this-repo">Clinical-data results (context — not reproducible from this repo)</h2>
@@ -182,12 +187,12 @@ flow ≡ R fit (outcome-node coefficients and ATE) without an R installation.</p
 <tr>
   <td>this flow, nihss6 config</td>
   <td><strong>+0.063</strong></td>
-  <td><code>experiments/nihss6_flow.py</code></td>
+  <td><code>experiments/stale/nihss6_flow.py</code> (parked)</td>
 </tr>
 <tr>
   <td>this flow, all-ls</td>
   <td><strong>+0.057</strong></td>
-  <td><code>experiments/all_ls_flow.py</code></td>
+  <td><code>experiments/stale/all_ls_flow.py</code> (parked)</td>
 </tr>
 <tr>
   <td>classical proportional-odds MLE, same 80% split</td>
@@ -215,35 +220,36 @@ flow ≡ R fit (outcome-node coefficients and ATE) without an R installation.</p
 <p>Reading notes:</p>
 
 <ul>
-<li><strong>The all-ls flow IS the classical MLE</strong> when trained to convergence without
-early stopping (the default, <code>restore_best=False</code>): on the synthetic <code>ls</code>
-cohort its outcome-node coefficients match <code>statsmodels</code> <em>and</em> R <code>polr</code> to 4
-decimals (Age 0.0526, NIHSSa 0.1630, T −0.9424; ATE +0.1429 vs +0.1428) — see
-<code>experiments/validate_ls.py</code> and
-<code>test_simulations.py::test_all_ls_flow_is_exact_mle</code>. The earlier
-+0.057-vs-+0.055 residual on the clinical data was exactly the early-stopping
+<li>When the all-ls flow trains to convergence without early stopping (the
+default, <code>restore_best=False</code>), <strong>it IS the classical MLE</strong>. On the
+synthetic <code>ls</code> cohort, its outcome-node coefficients match <code>statsmodels</code>
+<em>and</em> R <code>polr</code> to 4 decimals (Age 0.0526, NIHSSa 0.1630, T −0.9424, and ATE
++0.1429 vs +0.1428). See <code>experiments/validate_ls.py</code> and
+<code>test_simulations.py::test_all_ls_flow_is_exact_mle</code>. The earlier residual
+of +0.057 vs +0.055 on the clinical data was exactly the early-stopping
 effect (see CHANGELOG).</li>
 <li><strong>Flexible (<code>ci</code>/<code>cs</code>) models are different</strong>: their MLE <em>overfits the
-observational confounding</em>, so they need <code>restore_best=True</code> (early-stopping
-regularization) to recover the causal effect — confirmed on the synthetic <code>nl</code>
-cohort, where the flexible MLE undershoots (+0.076) but the early-stopped fit
-recovers the true ATE (+0.10), with a lower validation NLL. <code>run_experiment</code>
-defaults <code>restore_best</code> per style accordingly (off for all-<code>ls</code>, on for
-flexible).</li>
+observational confounding</em>. Therefore they need <code>restore_best=True</code>
+(early-stopping regularization) to recover the causal effect. The synthetic
+<code>nl</code> cohort confirms this: the flexible MLE undershoots (+0.076), but the
+early-stopped fit recovers the true ATE (+0.10), with a lower validation
+NLL. <code>run_experiment</code> defaults <code>restore_best</code> per style accordingly (off for
+all-<code>ls</code>, on for flexible).</li>
 <li>The treatment effect is <strong>weakly identified</strong> in this observational cohort:
-the likelihood around the T-coefficient is nearly flat, and refits drift to
-the 80%-split optimum of ≈ +0.054 — the original +0.108 is a
-near-likelihood-equivalent solution, not a sharper optimum. Both flow results
-sit inside the established acceptance band [+0.03, +0.14]; matching the band,
-not the point estimate, is the meaningful check.</li>
+the likelihood around the T-coefficient is nearly flat. Refits drift to the
+80%-split optimum of ≈ +0.054. The original +0.108 is a
+near-likelihood-equivalent solution, not a sharper optimum. Both flow
+results sit inside the established acceptance band [+0.03, +0.14]. The
+meaningful check is the match to the band, not to the point estimate.</li>
 </ul>
 
 <h2 id="counterfactual-demo">Counterfactual demo</h2>
 
-<p><code>experiments/counterfactual_demo.py</code> (a capability beyond the original scripts)
-abducts the latents of the 128 held-out test patients, verifies exact factual
-reconstruction, and predicts each patient's outcome under the opposite
-treatment (<code>results/&lt;name&gt;/counterfactuals_test.csv</code>,
+<p><code>experiments/stale/counterfactual_demo.py</code> (parked, needs an API migration
+before it runs again) is a capability beyond the original
+scripts. It abducts the latents of the 128 held-out test patients and confirms
+exact factual reconstruction. It then predicts the outcome of each patient
+under the opposite treatment (<code>results/&lt;name&gt;/counterfactuals_test.csv</code>,
 <code>plots/counterfactual_mrs3m.png</code>).</p>
 </div>
 
@@ -251,7 +257,7 @@ treatment (<code>results/&lt;name&gt;/counterfactuals_test.csv</code>,
 
                         <label class="view-source-button" for="mod-stroke_case_study-view-source"><span>View Source</span></label>
 
-                        <div class="pdoc-code codehilite"><pre><span></span><span id="L-1"><a href="#L-1"><span class="linenos">1</span></a><span class="sd">&quot;&quot;&quot;.. include:: ../../../docs/stroke-case-study.md&quot;&quot;&quot;</span>
+                        <div class="pdoc-code codehilite"><pre><span></span><span id="L-1"><a href="#L-1"><span class="linenos">1</span></a><span class="sd">""".. include:: ../../../docs/stroke-case-study.md"""</span>
 </span></pre></div>
 
 
