@@ -158,6 +158,9 @@ import torch
 
 from tramdag import CS, LS, CausalFlowDAG, ContinuousNode, OrdinalNode
 
+# tramdag reports fit() progress on its module logger
+logging.basicConfig(level=logging.INFO, format="%(message)s")
+
 plt.rcParams["figure.dpi"] = 110
 
 # %% [markdown]

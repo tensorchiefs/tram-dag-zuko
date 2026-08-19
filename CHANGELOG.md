@@ -96,6 +96,17 @@
 
 ### Changed (breaking)
 
+- **`VC(*modifiers, t=...)`**: the positional arguments are the
+  covariates that enter `b_theta`; the treatment `t` is a required
+  keyword. `VC("X2", "X3", t="T")` reads as
+  `(beta0 + b_theta(x2, x3)) * x_t`. (0.3 wrote `VC("T", "X2", "X3")`.)
+
+- **Progress goes through `logging`, not `print`.** `fit`,
+  `fit_classical` and the all-frozen notice emit INFO records on the
+  `tramdag.flow` module logger, still gated by `verbose=`. Scripts and
+  notebooks that relied on stdout add one line:
+  `logging.basicConfig(level=logging.INFO, format="%(message)s")`.
+
 - **The node formula argument is `terms`, not `transformation`.**
   `ContinuousNode(terms=...)` / `OrdinalNode(levels, terms=...)`, and the
   attribute is `node.terms`. It is still the first positional argument, so

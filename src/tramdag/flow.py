@@ -15,6 +15,7 @@ Causal queries:
 from __future__ import annotations
 
 import copy
+import logging
 import time
 from pathlib import Path
 from typing import NamedTuple
@@ -53,6 +54,8 @@ from .transforms import (
 )
 
 __all__ = ["CausalFlowDAG"]
+
+logger = logging.getLogger(__name__)
 
 
 class _VCGroup(NamedTuple):
@@ -772,15 +775,18 @@ class CausalFlowDAG(nn.Module):
             if verbose and (epoch % verbose == 0 or epoch == epochs - 1):
                 tot_t = sum(train_acc.values())
                 tot_v = sum(val_per_node.values())
-                print(
-                    f"[epoch {epoch + 1:5d}/{epochs}] train NLL {tot_t:.4f}  "
-                    f"val NLL {tot_v:.4f}"
-                    + (f"  frozen {sorted(frozen)}" if frozen else "")
+                logger.info(
+                    "[epoch %5d/%d] train NLL %.4f  val NLL %.4f%s",
+                    epoch + 1,
+                    epochs,
+                    tot_t,
+                    tot_v,
+                    f"  frozen {sorted(frozen)}" if frozen else "",
                 )
 
             if len(frozen) == len(self.order):  # everything converged
                 if verbose:
-                    print(f"[epoch {epoch + 1:5d}] all nodes frozen — stopping.")
+                    logger.info("[epoch %5d] all nodes frozen — stopping.", epoch + 1)
                 break
 
         if restore_best:  # restore per-node best-validation weights
@@ -1414,10 +1420,12 @@ class CausalFlowDAG(nn.Module):
             "coefficients": coefs,
         }
         if verbose:
-            print(
-                f"fit_classical: {n_iter} L-BFGS iters, NLL {final_nll:.6f}, "
-                f"{report['seconds']:.2f}s"
-                + ("" if converged else f"  (NLL still moving at {max_iter} iters)")
+            logger.info(
+                "fit_classical: %d L-BFGS iters, NLL %.6f, %.2fs%s",
+                n_iter,
+                final_nll,
+                report["seconds"],
+                "" if converged else f"  (NLL still moving at {max_iter} iters)",
             )
         return report
 

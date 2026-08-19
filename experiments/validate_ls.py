@@ -17,6 +17,7 @@ Usage: uv run python validate_ls.py [source] [--classical]
                     instead of the multi-phase Adam schedule
 """
 
+import logging
 import sys
 
 import pandas as pd
@@ -31,6 +32,7 @@ PHASES = [(4000, 1e-2), (2000, 1e-3), (1000, 1e-4)]  # to tight convergence
 
 
 def main(source: str = "magic-mrclean/ls", classical: bool = False):
+    logging.basicConfig(level=logging.INFO, format="%(message)s")  # fit progress
     obs, rct, truth = load_data(source)
     fitter = "fit_classical (float64 L-BFGS)" if classical else "Adam (multi-phase)"
     print(f"=== spot-on all-ls comparison on '{source}' (N={len(obs)}) — {fitter} ===")

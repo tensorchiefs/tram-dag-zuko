@@ -15,10 +15,13 @@ Usage: uv run python sim_flow.py [ls|nl]   (default nl)
 """
 
 import argparse
+import logging
 
 from common import run_experiment
 
 if __name__ == "__main__":
+    # fit() reports progress on the tramdag.flow logger
+    logging.basicConfig(level=logging.INFO, format="%(message)s")
     parser = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
     )

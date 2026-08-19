@@ -37,6 +37,7 @@
 
 # %%
 import importlib.util
+import logging
 import subprocess
 import sys
 import time
@@ -53,6 +54,9 @@ import torch
 
 from tramdag import CausalFlowDAG, ContinuousNode, I
 from tramdag.simulations import VacaTriangle
+
+# tramdag reports fit() progress on its module logger
+logging.basicConfig(level=logging.INFO, format="%(message)s")
 
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 plt.rcParams["figure.dpi"] = 110
