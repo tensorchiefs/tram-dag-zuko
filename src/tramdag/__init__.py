@@ -24,12 +24,14 @@ from .spec import (
     simple_intercept,
     varying_coefficient,
 )
+from .utils import load_config
 
 __all__ = [
     "CausalFlowDAG",
     "ContinuousNode",
     "OrdinalNode",
     "machine_info",
+    "load_config",
     # term-formula notation: short aliases and their definitions
     "Term",
     "I",

@@ -19,24 +19,27 @@ Usage (from experiments/)::
 from __future__ import annotations
 
 import argparse
+from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from common import (
-    finish,
-    fit_with_snapshots,
-    load_config,
     make_output_dir,
     save_metrics,
-    split_train_val,
     variants_of,
     write_report,
 )
-from simulations.carefl import ALPHA_GRID, X_OBS, Carefl4
 
-from tramdag import ContinuousNode, I
+from paper.helpers import (
+    finish,
+    fit_with_snapshots,
+    split_train_val,
+)
+from paper.simulations.carefl import ALPHA_GRID, X_OBS, Carefl4
+from tramdag import ContinuousNode, I, load_config
 
+CONFIG = Path(__file__).with_suffix(".yaml")
 CONFIG_KEYS = {
     "n_train",
     "n_val",
@@ -130,8 +133,8 @@ def heldout_errors(generator, flow, config) -> dict:
 
 def run(variant: str) -> dict:
     """Run the benchmark end to end and give its metrics."""
-    config = load_config("carefl", variant, CONFIG_KEYS)
-    out = make_output_dir(f"carefl-{variant}")
+    config = load_config(CONFIG, "variants", variant, require=CONFIG_KEYS)
+    out = make_output_dir(__file__, f"carefl-{variant}")
 
     generator = Carefl4(seed=config["dgp_seed"])
     sample = generator.observational(config["n_train"] + config["n_val"])
@@ -192,7 +195,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument(
         "variant",
-        choices=variants_of("carefl"),
+        choices=variants_of(__file__),
         help="which model to run; hyperparameters live in carefl.yaml",
     )
     run(parser.parse_args().variant)

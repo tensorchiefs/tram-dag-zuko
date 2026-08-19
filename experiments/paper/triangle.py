@@ -22,26 +22,29 @@ Usage (from experiments/)::
 from __future__ import annotations
 
 import argparse
+from pathlib import Path
 
 import numpy as np
 from common import (
-    cs_curve,
-    fit_with_snapshots,
-    load_config,
-    ls_weight,
     make_output_dir,
-    plot_cs_curve,
-    plot_hist_grid,
-    plot_trajectories,
     save_metrics,
-    split_train_val,
     variants_of,
     write_report,
 )
-from simulations.triangle import TriangleContinuous
 
-from tramdag import CS, LS, ContinuousNode
+from paper.helpers import (
+    cs_curve,
+    fit_with_snapshots,
+    ls_weight,
+    plot_cs_curve,
+    plot_hist_grid,
+    plot_trajectories,
+    split_train_val,
+)
+from paper.simulations.triangle import TriangleContinuous
+from tramdag import CS, LS, ContinuousNode, load_config
 
+CONFIG = Path(__file__).with_suffix(".yaml")
 CONFIG_KEYS = {
     "f",
     "shift",
@@ -110,8 +113,8 @@ def snapshot(flow, shift: str) -> dict:
 
 def run(variant: str) -> dict:
     """Run one variant end to end and give its metrics."""
-    config = load_config("triangle", variant, CONFIG_KEYS)
-    out = make_output_dir(f"triangle-{variant}")
+    config = load_config(CONFIG, "variants", variant, require=CONFIG_KEYS)
+    out = make_output_dir(__file__, f"triangle-{variant}")
     figures = []
 
     generator = TriangleContinuous(f=config["f"], seed=config["dgp_seed"])
@@ -212,7 +215,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument(
         "variant",
-        choices=variants_of("triangle"),
+        choices=variants_of(__file__),
         help="which DGP and model to run; hyperparameters live in triangle.yaml",
     )
     run(parser.parse_args().variant)

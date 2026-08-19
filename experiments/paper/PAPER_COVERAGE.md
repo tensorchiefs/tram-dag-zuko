@@ -52,6 +52,6 @@ in the DGP under `do(x1 += 1)`, theory `e² ≈ 7.39`).
    level-exactly rather than pointwise.
 3. **The `cubic` f variant** exists in the generator but has no experiment
    variant: the paper's C.3 uses `linear`, `atan` and `sin`. Add a section to
-   `triangle.yaml` if it is ever wanted.
+   `paper/triangle.yaml` if it is ever wanted.
 4. **Section 7's application** (the clinical case study) is not here: that data
    is private and its storyline lives in its own repository.

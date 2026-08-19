@@ -24,6 +24,7 @@ docs = [
 experiments = [
   "matplotlib",
   "pyyaml",  # the per-experiment hyperparameter files
+  "scipy",  # KS tests in the generator checks
   "statsmodels"  # classical reference (OrderedModel in validate_ls.py)
 ]
 notebooks = [
@@ -78,6 +79,11 @@ readme = "README.md"
 requires-python = ">=3.10"
 version = "0.3.0"
 
+[project.optional-dependencies]
+# tramdag.load_config reads YAML; nothing else in the package needs it, so it
+# is an extra rather than a dependency: `pip install "tramdag[config]"`.
+config = ["pyyaml"]
+
 [project.urls]
 Homepage = "https://github.com/tensorchiefs/tramdag"
 "Method paper (CLeaR 2025)" = "https://arxiv.org/abs/2503.16206"
@@ -94,7 +100,13 @@ addopts = ["-v", "--tb=short"]
 markers = [
   "slow: long fit/training tests — excluded from PR CI, run in the nightly full suite"
 ]
-testpaths = ["tests"]
+# so `paper.simulations` and `common` import the same way as when a script is
+# run with `python -m paper.triangle` from experiments/
+pythonpath = ["experiments"]
+# The framework suite and the per-area experiment checks both run on a bare
+# `pytest`. The experiment tests are cheap (numpy-only generator properties);
+# the training runs live in the experiments workflow, not here.
+testpaths = ["tests", "experiments"]
 
 [tool.ruff]
 # .claude/ is agent tooling, not package code. notebooks/stale/ is an archive:

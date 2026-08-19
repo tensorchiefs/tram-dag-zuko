@@ -15,11 +15,11 @@ on:
   workflow_dispatch:
     inputs:
       script:
-        description: 'run only this script (empty = all)'
+        description: run only this script (empty = all)
         required: false
         default: ''
       variant:
-        description: 'run only this variant (needs script)'
+        description: run only this variant (needs script)
         required: false
         default: ''
 
@@ -66,12 +66,14 @@ jobs:
         only_script = os.environ.get("ONLY_SCRIPT", "")
         only_variant = os.environ.get("ONLY_VARIANT", "")
         include = []
-        for path in sorted(pathlib.Path(".").glob("*.yaml")):
-            script = path.stem
+        for path in sorted(pathlib.Path(".").glob("*/*.yaml")):
+            area, script = path.parent.name, path.stem
             for variant in sorted(yaml.safe_load(path.read_text())["variants"]):
                 if only_script and (script, variant) != (only_script, only_variant):
                     continue
-                include.append({"script": script, "variant": variant})
+                include.append(
+                    {"area": area, "script": script, "variant": variant}
+                )
         if not include:
             raise SystemExit(
                 f"no experiment matches script={only_script!r} variant={only_variant!r}"
@@ -98,10 +100,11 @@ jobs:
 
     - name: run the experiment
       working-directory: experiments
-      run: uv run --group experiments python ${{ matrix.script }}.py ${{ matrix.variant }}
+      run: >-
+        uv run --group experiments python -m
+        ${{ matrix.area }}.${{ matrix.script }} ${{ matrix.variant }}
 
-    # the results directory of a run: <script-with-dashes>-<variant>, except
-    # validate_ls, whose script name carries an underscore
+    # the results directory of a run: <script-with-dashes>-<variant>
     - name: name the result directory
       id: result
       run: |
@@ -111,13 +114,16 @@ jobs:
 
     - name: check the metrics against the committed ground truth
       working-directory: experiments
-      run: uv run --group experiments python check.py ${{ steps.result.outputs.name }}
+      run: >-
+        uv run --group experiments python -m check
+        ${{ matrix.area }} ${{ steps.result.outputs.name }}
 
     - if: always()               # a drifted run is when the figures matter most
       uses: iterative/setup-cml@v3
     - name: post the report as a commit comment
       if: always()
-      working-directory: experiments/results/${{ steps.result.outputs.name }}
+      working-directory: >-
+        experiments/${{ matrix.area }}/results/${{ steps.result.outputs.name }}
       env:
         REPO_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |

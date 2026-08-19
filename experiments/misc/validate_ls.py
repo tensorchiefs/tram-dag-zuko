@@ -26,12 +26,11 @@ from __future__ import annotations
 
 import argparse
 import json
+from pathlib import Path
 
 import pandas as pd
 import torch
 from common import (
-    DATA,
-    load_config,
     make_output_dir,
     save_metrics,
     variants_of,
@@ -39,8 +38,9 @@ from common import (
 )
 from statsmodels.miscmodels.ordinal_model import OrderedModel
 
-from tramdag import LS, CausalFlowDAG, ContinuousNode, OrdinalNode
+from tramdag import LS, CausalFlowDAG, ContinuousNode, OrdinalNode, load_config
 
+CONFIG = Path(__file__).with_suffix(".yaml")
 CONFIG_KEYS = {
     "cohort",
     "fitter",
@@ -70,7 +70,7 @@ def build_spec() -> dict:
 
 def load_cohort(cohort: str) -> tuple:
     """Read the frozen cohort: observational rows, trial rows, truth, R reference."""
-    base = DATA / cohort
+    base = Path(__file__).resolve().parent / "data" / cohort
     columns = ["Age", "mRS_pre", "NIHSSa", "T", "mRS_3m"]
     observed = pd.read_csv(base / "obs.csv")[columns]
     trial = pd.read_csv(base / "rct.csv")[columns].astype(
@@ -194,8 +194,8 @@ def treatment_effect(flow, statsmodels_result, trial, good_levels: int) -> dict:
 
 def run(variant: str) -> dict:
     """Run one variant end to end and give its metrics."""
-    config = load_config("validate_ls", variant, CONFIG_KEYS)
-    out = make_output_dir(f"validate-ls-{variant}")
+    config = load_config(CONFIG, "variants", variant, require=CONFIG_KEYS)
+    out = make_output_dir(__file__, f"validate-ls-{variant}")
 
     observed, trial, truth, reference = load_cohort(config["cohort"])
     print(
@@ -256,7 +256,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument(
         "variant",
-        choices=variants_of("validate_ls"),
+        choices=variants_of(__file__),
         help="which fitting route to use; hyperparameters live in validate_ls.yaml",
     )
     run(parser.parse_args().variant)

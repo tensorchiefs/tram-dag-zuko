@@ -17,21 +17,23 @@ it ever needs regenerating.
 
 Usage (from experiments/)::
 
-    uv run python check_data.py
+    uv run python -m paper.check_data
 """
 
 from __future__ import annotations
 
 import json
 import sys
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
-from common import DATA
-from simulations.carefl import Carefl4
-from simulations.triangle import TriangleContinuous, TriangleMixed
-from simulations.vaca import VacaTriangle
 
+from paper.simulations.carefl import Carefl4
+from paper.simulations.triangle import TriangleContinuous, TriangleMixed
+from paper.simulations.vaca import VacaTriangle
+
+DATA = Path(__file__).resolve().parent / "data"
 ATOL = 1e-9
 
 # dataset directory -> (generator factory taking the truth dict, ...)

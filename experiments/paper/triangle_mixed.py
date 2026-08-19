@@ -21,26 +21,29 @@ Usage (from experiments/)::
 from __future__ import annotations
 
 import argparse
+from pathlib import Path
 
 import numpy as np
 from common import (
-    cs_curve,
-    fit_with_snapshots,
-    load_config,
-    ls_weight,
     make_output_dir,
-    plot_cs_curve,
-    plot_hist_grid,
-    plot_trajectories,
     save_metrics,
-    split_train_val,
     variants_of,
     write_report,
 )
-from simulations.triangle import TriangleMixed
 
-from tramdag import CS, LS, ContinuousNode, OrdinalNode
+from paper.helpers import (
+    cs_curve,
+    fit_with_snapshots,
+    ls_weight,
+    plot_cs_curve,
+    plot_hist_grid,
+    plot_trajectories,
+    split_train_val,
+)
+from paper.simulations.triangle import TriangleMixed
+from tramdag import CS, LS, ContinuousNode, OrdinalNode, load_config
 
+CONFIG = Path(__file__).with_suffix(".yaml")
 CONFIG_KEYS = {
     "f",
     "shift",
@@ -129,8 +132,8 @@ def dgp_odds_ratio(generator, threshold: float, n: int, seed: int) -> float:
 
 def run(variant: str) -> dict:
     """Run one variant end to end and give its metrics."""
-    config = load_config("triangle_mixed", variant, CONFIG_KEYS)
-    out = make_output_dir(f"triangle-mixed-{variant}")
+    config = load_config(CONFIG, "variants", variant, require=CONFIG_KEYS)
+    out = make_output_dir(__file__, f"triangle-mixed-{variant}")
     figures = []
 
     generator = TriangleMixed(f=config["f"], seed=config["dgp_seed"])
@@ -236,7 +239,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument(
         "variant",
-        choices=variants_of("triangle_mixed"),
+        choices=variants_of(__file__),
         help="which DGP and model to run; hyperparameters live in triangle_mixed.yaml",
     )
     run(parser.parse_args().variant)

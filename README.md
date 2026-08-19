@@ -183,11 +183,12 @@ See the [`tests/README.md`](tests/README.md) file for more details.
 src/tramdag/            spec.py transforms.py conditioners.py flow.py
                         scores.py env.py          <- the framework, and nothing else
 tests/                  unit tests, identities, acceptance bars, three inline DGPs
-experiments/            the paper replications, self-contained:
-                          <name>.py + <name>.yaml   one script and its hyperparameters
-                          simulations/              numpy-only SCM generators
-                          data/                     frozen CSVs + truth.json
-                          ground_truth/             expected metrics, checked by CI
+experiments/            research code, one directory per area, each self-contained:
+                          paper/       the replications + generators + frozen data
+                          benchmarks/  training-speed and machine measurements
+                          misc/        the classical-MLE validation
+                        each area: <name>.py + <name>.yaml, data/, ground_truth/,
+                        tests/, results/
 notebooks/              intro (didactic) + Colab demo   (jupytext .py — see README there)
 docs/                   code-map.md (every class/function + all knobs),
                         fitting.md, notation.md, training-speed.md,

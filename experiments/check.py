@@ -1,7 +1,7 @@
 """Compare an experiment's metrics against the committed ground truth.
 
 The experiments workflow calls this after each run. Ground truth lives in
-``ground_truth/<result-dir>.json`` as one entry per metric::
+``<area>/ground_truth/<result-dir>.json`` as one entry per metric::
 
     {"_note": "what these numbers mean",
      "beta12": {"value": 2.0012, "atol": 0.05}}
@@ -14,9 +14,9 @@ without an entry is reported and ignored; an entry without a metric is an
 error, because that means the experiment stopped producing a number the
 ground truth claims to check.
 
-Usage (from experiments/)::
+Usage (from ``experiments/``)::
 
-    uv run python check.py triangle-atan-cs
+    uv run python -m check paper triangle-atan-cs
 """
 
 from __future__ import annotations
@@ -24,15 +24,19 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+from pathlib import Path
 
-from common import GROUND_TRUTH, RESULTS
+HERE = Path(__file__).resolve().parent
+AREAS = ("paper", "benchmarks", "misc")
 
 
-def compare(name: str) -> tuple[list[str], list[str]]:
+def compare(area: str, name: str) -> tuple[list[str], list[str]]:
     """Compare one result directory against its ground truth.
 
     Parameters
     ----------
+    area : str
+        Experiment area: ``paper``, ``benchmarks`` or ``misc``.
     name : str
         Name of the results directory, for example ``"triangle-atan-cs"``.
 
@@ -46,14 +50,14 @@ def compare(name: str) -> tuple[list[str], list[str]]:
     FileNotFoundError
         If the metrics or the ground-truth file is missing.
     """
-    metrics_path = RESULTS / name / "metrics.json"
-    truth_path = GROUND_TRUTH / f"{name}.json"
+    metrics_path = HERE / area / "results" / name / "metrics.json"
+    truth_path = HERE / area / "ground_truth" / f"{name}.json"
     if not metrics_path.exists():
         raise FileNotFoundError(f"no metrics to check: {metrics_path}")
     if not truth_path.exists():
         raise FileNotFoundError(
-            f"no ground truth for '{name}': {truth_path}. Write one from a "
-            "reviewed run before wiring the experiment into CI."
+            f"no ground truth for '{area}/{name}': {truth_path}. Write one from "
+            "a reviewed run before wiring the experiment into CI."
         )
 
     metrics = json.loads(metrics_path.read_text())
@@ -83,21 +87,23 @@ def compare(name: str) -> tuple[list[str], list[str]]:
     return failures, notes
 
 
-def main(name: str) -> int:
+def main(area: str, name: str) -> int:
     """Print the comparison and give the process exit code."""
-    failures, notes = compare(name)
+    failures, notes = compare(area, name)
     for note in notes:
         print(f"  ok   {note}")
     for failure in failures:
         print(f"  FAIL {failure}")
     if failures:
-        print(f"\n{name}: {len(failures)} metric(s) outside tolerance")
+        print(f"\n{area}/{name}: {len(failures)} metric(s) outside tolerance")
         return 1
-    print(f"\n{name}: all checked metrics within tolerance")
+    print(f"\n{area}/{name}: all checked metrics within tolerance")
     return 0
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser.add_argument("area", choices=AREAS, help="experiment area")
     parser.add_argument("name", help="results directory name, e.g. triangle-atan-cs")
-    sys.exit(main(parser.parse_args().name))
+    args = parser.parse_args()
+    sys.exit(main(args.area, args.name))

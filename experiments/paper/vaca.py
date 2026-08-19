@@ -19,24 +19,27 @@ Usage (from experiments/)::
 from __future__ import annotations
 
 import argparse
+from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
 from common import (
-    finish,
-    fit_with_snapshots,
-    hist_overlay,
-    load_config,
     make_output_dir,
     save_metrics,
-    split_train_val,
     variants_of,
     write_report,
 )
-from simulations.vaca import DO_X2_VALUES, VacaTriangle
 
-from tramdag import ContinuousNode, I
+from paper.helpers import (
+    finish,
+    fit_with_snapshots,
+    hist_overlay,
+    split_train_val,
+)
+from paper.simulations.vaca import DO_X2_VALUES, VacaTriangle
+from tramdag import ContinuousNode, I, load_config
 
+CONFIG = Path(__file__).with_suffix(".yaml")
 CONFIG_KEYS = {
     "n_train",
     "n_val",
@@ -139,8 +142,8 @@ def plot_interventional(generator, flow, config, truth, path) -> dict:
 
 def run(variant: str) -> dict:
     """Run the benchmark end to end and give its metrics."""
-    config = load_config("vaca", variant, CONFIG_KEYS)
-    out = make_output_dir(f"vaca-{variant}")
+    config = load_config(CONFIG, "variants", variant, require=CONFIG_KEYS)
+    out = make_output_dir(__file__, f"vaca-{variant}")
 
     generator = VacaTriangle(seed=config["dgp_seed"])
     sample = generator.observational(config["n_train"] + config["n_val"])
@@ -210,7 +213,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument(
         "variant",
-        choices=variants_of("vaca"),
+        choices=variants_of(__file__),
         help="which model to run; hyperparameters live in vaca.yaml",
     )
     run(parser.parse_args().variant)

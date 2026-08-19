@@ -7,7 +7,8 @@ __pycache__/
 
 # Experiment outputs — regenerable, and (for the clinical 'magic' source) derived
 # from patient data, so never committed. The synthetic data/ folder IS tracked.
-experiments/results/
+# run outputs of any experiment area, at any depth
+results/
 
 # R
 .Rhistory
