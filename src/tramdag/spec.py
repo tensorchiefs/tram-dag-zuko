@@ -9,15 +9,19 @@ positional argument, written as a list or as a ``+`` sum::
 
 Term constructors name the parent(s) a term depends on. Each has a
 pythonic name and a short alias — ``intercept``/``I``,
+``simple_intercept``/``SI``, ``complex_intercept``/``CI``,
 ``linear_shift``/``LS``, ``complex_shift``/``CS`` and
 ``varying_coefficient``/``VC`` — and the two spellings are the same
 object, so use whichever reads better:
 
 - :func:`I`  — *intercept* term: the parent(s) reshape the monotone transform
-  (its Bernstein coefficients / ordinal cutpoints). ``I()`` with no parent — or
-  the bare name ``I`` — is the simple-intercept baseline (always present,
-  optional to write). ``I(..., transform="spline")`` picks the basis of the
-  monotone transform for a continuous node.
+  (its Bernstein coefficients / ordinal cutpoints). ``I`` dispatches on its
+  arguments: without parents it is the paper's simple intercept :func:`SI`
+  (always present, optional to write — the bare names ``I`` and ``SI`` both
+  work in a term list), with parents the complex intercept :func:`CI`.
+  ``transform="spline"`` picks the basis of the monotone transform for a
+  continuous node; extra keyword arguments go straight to the transform
+  class (``SI(transform="spline", bins=16)``).
 - :func:`LS` — *linear shift*: ``beta * x`` (one interpretable weight), one parent.
 - :func:`CS` — *complex shift*: an additive MLP ``g(x)`` on the latent scale.
 - :func:`VC` — *varying-coefficient shift*: ``beta(modifiers) * x_on`` with
@@ -135,47 +139,80 @@ class Term:
         return NotImplemented
 
 
-def intercept(
-    *parents: str,
-    allow_interaction: bool = True,
-    transform: str | None = None,
-    transform_kwargs: dict | None = None,
-    units: list[int] | tuple[int, ...] | None = None,
-) -> Term:
-    """Build an intercept term: the parents reshape the monotone transform.
+def simple_intercept(transform: str | None = None, **transform_kwargs) -> Term:
+    """Build the simple-intercept baseline term — the paper's SI.
 
-    ``I`` is the exported alias of this function, the notation of the docs
-    and the paper. A call with no parents, or the bare name ``I``, is the
-    simple-intercept baseline.
+    ``SI`` is the exported alias of this function. The term's transform
+    parameters are a free vector, the same for every observation.
 
     Parameters
     ----------
-    *parents : str
-        Parent names. With several parents the term is one **joint**
-        network (an interaction).
-    allow_interaction : bool, optional
-        ``False`` makes a multi-parent term **additive** instead: one
-        network per parent, their parameter vectors summed in coefficient
-        space. A node takes at most one intercept term with parents —
-        write an additive intercept with this flag, not with several ``I``
-        terms. Default ``True``.
     transform : str | None, optional
         Basis of a continuous node's monotone transform: ``"bernstein"``
-        (default), ``"spline"`` or ``"affine"``. At most one ``I`` term
-        per node can set it. An ordinal node accepts none, because its
-        intercept is the cutpoint vector.
-    transform_kwargs : dict | None, optional
-        Keyword arguments, forwarded to the basis.
-    units : list[int] | tuple[int, ...] | None, optional
-        Hidden layers of the term's network, for example ``units=[16]``
-        for one hidden layer of 16 neurons. Default ``[8, 8]``.
+        (default), ``"spline"`` or ``"affine"``. At most one intercept
+        term per node can set it. An ordinal node accepts none, because
+        its intercept is the cutpoint vector.
+    **transform_kwargs
+        Forwarded to the transform class, for example
+        ``SI(transform="spline", bins=16)``.
 
     Returns
     -------
     Term
         The intercept term.
     """
-    kw = tuple(sorted(transform_kwargs.items())) if transform_kwargs else None
+    kw = tuple(sorted(transform_kwargs.items())) or None
+    return Term("I", (), _options(transform=transform, transform_kwargs=kw))
+
+
+def complex_intercept(
+    *parents: str,
+    allow_interaction: bool = True,
+    units: list[int] | tuple[int, ...] | None = None,
+    transform: str | None = None,
+    **transform_kwargs,
+) -> Term:
+    """Build a complex-intercept term — the paper's CI.
+
+    ``CI`` is the exported alias of this function. The parents reshape the
+    monotone transform: its parameters become a function of them.
+
+    Parameters
+    ----------
+    *parents : str
+        Parent names, at least one. With several parents the term is one
+        **joint** network (an interaction).
+    allow_interaction : bool, optional
+        ``False`` makes a multi-parent term **additive** instead: one
+        network per parent, their parameter vectors summed in coefficient
+        space. A node takes at most one intercept term with parents —
+        write an additive intercept with this flag, not with several
+        intercept terms. Default ``True``.
+    units : list[int] | tuple[int, ...] | None, optional
+        Hidden layers of the term's network, for example ``units=[16]``
+        for one hidden layer of 16 neurons. Default ``[8, 8]``.
+    transform : str | None, optional
+        Basis of the node's monotone transform, as for
+        :func:`simple_intercept`.
+    **transform_kwargs
+        Forwarded to the transform class.
+
+    Returns
+    -------
+    Term
+        The intercept term.
+
+    Raises
+    ------
+    ValueError
+        If no parent is given.
+    """
+    if not parents:
+        raise ValueError(
+            "complex_intercept() needs at least one parent. The parentless "
+            "baseline is simple_intercept() / SI."
+        )
+    kw = tuple(sorted(transform_kwargs.items())) or None
     return Term(
         "I",
         tuple(parents),
@@ -186,6 +223,31 @@ def intercept(
             allow_interaction=bool(allow_interaction) or len(parents) < 2,
         ),
     )
+
+
+def intercept(*parents: str, **kwargs) -> Term:
+    """Build an intercept term, dispatching on the arguments.
+
+    ``I`` is the exported alias of this function, the notation of the docs
+    and the paper. Without parents it is :func:`simple_intercept`; with
+    parents it is :func:`complex_intercept`. The bare name ``I`` in a term
+    list stands for ``I()``.
+
+    Parameters
+    ----------
+    *parents : str
+        Parent names, forwarded to the matching constructor.
+    **kwargs
+        Forwarded to the matching constructor.
+
+    Returns
+    -------
+    Term
+        The intercept term.
+    """
+    if parents:
+        return complex_intercept(*parents, **kwargs)
+    return simple_intercept(**kwargs)
 
 
 def linear_shift(*parents: str) -> Term:
@@ -356,8 +418,8 @@ def _as_term(value) -> Term:
     TypeError
         If the entry is neither a term nor the bare ``I``.
     """
-    if value is intercept:
-        return intercept()
+    if value in (intercept, simple_intercept):
+        return simple_intercept()
     if isinstance(value, Term):
         return value
     raise TypeError(
@@ -711,6 +773,8 @@ def spec_from_dict(d: dict) -> dict[str, NodeSpec]:
 # spelling nearly every caller uses; the long names above are their
 # definitions, so `I is intercept` and the bare `I` sugar keeps working.
 I = intercept  # noqa: E741 - ambiguous only out of context
+SI = simple_intercept
+CI = complex_intercept
 LS = linear_shift
 CS = complex_shift
 VC = varying_coefficient

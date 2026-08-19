@@ -133,5 +133,5 @@ default you can read at the call site. Nothing numeric is buried.
 | VC penalty and centering | `VC(penalty=, center=, center_folds=)` | 1.0 / False / 5 |
 | L-BFGS budget | `fit_classical(max_iter=, tol=, chunk=, history_size=)` | 400 / 1e-6 / 25 / 50 |
 | network widths | `units=` on `I`/`CS`/`VC` | (8, 8) / (64, 128, 64) / (16,) — Keras-parity architecture defaults |
-| transform basis | `I(transform=, transform_kwargs=)` | `"bernstein"`, `n_coeffs=20`; spline `bins=8` (the domain is fixed at [-5, 5], `transforms.BOUND`) |
+| transform basis | `I(transform=, **kwargs)` (extra kwargs go to the transform class) | `"bernstein"`, `n_coeffs=20`; spline `bins=8` (the domain is fixed at [-5, 5], `transforms.BOUND`) |
 | shuffling / weight init | `fit(seed=)` / `CausalFlowDAG(seed=)` | init happens at construction — the constructor seed is the reproducibility knob |

@@ -328,7 +328,7 @@ plt.show()
 # 8–32 bins, lr 0.01–0.1, up to 2000 epochs). This is an honest empirical reason
 # why **Bernstein** is the TRAM-faithful default: its monotone softplus-cumsum
 # parametrization is easier to optimize. You can swap the transform per node at
-# any time with `I(..., transform="spline", transform_kwargs={"bins": 16})`.
+# any time with `I(..., transform="spline", bins=16)`.
 
 # %% [markdown]
 # ## 7. GPU vs CPU

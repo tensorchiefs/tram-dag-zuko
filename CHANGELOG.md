@@ -10,8 +10,10 @@
   `OrdinalNode(4, [I, LS("x1")])`). New on `I`:
   `allow_interaction=False` (multi-parent intercept becomes additive,
   `I("a","b", allow_interaction=False) == I("a") + I("b")`) and
-  `transform=`/`transform_kwargs=` (the monotone basis moves onto the
-  intercept term, e.g. `I("x1", transform="spline")`). Everything
+  `transform=` (the monotone basis moves onto the intercept term,
+  e.g. `I("x1", transform="spline")`; extra keyword arguments pass
+  straight to the transform class, `I("x1", transform="spline", bins=6)`).
+  Everything
   normalizes to the same internal term list, and equivalence is pinned by
   state-dict-identical tests (`tests/test_transformation_syntax.py`).
 
@@ -24,6 +26,10 @@
   `fit_classical(chunk=25, history_size=50)` (L-BFGS round length and
   memory). The plateau lr floor (`1e-3 * learning_rate`) and the freeze
   guard (`1e-2 * learning_rate`) are documented in the `fit` docstring.
+
+- **Paper-aligned intercept constructors**: `simple_intercept`/`SI`
+  (parentless baseline) and `complex_intercept`/`CI` (needs parents);
+  `intercept`/`I` stays as the fallback and dispatches on its arguments.
 
 - **Pythonic names for every term constructor**, with the short
   notation kept as an alias of the same object: `intercept`/`I`,

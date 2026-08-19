@@ -9,16 +9,20 @@ from . import simulations
 from .env import machine_info
 from .flow import CausalFlowDAG
 from .spec import (
+    CI,
     CS,
     LS,
+    SI,
     VC,
     ContinuousNode,
     I,
     OrdinalNode,
     Term,
+    complex_intercept,
     complex_shift,
     intercept,
     linear_shift,
+    simple_intercept,
     varying_coefficient,
 )
 
@@ -32,6 +36,10 @@ __all__ = [
     "Term",
     "I",
     "intercept",
+    "SI",
+    "simple_intercept",
+    "CI",
+    "complex_intercept",
     "LS",
     "linear_shift",
     "CS",

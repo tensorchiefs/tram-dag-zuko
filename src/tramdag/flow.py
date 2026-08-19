@@ -842,7 +842,7 @@ class CausalFlowDAG(nn.Module):
                     [
                         I(
                             transform=node_spec.transform,
-                            transform_kwargs=dict(node_spec.transform_kwargs),
+                            **dict(node_spec.transform_kwargs),
                         ),
                         *ls_terms,
                     ]

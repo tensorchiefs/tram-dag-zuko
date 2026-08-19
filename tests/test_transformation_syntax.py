@@ -8,7 +8,7 @@ term with parents, and a VC term names its treatment by keyword.
 import pytest
 import torch
 
-from tramdag import CS, LS, VC, CausalFlowDAG, ContinuousNode, I, OrdinalNode
+from tramdag import CI, CS, LS, SI, VC, CausalFlowDAG, ContinuousNode, I, OrdinalNode
 from tramdag.spec import spec_from_dict, spec_to_dict, validate_and_sort
 
 # ----------------------------------------------------------- normalization
@@ -72,9 +72,18 @@ def test_multi_parent_i_stays_joint_by_default():
 
 
 def test_i_transform_hoists_to_the_node():
-    node = ContinuousNode([I("x1", transform="spline", transform_kwargs={"bins": 6})])
+    node = ContinuousNode([I("x1", transform="spline", bins=6)])
     assert node.transform == "spline"
     assert node.transform_kwargs == {"bins": 6}
+
+
+def test_i_dispatches_to_si_and_ci():
+    """I is the fallback: no parents -> SI, parents -> CI."""
+    assert I() == SI()
+    assert I(transform="spline", bins=6) == SI(transform="spline", bins=6)
+    assert I("a", "b", units=[4]) == CI("a", "b", units=[4])
+    with pytest.raises(ValueError, match="at least one parent"):
+        CI()
 
 
 def test_bare_i_can_carry_the_source_basis():
@@ -182,7 +191,7 @@ def test_saved_checkpoint_of_new_syntax_loads(tmp_path):
 def test_every_option_survives_the_roundtrip():
     """One spec exercising every Term option, through the serializer."""
     spec = {
-        "a": ContinuousNode([I(transform="spline", transform_kwargs={"bins": 6})]),
+        "a": ContinuousNode([SI(transform="spline", bins=6)]),
         "b": ContinuousNode(),
         "t": OrdinalNode(2, [LS("a")]),
         "y": ContinuousNode(
