@@ -469,10 +469,7 @@ class ContinuousNode:
         """Compare the terms; the basis is derived from them."""
         # transform/transform_kwargs are derived from the terms, so equal
         # term lists already imply an equal basis
-        return (
-            isinstance(other, ContinuousNode)
-            and self.terms == other.terms
-        )
+        return isinstance(other, ContinuousNode) and self.terms == other.terms
 
 
 class OrdinalNode:

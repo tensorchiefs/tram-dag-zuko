@@ -20,7 +20,6 @@ def _spec(style: str) -> dict:
     return MagicMrClean().spec("ls" if style == "ls" else "flexible")
 
 
-
 # ----------------------------------------------------------------- generator
 def test_generator_schema_and_ranges():
     gen = MagicMrClean(variant="nl", seed=7)
