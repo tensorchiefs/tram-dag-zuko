@@ -11,6 +11,9 @@ dev = [
   {include-group = "test"},
   "pre-commit",
   "pylsp-rope",
+  # actionlint lints a workflow's shell scripts only when shellcheck is on
+  # PATH. Without it, a local hook run silently checks less than CI does.
+  "shellcheck-py",
   "python-lsp-ruff",
   "python-lsp-server[all]"
 ]
