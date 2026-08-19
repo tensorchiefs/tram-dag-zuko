@@ -5,7 +5,6 @@
 
 from importlib.metadata import version
 
-from . import simulations
 from .env import machine_info
 from .flow import CausalFlowDAG
 from .spec import (
@@ -31,7 +30,6 @@ __all__ = [
     "ContinuousNode",
     "OrdinalNode",
     "machine_info",
-    "simulations",
     # term-formula notation: short aliases and their definitions
     "Term",
     "I",

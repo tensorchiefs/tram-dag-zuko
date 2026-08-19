@@ -46,8 +46,7 @@ class DatasetDraws:
     Each generator owns ``simulate`` and ``draw_latents``; the draws below
     only pick the random stream. The seed offsets are part of the frozen
     data contract in ``data/``, so they live here once: observational
-    ``+1``, interventional ``+501``, counterfactual ``+2``. (``MagicMrClean``
-    adds its own ``rct`` at ``+1001``.)
+    ``+1``, interventional ``+501``, counterfactual ``+2``.
     """
 
     def observational(self, n: int, seed_offset: int = 0) -> pd.DataFrame:

@@ -1,10 +1,9 @@
 """Synthetic-cohort generators for tramdag.
 
-.. note:: **Scheduled to move.** This package is research code, not
-   framework code: it will relocate to the simulation-study companion
-   repo (``tensorchiefs/tramdag-simu``) together with ``experiments/``
-   and the tests that consume the frozen ``data/`` contract. Do not grow
-   it; new DGPs start in the companion repo.
+Research code, not framework code: it lives with the experiments that
+consume it. The stroke cohort (``magic_mrclean``) and the VC validation
+DGP (``vc_shift``) moved out with the stroke storyline — recover them
+with ``git checkout pre-experiments-cut -- <path>`` if needed.
 
 Each scenario is one module exposing a numpy-only SCM generator class with known
 causal ground truth. New scenarios register here so experiments/tests can look
@@ -13,26 +12,20 @@ regenerate only deliberately via each module's CLI.
 """
 
 from .carefl import Carefl4
-from .magic_mrclean import MagicMrClean
 from .triangle import TriangleContinuous, TriangleMixed
 from .vaca import VacaTriangle
-from .vc_shift import VCLogisticShift
 
 REGISTRY = {
-    "magic-mrclean": MagicMrClean,
     "triangle": TriangleContinuous,
     "triangle-mixed": TriangleMixed,
     "vaca": VacaTriangle,
     "carefl": Carefl4,
-    "vc-shift": VCLogisticShift,
 }
 
 __all__ = [
-    "MagicMrClean",
     "TriangleContinuous",
     "TriangleMixed",
     "VacaTriangle",
     "Carefl4",
-    "VCLogisticShift",
     "REGISTRY",
 ]
