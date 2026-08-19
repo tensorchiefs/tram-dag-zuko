@@ -12,6 +12,15 @@ on:
   pull_request:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      script:
+        description: 'run only this script (empty = all)'
+        required: false
+        default: ''
+      variant:
+        description: 'run only this variant (needs script)'
+        required: false
+        default: ''
 
 concurrency:                     # one run per ref; a new push supersedes
   group: experiments-${{ github.ref }}
@@ -21,33 +30,53 @@ permissions:
   contents: write                # commit comments
 
 jobs:
+  # The matrix comes from the YAML configs, not from a list in this file: a
+  # variant added to <script>.yaml is picked up here automatically, and the two
+  # can never disagree. A dispatch may narrow it to one script+variant.
+  plan:
+    runs-on: ubuntu-latest
+    outputs:
+      include: ${{ steps.pick.outputs.include }}
+    steps:
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1
+    - uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9   # v9.0.0
+      with:
+        enable-cache: true
+    - id: pick
+      working-directory: experiments
+      env:
+        UV_NO_DEFAULT_GROUPS: '1'
+        ONLY_SCRIPT: ${{ inputs.script }}
+        ONLY_VARIANT: ${{ inputs.variant }}
+      run: |
+        set -euo pipefail
+        uv run --group experiments python - >> "$GITHUB_OUTPUT" <<'EOF'
+        import json, os, pathlib, yaml
+
+        only_script = os.environ.get("ONLY_SCRIPT", "")
+        only_variant = os.environ.get("ONLY_VARIANT", "")
+        include = []
+        for path in sorted(pathlib.Path(".").glob("*.yaml")):
+            script = path.stem
+            for variant in sorted(yaml.safe_load(path.read_text())["variants"]):
+                if only_script and (script, variant) != (only_script, only_variant):
+                    continue
+                include.append({"script": script, "variant": variant})
+        if not include:
+            raise SystemExit(
+                f"no experiment matches script={only_script!r} variant={only_variant!r}"
+            )
+        print("include=" + json.dumps(include))
+        EOF
+
   replicate:
+    needs: plan
     runs-on: ubuntu-latest
     timeout-minutes: 90
     strategy:
       fail-fast: false           # one drifting experiment must not hide the rest
       matrix:
-        include:
-        - script: triangle
-          variant: linear-ls
-        - script: triangle
-          variant: linear-cs
-        - script: triangle
-          variant: atan-cs
-        - script: triangle
-          variant: sin-cs
-        - script: triangle_mixed
-          variant: linear-ls
-        - script: triangle_mixed
-          variant: exp-cs
-        - script: vaca
-          variant: flexible
-        - script: carefl
-          variant: flexible
-        - script: validate_ls
-          variant: adam
-        - script: validate_ls
-          variant: classical
+        include: ${{ fromJSON(needs.plan.outputs.include) }}
     env:
       UV_NO_DEFAULT_GROUPS: '1'  # dev drags in editor tooling; name the group
       OMP_NUM_THREADS: '2'       # the runners have 2 cores; avoid thread thrash
