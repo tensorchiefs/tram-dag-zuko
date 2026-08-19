@@ -22,7 +22,7 @@ concurrency:              # every run pushes to the same branch
 jobs:
   docs:
     runs-on: ubuntu-latest
-    timeout-minutes: 120
+    timeout-minutes: 60
     permissions:
       contents: write     # pushes gh-pages
     env:
@@ -118,15 +118,34 @@ jobs:
             fix(page, basedir, "../" * depth)
         EOF
 
+    # The PDF is a convenience, so it must not gate the site: it is bounded by
+    # its own timeout and marked continue-on-error. Two things could hang it
+    # for the whole job budget, silently, because -qq suppressed every line of
+    # output: apt waiting forever on a held dpkg lock, and WeasyPrint fetching
+    # the README's remote badges with no timeout. Both are addressed below.
     - name: build the PDF (README + guides)
+      timeout-minutes: 10
+      continue-on-error: true
+      env:
+        DEBIAN_FRONTEND: noninteractive
       run: |
         set -euo pipefail
-        # neither pandoc nor weasyprint's pango are preinstalled
-        sudo apt-get update -qq
-        sudo apt-get install -y -qq pandoc libpango-1.0-0 libpangocairo-1.0-0
+        # neither pandoc nor weasyprint's pango are preinstalled. Lock::Timeout
+        # makes apt fail instead of waiting out the job on a held dpkg lock.
+        sudo apt-get -q -o DPkg::Lock::Timeout=120 update
+        sudo apt-get -q -y -o DPkg::Lock::Timeout=120 install \
+          pandoc libpango-1.0-0 libpangocairo-1.0-0
+        # WeasyPrint fetches every remote <img> and has no fetch timeout, so one
+        # slow badge host stalls the build. Strip them from a throwaway copy —
+        # CI and PyPI badges are noise in a PDF anyway.
+        mkdir -p build/pdf
+        sed -E -e 's#\[!\[[^]]*\]\([^)]*\)\]\([^)]*\)##g' \
+               -e 's#!\[[^]]*\]\(https?://[^)]*\)##g' \
+          README.md > build/pdf/README.md
         uv run --group notebooks --group docs --with weasyprint pandoc -f gfm -s \
           --resource-path=.:docs --metadata title="tramdag documentation" \
-          README.md docs/*.md -o site/tramdag-docs.pdf --pdf-engine=weasyprint
+          build/pdf/README.md docs/*.md \
+          -o site/tramdag-docs.pdf --pdf-engine=weasyprint
 
     - name: publish to gh-pages
       env:
