@@ -159,7 +159,10 @@ def run(variant: str) -> dict:
             fitted=cs_curve(flow, "x3", "x2", grid).ravel(),
             true=generator.true_shift_curve(grid),
             path=out / "plots" / "cs_curve.png",
-            title=f"complex shift, DGP f = {config['f']} (Fig. 7 right)",
+            # which paper figure this is depends on f (7 right for atan,
+            # 17 for the misspecified linear case, 18 for sin) —
+            # PAPER_COVERAGE.md holds that mapping
+            title=f"complex shift, DGP f = {config['f']}: fitted vs $-f(x_2)$",
         )
         figures.append("cs_curve.png")
 
