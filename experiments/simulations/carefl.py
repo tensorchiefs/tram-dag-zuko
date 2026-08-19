@@ -80,13 +80,28 @@ class Carefl4(DatasetDraws):
         do = do or {}
         latents, n = resolve_latents(self, n, rng, latents)
 
-        def clamp_or(name, value):
-            return np.full(n, float(do[name])) if name in do else value
+        # one if/else per variable, in topological order: an intervened
+        # variable is clamped and its structural equation skipped
+        if "x1" in do:
+            x1 = np.full(n, float(do["x1"]))
+        else:
+            x1 = latents["x1"]
 
-        x1 = clamp_or("x1", latents["x1"])
-        x2 = clamp_or("x2", latents["x2"])
-        x3 = clamp_or("x3", x1 + 0.5 * x2**3 + latents["x3"])
-        x4 = clamp_or("x4", -x2 + 0.5 * x1**2 + latents["x4"])
+        if "x2" in do:
+            x2 = np.full(n, float(do["x2"]))
+        else:
+            x2 = latents["x2"]
+
+        if "x3" in do:
+            x3 = np.full(n, float(do["x3"]))
+        else:
+            x3 = x1 + 0.5 * x2**3 + latents["x3"]
+
+        if "x4" in do:
+            x4 = np.full(n, float(do["x4"]))
+        else:
+            x4 = -x2 + 0.5 * x1**2 + latents["x4"]
+
         return pd.DataFrame({"x1": x1, "x2": x2, "x3": x3, "x4": x4})
 
     # -------------------------------------------------------------- ground truth

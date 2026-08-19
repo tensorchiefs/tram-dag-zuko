@@ -1,0 +1,22 @@
+# Hyperparameters of the CAREFL counterfactual benchmark (carefl.py).
+#
+# Every value the script uses is in this file: it reads no defaults of its
+# own and rejects a variant whose keys do not match exactly.
+
+variants:
+  # all conditionals complex intercepts; the Laplace noise is additive, so
+  # the counterfactual truth is analytic and the errors below are exact
+  flexible:
+    n_train: 18000
+    n_val: 2000
+    epochs: 300
+    learning_rate: 0.01
+    batch_size: 512
+    polish_epochs: 100          # second phase at a lower rate
+    polish_learning_rate: 0.001
+    dgp_seed: 42                # the paper's generator seed
+    init_seed: 7                # flow weight initialization
+    shuffle_seed: 0             # minibatch shuffling
+    n_heldout: 300              # typical rows scored instead of the 4-sigma x_obs
+    heldout_seed: 999           # seed offset of the held-out draw
+    alphas_scored: [-1.5, 0.0, 1.5]

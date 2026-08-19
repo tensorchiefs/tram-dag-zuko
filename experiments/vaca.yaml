@@ -1,0 +1,23 @@
+# Hyperparameters of the VACA/CNF benchmark (vaca.py).
+#
+# Every value the script uses is in this file: it reads no defaults of its
+# own and rejects a variant whose keys do not match exactly.
+
+variants:
+  # all conditionals complex intercepts — the Gaussian, bimodal DGP is
+  # outside the logistic-latent family, so the transforms must do the work
+  flexible:
+    n_train: 18000
+    n_val: 2000
+    epochs: 400
+    learning_rate: 0.01
+    batch_size: 512
+    polish_epochs: 120          # second phase at a lower rate
+    polish_learning_rate: 0.001
+    dgp_seed: 42                # the paper's generator seed
+    init_seed: 7                # flow weight initialization
+    shuffle_seed: 0             # minibatch shuffling
+    sample_seed: 1
+    n_compare: 50000            # rows per interventional panel (Fig. 5)
+    n_scatter: 2000             # points per off-diagonal scatter (Fig. 4)
+    hist_bins: 60

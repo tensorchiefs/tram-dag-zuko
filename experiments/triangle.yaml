@@ -1,0 +1,43 @@
+# Hyperparameters of the continuous-triangle replication (triangle.py).
+#
+# Every value the script uses is in this file: it reads no defaults of its
+# own and rejects a variant whose keys do not match exactly. The shared
+# block is written once and merged into each variant with YAML's << key,
+# so what a run uses stays readable at the point of use.
+
+paper_protocol: &paper_protocol
+  # paper App. C.3: n = 40000, 500 epochs, Adam at lr 1e-3
+  n_train: 36000
+  n_val: 4000
+  epochs: 500
+  learning_rate: 0.001
+  batch_size: 512
+  record_every: 10        # epochs between coefficient snapshots (Fig. 14/15)
+  dgp_seed: 42            # the paper's generator seed
+  init_seed: 7            # flow weight initialization
+  shuffle_seed: 0         # minibatch shuffling
+  sample_seed: 0          # sampling for the distribution comparisons
+  n_compare: 10000        # rows per distribution panel (Fig. 16/17)
+  do_x1: -1.0             # the paper's L2 query, do(x1 = -1)
+  grid_low: -1.0          # x2 grid of the complex-shift overlay (Fig. 7 right)
+  grid_high: 1.0
+  grid_points: 81
+
+variants:
+  # the linear DGP is the only one with a true beta23 (+0.3) to recover
+  linear-ls:
+    <<: *paper_protocol
+    f: linear
+    shift: ls
+
+  # the headline complex-shift experiment (Fig. 7/15/16)
+  atan-cs:
+    <<: *paper_protocol
+    f: atan
+    shift: cs
+
+  # a second nonlinear f, to show the shift recovery is not atan-specific
+  sin-cs:
+    <<: *paper_protocol
+    f: sin
+    shift: cs

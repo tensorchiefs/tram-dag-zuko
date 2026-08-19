@@ -80,20 +80,25 @@ class VacaTriangle(DatasetDraws):
         do = do or {}
         latents, n = resolve_latents(self, n, rng, latents)
 
+        # one if/else per variable, in topological order: an intervened
+        # variable is clamped and its structural equation skipped
         if "x1" in do:
             x1 = np.full(n, float(do["x1"]))
         else:
-            x1 = np.where(
-                latents["x1_mix"] < 0.5,
-                -2.0 + np.sqrt(1.5) * latents["x1_a"],
-                1.5 + 1.0 * latents["x1_b"],
-            )
-        x2 = np.full(n, float(do["x2"])) if "x2" in do else -x1 + latents["x2"]
-        x3 = (
-            np.full(n, float(do["x3"]))
-            if "x3" in do
-            else x1 + 0.25 * x2 + latents["x3"]
-        )
+            first_component = -2.0 + np.sqrt(1.5) * latents["x1_a"]
+            second_component = 1.5 + 1.0 * latents["x1_b"]
+            x1 = np.where(latents["x1_mix"] < 0.5, first_component, second_component)
+
+        if "x2" in do:
+            x2 = np.full(n, float(do["x2"]))
+        else:
+            x2 = -x1 + latents["x2"]
+
+        if "x3" in do:
+            x3 = np.full(n, float(do["x3"]))
+        else:
+            x3 = x1 + 0.25 * x2 + latents["x3"]
+
         return pd.DataFrame({"x1": x1, "x2": x2, "x3": x3})
 
     # -------------------------------------------------------------- ground truth
