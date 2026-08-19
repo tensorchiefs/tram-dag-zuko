@@ -139,7 +139,7 @@ def test_training_ehat_is_out_of_fold():
     flow = CausalFlowDAG(_misspecified_spec(True), seed=0)
     flow.fit(df, epochs=2, verbose=0, seed=0)
     info = flow.vc_center_info[("Y", "T")]
-    assert info["source"] == "oof-refit" and info["folds"] == 5
+    assert info["folds"] == 5
     fold_id, e_oof = info["fold_id"], info["e_oof"]
     assert fold_id.shape == (len(df),) and set(fold_id) == set(range(5))
 
@@ -159,7 +159,6 @@ def test_training_ehat_is_out_of_fold():
     full.fit_classical(df[["X", "T"]], verbose=False)
     e_in = full._predict_p1("T", df)
     assert np.abs(e_oof - e_in).max() > 1e-4
-
 
 
 # ------------------------------------- acceptance: do() recomputes t - e_hat
@@ -274,7 +273,7 @@ def test_vc_oof_fit_reaches_the_stage_one_proxy():
     flow = CausalFlowDAG(spec, seed=0)
     flow.fit(df, **kw, vc_oof_fit={"epochs": 1, "batch_size": 64})
     info = flow.vc_center_info[("Y", "T")]
-    assert info["source"] == "oof-refit" and info["folds"] == 2
+    assert info["folds"] == 2
     assert len(np.unique(info["fold_id"])) == 2
 
     with pytest.raises(TypeError):

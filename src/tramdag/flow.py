@@ -375,9 +375,7 @@ class CausalFlowDAG(nn.Module):
         treatment nodes (which cannot be centered themselves, so one level
         is all there is).
         """
-        cols = [
-            p for g in nd._vc_groups if g.center for p in self.nodes[g.on].parents
-        ]
+        cols = [p for g in nd._vc_groups if g.center for p in self.nodes[g.on].parents]
         return [c for c in dict.fromkeys(cols) if c not in nd.parents]
 
     # ------------------------------------------------------------- likelihood
@@ -887,8 +885,8 @@ class CausalFlowDAG(nn.Module):
         requirement; in-sample e_hat reintroduces the own-observation bias
         and can be worse than no centering). Bookkeeping lands in
         ``self.vc_center_info[(node, on)]`` (``e_oof``, ``fold_id``,
-        ``folds``, ``source``) so tests can assert the fold structure — a
-        later "simplification" to in-sample e_hat fails CI.
+        ``folds``, ``n``) so tests can assert the fold structure — a later
+        "simplification" to in-sample e_hat fails CI.
         """
         jobs = [
             (name, g)
@@ -911,7 +909,6 @@ class CausalFlowDAG(nn.Module):
                     e.astype(np_dtype), device=self.device
                 )
                 self.vc_center_info[(name, g.on)] = {
-                    "source": "oof-refit",
                     "folds": int(g.folds),
                     "fold_id": fold_id,
                     "e_oof": e.copy(),
@@ -1465,9 +1462,11 @@ class CausalFlowDAG(nn.Module):
             If both ``n`` and ``u`` are omitted.
         """
         do = do or {}
-        gen = None
-        if seed is not None:
-            gen = torch.Generator(device=self.device).manual_seed(seed)
+        gen = (
+            None
+            if seed is None
+            else torch.Generator(device=self.device).manual_seed(seed)
+        )
 
         np_dtype = self._np_dtype
         if u is not None:
@@ -1530,9 +1529,11 @@ class CausalFlowDAG(nn.Module):
             The latents, one column per node, aligned with the rows of
             ``df``.
         """
-        gen = None
-        if seed is not None:
-            gen = torch.Generator(device=self.device).manual_seed(seed)
+        gen = (
+            None
+            if seed is None
+            else torch.Generator(device=self.device).manual_seed(seed)
+        )
         values = self._tensorize(df)
         feats = self._features(values)
         n = len(df)
