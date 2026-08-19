@@ -66,13 +66,19 @@ long-run reference (3 torch seeds, medians):
 
 | workload | model / data | reference NLL | tight tol | practical tol |
 |---|---|---|---|---|
-| **stroke-ls** | all-`ls` stroke DAG, frozen `magic-mrclean/ls` (n=1275, full-data MLE) | 10.3042 (train) | +1e-3 | +5e-3 |
-| **vaca-ci** | all-`ci` flow, frozen `vaca` (n=5000, 90/10 split) | 4.9632 (val) | +2e-3 | +1e-2 |
+| **stroke-ls** | all-`ls` 5-node DAG, frozen `experiments/data/magic-mrclean/ls` (n=1275, full-data MLE) | 10.3042 (train) | +1e-3 | +5e-3 |
+| **vaca-ci** | all-`ci` flow, frozen `experiments/data/vaca` (n=5000, 90/10 split) | 4.9632 (val) | +2e-3 | +1e-2 |
 
 *Tight* ≈ exact-MLE equivalence (statsmodels/R-polr match). *Practical* ≈
-coefficient-equivalent: a stroke fit with gap ≈ 3e-3 already matches the R reference
-coefficients within the test tolerances
-(`tests/test_fit_schedules.py::test_plateau_freeze_preserves_exact_mle`).
+coefficient-equivalent: a fit with gap ≈ 3e-3 already matches the R reference
+coefficients within the tolerances of
+[`experiments/validate_ls.py`](../experiments/validate_ls.py). The same
+exact-MLE-under-plateau-and-freezing property is pinned on an inline DGP by
+`tests/test_fit_schedules.py::test_plateau_freeze_preserves_exact_mle`.
+
+These numbers were measured before the experiment code moved into
+`experiments/`; the workloads themselves are unchanged (same frozen data,
+same specs), so the timings still stand.
 
 ## Results
 

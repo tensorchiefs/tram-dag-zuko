@@ -12,7 +12,9 @@ are the same object, so `LS is linear_shift`.
 | Name | Role |
 |---|---|
 | `Term` | One additive term of a node's transformation: the frozen triple `(effect, parents, options)`. `+` on terms builds plain lists. Effect-specific settings live in `options` and read as attributes (`term.penalty`, `term.units`, ...). |
-| `intercept()` / `I` | Intercept term: the parents reshape the monotone transform. `I()` or the bare name `I` is the simple-intercept baseline. Carries the basis choice (`transform=`, default `"bernstein"`) and `allow_interaction=` (joint vs. additive multi-parent intercept). |
+| `simple_intercept()` / `SI` | The parentless intercept — the paper's SI. Free transform parameters, the same for every row. Carries the basis choice (`transform=`, default `"bernstein"`); extra keyword arguments pass straight to the transform class. |
+| `complex_intercept()` / `CI` | The parent-conditioned intercept — the paper's CI: the parents reshape the monotone transform. Needs at least one parent. Also carries `units=` and `allow_interaction=` (joint vs. additive multi-parent intercept). |
+| `intercept()` / `I` | The fallback: dispatches on its arguments to `SI` (no parents) or `CI` (parents). The bare names `I` and `SI` in a term list both mean the simple intercept. |
 | `linear_shift()` / `LS` | Linear shift `beta * x` — the interpretable log-odds coefficient. Exactly one parent. |
 | `complex_shift()` / `CS` | Complex shift: an MLP `g(x)`, additive on the latent scale. Several parents form one joint network. |
 | `varying_coefficient()` / `VC` | Varying-coefficient shift `(beta0 + b_theta(mods)) * x_t` — the penalized treatment-effect head (issue #28). `center=` adds propensity centering (issue #30). |
@@ -91,30 +93,14 @@ stay comparable to it.
 |---|---|
 | `machine_info()` | Machine/software snapshot stored by `save()`, so timings stay comparable across machines. Never raises. |
 
-## `simulations/` — numpy-only ground truth
+## What is *not* in the package
 
-Each generator is independent of the flow implementation and has a CLI that
-regenerates its frozen `data/<name>/` CSVs (a test contract — never
-regenerate silently). `REGISTRY` maps name → class.
-
-**Scheduled to move** to the simulation-study companion repo
-(`tensorchiefs/tramdag-simu`) with `experiments/` and the data-contract
-tests; frozen until then.
-
-`_common.py` holds what the generators share: `logistic`, `sigmoid`,
-`resolve_latents` (the `n`/`rng`/`latents` triple), and the `DatasetDraws`
-mixin — `observational`, `interventional`, `counterfactual_pair`. Those
-three carry the seed offsets (`+1`, `+501`, `+2`) that the frozen CSVs in
-`data/` depend on, so they are defined once. Each generator module then
-holds only its own structural equations and ground truth.
-
-| Class (module) | DGP | Ground-truth read-outs |
-|---|---|---|
-| `MagicMrClean` (`magic_mrclean`) | Synthetic stroke cohort, `ls`/`nl` variants | `true_ate()`, `counterfactual_pair()`, `observational()`, `rct()` |
-| `TriangleContinuous` / `TriangleMixed` (`triangle`) | Paper §6 triangles, f variants linear/cubic/exp/atan/sin | `paper_truth()`, `zuko_expectations()`, `true_shift_curve()`, `true_pmf()` (mixed), `interventional()`, `counterfactual_pair()` |
-| `VacaTriangle` (`vaca`) | App. C.1 bimodal Gaussian benchmark | `true_moments()` (analytic do-moments), `interventional()` |
-| `Carefl4` (`carefl`) | App. C.2 Laplace SCM | `abduct_noise()`, `true_counterfactual()`, `true_cf_curves()` — all analytic |
-| `VCLogisticShift` (`vc_shift`) | Issue #28 heterogeneous-effect DGP | `true_beta()` (known effect function), `counterfactual_pair()` |
+The SCM generators, the frozen datasets and the replication scripts are
+research code and live in [`experiments/`](../experiments/), outside the
+installed package — see
+[`experiments/README.md`](../experiments/README.md). The framework's own
+tests do not depend on them: they measure against three inline DGPs in
+[`tests/conftest.py`](../tests/conftest.py).
 
 ## Where every training hyperparameter lives
 

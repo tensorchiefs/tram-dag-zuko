@@ -197,7 +197,7 @@ transformation model (ordered-logit / Colr). It raises on any `cs`/`ci` edge.
   Bernstein intercept and weakly-identified directions (rare one-hot levels, a
   flat treatment-effect ridge) continue to drift along zero-curvature valleys
   after the likelihood is at the optimum. Correctness comes from a comparison
-  with classical software (`experiments/validate_ls.py --classical`), not from
+  with classical software (`experiments/validate_ls.py classical`), not from
   the flag.
 - Read the fitted coefficients with `ls_coefficients()`.
 

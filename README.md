@@ -6,7 +6,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 > ⚠️ **Status: beta (0.x), under active development.** The API may change between
-> releases until 1.0; pin a version (`tramdag==0.3.*`) for reproducibility.
+> releases until 1.0; pin a version (`tramdag==0.4.*`) for reproducibility.
 
 **TRAM-DAGs** model each variable of a structural causal model with a
 (transformation-model) flow: one triangular normalizing flow from iid
@@ -41,15 +41,13 @@ Pin the dev install to a commit for reproducibility, e.g. `...tramdag.git@<sha>`
 ## 30 seconds of API
 
 ```python
-import tramdag as td
 from tramdag import CausalFlowDAG, ContinuousNode, OrdinalNode, I, LS, CS
 
 spec = {  # the spec IS the labelled DAG
-    "Age": ContinuousNode(),
-    "mRS_pre": OrdinalNode(6, I("Age")),
-    "NIHSSa": ContinuousNode(I("Age") + LS("mRS_pre")),
-    "T": OrdinalNode(2, I("Age") + LS("mRS_pre") + CS("NIHSSa")),
-    "mRS_3m": OrdinalNode(7, I("Age") + LS("mRS_pre") + CS("NIHSSa") + LS("T")),
+    "X1": ContinuousNode(),
+    "X2": ContinuousNode(I("X1")),
+    "T": OrdinalNode(2, LS("X1") + CS("X2")),
+    "Y": OrdinalNode(4, I("X1") + CS("X2") + LS("T")),
 }
 flow = CausalFlowDAG(spec)  # validates acyclicity, builds the flow
 
@@ -74,28 +72,26 @@ flow.fit_classical(train_df)  # raises on cs/ci specs
 flow.log_prob(df)  # L1: joint log-likelihood per row
 flow.sample(1000)  # L1: observational sampling
 flow.sample(1000, do={"T": 1})  # L2: interventional (graph mutilation)
-flow.pmf(df, node="mRS_3m", do={"T": 1})  # L2: analytic interventional PMF
+flow.pmf(df, node="Y", do={"T": 1})  # L2: analytic interventional PMF
 
 u = flow.abduct(df)  # L3 step 1: latents from observations
 cf = flow.sample(do={"T": 1}, u=u)  # L3 steps 2+3: counterfactuals
 
-flow.ls_coefficients()  # interpret: per-edge log-odds-ratios
-flow.intercept_contributions("NIHSSa", df)  # interpret: per-parent partial effects
+flow.ls_coefficients()  # interpret: per-edge log-odds-ratios (LS terms)
+flow.intercept_contributions("Y", df)  # interpret: per-parent partial effects
 # of an additive complex intercept (centered)
 
 # heterogeneous treatment effects: a small, penalized effect head beta(x)*T
 # (VC term) with a first-class read-out — see docs/varying-coefficients.md
-# e.g. CS("Age", "NIHSSa") + VC("Age", t="T") ->
-# flow.varying_coef("mRS_3m", df)          # beta(x): deterministic, y-free
+# e.g. CS("X1", "X2") + VC("X1", t="T") ->
+# flow.varying_coef("Y", df)               # beta(x): deterministic, y-free
 
-flow.scores(df, node="mRS_3m")  # per-observation scores dl_i/dtheta
-flow.effect_modifier_scan(df, "mRS_3m", t="T")  # which VC modifiers? (CUSUM
+flow.scores(df, node="Y")  # per-observation scores dl_i/dtheta
+flow.effect_modifier_scan(df, "Y", t="T")  # which VC modifiers? (CUSUM
 # scan from a cheap all-ls fit) — docs/scores.md
 
 flow.save("flow.pt")
 flow = CausalFlowDAG.load("flow.pt")
-
-td.simulations.REGISTRY  # synthetic DGPs with known ground truth
 ```
 
 ## The model in detail: spec → math → networks
@@ -142,60 +138,38 @@ reproduces `df` exactly / level-exactly.
 
 There are two ways to fit the model: a stochastic deep learning optimizer (`fit`) and a 2nd order optimization like in the classical statistical models (`fit_classical`). The latter is more efficient for all-`ls` models (each node-conditional is then a classical transformation model). For more details, see the [`docs/fitting.md`](docs/fitting.md) file.
 
-## Validation (all pinned by tests)
+## Validation
 
-- **Paper replication** — each of the paper's four DGP families has a generator in
-  the registry (numpy-only SCM + frozen CSVs + replication script) and is pinned
-  by tests:
+Two layers, deliberately separate.
 
-  | family | paper | demonstrates |
-  |---|---|---|
-  | `triangle` (`linear`,`atan`,`sin`) | §6.1 | LS coefficient recovery (β = 2, −0.2, +0.3), CS curve ≡ −f(x₂), non-monotone f |
-  | `triangle-mixed` (`linear`,`exp`) | §6.2 | mixed data L1/L2 + the C.4 odds-ratio check (OR ≈ 7.4) |
-  | `vaca` | §5.1–5.2 | the bimodal L1 case a default CNF misses; L2 `p(x₃ \| do(x₂))` |
-  | `carefl` | §5.3 | L3 counterfactual curves vs **analytic** truth |
+**The framework's own test suite** ([`tests/`](tests/)) measures the library
+against three inline data-generating processes it carries itself, so it needs no
+research code to run. Its strongest claim is an equality, not a similarity: an
+all-`ls` outcome node *is* an ordered-logit model, so the flow's MLE must match
+`statsmodels` `OrderedModel` on the same design matrix — it does, and the
+varying-coefficient acceptance bars (effect recovery, propensity centering) are
+pinned the same way. What the tests guarantee, and how each ground truth is
+obtained, is documented in [`tests/README.md`](tests/README.md).
 
-  Sign note: ordinal shifts are *subtracted* here but *added* in the paper, so
-  fitted ordinal weights are the paper's with flipped sign (`truth.json` records
-  both conventions per family).
+**The paper replications** ([`experiments/`](experiments/)) are separate: one
+self-contained script per dataset, with its hyperparameters in a sibling YAML
+file and its expected results committed under `experiments/ground_truth/`. A
+dedicated workflow runs them and compares.
 
-- **Exact classical equivalence** — an all-`ls` flow trained to convergence *is*
-  the proportional-odds MLE: coefficients match `statsmodels` **and** R
-  `MASS::polr` to ~4 decimals (`experiments/validate_ls.py`, R reference committed
-  under `data/magic-mrclean/*/ref_ls/`).
-
-- **Training speed** — schedules, per-node freezing, LBFGS and device benchmarks:
-  [`docs/training-speed.md`](docs/training-speed.md).
-
-What the tests actually guarantee — the principles behind them (known identities,
-the datasets and software they compare against, and how the ground truth was
-obtained) — is documented in [`tests/README.md`](tests/README.md).
-
-<!-- ## Case study: individualized treatment effects in stroke
-
-
-
-The method's flagship application estimates individualized thrombectomy effects
-from the observational MAGIC cohort with external validation against the
-MR CLEAN trial:
-
-> Dürr, Herzog, Bühler, Wegener & Sick, *Estimating Individualized Treatment
-> Effects in Acute Ischemic Stroke with Causal Transformation Models (TRAM-DAG)*
-> ([arXiv:2606.12623](https://arxiv.org/abs/2606.12623)).
-
-The clinical data is private and **never** part of this repo. Its public
-stand-in is `data/magic-mrclean/` — a fully synthetic cohort with the same
-schema and **known ground truth** (true ATE, true individual counterfactuals),
-including an `nl` variant where an all-`ls` model is provably misspecified:
-
-| `nl` variant | ATE | vs true **+0.104** |
+| experiment | paper | demonstrates |
 |---|---|---|
-| naive observational contrast | +0.303 | confounded (overstates 2.9×) |
-| all-`ls` flow | +0.076 | undershoots (misses the age-varying effect) |
-| flexible (`ci`/`cs`) flow | +0.101 | **recovers the truth** | -->
+| `triangle.py` (`linear-ls`, `atan-cs`, `sin-cs`) | §6.1 | LS coefficient recovery (β = 2, −0.2, +0.3), CS curve ≡ −f(x₂) for non-monotone f |
+| `triangle_mixed.py` (`linear-ls`, `exp-cs`) | §6.2 | mixed data L1/L2 + the C.4 odds-ratio check (OR ≈ 7.4) |
+| `vaca.py` | §5.1–5.2 | the bimodal L1 case a default CNF misses; L2 `p(x₃ \| do(x₂))` against analytic means |
+| `carefl.py` | §5.3 | L3 counterfactual curves vs **analytic** truth |
+| `validate_ls.py` | — | flow ≡ `statsmodels` ≡ R `MASS::polr` to ~4 decimals, on a frozen synthetic cohort with a known true effect |
 
-Full storyline, clinical-data context, R cross-check and reading notes:
-[`docs/stroke-case-study.md`](docs/stroke-case-study.md).
+Sign note: ordinal shifts are *subtracted* here but *added* in the paper, so
+fitted ordinal weights are the paper's with flipped sign (each `truth.json`
+records both conventions).
+
+**Training speed** — schedules, per-node freezing, L-BFGS and device benchmarks:
+[`docs/training-speed.md`](docs/training-speed.md).
 
 ## Testing policy
 See the [`tests/README.md`](tests/README.md) file for more details.
@@ -204,16 +178,17 @@ See the [`tests/README.md`](tests/README.md) file for more details.
 
 ```
 src/tramdag/            spec.py transforms.py conditioners.py flow.py
-                        scores.py env.py
-                        simulations/   (magic_mrclean, triangle, vaca, carefl,
-                                        vc_shift + CLIs)
-data/                   frozen synthetic CSVs + truth.json — a test contract
-experiments/            stroke pipeline + paper replications
+                        scores.py env.py          <- the framework, and nothing else
+tests/                  unit tests, identities, acceptance bars, three inline DGPs
+experiments/            the paper replications, self-contained:
+                          <name>.py + <name>.yaml   one script and its hyperparameters
+                          simulations/              numpy-only SCM generators
+                          data/                     frozen CSVs + truth.json
+                          ground_truth/             expected metrics, checked by CI
 notebooks/              intro (didactic) + Colab demo   (jupytext .py — see README there)
-tests/                  unit, known-truth recovery, R regression
 docs/                   code-map.md (every class/function + all knobs),
                         fitting.md, notation.md, training-speed.md,
-                        stroke-case-study.md, varying-coefficients.md, scores.md
+                        varying-coefficients.md, scores.md
 ```
 
 Implementation conventions (latent-scale signs, raw/one-hot parent encoding,
