@@ -42,6 +42,10 @@ __all__ = [
     "ordinal_abduct",
 ]
 
+# half-width B of the pre-scaled domain [-B, B]. Fixed: nothing ever set it,
+# and the quantile pre-map makes one canonical domain work for any data scale.
+BOUND = 5.0
+
 
 class StandardLogistic:
     """Standard logistic base distribution (the TRAM latent)."""
@@ -63,7 +67,7 @@ class StandardLogistic:
         return -z - 2.0 * torch.nn.functional.softplus(-z)
 
     @staticmethod
-    def sample(shape, device=None, eps: float = 1e-7) -> Tensor:
+    def sample(shape, device=None, eps: float = 1e-7, generator=None) -> Tensor:
         """Draw samples of the given ``shape``.
 
         Parameters
@@ -75,13 +79,16 @@ class StandardLogistic:
         eps : float, optional
             Clamp margin that keeps the uniform draw off 0 and 1, by
             default 1e-7.
+        generator : torch.Generator | None, optional
+            Random source for a reproducible draw, by default ``None``.
 
         Returns
         -------
         Tensor
             The samples.
         """
-        return StandardLogistic.icdf(torch.rand(shape, device=device), eps)
+        u = torch.rand(shape, device=device, generator=generator)
+        return StandardLogistic.icdf(u, eps)
 
     @staticmethod
     def icdf(u: Tensor, eps: float = 1e-7) -> Tensor:
@@ -104,7 +111,7 @@ class StandardLogistic:
 
 
 def _expanding_bisection(
-    f, z: Tensor, lo: Tensor, hi: Tensor, max_expand: int = 60, iters: int = 80
+    f, z: Tensor, lo: Tensor, hi: Tensor, max_expand: int = 20, iters: int = 40
 ) -> Tensor:
     """Solve ``f(t) = z`` element-wise for a monotone increasing ``f``.
 
@@ -121,9 +128,11 @@ def _expanding_bisection(
     lo, hi : Tensor
         Initial bracket, same shape as ``z``.
     max_expand : int, optional
-        Upper limit on bracket doublings, by default 60.
+        Upper limit on bracket doublings, by default 20 — 2^20 times the
+        initial width, far past any latent a logistic shift can reach.
     iters : int, optional
-        Bisection iterations after bracketing, by default 80.
+        Bisection iterations after bracketing, by default 40 — beyond
+        float32's 24-bit mantissa with margin.
 
     Returns
     -------
@@ -150,19 +159,14 @@ def _expanding_bisection(
 class _ScaledUT(torch.nn.Module):
     """Base class for the scaled univariate transforms.
 
-    An affine pre-map takes ``[xmin, xmax]`` to ``[-B, B]``, then a zuko
-    transform maps to the latent scale. Subclasses define ``n_params`` and
-    ``_build(theta) -> zuko Transform``.
-
-    Parameters
-    ----------
-    bound : float, optional
-        Half-width ``B`` of the pre-scaled domain, by default 5.0.
+    An affine pre-map takes ``[xmin, xmax]`` to ``[-B, B]`` with
+    ``B = BOUND``, then a zuko transform maps to the latent scale.
+    Subclasses define ``n_params`` and ``_build(theta) -> zuko Transform``.
     """
 
-    def __init__(self, bound: float = 5.0):
+    def __init__(self):
         super().__init__()
-        self.bound = bound
+        self.bound = BOUND
         self.register_buffer("xmin", torch.tensor(0.0))
         self.register_buffer("xmax", torch.tensor(1.0))
         self._fitted = False
@@ -259,12 +263,10 @@ class BernsteinUT(_ScaledUT):
     ----------
     n_coeffs : int, optional
         Number of Bernstein coefficients, by default 20.
-    bound : float, optional
-        Half-width of the pre-scaled domain, by default 5.0.
     """
 
-    def __init__(self, n_coeffs: int = 20, bound: float = 5.0):
-        super().__init__(bound=bound)
+    def __init__(self, n_coeffs: int = 20):
+        super().__init__()
         self._n = n_coeffs
 
     @property
@@ -329,12 +331,10 @@ class SplineUT(_ScaledUT):
     ----------
     bins : int, optional
         Number of spline bins, by default 8.
-    bound : float, optional
-        Half-width of the pre-scaled domain, by default 5.0.
     """
 
-    def __init__(self, bins: int = 8, bound: float = 5.0):
-        super().__init__(bound=bound)
+    def __init__(self, bins: int = 8):
+        super().__init__()
         self.bins = bins
 
     @property
@@ -427,10 +427,9 @@ def ordinal_cutpoints(theta_tilde: Tensor) -> Tensor:
         (n, 1), torch.inf, device=theta_tilde.device, dtype=theta_tilde.dtype
     )
     first = theta_tilde[:, :1]
-    if theta_tilde.shape[1] > 1:
-        rest = first + torch.cumsum(torch.exp(theta_tilde[:, 1:]), dim=1)
-        return torch.cat([neg_inf, first, rest, pos_inf], dim=1)
-    return torch.cat([neg_inf, first, pos_inf], dim=1)
+    # cumsum over the empty slice is (n, 0), so K == 2 needs no special case
+    rest = first + torch.cumsum(torch.exp(theta_tilde[:, 1:]), dim=1)
+    return torch.cat([neg_inf, first, rest, pos_inf], dim=1)
 
 
 def ordinal_marginal_init_theta(counts, eps: float = 1e-3) -> Tensor:

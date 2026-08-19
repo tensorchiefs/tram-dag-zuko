@@ -31,7 +31,7 @@ def _toy_spec():
     return {"x1": ContinuousNode(), "x2": ContinuousNode([LS("x1")])}
 
 
-@pytest.mark.parametrize("schedule", [None, "onecycle", "cosine", "plateau"])
+@pytest.mark.parametrize("schedule", [None, "plateau"])
 def test_schedules_smoke_and_improve(schedule):
     df = _toy_df()
     torch.manual_seed(0)

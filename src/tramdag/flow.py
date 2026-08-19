@@ -67,20 +67,17 @@ class _VCGroup(NamedTuple):
     on_is_ord : bool
         ``True`` when the treatment is a binary ordinal node. The raw
         treatment column is then the level-1 one-hot indicator.
-    center : bool | str
-        Propensity-centering mode. ``False`` turns centering off.
-        ``True`` centers with out-of-fold refits of the treatment node.
-        A string names a ``train_df`` column that holds user-supplied
-        cross-fitted propensities.
+    center : bool
+        ``True`` centers the regressor with out-of-fold propensities from
+        refits of the treatment node.
     folds : int
-        Number of folds for the out-of-fold refits. Read only when
-        ``center`` is ``True``.
+        Number of folds for those refits.
     """
 
     on: str
     mods: tuple[str, ...]
     on_is_ord: bool
-    center: bool | str
+    center: bool
     folds: int
 
 
@@ -360,9 +357,9 @@ class CausalFlowDAG(nn.Module):
                 continue
             on_nd = self.nodes[g.on]
             feats = self._features({p: values[p] for p in on_nd.parents})
-            theta, shift = on_nd.theta_shift(
-                feats, n, vc_ehat=self._vc_ehat_live(on_nd, values, n)
-            )
+            # chained centering is refused at fit time, so the treatment node
+            # itself never has a centered term and needs no e_hat of its own
+            theta, shift = on_nd.theta_shift(feats, n)
             # binary ordinal on: P(on <= 0) = sigmoid(theta_0 - s),
             # so e = sigmoid(s - theta_0)
             out[g.on] = torch.sigmoid(shift - theta[:, 0]).detach()
@@ -371,15 +368,13 @@ class CausalFlowDAG(nn.Module):
     def _vc_ehat_columns(self, nd: _Node) -> list[str]:
         """List the extra columns needed for the centered VC terms of ``nd``.
 
-        These are the columns beyond ``nd.parents``, namely the parents of the
-        treatment nodes, found recursively.
+        These are the columns beyond ``nd.parents``: the parents of the
+        treatment nodes (which cannot be centered themselves, so one level
+        is all there is).
         """
-        cols: list[str] = []
-        for g in nd._vc_groups:
-            if not g.center:
-                continue
-            on_nd = self.nodes[g.on]
-            cols += [*on_nd.parents, *self._vc_ehat_columns(on_nd)]
+        cols = [
+            p for g in nd._vc_groups if g.center for p in self.nodes[g.on].parents
+        ]
         return [c for c in dict.fromkeys(cols) if c not in nd.parents]
 
     # ------------------------------------------------------------- likelihood
@@ -647,7 +642,7 @@ class CausalFlowDAG(nn.Module):
         validation monitor, and every post-fit query, uses the live
         full-fit treatment node.
         """
-        if schedule not in (None, "onecycle", "cosine", "plateau"):
+        if schedule not in (None, "plateau"):
             raise ValueError(f"unknown schedule {schedule!r}")
         if seed is not None:
             torch.manual_seed(seed)
@@ -671,7 +666,6 @@ class CausalFlowDAG(nn.Module):
         train_vals = self._tensorize(train_df)
         val_vals = self._tensorize(val_df) if val_df is not None else train_vals
         n = len(train_df)
-        steps_per_epoch = (n + batch_size - 1) // batch_size
 
         opt = torch.optim.Adam(
             [
@@ -683,16 +677,6 @@ class CausalFlowDAG(nn.Module):
                 for name in self.order
             ]
         )
-        sched = None
-        if schedule == "onecycle":
-            sched = torch.optim.lr_scheduler.OneCycleLR(
-                opt, max_lr=learning_rate, total_steps=epochs * steps_per_epoch
-            )
-        elif schedule == "cosine":
-            sched = torch.optim.lr_scheduler.CosineAnnealingLR(
-                opt, T_max=epochs, eta_min=learning_rate * 1e-3
-            )
-
         if restore_best and not hasattr(self, "_best"):
             self._best = {name: (float("inf"), None) for name in self.order}
         best = self._best if restore_best else None
@@ -730,13 +714,9 @@ class CausalFlowDAG(nn.Module):
                 opt.zero_grad()
                 loss.backward()
                 opt.step()
-                if schedule == "onecycle":
-                    sched.step()
                 w = len(idx) / n
                 for k, v in node_nlls.items():
                     train_acc[k] += float(v.detach()) * w
-            if schedule == "cosine":
-                sched.step()
             prev_train = train_acc
 
             self.eval()
@@ -897,14 +877,13 @@ class CausalFlowDAG(nn.Module):
         The result holds the frozen training-time propensities, as
         ``{node: {on: (n,) tensor}}``.
 
-        For ``center=True`` the values are **out-of-fold** — K refits of the
-        treatment node only, each predicting its held-out fold (the DML
-        cross-fitting requirement; in-sample e_hat reintroduces the
-        own-observation bias and can be worse than no centering). For
-        ``center="col"`` the user-supplied cross-fitted column is taken as-is.
-        Bookkeeping lands in ``self.vc_center_info[(node, on)]`` (``e_oof``,
-        ``fold_id``, ``folds``, ``source``) so tests can assert the fold
-        structure — a later "simplification" to in-sample e_hat fails CI.
+        The values are **out-of-fold** — K refits of the treatment node
+        only, each predicting its held-out fold (the DML cross-fitting
+        requirement; in-sample e_hat reintroduces the own-observation bias
+        and can be worse than no centering). Bookkeeping lands in
+        ``self.vc_center_info[(node, on)]`` (``e_oof``, ``fold_id``,
+        ``folds``, ``source``) so tests can assert the fold structure — a
+        later "simplification" to in-sample e_hat fails CI.
         """
         jobs = [
             (name, g)
@@ -920,26 +899,15 @@ class CausalFlowDAG(nn.Module):
         rng_state = torch.get_rng_state()  # proxies reseed; keep fit reproducible
         try:
             for name, g in jobs:
-                if isinstance(g.center, str):  # user-supplied cross-fitted col
-                    if g.center not in train_df.columns:
-                        raise KeyError(f"center column {g.center!r} not in train_df.")
-                    e = train_df[g.center].to_numpy(dtype=np.float64)
-                    if not ((e > 0.0) & (e < 1.0)).all():
-                        raise ValueError(
-                            f"center column {g.center!r} must hold propensities "
-                            "strictly inside (0, 1)."
-                        )
-                    fold_id = None
-                else:
-                    e, fold_id = self._vc_oof_propensity(
-                        g.on, train_df, g.folds, vc_oof_fit
-                    )
+                e, fold_id = self._vc_oof_propensity(
+                    g.on, train_df, g.folds, vc_oof_fit
+                )
                 out.setdefault(name, {})[g.on] = torch.as_tensor(
                     e.astype(np_dtype), device=self.device
                 )
                 self.vc_center_info[(name, g.on)] = {
-                    "source": g.center if isinstance(g.center, str) else "oof-refit",
-                    "folds": None if fold_id is None else int(g.folds),
+                    "source": "oof-refit",
+                    "folds": int(g.folds),
                     "fold_id": fold_id,
                     "e_oof": e.copy(),
                     "n": len(train_df),
@@ -1505,11 +1473,7 @@ class CausalFlowDAG(nn.Module):
             }
         elif n is not None:
             u_vals = {
-                name: StandardLogistic.sample((n,), device=self.device)
-                if gen is None
-                else StandardLogistic.icdf(
-                    torch.rand((n,), device=self.device, generator=gen)
-                )
+                name: StandardLogistic.sample((n,), device=self.device, generator=gen)
                 for name in self.order
             }
         else:

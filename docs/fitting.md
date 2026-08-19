@@ -91,9 +91,10 @@ learning rates, per-node freezing (below), and the all-`ls` classical fit.
   the summed per-node mean NLL on the batch.
 - **Transform ranges**: `_set_ranges` sets them once at the start from the train
   5%/95% quantiles. These ranges define each Bernstein/spline domain.
-- **Learning-rate schedules** (`schedule=`): `None` (constant), `"onecycle"`,
-  `"cosine"`, or `"plateau"`. The `"plateau"` schedule decays each node's lr off
-  *its own* validation NLL.
+- **Learning-rate schedules** (`schedule=`): `None` (constant) or
+  `"plateau"`, which decays each node's lr off *its own* validation NLL.
+  (`"onecycle"` and `"cosine"` lost to plateau in the June 2026 benchmark
+  and were removed in 0.4.0.)
 - **Per-node freezing** (`freeze_patience=`, see below).
 - **`restore_best`**: when enabled, `fit` snapshots each node's best-validation
   weights and restores them at the end (early-stopping regularization). The

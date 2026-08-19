@@ -27,7 +27,7 @@ are the same object, so `LS is linear_shift`.
 
 | Name | Role |
 |---|---|
-| `StandardLogistic` | The TRAM base distribution: `log_prob`, `sample`, `icdf`. |
+| `StandardLogistic` | The TRAM base distribution: `log_prob`, `sample` (generator-aware), `icdf`. |
 | `BernsteinUT` | Bernstein-polynomial transform (default basis, `n_coeffs=20`). Linear tail extrapolation follows the boundary derivative. `marginal_init_theta()` gives the calibrated start used by `fit(marginal_init=True)`. |
 | `SplineUT` | Monotone rational-quadratic spline (`bins=8`). Tails extrapolate with a *fixed* slope — the structural reason spline trails Bernstein on tail-heavy data. |
 | `AffineUT` | Monotone affine transform: the node-conditional is a logistic GLM. |
@@ -50,14 +50,14 @@ stay comparable to it.
 | `LinearShift` | `LS` | `Linear(n, 1, bias=False)`. `.weight` is the interpretable coefficient; no bias because the intercept slot owns the constant. |
 | `ComplexShift` | `CS` | 64-128-64 ReLU MLP to one shift value. |
 | `VaryingCoef` | `VC` | `beta0 + b_theta(mods)` with a zero-initialized output layer and the L2 hook `l2()`. `beta()` evaluates the effect, `recenter()` re-splits `beta0`/`b_theta` after training (function-preserving). |
-| (`_mlp`) | — | The one MLP builder. Its module indices match the historical Sequentials, so old checkpoints load. |
+| (`_mlp`) | — | The one MLP builder: a ReLU stack of the given `units`, then a bias-free output layer. |
 
 ## `flow.py` — the model
 
 | Name | Role |
 |---|---|
 | `CausalFlowDAG` | The flow: one `_Node` per variable in topological order. Construction seeds the weights (`seed=` is the reproducibility knob). |
-| `fit()` | Joint maximum likelihood with Adam, one parameter group per node (exact, because the NLL decomposes per node). Options: schedules (`plateau` decays per node), per-node freezing, `restore_best`, `marginal_init`, `vc_warm_start`, `plateau_factor`, `vc_oof_fit`. A second call continues training. |
+| `fit()` | Joint maximum likelihood with Adam, one parameter group per node (exact, because the NLL decomposes per node). Options: `schedule="plateau"` (per-node decay), per-node freezing, `restore_best`, `marginal_init`, `vc_warm_start`, `plateau_factor`, `vc_oof_fit`. A second call continues training. Progress goes to the `tramdag.flow` logger. |
 | `fit_classical()` | Float64 full-batch L-BFGS for all-`ls` specs: deterministic, exact MLE, matches `statsmodels`/R `polr`. Refuses flexible specs. |
 | `sample()` | Observational, interventional (`do=`, graph mutilation) and counterfactual (`u=`) sampling. |
 | `abduct()` | Pearl step 1: recover the latents. Continuous exactly, ordinal by truncated draw. |
@@ -133,5 +133,5 @@ default you can read at the call site. Nothing numeric is buried.
 | VC penalty and centering | `VC(penalty=, center=, center_folds=)` | 1.0 / False / 5 |
 | L-BFGS budget | `fit_classical(max_iter=, tol=, chunk=, history_size=)` | 400 / 1e-6 / 25 / 50 |
 | network widths | `units=` on `I`/`CS`/`VC` | (8, 8) / (64, 128, 64) / (16,) — Keras-parity architecture defaults |
-| transform basis | `I(transform=, transform_kwargs=)` | `"bernstein"`, `n_coeffs=20`; spline `bins=8`; domain bound 5.0 |
+| transform basis | `I(transform=, transform_kwargs=)` | `"bernstein"`, `n_coeffs=20`; spline `bins=8` (the domain is fixed at [-5, 5], `transforms.BOUND`) |
 | shuffling / weight init | `fit(seed=)` / `CausalFlowDAG(seed=)` | init happens at construction — the constructor seed is the reproducibility knob |

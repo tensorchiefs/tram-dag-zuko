@@ -161,19 +161,6 @@ def test_training_ehat_is_out_of_fold():
     assert np.abs(e_oof - e_in).max() > 1e-4
 
 
-def test_user_supplied_center_column():
-    """center='colname' takes the training propensity from that column."""
-    df = _confounded_df(900, seed=3)
-    df["my_e"] = 1.0 / (1.0 + np.exp(-2.0 * df["X"]))  # oracle propensity
-    spec = {**_misspecified_spec("my_e")}
-    flow = CausalFlowDAG(spec, seed=0)
-    flow.fit(df, epochs=2, verbose=0, seed=0)
-    info = flow.vc_center_info[("Y", "T")]
-    assert info["source"] == "my_e" and info["fold_id"] is None
-    np.testing.assert_allclose(info["e_oof"], df["my_e"].to_numpy(), atol=1e-12)
-    with pytest.raises(KeyError, match="my_e"):
-        CausalFlowDAG(spec, seed=0).fit(df.drop(columns=["my_e"]), epochs=1, verbose=0)
-
 
 # ------------------------------------- acceptance: do() recomputes t - e_hat
 def test_do_recomputes_centered_regressor():

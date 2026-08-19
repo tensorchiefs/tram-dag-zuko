@@ -249,7 +249,7 @@ def varying_coefficient(
     *modifiers: str,
     t: str,
     penalty: float = 1.0,
-    center: bool | str = False,
+    center: bool = False,
     center_folds: int = 5,
     units: list[int] | tuple[int, ...] | None = None,
 ) -> Term:
@@ -289,13 +289,12 @@ def varying_coefficient(
     penalty : float, optional
         L2 weight on the ``b_theta`` weights, by default 1.0. Must be
         >= 0.
-    center : bool | str, optional
+    center : bool, optional
         Propensity centering (issue #30), by default ``False``.
         ``True`` uses the **propensity-centered** regressor
         ``beta(x) * (x_t - e_hat(pa_t))`` — the Robinson/R-learner
         orthogonalization inside the likelihood. Requires a binary ordinal
-        ``t``. A string takes the training-time cross-fitted propensity
-        from that column of ``train_df`` instead.
+        ``t``.
     center_folds : int, optional
         Fold count for the out-of-fold refits under ``center=True``, by
         default 5. Must be >= 2.

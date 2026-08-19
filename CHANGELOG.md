@@ -36,13 +36,6 @@
   CS `[64, 128, 64]`, VC `[16]`); serialized per term. All conditioner
   networks now build through one `_mlp()` helper.
 
-### Changed (breaking)
-
-- **`VC(*modifiers, t=...)`**: the positional arguments are the
-  covariates that enter `b_theta`; the treatment `t` is a required
-  keyword. `VC("X2", "X3", t="T")` reads as
-  `(beta0 + b_theta(x2, x3)) * x_t`. (0.3 wrote `VC("T", "X2", "X3")`.)
-
 ### Fixed
 
 - **`marginal_init` no longer resets a loaded model.** The calibration is
@@ -54,6 +47,19 @@
   (`tests/test_marginal_init.py`).
 
 ### Removed (breaking)
+
+- **`fit(schedule=)` keeps `None` and `"plateau"` only.** `"onecycle"`
+  and `"cosine"` had no caller outside one parametrized test, and the
+  June 2026 benchmark measured both behind plateau on every workload
+  (`docs/training-speed.md` keeps the numbers).
+
+- **The `bound` knob on the univariate transforms.** Nothing ever set it;
+  the pre-scaled domain is fixed at `[-5, 5]` (`transforms.BOUND`).
+
+- **`VC(center=)` is a plain bool.** The `center="colname"` variant
+  (user-supplied cross-fitted propensities) had a self-test and no other
+  caller; it was staged-unreleased, so its Added entry is corrected in
+  place.
 
 - **All backward compatibility.** Pre-1.0, one API and one checkpoint
   format: `term()` takes the current labels only (`"I"`, `"LS"`, `"CS"`,
@@ -68,6 +74,16 @@
 
 - **`Term.slot`** — derived from `effect`, and its only user in the repo
   was a test assertion.
+
+- The `terms=` keyword (use the first positional argument), node-level
+  `ContinuousNode(transform=/transform_kwargs=)` (choose the basis on the
+  intercept term, `I(..., transform="spline")`), the unused
+  `Intercept`/`LinShift`/`CShift` aliases, and the `parents={...}`
+  checkpoint loader.
+- The unmaintained notebooks and experiment scripts moved to
+  `notebooks/stale/` and `experiments/stale/`; the maintained set is
+  the intro and Colab demo notebooks plus `sim_flow.py` and
+  `validate_ls.py`.
 
 - **`term(effect, *parents)`** — the string-label term factory. It was a
   second, weaker way to build a term, its `VC` branch and `penalty=`
@@ -109,16 +125,6 @@
   exposes the same three named draws. `simulations/` drops from 1663 to
   1377 lines with the frozen-CSV contract unchanged.
 
-- The `terms=` keyword (use the first positional argument), node-level
-  `ContinuousNode(transform=/transform_kwargs=)` (choose the basis on the
-  intercept term, `I(..., transform="spline")`), the unused
-  `Intercept`/`LinShift`/`CShift` aliases, and the `parents={...}`
-  checkpoint loader.
-- The unmaintained notebooks and experiment scripts moved to
-  `notebooks/stale/` and `experiments/stale/`; the maintained set is
-  the intro and Colab demo notebooks plus `sim_flow.py` and
-  `validate_ls.py`.
-
 ### Added (staged earlier as an unreleased 0.3.1)
 
 - **Propensity-centered VC: `VC(..., center=True, center_folds=5)`** (issue
@@ -129,8 +135,7 @@
   fails CI), frozen as data (zero gradient into the treatment node from the
   outcome loss — tested); inference recomputes ê from the flow's own fitted
   treatment node and re-derives `t − ê(x)` under `do` (never cached — tested
-  on fresh rows). `center="colname"` supplies user cross-fitted propensities;
-  binary ordinal treatments only; `center=False` (default) is bit-identical
+  on fresh rows). binary ordinal treatments only; `center=False` (default) is bit-identical
   to the uncentered term (tested). Measured (the Dandl et al. 2024
   reproduction, `tests/test_vc_centered.py`): under strong confounding + an
   under-specified prognostic part, centering cuts β̂ bias **5–10×**

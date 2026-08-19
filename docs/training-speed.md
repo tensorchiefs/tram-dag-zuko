@@ -17,8 +17,10 @@ the parked benchmark and is not committed.
 |---|---|
 | `None` (default) | constant lr — the classic behavior, exactly as before this PR |
 | `"plateau"` | **per-node**: a node whose own validation NLL hasn't improved by `min_delta` (default 1e-4) for `plateau_patience` epochs (default 15) gets its lr × 0.3, floored at 1e-3 × the initial lr. Each node decays independently — valid because the per-node losses have independent gradients. |
-| `"onecycle"` | warmup to `learning_rate`, then anneal to ~0 over exactly the `epochs` budget (torch `OneCycleLR`) — use only when you know the right budget |
-| `"cosine"` | cosine decay from `learning_rate` over `epochs` |
+
+`"onecycle"` and `"cosine"` were part of this benchmark and lost to
+`"plateau"` on every workload; 0.4.0 removed both. The result tables below
+keep their measured rows as the record of that decision.
 
 **Early stopping / freezing** (`fit(..., freeze_patience=N)`): if the validation NLL of a
 node does not improve for `N` epochs, the fit *freezes* that node. A frozen node leaves

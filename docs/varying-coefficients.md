@@ -120,8 +120,7 @@ design:
   values enter the outcome loss as frozen data. Thus **no gradient reaches
   the treatment node** from the outcome node, and the per-node factorization
   stays intact (pinned by a gradient-isolation test). The flow exposes the
-  fold bookkeeping in `flow.vc_center_info`, pinned by tests. To supply your
-  own cross-fitted propensities, use `center="colname"`.
+  fold bookkeeping in `flow.vc_center_info`, pinned by tests.
 - **Inference** (`log_prob` / `sample` / `abduct` / `pmf` / `scores`)
   recomputes ê from the flow's **own fitted treatment node**, the full-data
   fit (the standard DML train/predict split). The computation is detached
