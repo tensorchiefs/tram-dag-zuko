@@ -79,11 +79,6 @@ readme = "README.md"
 requires-python = ">=3.10"
 version = "0.3.0"
 
-[project.optional-dependencies]
-# tramdag.load_config reads YAML; nothing else in the package needs it, so it
-# is an extra rather than a dependency: `pip install "tramdag[config]"`.
-config = ["pyyaml"]
-
 [project.urls]
 Homepage = "https://github.com/tensorchiefs/tramdag"
 "Method paper (CLeaR 2025)" = "https://arxiv.org/abs/2503.16206"

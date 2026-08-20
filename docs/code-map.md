@@ -87,17 +87,15 @@ stay comparable to it.
 | `sup_bb_pvalue()` | `P(sup |Brownian bridge| > stat)`, the Kolmogorov series. |
 | (`_dl_ds`, `CRIT_5PCT`) | Closed-form latent-scale derivative; the 5% critical value 1.3581. |
 
-## `utils.py` — helpers around a fit
+## `utils.py` — helpers that are not about modelling
+
+Nothing is imported at module level here: `config_section` needs no
+dependency, and `machine_info` pulls in torch and platform only when called.
 
 | Name | Role |
 |---|---|
-| `load_config()` | Read a mapping out of a YAML file (descending through any number of keys) and require an exact key set, so a missing key cannot become a hidden default and an extra one cannot look effective. PyYAML is imported lazily and declared as the optional `config` extra. |
-
-## `env.py`
-
-| Name | Role |
-|---|---|
-| `machine_info()` | Machine/software snapshot stored by `save()`, so timings stay comparable across machines. Never raises. |
+| `config_section()` | Pick a mapping out of an **already-parsed** configuration (descending through any number of keys) and require an exact key set, so a missing key cannot become a hidden default and an extra one cannot look effective. Parsing stays with the caller, so the package depends on no config parser. |
+| `machine_info()` | Machine/software snapshot stored by `save()`, so timings stay comparable across machines. Never raises. Exported top-level as `tramdag.machine_info`. |
 
 ## What is *not* in the package
 

@@ -1695,7 +1695,7 @@ class CausalFlowDAG(nn.Module):
         from datetime import datetime, timezone
 
         from . import __version__
-        from .env import machine_info
+        from .utils import machine_info
 
         path = Path(path)
         path.parent.mkdir(parents=True, exist_ok=True)

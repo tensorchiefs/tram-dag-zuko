@@ -19,12 +19,12 @@ Usage (from experiments/)::
 from __future__ import annotations
 
 import argparse
-from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from common import (
+    load_variant,
     make_output_dir,
     save_metrics,
     variants_of,
@@ -37,9 +37,8 @@ from paper.helpers import (
     split_train_val,
 )
 from paper.simulations.carefl import ALPHA_GRID, X_OBS, Carefl4
-from tramdag import ContinuousNode, I, load_config
+from tramdag import ContinuousNode, I
 
-CONFIG = Path(__file__).with_suffix(".yaml")
 CONFIG_KEYS = {
     "n_train",
     "n_val",
@@ -133,7 +132,7 @@ def heldout_errors(generator, flow, config) -> dict:
 
 def run(variant: str) -> dict:
     """Run the benchmark end to end and give its metrics."""
-    config = load_config(CONFIG, "variants", variant, require=CONFIG_KEYS)
+    config = load_variant(__file__, variant, CONFIG_KEYS)
     out = make_output_dir(__file__, f"carefl-{variant}")
 
     generator = Carefl4(seed=config["dgp_seed"])

@@ -1,48 +1,42 @@
-"""Small helpers that are useful around a fit without being part of one.
+"""Helpers that are useful around a fit without being part of one.
 
-Currently one: :func:`load_config`, a YAML reader that refuses a
-configuration whose keys do not match what the caller says it reads. The
-point is not the file handling — it is that a *missing* key can never become
-a hidden default and an *extra* key can never look effective. Any script that
-keeps its hyperparameters in a file rather than in code wants that guarantee,
-which is why it lives here rather than being copied into each caller.
+Two of them: :func:`config_section`, which picks a section out of an
+already-parsed configuration and refuses one whose keys are not exactly what
+the caller says it reads, and :func:`machine_info`, the environment snapshot
+``save`` stores with a model.
 
-PyYAML is imported lazily and declared as the optional ``config`` extra, so
-installing ``tramdag`` does not pull it in for users who never call this.
+Neither is about causal modelling, which is why they live together here
+rather than being spread through the modelling modules.
+
+Nothing is imported at module level: reading a config needs no dependency at
+all, and the environment snapshot pulls in ``torch`` and ``platform`` only
+when it is actually called.
 """
 
 from __future__ import annotations
 
-from pathlib import Path
+__all__ = ["config_section", "machine_info"]
 
 
-def _yaml():
-    """Import PyYAML, with an error that names the extra to install."""
-    try:
-        import yaml
-    except ModuleNotFoundError as exc:  # pragma: no cover - depends on the env
-        raise ModuleNotFoundError(
-            "load_config needs PyYAML. Install it with "
-            "`pip install 'tramdag[config]'` (or add pyyaml to your project)."
-        ) from exc
-    return yaml
+def config_section(document: dict, *keys: str, require: set[str] | None = None) -> dict:
+    """Pick a mapping out of a parsed configuration and check its keys.
 
-
-def load_config(path: str | Path, *keys: str, require: set[str] | None = None) -> dict:
-    """Read a mapping out of a YAML file, and check its keys exactly.
+    Parsing is the caller's job — pass whatever ``yaml.safe_load``,
+    ``json.load`` or ``tomllib.load`` returned. What this adds is the part
+    worth having in one place: a **missing** key can never become a hidden
+    default, and an **extra** key can never look effective.
 
     Parameters
     ----------
-    path : str | Path
-        The YAML file.
+    document : dict
+        The parsed configuration.
     *keys : str
         Keys to descend through before the mapping is returned, for example
-        ``"variants", "atan-cs"`` for a file that groups several variants.
-        Without any key the top-level mapping is used.
+        ``"variants", "atan-cs"`` for a document that groups several
+        variants. Without any key the document itself is used.
     require : set[str] | None, optional
-        The keys the caller reads. The mapping must carry exactly these:
-        anything missing, and anything extra, is an error. Default ``None``
-        skips the check.
+        The keys the caller reads. The mapping must carry exactly these.
+        Default ``None`` skips the check.
 
     Returns
     -------
@@ -51,54 +45,99 @@ def load_config(path: str | Path, *keys: str, require: set[str] | None = None) -
 
     Raises
     ------
-    FileNotFoundError
-        If the file does not exist.
     KeyError
-        If one of ``keys`` is not in the document. The message lists what is
+        If one of ``keys`` is not present. The message lists what is
         available at that level.
     ValueError
-        If the mapping's keys do not match ``require``, or if the selection
-        is not a mapping at all.
+        If a selected value is not a mapping, or if its keys do not match
+        ``require``.
 
     Examples
     --------
-    >>> load_config(  # doctest: +SKIP
-    ...     Path(__file__).with_suffix(".yaml"),
-    ...     "variants",
-    ...     "atan-cs",
-    ...     require={"epochs", "learning_rate"},
-    ... )
-    {'epochs': 500, 'learning_rate': 0.001}
+    >>> document = {"variants": {"fast": {"epochs": 5, "lr": 0.01}}}
+    >>> config_section(document, "variants", "fast", require={"epochs", "lr"})
+    {'epochs': 5, 'lr': 0.01}
+    >>> config_section(document, "variants", "fast", require={"epochs"})
+    Traceback (most recent call last):
+        ...
+    ValueError: variants -> fast: missing keys [], unknown keys ['lr']
     """
-    path = Path(path)
-    if not path.exists():
-        raise FileNotFoundError(f"no such config file: {path}")
-
-    node = _yaml().safe_load(path.read_text())
-    for key in keys:
+    node = document
+    for depth, key in enumerate(keys):
         if not isinstance(node, dict):
-            raise ValueError(f"{path.name}: '{key}' is not inside a mapping")
+            raise ValueError(
+                f"{' -> '.join(keys[:depth]) or 'the document'} is "
+                f"{type(node).__name__}, not a mapping"
+            )
         if key not in node:
             raise KeyError(
-                f"{path.name}: no '{key}' here. Available: "
-                f"{', '.join(sorted(map(str, node)))}"
+                f"no '{key}' in {' -> '.join(keys[:depth]) or 'the document'}. "
+                f"Available: {', '.join(sorted(map(str, node)))}"
             )
         node = node[key]
 
+    where = " -> ".join(keys) or "the document"
     if not isinstance(node, dict):
-        raise ValueError(
-            f"{path.name}: {' -> '.join(keys) or 'the document'} is "
-            f"{type(node).__name__}, not a mapping"
-        )
+        raise ValueError(f"{where} is {type(node).__name__}, not a mapping")
 
-    config = dict(node)
+    section = dict(node)
     if require is not None:
-        missing = set(require) - set(config)
-        unknown = set(config) - set(require)
+        missing = sorted(set(require) - set(section))
+        unknown = sorted(set(section) - set(require))
         if missing or unknown:
-            where = " -> ".join(keys) or path.name
-            raise ValueError(
-                f"{path.name}, {where}: missing keys {sorted(missing)}, "
-                f"unknown keys {sorted(unknown)}"
-            )
-    return config
+            raise ValueError(f"{where}: missing keys {missing}, unknown keys {unknown}")
+    return section
+
+
+def machine_info() -> dict:
+    """Describe the machine and the software environment.
+
+    The snapshot holds the host name, the operating system, the CPU and GPU,
+    the core count, the RAM size, and the versions of python, torch, zuko and
+    tramdag. ``save`` stores it with the model, so timing and benchmark
+    numbers stay comparable across machines.
+
+    Returns
+    -------
+    dict
+        One key per property. A property that cannot be read is ``None``.
+        This function never raises.
+    """
+    import os
+    import platform
+    import socket
+
+    import torch
+
+    info: dict = {
+        "hostname": socket.gethostname().split(".")[0],
+        "os": f"{platform.system()} {platform.release()}",
+        "machine": platform.machine(),
+        "processor": platform.processor() or platform.machine(),
+        "cpu_count": os.cpu_count(),
+        "python": platform.python_version(),
+        "torch": torch.__version__,
+        "cuda": (torch.cuda.get_device_name(0) if torch.cuda.is_available() else None),
+        "mps": bool(
+            getattr(torch.backends, "mps", None) and torch.backends.mps.is_available()
+        ),
+    }
+    try:
+        import zuko
+
+        info["zuko"] = zuko.__version__
+    except Exception:
+        info["zuko"] = None
+    try:
+        from . import __version__
+
+        info["tramdag"] = __version__
+    except Exception:
+        info["tramdag"] = None
+    try:  # total RAM (POSIX)
+        info["ram_gb"] = round(
+            os.sysconf("SC_PAGE_SIZE") * os.sysconf("SC_PHYS_PAGES") / 1e9, 1
+        )
+    except (ValueError, OSError, AttributeError):
+        info["ram_gb"] = None
+    return info

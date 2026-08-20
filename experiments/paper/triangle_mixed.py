@@ -21,10 +21,10 @@ Usage (from experiments/)::
 from __future__ import annotations
 
 import argparse
-from pathlib import Path
 
 import numpy as np
 from common import (
+    load_variant,
     make_output_dir,
     save_metrics,
     variants_of,
@@ -41,9 +41,8 @@ from paper.helpers import (
     split_train_val,
 )
 from paper.simulations.triangle import TriangleMixed
-from tramdag import CS, LS, ContinuousNode, OrdinalNode, load_config
+from tramdag import CS, LS, ContinuousNode, OrdinalNode
 
-CONFIG = Path(__file__).with_suffix(".yaml")
 CONFIG_KEYS = {
     "f",
     "shift",
@@ -132,7 +131,7 @@ def dgp_odds_ratio(generator, threshold: float, n: int, seed: int) -> float:
 
 def run(variant: str) -> dict:
     """Run one variant end to end and give its metrics."""
-    config = load_config(CONFIG, "variants", variant, require=CONFIG_KEYS)
+    config = load_variant(__file__, variant, CONFIG_KEYS)
     out = make_output_dir(__file__, f"triangle-mixed-{variant}")
     figures = []
 

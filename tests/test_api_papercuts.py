@@ -1,5 +1,6 @@
 """Tests for the API papercuts in issue #12: constructor seeding, history +
-machine-info persistence through save/load, and the machine_info() helper.
+and machine-info persistence through save/load (the helper itself is
+tested in test_utils.py).
 """
 
 import numpy as np
@@ -62,25 +63,6 @@ def test_save_load_round_trips_history(tmp_path):
 
 
 # ----------------------------------------- #4 machine/env info in metadata
-def test_machine_info_has_expected_fields():
-    info = td.machine_info()
-    for k in [
-        "hostname",
-        "os",
-        "cpu_count",
-        "python",
-        "torch",
-        "zuko",
-        "tramdag",
-        "cuda",
-        "mps",
-        "ram_gb",
-    ]:
-        assert k in info
-    assert info["torch"] == torch.__version__
-    assert info["tramdag"] == td.__version__
-
-
 def test_save_carries_machine_and_version_metadata(tmp_path):
     flow = CausalFlowDAG(_spec(), seed=0)
     p = tmp_path / "flow.pt"

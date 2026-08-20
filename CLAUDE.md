@@ -33,8 +33,8 @@ uv run python -m paper.check_data            # frozen data still regenerates
 ```
 
 Every experiment reads its hyperparameters from its sibling `<script>.yaml` and
-has **no defaults in code**; `tramdag.load_config` rejects a variant with a
-missing or unknown key. `experiments/` is split into `paper/`, `benchmarks/` and
+has **no defaults in code**; `experiments/common.py::load_variant` parses it and
+`tramdag.utils.config_section` rejects a variant with a missing or unknown key. `experiments/` is split into `paper/`, `benchmarks/` and
 `misc/`, each with its own `data/`, `ground_truth/`, `tests/` and `results/`;
 only `common.py` (output layout) and `check.py` (ground-truth comparison) are
 shared. The area tests run in the ordinary `uv run pytest`.
@@ -70,9 +70,11 @@ See `experiments/README.md`.
   (`P(Y<=k) = sigmoid(theta_k - shift)`, cutpoints `[t0, t0+cumsum(exp(...))]`).
 - `conditioners.py` — the LS/CS/intercept networks (widths replicate the reference
   Keras implementation).
-- `utils.py` — `load_config`: read a YAML mapping and require an exact key
-  set, so a missing key cannot become a hidden default. PyYAML is lazy and
-  declared as the `config` extra, so the wheel does not depend on it.
+- `utils.py` — the non-modelling helpers, with no module-level imports:
+  `config_section` (pick a section out of an already-parsed config and require
+  an exact key set, so a missing key cannot become a hidden default — parsing
+  stays with the caller, so the package needs no config parser) and
+  `machine_info` (the environment snapshot `save` stores; was `env.py`).
 - `flow.py` — `CausalFlowDAG`: `fit`, `fit_classical` (float64 full-batch
   L-BFGS, exact MLE for all-`ls` specs), `sample(n, do=, u=)`, `abduct`, `pmf`,
   `log_prob`, `save/load`, `ls_coefficients` (LS weights only — network shifts

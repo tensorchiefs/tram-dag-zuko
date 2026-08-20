@@ -5,7 +5,6 @@
 
 from importlib.metadata import version
 
-from .env import machine_info
 from .flow import CausalFlowDAG
 from .spec import (
     CI,
@@ -24,14 +23,13 @@ from .spec import (
     simple_intercept,
     varying_coefficient,
 )
-from .utils import load_config
+from .utils import machine_info
 
 __all__ = [
     "CausalFlowDAG",
     "ContinuousNode",
     "OrdinalNode",
     "machine_info",
-    "load_config",
     # term-formula notation: short aliases and their definitions
     "Term",
     "I",

@@ -9,10 +9,10 @@ helpers only it needs.
 What is left here is the output layout the experiments workflow reads:
 ``results/<name>/`` with ``metrics.json``, ``report.md`` and ``plots/``.
 
-The strict config reader is **not** here: it moved into the framework as
-:func:`tramdag.load_config`, because "a missing key must never become a
-hidden default" is a guarantee worth having in one place, and useful to any
-script that keeps its hyperparameters in a file.
+Reading a script's YAML file is here; checking the section it yields is not.
+:func:`load_variant` parses the file and hands the document to
+:func:`tramdag.utils.config_section`, which enforces the exact key set — that
+guarantee is worth having in one place, and it needs no YAML.
 
 Every function takes the calling script's ``__file__``, so paths resolve
 inside that script's own area with no directory names written in the code.
@@ -30,6 +30,8 @@ from pathlib import Path
 
 import yaml
 
+from tramdag.utils import config_section
+
 
 def config_path(script: str) -> Path:
     """Give the YAML file belonging to a script: same directory, same stem.
@@ -45,6 +47,43 @@ def config_path(script: str) -> Path:
         The sibling ``.yaml`` file.
     """
     return Path(script).resolve().with_suffix(".yaml")
+
+
+def load_variant(script: str, variant: str, expected_keys: set[str]) -> dict:
+    """Read one variant's hyperparameters from the script's own YAML file.
+
+    The file lists every value the experiment uses, one section per variant
+    under ``variants:``. Shared values are written once under an anchor and
+    merged with YAML's ``<<`` key, so the merge is visible in the file
+    instead of happening in code.
+
+    Parameters
+    ----------
+    script : str
+        The calling script's ``__file__``. The config is the sibling file
+        with the same stem and a ``.yaml`` suffix.
+    variant : str
+        Key under ``variants:``.
+    expected_keys : set[str]
+        The keys the script reads. A config that does not match this set
+        exactly is an error: a missing key would otherwise become a hidden
+        default, an extra key a silently ignored setting.
+
+    Returns
+    -------
+    dict
+        The variant's hyperparameters.
+
+    Raises
+    ------
+    FileNotFoundError
+        If the config file does not exist.
+    """
+    path = config_path(script)
+    if not path.exists():
+        raise FileNotFoundError(f"no config next to {Path(script).name}: {path}")
+    document = yaml.safe_load(path.read_text())
+    return config_section(document, "variants", variant, require=expected_keys)
 
 
 def variants_of(script: str) -> list[str]:

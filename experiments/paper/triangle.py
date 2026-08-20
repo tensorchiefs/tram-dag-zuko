@@ -22,10 +22,10 @@ Usage (from experiments/)::
 from __future__ import annotations
 
 import argparse
-from pathlib import Path
 
 import numpy as np
 from common import (
+    load_variant,
     make_output_dir,
     save_metrics,
     variants_of,
@@ -42,9 +42,8 @@ from paper.helpers import (
     split_train_val,
 )
 from paper.simulations.triangle import TriangleContinuous
-from tramdag import CS, LS, ContinuousNode, load_config
+from tramdag import CS, LS, ContinuousNode
 
-CONFIG = Path(__file__).with_suffix(".yaml")
 CONFIG_KEYS = {
     "f",
     "shift",
@@ -113,7 +112,7 @@ def snapshot(flow, shift: str) -> dict:
 
 def run(variant: str) -> dict:
     """Run one variant end to end and give its metrics."""
-    config = load_config(CONFIG, "variants", variant, require=CONFIG_KEYS)
+    config = load_variant(__file__, variant, CONFIG_KEYS)
     out = make_output_dir(__file__, f"triangle-{variant}")
     figures = []
 

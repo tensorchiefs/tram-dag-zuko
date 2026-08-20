@@ -31,6 +31,7 @@ from pathlib import Path
 import pandas as pd
 import torch
 from common import (
+    load_variant,
     make_output_dir,
     save_metrics,
     variants_of,
@@ -38,9 +39,8 @@ from common import (
 )
 from statsmodels.miscmodels.ordinal_model import OrderedModel
 
-from tramdag import LS, CausalFlowDAG, ContinuousNode, OrdinalNode, load_config
+from tramdag import LS, CausalFlowDAG, ContinuousNode, OrdinalNode
 
-CONFIG = Path(__file__).with_suffix(".yaml")
 CONFIG_KEYS = {
     "cohort",
     "fitter",
@@ -194,7 +194,7 @@ def treatment_effect(flow, statsmodels_result, trial, good_levels: int) -> dict:
 
 def run(variant: str) -> dict:
     """Run one variant end to end and give its metrics."""
-    config = load_config(CONFIG, "variants", variant, require=CONFIG_KEYS)
+    config = load_variant(__file__, variant, CONFIG_KEYS)
     out = make_output_dir(__file__, f"validate-ls-{variant}")
 
     observed, trial, truth, reference = load_cohort(config["cohort"])
