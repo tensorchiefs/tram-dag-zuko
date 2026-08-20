@@ -36,7 +36,12 @@ notebooks = [
 test = [
   "pytest",
   "pytest-xdist",
-  "scipy",  # scipy.stats in the generator tests
+  # testpaths covers experiments/ too, so this group must be able to import
+  # what those tests import: the generators (scipy), the config reader (pyyaml)
+  # and the benchmark modules (matplotlib)
+  "matplotlib",
+  "pyyaml",
+  "scipy",
   "statsmodels"  # exact-MLE agreement tests
 ]
 

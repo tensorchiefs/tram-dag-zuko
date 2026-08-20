@@ -29,7 +29,7 @@ and the ``cs`` module again learns ``-f(x2)``.
 
 CLI (regenerate the frozen CSVs for both families)::
 
-    uv run python -m tramdag.simulations.triangle --out data --seed 42
+    uv run python -m paper.simulations.triangle --out data --seed 42
 """
 
 from __future__ import annotations

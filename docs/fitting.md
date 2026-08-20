@@ -197,7 +197,7 @@ transformation model (ordered-logit / Colr). It raises on any `cs`/`ci` edge.
   Bernstein intercept and weakly-identified directions (rare one-hot levels, a
   flat treatment-effect ridge) continue to drift along zero-curvature valleys
   after the likelihood is at the optimum. Correctness comes from a comparison
-  with classical software (`experiments/validate_ls.py classical`), not from
+  with classical software (`python -m misc.validate_ls classical`), not from
   the flag.
 - Read the fitted coefficients with `ls_coefficients()`.
 
@@ -258,7 +258,7 @@ These extensions are worth consideration as the package matures:
 - **Modern first-order variants.** AdamW (decoupled weight decay), RAdam (warmup-
   free), or Lion/Sophia are drop-in alternatives to Adam. The benchmark harness
   ([`experiments/benchmarks/bench_training.py`](../experiments/benchmarks/bench_training.py),
-  parked — needs an API migration) exists to evaluate exactly such swaps on
+  in `experiments/benchmarks/`) exists to evaluate exactly such swaps on
   time-to-target.
 - **Per-node optimizer selection.** The loss decomposes, and the optimizer
   already holds one group per node. Therefore different nodes can in principle

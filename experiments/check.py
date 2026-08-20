@@ -4,7 +4,12 @@ The experiments workflow calls this after each run. Ground truth lives in
 ``<area>/ground_truth/<result-dir>.json`` as one entry per metric::
 
     {"_note": "what these numbers mean",
-     "beta12": {"value": 2.0012, "atol": 0.05}}
+     "beta12": {"value": 2.0012, "atol": 0.05},
+     "cs_curve_max_abs_err": {"max": 0.23}}
+
+Two forms. ``{value, atol}`` is two-sided, for a quantity that should stay
+where it is. ``{max}`` is an upper bound, for an **error measure**, where a
+smaller number is a better fit rather than a drift and must not fail the run.
 
 A key starting with an underscore is a note for the reader and is skipped.
 
@@ -70,17 +75,27 @@ def compare(area: str, name: str) -> tuple[list[str], list[str]]:
         if metric not in metrics:
             failures.append(f"{metric}: the run produced no such metric")
             continue
-        deviation = abs(metrics[metric] - expected["value"])
+        measured = metrics[metric]
+        if "max" in expected:
+            # an error measure: only exceeding it is a regression, because a
+            # smaller error is a better fit, not a drifted one
+            if measured > expected["max"]:
+                failures.append(
+                    f"{metric}: {measured:+.4f} exceeds its bound "
+                    f"{expected['max']:+.4f}"
+                )
+            else:
+                notes.append(f"{metric}: {measured:+.4f} (bound {expected['max']})")
+            continue
+        deviation = abs(measured - expected["value"])
         if deviation > expected["atol"]:
             failures.append(
-                f"{metric}: {metrics[metric]:+.4f} vs expected "
+                f"{metric}: {measured:+.4f} vs expected "
                 f"{expected['value']:+.4f} (deviation {deviation:.4f} > "
                 f"atol {expected['atol']})"
             )
         else:
-            notes.append(
-                f"{metric}: {metrics[metric]:+.4f} (within {expected['atol']})"
-            )
+            notes.append(f"{metric}: {measured:+.4f} (within {expected['atol']})")
     for metric in metrics:
         if metric not in truth:
             notes.append(f"{metric}: {metrics[metric]} (not checked)")

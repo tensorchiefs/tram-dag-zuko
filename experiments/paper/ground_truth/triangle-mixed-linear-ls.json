@@ -25,8 +25,7 @@
     "atol": 0.5
   },
   "cf_pmf_tv_vs_analytic": {
-    "value": 0.054191417032043374,
-    "atol": 0.03
+    "max": 0.084191417
   },
   "cf_prob_true_level_flow": {
     "value": 0.7138175,

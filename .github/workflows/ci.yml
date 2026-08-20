@@ -47,8 +47,10 @@ jobs:
         uv sync --no-default-groups --group test
         --python ${{ matrix.python-version }}
 
+    # no path argument: testpaths in pyproject covers tests/ and the
+    # per-area experiment checks, and both are meant to run here
     - name: Tests
       shell: bash
       run: >-
-        uv run pytest tests/ -q -n auto
+        uv run pytest -q -n auto
         ${{ (github.event_name != 'schedule' && github.event_name != 'workflow_dispatch') && '-m "not slow"' || '' }}

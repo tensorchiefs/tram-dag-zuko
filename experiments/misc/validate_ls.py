@@ -18,8 +18,8 @@ known true effect of the synthetic cohort.
 
 Usage (from experiments/)::
 
-    uv run python validate_ls.py adam
-    uv run python validate_ls.py classical
+    uv run python -m misc.validate_ls adam
+    uv run python -m misc.validate_ls classical
 """
 
 from __future__ import annotations

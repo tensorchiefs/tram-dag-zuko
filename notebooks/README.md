@@ -12,9 +12,11 @@ truth**.
 | `additive_vs_joint_ci.py` | joint vs additive complex intercept, and reading per-parent effects out of the additive one with `intercept_contributions` |
 | `varying_coefficients.py` | heterogeneous treatment effects: the `VC` head, `varying_coef`, the modifier scan and propensity centering, all scored against a known `beta(x)` |
 
-Every notebook here is executed on each push by the docs workflow, which is
-what keeps it working against the current API. A notebook that is not in that
-workflow's `NOTEBOOKS` list does not belong in this directory.
+Every notebook here is executed by the docs workflow — on pushes to `main` and
+`dev-*` branches — which is what keeps them working against the current API. A
+notebook that is not in that workflow's `NOTEBOOKS` list does not belong in this
+directory. On a feature branch, run one by hand:
+`MPLBACKEND=Agg uv run python notebooks/<name>.py`.
 
 ## Rules
 

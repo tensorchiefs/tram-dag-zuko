@@ -7,7 +7,9 @@ the true interventional effects are known exactly. It is a drop-in substitute fo
 private clinical data — identical column schema, dtypes and ranges — so the same
 experiment and analysis scripts run on either by changing one string.
 
-Generator: [`src/tramdag/simulations/magic_mrclean.py`](../../src/tramdag/simulations/magic_mrclean.py).
+Generator: **not in this repository.** It left with the clinical storyline in
+0.4; recover it with `git checkout pre-experiments-cut -- src/tramdag/simulations/magic_mrclean.py`. This cohort is frozen input data,
+pinned by `experiments/misc/tests/` rather than by regeneration.
 
 ## DAG and schema
 
@@ -83,6 +85,7 @@ The CSVs are **frozen** (committed) so Python and R see byte-identical data. To
 regenerate (e.g. a new seed → bump to a new folder rather than overwriting):
 
 ```bash
+# only after recovering the generator from the pre-experiments-cut tag:
 uv run python -m tramdag.simulations.magic_mrclean --out data/magic-mrclean --seed 7
 ```
 

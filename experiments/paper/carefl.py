@@ -13,7 +13,7 @@ number to watch for regressions.
 
 Usage (from experiments/)::
 
-    uv run python carefl.py flexible
+    uv run python -m paper.carefl flexible
 """
 
 from __future__ import annotations

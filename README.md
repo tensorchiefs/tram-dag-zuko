@@ -154,7 +154,7 @@ obtained, is documented in [`tests/README.md`](tests/README.md).
 
 **The paper replications** ([`experiments/`](experiments/)) are separate: one
 self-contained script per dataset, with its hyperparameters in a sibling YAML
-file and its expected results committed under `experiments/ground_truth/`. A
+file and its expected results committed under each area's `ground_truth/`. A
 dedicated workflow runs them and compares.
 
 | experiment | paper | demonstrates |
@@ -169,7 +169,7 @@ Sign note: ordinal shifts are *subtracted* here but *added* in the paper, so
 fitted ordinal weights are the paper's with flipped sign (each `truth.json`
 records both conventions). A figure-by-figure account of what is reproduced,
 and what is not (the competing CNF/NSF baselines), is in
-[`experiments/PAPER_COVERAGE.md`](experiments/PAPER_COVERAGE.md).
+[`experiments/paper/PAPER_COVERAGE.md`](experiments/paper/PAPER_COVERAGE.md).
 
 **Training speed** — schedules, per-node freezing, L-BFGS and device benchmarks:
 [`docs/training-speed.md`](docs/training-speed.md).
@@ -181,7 +181,7 @@ See the [`tests/README.md`](tests/README.md) file for more details.
 
 ```
 src/tramdag/            spec.py transforms.py conditioners.py flow.py
-                        scores.py env.py          <- the framework, and nothing else
+                        scores.py utils.py        <- the framework, and nothing else
 tests/                  unit tests, identities, acceptance bars, three inline DGPs
 experiments/            research code, one directory per area, each self-contained:
                           paper/       the replications + generators + frozen data
@@ -189,7 +189,8 @@ experiments/            research code, one directory per area, each self-contain
                           misc/        the classical-MLE validation
                         each area: <name>.py + <name>.yaml, data/, ground_truth/,
                         tests/, results/
-notebooks/              intro (didactic) + Colab demo   (jupytext .py — see README there)
+notebooks/              four executed examples: didactic intro, Colab demo,
+                        additive-vs-joint intercepts, varying coefficients
 docs/                   code-map.md (every class/function + all knobs),
                         fitting.md, notation.md, training-speed.md,
                         varying-coefficients.md, scores.md

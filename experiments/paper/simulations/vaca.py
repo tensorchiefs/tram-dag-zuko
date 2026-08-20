@@ -17,7 +17,7 @@ queries in the paper: p(x3 | do(x2 = a)) for a in {-3, -1, 0}.
 
 CLI::
 
-    uv run python -m tramdag.simulations.vaca --out data/vaca --seed 42
+    uv run python -m paper.simulations.vaca --out paper/data/vaca --seed 42
 """
 
 from __future__ import annotations

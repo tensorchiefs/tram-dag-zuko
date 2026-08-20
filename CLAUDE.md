@@ -134,25 +134,26 @@ Experiments (`experiments/`, seed 42 unless stated, arXiv:2503.16206):
   extrapolation — looser tolerance). `carefl`: counterfactuals are analytic
   (`Carefl4.true_counterfactual`); the paper's x_obs has a ~4σ abducted noise, so
   typical held-out rows are scored instead of that single point.
-- **`validate_ls`** (`experiments/data/magic-mrclean/ls`, seed 7, n=1275, full data,
+- **`validate_ls`** (`experiments/misc/data/magic-mrclean/ls`, seed 7, n=1275, full data,
   `restore_best=False`): flow = statsmodels = R polr at Age 0.0526, NIHSSa 0.1630,
   T −0.9424; ATE +0.1429 vs +0.1428, true ATE +0.132. The R reference
   (`fit_ls.R`, needs `tram`/`MASS`) has its outputs committed under `ref_ls/`, so
   nothing needs R installed.
-- Committed expectations live in `experiments/ground_truth/<name>.json`, one
-  `{value, atol}` entry per metric; `check.py` enforces them.
+- Committed expectations live in `experiments/<area>/ground_truth/<name>.json`;
+  `check.py` enforces them. Two entry forms: `{value, atol}` (two-sided) and
+  `{max}` (an upper bound, for error measures, so a better fit cannot fail).
 
 ## Testing policy
 
 - Framework tests must not depend on `experiments/`. A new causal feature is
   validated against an inline DGP's known truth (add one to `conftest.py` if
   none fits), never with "runs without error".
-- Frozen CSVs in `experiments/data/` are a contract — **never regenerate
+- Frozen CSVs in `experiments/<area>/data/` are a contract — **never regenerate
   silently**; a new seed or new equations means a **new folder**. `check_data.py`
   regenerates each from the seed in its `truth.json` and compares at **1e-9**, not
   bit equality: numpy's transcendental functions move their last bits between
   releases (measured ~1e-15 after the 2026-08 dependency bump).
-- `experiments/data/magic-mrclean/ls` has no generator here (it left with the
+- `experiments/misc/data/magic-mrclean/ls` has no generator here (it left with the
   stroke storyline); it is frozen input data. Recover the generator from
   `pre-experiments-cut` if it ever needs regenerating.
 - Fit checks for the paper DGPs train on the paper protocol (n=40k, 500 epochs),

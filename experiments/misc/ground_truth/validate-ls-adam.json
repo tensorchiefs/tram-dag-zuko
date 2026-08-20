@@ -37,8 +37,7 @@
     "atol": 0.0001
   },
   "max_abs_diff_flow_vs_statsmodels": {
-    "value": 0.0004347693977124756,
-    "atol": 0.005
+    "max": 0.0054347694
   },
   "ate_flow": {
     "value": 0.14285694062709808,
@@ -57,7 +56,6 @@
     "atol": 1e-09
   },
   "ate_abs_diff_flow_vs_statsmodels": {
-    "value": 1.4296804983354727e-05,
-    "atol": 0.002
+    "max": 0.0020142968
   }
 }

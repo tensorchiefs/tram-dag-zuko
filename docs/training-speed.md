@@ -2,12 +2,15 @@
 
 This document benchmarks learning-rate schedules, per-node freezing, batch sizes, devices,
 and LBFGS. The benchmark ran in June 2026 on an Apple-silicon Mac mini with torch 2.12
-(CPU unless noted). To reproduce it, use [`experiments/benchmarks/bench_training.py`](../experiments/benchmarks/bench_training.py).
-Migrate the script to the current API first. The grid takes ≈ 35 min. For a quick **cross-machine** comparison, use the
-self-contained [`experiments/benchmarks/perf_machine.py`](../experiments/benchmarks/perf_machine.py). It runs fixed 200-epoch
-workloads on all available devices and writes a machine fingerprint to JSON. After
-`pip install tramdag`, it runs on any machine. The raw CSV is a local artifact of
-the parked benchmark and is not committed.
+(CPU unless noted). To reproduce it, run
+[`experiments/benchmarks/bench_training.py`](../experiments/benchmarks/bench_training.py)
+(`cd experiments && uv run python -m benchmarks.bench_training`, or `--quick` for
+one seed on cpu); the full grid takes ≈ 35 min. For a quick **cross-machine**
+comparison, use the self-contained
+[`experiments/benchmarks/perf_machine.py`](../experiments/benchmarks/perf_machine.py).
+It runs fixed 200-epoch workloads on all available devices and writes a machine
+fingerprint to JSON, and it needs nothing but `pip install tramdag`. The raw CSV
+is a local run artifact and is not committed.
 
 ## The options, and how to use them
 
@@ -39,7 +42,7 @@ flow.fit(train_df, epochs=4000, learning_rate=1e-2, batch_size=512)  # constant 
 flow.fit(train_df, epochs=2000, learning_rate=1e-3, batch_size=512)  # 2nd phase
 ```
 
-is still the exact-MLE path that `experiments/validate_ls.py` uses. Independent of all
+is still the exact-MLE path that `experiments/misc/validate_ls.py` uses. Independent of all
 this, `restore_best=False` remains the default (see CHANGELOG). The guard test
 `tests/test_fit_schedules.py::test_plateau_freeze_preserves_exact_mle` also shows that
 even *with* plateau+freezing the all-`ls` fit lands on the classical MLE within the usual
@@ -66,13 +69,13 @@ long-run reference (3 torch seeds, medians):
 
 | workload | model / data | reference NLL | tight tol | practical tol |
 |---|---|---|---|---|
-| **stroke-ls** | all-`ls` 5-node DAG, frozen `experiments/data/magic-mrclean/ls` (n=1275, full-data MLE) | 10.3042 (train) | +1e-3 | +5e-3 |
-| **vaca-ci** | all-`ci` flow, frozen `experiments/data/vaca` (n=5000, 90/10 split) | 4.9632 (val) | +2e-3 | +1e-2 |
+| **stroke-ls** | all-`ls` 5-node DAG, frozen `experiments/misc/data/magic-mrclean/ls` (n=1275, full-data MLE) | 10.3042 (train) | +1e-3 | +5e-3 |
+| **vaca-ci** | all-`ci` flow, frozen `experiments/paper/data/vaca` (n=5000, 90/10 split) | 4.9632 (val) | +2e-3 | +1e-2 |
 
 *Tight* ≈ exact-MLE equivalence (statsmodels/R-polr match). *Practical* ≈
 coefficient-equivalent: a fit with gap ≈ 3e-3 already matches the R reference
 coefficients within the tolerances of
-[`experiments/validate_ls.py`](../experiments/validate_ls.py). The same
+[`experiments/misc/validate_ls.py`](../experiments/misc/validate_ls.py). The same
 exact-MLE-under-plateau-and-freezing property is pinned on an inline DGP by
 `tests/test_fit_schedules.py::test_plateau_freeze_preserves_exact_mle`.
 
@@ -92,7 +95,7 @@ never reached the target within the budget.
 | config | stroke-ls practical | stroke-ls tight | vaca-ci practical | vaca-ci tight | self-stops |
 |---|---|---|---|---|---|
 | baseline two-phase (old default) | 9.0 | **21.4** | 2.1 | 2.8¹ | no (runs 40 s / 15 s) |
-| constant 1e-2 | 9.1 | 21.5² | 2.2 | 2.8¹ | no |
+| constant 1e-2 | 9.1 | 21.5³ | 2.2 | 2.8¹ | no |
 | onecycle (1500 / 300 ep)² | — | — | 3.5 | 4.5 | no |
 | onecycle (3000 ep)² | 16.8 | — (gap 1–2e-3) | | | no |
 | cosine² | — | — | 2.2 | 3.5¹ | no |

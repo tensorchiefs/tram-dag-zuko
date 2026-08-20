@@ -13,7 +13,7 @@ compare the flow against exact values, not against a second sample.
 
 Usage (from experiments/)::
 
-    uv run python vaca.py flexible
+    uv run python -m paper.vaca flexible
 """
 
 from __future__ import annotations

@@ -16,7 +16,7 @@ overlay (Fig. 7 right / 17 left / 18 right) and the observational plus
 
 Usage (from experiments/)::
 
-    uv run python triangle.py atan-cs
+    uv run python -m paper.triangle atan-cs
 """
 
 from __future__ import annotations

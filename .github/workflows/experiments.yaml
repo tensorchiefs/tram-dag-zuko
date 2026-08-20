@@ -55,6 +55,11 @@ jobs:
 
         only_script = os.environ.get("ONLY_SCRIPT", "")
         only_variant = os.environ.get("ONLY_VARIANT", "")
+        if bool(only_script) != bool(only_variant):
+            raise SystemExit(
+                "narrowing the run needs both inputs: "
+                f"script={only_script!r} variant={only_variant!r}"
+            )
         include = []
         for path in sorted(pathlib.Path(".").glob("*/*.yaml")):
             area, script = path.parent.name, path.stem

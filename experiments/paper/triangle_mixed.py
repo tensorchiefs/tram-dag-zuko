@@ -15,7 +15,7 @@ for ``cs`` variants, the observational plus ``do(x1)`` distributions
 
 Usage (from experiments/)::
 
-    uv run python triangle_mixed.py linear-ls
+    uv run python -m paper.triangle_mixed linear-ls
 """
 
 from __future__ import annotations

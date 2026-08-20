@@ -18,7 +18,7 @@ and sweeps two queries for alpha in [-3, 3]:
 
 CLI::
 
-    uv run python -m tramdag.simulations.carefl --out data/carefl --seed 42
+    uv run python -m paper.simulations.carefl --out paper/data/carefl --seed 42
 """
 
 from __future__ import annotations
