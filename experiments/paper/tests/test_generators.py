@@ -17,17 +17,12 @@ import numpy as np
 import pandas as pd
 import pytest
 from paper.check_data import DATASETS
-from paper.simulations import REGISTRY
 from paper.simulations.carefl import X_OBS, Carefl4
 from paper.simulations.triangle import TriangleContinuous, TriangleMixed
 from paper.simulations.vaca import VacaTriangle
 from scipy import stats
 
 DATA = Path(__file__).resolve().parents[1] / "data"
-
-
-def test_registry_lists_every_paper_dgp():
-    assert set(REGISTRY) == {"triangle", "triangle-mixed", "vaca", "carefl"}
 
 
 @pytest.mark.parametrize(

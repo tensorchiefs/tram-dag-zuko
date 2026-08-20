@@ -15,17 +15,9 @@ from .carefl import Carefl4
 from .triangle import TriangleContinuous, TriangleMixed
 from .vaca import VacaTriangle
 
-REGISTRY = {
-    "triangle": TriangleContinuous,
-    "triangle-mixed": TriangleMixed,
-    "vaca": VacaTriangle,
-    "carefl": Carefl4,
-}
-
 __all__ = [
     "TriangleContinuous",
     "TriangleMixed",
     "VacaTriangle",
     "Carefl4",
-    "REGISTRY",
 ]

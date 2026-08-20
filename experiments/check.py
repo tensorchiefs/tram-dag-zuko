@@ -32,7 +32,9 @@ import sys
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
-AREAS = ("paper", "benchmarks", "misc")
+# only areas that commit ground truth; the benchmarks are measured and
+# written up in docs/, not checked against a recorded value
+AREAS = ("paper", "misc")
 
 
 def compare(area: str, name: str) -> tuple[list[str], list[str]]:

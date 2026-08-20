@@ -6,11 +6,7 @@ bimodal DGP drifting away from the maintained generator, and a workload's
 frozen CSV disappearing from the area that owns it.
 """
 
-from pathlib import Path
-
 import numpy as np
-import pandas as pd
-import pytest
 from benchmarks.bench_training import all_ls_spec, stroke_data, vaca_data
 from benchmarks.perf_machine import vaca_dgp
 
@@ -57,17 +53,3 @@ def test_vaca_workload_reads_the_frozen_csv():
     train, val = vaca_data()
     assert len(train) + len(val) == 5000
     assert list(train.columns) == ["x1", "x2", "x3"]
-
-
-@pytest.mark.parametrize(
-    "path",
-    [
-        Path("misc") / "data" / "magic-mrclean" / "ls" / "obs.csv",
-        Path("paper") / "data" / "vaca" / "obs.csv",
-    ],
-)
-def test_workload_data_lives_where_the_benchmark_looks(path):
-    """The benchmarks read frozen CSVs from the areas that own them."""
-    full = Path(__file__).resolve().parents[2] / path
-    assert full.exists(), f"missing benchmark workload data: {full}"
-    assert len(pd.read_csv(full)) > 0
