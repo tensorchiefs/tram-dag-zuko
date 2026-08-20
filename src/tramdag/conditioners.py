@@ -1,8 +1,20 @@
 """Conditioner networks, one per edge term type.
 
-Each architecture copies the default of the original Keras implementation
-(``tram_models.py`` in https://github.com/tensorchiefs/tram-dag). A fitted
-model is therefore directly comparable with that implementation.
+Each architecture copies a default of the PyTorch reference this package grew
+out of: ``tramdag/models/tram_models.py`` in
+https://github.com/buehlpa/TramDag, whose ``ComplexShiftDefaultTabular`` is
+64-128-64 ReLU into a bias-free ``Linear(64, 1)`` and whose
+``ComplexInterceptDefaultTabular`` is 8-8 ReLU into a bias-free
+``Linear(8, n_thetas)`` with ``n_thetas=20``. A fitted model is therefore
+directly comparable with that implementation.
+
+Those defaults are **not** the TRAM-DAG paper's own nets. The paper's R
+implementation (https://github.com/tensorchiefs/tram-dag) uses
+``hidden_features_I = hidden_features_CS = c(2, 25, 25, 2)`` with sigmoid
+activations for the triangle experiments, and a 10-100 tanh net for the
+CAREFL/VACA comparisons. Every replication in ``experiments/paper/`` therefore
+sets ``units=`` and ``activation=`` explicitly from its own reference script,
+and none of them relies on the defaults here.
 
 ===================== ============================================ ======
 Conditioner           Architecture                                 Term
@@ -28,7 +40,12 @@ from __future__ import annotations
 import torch
 from torch import Tensor, nn
 
+# the activations the reference implementations use: relu in the PyTorch
+# reference's default classes, sigmoid in the paper's create_param_net, tanh in
+# the paper's make_model for the CAREFL/VACA comparisons.
 ACTIVATIONS = {"relu": nn.ReLU, "sigmoid": nn.Sigmoid, "tanh": nn.Tanh}
+# relu, because the architectures these conditioners copy use relu -- the
+# default net and the default activation come from the same source.
 DEFAULT_ACTIVATION = "relu"
 
 
@@ -54,9 +71,11 @@ def _mlp(
     n_out : int
         Output width.
     activation : str | None, optional
-        Key of :data:`ACTIVATIONS` — ``"relu"`` (the default, and what the
-        stroke reference used), ``"sigmoid"`` (what the TRAM-DAG paper's own
-        implementation uses) or ``"tanh"``. ``None`` takes the default.
+        Key of :data:`ACTIVATIONS`: ``"relu"`` (the default, and what the
+        PyTorch reference's default classes use), ``"sigmoid"`` (the paper's
+        ``create_param_net``) or ``"tanh"`` (the paper's ``make_model``, used
+        for its CAREFL/VACA comparisons). ``None`` takes
+        :data:`DEFAULT_ACTIVATION`.
     zero_init_last : bool, optional
         Zero the output layer, by default ``False``.
 
@@ -123,7 +142,12 @@ class ComplexIntercept(nn.Module):
     n_params : int
         Number of transform parameters to produce.
     units : tuple[int, ...] | None, optional
-        Hidden layers of the network, by default ``(8, 8)``.
+        Hidden layers of the network, by default ``(8, 8)`` — the two hidden
+        layers of ``ComplexInterceptDefaultTabular`` (see the module
+        docstring). The paper's own nets are wider; a replication should set
+        this explicitly.
+    activation : str | None, optional
+        Key of :data:`ACTIVATIONS`, by default :data:`DEFAULT_ACTIVATION`.
     """
 
     def __init__(
@@ -196,7 +220,12 @@ class ComplexShift(nn.Module):
     n_features : int
         Width of the encoded parent features.
     units : tuple[int, ...] | None, optional
-        Hidden layers of the network, by default ``(64, 128, 64)``.
+        Hidden layers of the network, by default ``(64, 128, 64)`` — the three
+        hidden layers of ``ComplexShiftDefaultTabular`` (see the module
+        docstring). The paper's own nets are narrower; a replication should
+        set this explicitly.
+    activation : str | None, optional
+        Key of :data:`ACTIVATIONS`, by default :data:`DEFAULT_ACTIVATION`.
     """
 
     def __init__(
@@ -249,7 +278,12 @@ class VaryingCoef(nn.Module):
     penalty : float, optional
         L2 weight on ``b_theta``, by default ``1.0``.
     units : tuple[int, ...] | None, optional
-        Hidden layers of ``b_theta``, by default ``(16,)``.
+        Hidden layers of ``b_theta``, by default ``(16,)``. One layer of 16 is
+        the head ``tests/test_vc_term.py`` recovers a known ``beta(x)`` with
+        at corr ~ 0.99; this term has no counterpart in the reference
+        implementations, so the size comes from that measurement.
+    activation : str | None, optional
+        Key of :data:`ACTIVATIONS`, by default :data:`DEFAULT_ACTIVATION`.
 
     Notes
     -----

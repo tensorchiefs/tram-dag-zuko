@@ -25,7 +25,12 @@ paper_protocol: &paper_protocol
   chunk_epochs: 10        # epochs per fit call; snapshots ride on the boundaries
   # the monotone transform, stated rather than inherited
   transform: bernstein    # from the paper: Bernstein polynomials
-  n_coeffs: 20            # from the paper: order M = 20
+  # from the reference: len_theta = 20 "Number of coefficients of the
+  # Bernstein polynomials". These are the unconstrained coefficients; zuko
+  # ties two more control points onto them to smooth the extrapolation, so
+  # this polynomial is order 21 where the reference's is order 19 and the
+  # paper's text says 20. The free-parameter count is what matches.
+  n_coeffs: 20
   dgp_seed: 42            # the paper's generator seed
   init_seed: 7            # flow weight initialization
   shuffle_seed: 0         # minibatch shuffling

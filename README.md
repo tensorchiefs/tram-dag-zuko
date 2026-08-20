@@ -129,8 +129,11 @@ Two knobs on the terms:
   nodes have no basis: their intercept is the cutpoint vector,
   `P(x ≤ k) = σ(ϑ_k − shift)`.
 - **`units=` on `I`/`CS`/`VC`** sizes the term's network, e.g. `units=[16]`
-  for one hidden layer of 16 neurons (defaults above match the original
-  Keras implementation, so fits stay comparable).
+  for one hidden layer of 16 neurons. The defaults match the PyTorch
+  reference this package grew out of ([buehlpa/TramDag](https://github.com/buehlpa/TramDag),
+  `tram_models.py`), **not** the TRAM-DAG paper's own R nets — so a
+  replication sets `units=` and `activation=` explicitly, as the configs in
+  `experiments/paper/` do.
 
 Feature widths: a continuous parent enters raw (1 column), an ordinal parent
 one-hot (`levels` columns). Abduction is exact for continuous nodes and

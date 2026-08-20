@@ -23,7 +23,10 @@ paper_protocol: &paper_protocol
   chunk_epochs: 10        # epochs per fit call; snapshots ride on the boundaries
   # the continuous nodes' transform, stated rather than inherited
   transform: bernstein    # from the paper: Bernstein polynomials
-  n_coeffs: 20            # from the reference implementation: len_theta = 20
+  # from the reference: len_theta = 20 unconstrained coefficients. zuko ties
+  # two more control points on to smooth the extrapolation (order 21 here
+  # against the reference's 19); the free-parameter count is what matches.
+  n_coeffs: 20
   dgp_seed: 42            # the paper's generator seed
   init_seed: 7            # flow weight initialization
   shuffle_seed: 0         # minibatch shuffling

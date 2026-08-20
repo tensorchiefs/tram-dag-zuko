@@ -13,7 +13,7 @@
     "atol": 0.05
   },
   "cs_curve_max_abs_err": {
-    "max": 0.2967147405
+    "max": 0.884957
   },
   "odds_ratio_predicted": {
     "value": 7.260892091451837,

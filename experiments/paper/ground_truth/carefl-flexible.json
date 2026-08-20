@@ -1,28 +1,28 @@
 {
-  "_note": "Paper Sec. 5.3. Counterfactuals are analytic. The Fig. 6 errors are at the paper's single x_obs, whose abducted noise is ~4 sigma; the cf_mae values over typical held-out rows are the regression signal.",
+  "_note": "Paper Sec. 5.3. Counterfactuals are analytic. The Fig. 6 errors are at the paper's single x_obs, whose abducted noise is ~4 sigma; the cf_mae values over typical held-out rows are the regression signal. Measured with the reference implementation's own comparison net (comparison/utils.R::make_model: dense(10, tanh) -> dense(100, tanh)), M = 30 as in comparison/carefl_fig5.r.",
   "fig6_max_abs_err_x3": {
     "max": 4.098363
   },
   "fig6_max_abs_err_x4": {
-    "max": 1.003253
+    "max": 0.941379
   },
   "cf_mae_x3_do_x2_-1.5": {
-    "max": 0.563544
+    "max": 0.272687
   },
   "cf_mae_x4_do_x1_-1.5": {
-    "max": 0.216432
+    "max": 0.194948
   },
   "cf_mae_x3_do_x2_+0.0": {
-    "max": 0.171792
+    "max": 0.132
   },
   "cf_mae_x4_do_x1_+0.0": {
-    "max": 0.174358
+    "max": 0.146399
   },
   "cf_mae_x3_do_x2_+1.5": {
-    "max": 0.293859
+    "max": 0.23802
   },
   "cf_mae_x4_do_x1_+1.5": {
-    "max": 0.21874
+    "max": 0.213739
   },
   "val_nll_x3": {
     "value": 1.3841248750686646,

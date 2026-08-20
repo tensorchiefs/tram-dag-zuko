@@ -150,9 +150,14 @@ def simple_intercept(transform: str | None = None, **transform_kwargs) -> Term:
     ----------
     transform : str | None, optional
         Basis of a continuous node's monotone transform: ``"bernstein"``
-        (default), ``"spline"`` or ``"affine"``. At most one intercept
-        term per node can set it. An ordinal node accepts none, because
-        its intercept is the cutpoint vector.
+        (default), ``"spline"`` or ``"affine"``. Bernstein is the default
+        because zuko's spline extrapolates outside ``[-B, B]`` with a *fixed*
+        slope, independent of the fitted parameters, so the ~10% of data
+        beyond the 5%/95% pre-scaling range is misweighted whenever the true
+        tail slope differs; Bernstein extrapolates linearly along its own
+        boundary derivative. At most one intercept term per node can set it.
+        An ordinal node accepts none, because its intercept is the cutpoint
+        vector.
     **transform_kwargs
         Forwarded to the transform class, for example
         ``SI(transform="spline", bins=16)``.
@@ -189,10 +194,14 @@ def complex_intercept(
         network per parent, their parameter vectors summed in coefficient
         space. A node takes at most one intercept term with parents —
         write an additive intercept with this flag, not with several
-        intercept terms. Default ``True``.
+        intercept terms. Default ``True``: one joint network is what the
+        reference implementations do, and the additive form is the variant
+        added here.
     units : list[int] | tuple[int, ...] | None, optional
         Hidden layers of the term's network, for example ``units=[16]``
-        for one hidden layer of 16 neurons. Default ``[8, 8]``.
+        for one hidden layer of 16 neurons. Default ``[8, 8]``, from the
+        PyTorch reference — see :mod:`tramdag.conditioners`, which also
+        explains why a paper replication sets this explicitly.
     transform : str | None, optional
         Basis of the node's monotone transform, as for
         :func:`simple_intercept`.
@@ -295,7 +304,8 @@ def complex_shift(
         At least one parent name. Several parents feed one joint network.
     units : list[int] | tuple[int, ...] | None, optional
         Hidden layers, for example ``units=[16]``. Default
-        ``[64, 128, 64]``.
+        ``[64, 128, 64]``, from the PyTorch reference — see
+        :mod:`tramdag.conditioners`.
 
     Returns
     -------
@@ -363,18 +373,28 @@ def varying_coefficient(
         binary (2-level) ordinal node. The term is linear in ``x_t``.
     penalty : float, optional
         L2 weight on the ``b_theta`` weights, by default 1.0. Must be
-        >= 0.
+        >= 0. 1.0 is the value at which ``tests/test_vc_term.py`` recovers
+        the known ``beta(x)`` of the ``vc_hetero`` DGP at corr ~ 0.99. The
+        penalty is on the total-NLL scale, so its effective strength moves
+        with ``n``: raise it for small ``n`` or many modifiers.
     center : bool, optional
-        Propensity centering (issue #30), by default ``False``.
+        Propensity centering (issue #30), by default ``False``, which is
+        bit-identical to the uncentered term — so a plain ``VC`` stays what
+        it was before centering existed, and every committed number keeps
+        reproducing. ``docs/varying-coefficients.md`` measures a 5-10x bias
+        reduction from turning it on, so turn it on for an effect estimate.
         ``True`` uses the **propensity-centered** regressor
         ``beta(x) * (x_t - e_hat(pa_t))`` — the Robinson/R-learner
         orthogonalization inside the likelihood. Requires a binary ordinal
         ``t``.
     center_folds : int, optional
         Fold count for the out-of-fold refits under ``center=True``, by
-        default 5. Must be >= 2.
+        default 5 — the standard cross-fitting count of double machine
+        learning. Must be >= 2. Each fold costs one refit of the treatment
+        node.
     units : list[int] | tuple[int, ...] | None, optional
-        Hidden layers of ``b_theta``, by default ``[16]``.
+        Hidden layers of ``b_theta``, by default ``[16]`` — see
+        :class:`tramdag.conditioners.VaryingCoef` for why that size.
 
     Returns
     -------
@@ -466,6 +486,9 @@ def _normalize_terms(value):
     return [_as_term(element) for element in items]
 
 
+# bernstein, because zuko's spline extrapolates with a fixed slope outside
+# [-B, B] while bernstein follows its own boundary derivative -- see the
+# `transform` parameter of simple_intercept.
 DEFAULT_TRANSFORM = "bernstein"
 
 

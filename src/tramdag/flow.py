@@ -513,14 +513,14 @@ class CausalFlowDAG(nn.Module):
         self,
         train_df: pd.DataFrame,
         val_df: pd.DataFrame | None = None,
-        epochs: int = 500,
+        epochs: int | None = None,
         learning_rate: float = 1e-2,
         batch_size: int = 512,
         verbose: int = 50,
         seed: int | None = None,
         restore_best: bool = False,
         schedule: str | None = None,
-        plateau_patience: int = 15,
+        plateau_patience: int = 30,
         freeze_patience: int | None = None,
         min_delta: float = 1e-4,
         marginal_init: bool = False,
@@ -553,15 +553,27 @@ class CausalFlowDAG(nn.Module):
             ``restore_best``, ``schedule="plateau"`` and
             ``freeze_patience``. If omitted, the training set supplies the
             validation metric.
-        epochs : int, optional
-            Number of training epochs, by default 500.
+        epochs : int
+            Number of training epochs. **Required**: there is no defensible
+            default. ``docs/training-speed.md`` measures fixed budgets going
+            wrong in both directions on the repo's own workloads (stroke
+            over-spends by 2.5x, vaca under-spends by 0.03 nats), so pick a
+            budget for the data, or set a generous one and let
+            ``schedule="plateau"`` with ``freeze_patience`` stop the fit.
         learning_rate : float, optional
-            Adam learning rate, by default 1e-2.
+            Adam learning rate, by default 1e-2 — the rate every row of the
+            ``docs/training-speed.md`` benchmark and every worked example in
+            the docs uses.
         batch_size : int, optional
-            Minibatch size, by default 512.
+            Minibatch size, by default 512. Measured: full-batch loses on
+            time-to-target despite higher epoch throughput, and 16k batches
+            only helped raw throughput at n=50k
+            (``docs/training-speed.md``, finding 4).
         verbose : int, optional
-            Print progress every ``verbose`` epochs, by default 50.
-            0 turns the output off.
+            Print progress every ``verbose`` epochs, by default 50. On the
+            fits this package is for, minutes pass between epochs 0 and
+            500, and silence is indistinguishable from a hang. 0 turns the
+            output off.
         seed : int | None, optional
             Seeds the minibatch shuffling only. Weight initialization
             happens at construction, see the class docstring.
@@ -575,14 +587,18 @@ class CausalFlowDAG(nn.Module):
             The fit is then *not* the training-data MLE, so leave it False
             for an exact classical comparison. Default False.
         schedule : str | None, optional
-            ``None`` (default) keeps the learning rate constant.
+            ``None`` (default) keeps the learning rate constant, so a fit is
+            reproducible from the rate and the budget alone; the measured
+            recommendation for everyday fits is ``"plateau"``
+            (``docs/training-speed.md``).
             ``"plateau"`` decays **per node**: when the validation NLL of
             a node did not improve by ``min_delta`` for
             ``plateau_patience`` epochs, its learning rate decreases by
             ``plateau_factor``, with floor ``1e-3 * learning_rate``.
         plateau_patience : int, optional
-            Epochs without improvement before one plateau decay step,
-            by default 15.
+            Epochs without improvement before one plateau decay step, by
+            default 30 — the value ``docs/training-speed.md`` recommends
+            after measuring it against the hand-tuned two-phase schedule.
         freeze_patience : int | None, optional
             If set, a node whose validation NLL did not improve by
             ``min_delta`` for this many epochs is **frozen** — excluded
@@ -593,7 +609,10 @@ class CausalFlowDAG(nn.Module):
             a node freezes only after its learning rate decayed to
             ``1e-2 * learning_rate`` or below.
         min_delta : float, optional
-            Smallest validation improvement that counts, by default 1e-4.
+            Smallest validation improvement that counts, by default 1e-4 —
+            an order of magnitude below the +1e-3/+5e-3 NLL tolerances any
+            check in this repo applies, so it cannot mask a difference
+            anyone measures.
         marginal_init : bool, optional
             If True, calibrate the intercept of each *unconditional* node
             to its marginal at initialization, instead of zuko's default
@@ -615,11 +634,19 @@ class CausalFlowDAG(nn.Module):
             nothing without VC terms.
         plateau_factor : float, optional
             Multiplier of one per-node plateau decay step, by default 0.3.
-            Read only under ``schedule="plateau"``.
+            Gentler than torch's own ``ReduceLROnPlateau`` (0.1), which
+            matters here because the decay is per node off a noisy per-node
+            validation curve: three 0.3 steps land near one 0.1 step, but a
+            single spurious plateau costs a third of the rate instead of a
+            tenth. Read only under ``schedule="plateau"``.
         vc_oof_fit : dict | None, optional
             Keyword overrides for the stage-1 out-of-fold proxy fits of
             centered VC terms, merged over the default
             ``{"epochs": 300, "learning_rate": 1e-2, "batch_size": 512}``.
+            Nothing in this repo measures those three numbers; they are the
+            pre-0.4 values, kept so centered fits stay comparable. They set
+            the quality of ``e_hat``, which is what the centering buys, so
+            override them if stage 1 underfits.
             Ignored when the treatment node is all-``ls`` — the
             deterministic :meth:`fit_classical` runs instead.
 
@@ -631,7 +658,8 @@ class CausalFlowDAG(nn.Module):
         Raises
         ------
         ValueError
-            If ``schedule`` is neither ``None`` nor ``"plateau"``.
+            If ``epochs`` is not given, or if ``schedule`` is neither
+            ``None`` nor ``"plateau"``.
 
         Notes
         -----
@@ -652,6 +680,13 @@ class CausalFlowDAG(nn.Module):
         validation monitor, and every post-fit query, uses the live
         full-fit treatment node.
         """
+        if epochs is None:
+            raise ValueError(
+                "fit() needs epochs=. There is no default budget: a fixed one "
+                "over-spends on some workloads and under-spends on others "
+                "(docs/training-speed.md). Set a budget, or a generous one "
+                "with schedule='plateau' and freeze_patience= to stop early."
+            )
         if schedule not in (None, "plateau"):
             raise ValueError(f"unknown schedule {schedule!r}")
         if seed is not None:

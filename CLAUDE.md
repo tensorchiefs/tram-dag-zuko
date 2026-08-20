@@ -68,8 +68,11 @@ See `experiments/README.md`.
   `AffineUT`; pre-scaled from train 5%/95% quantiles to [-5,5], expanding-bracket
   bisection inverse) + the ordinal ordered-logit transform
   (`P(Y<=k) = sigmoid(theta_k - shift)`, cutpoints `[t0, t0+cumsum(exp(...))]`).
-- `conditioners.py` — the LS/CS/intercept networks (widths replicate the reference
-  Keras implementation).
+- `conditioners.py` — the LS/CS/intercept networks. Default widths and `relu`
+  replicate the PyTorch reference (`buehlpa/TramDag`, `tram_models.py`:
+  `ComplexShiftDefaultTabular` 64-128-64, `ComplexInterceptDefaultTabular` 8-8,
+  `n_thetas=20`) — **not** the paper's R nets, which every `experiments/paper/`
+  config sets explicitly instead.
 - `utils.py` — the non-modelling helpers, with no module-level imports:
   `config_section` (pick a section out of an already-parsed config and require
   an exact key set, so a missing key cannot become a hidden default — parsing
@@ -128,7 +131,22 @@ Experiments (`experiments/`, seed 42 unless stated, arXiv:2503.16206). The
 paper states only four training numbers — n=40000, 500 epochs, Adam lr 1e-3,
 Bernstein order 20 — and the triangle configs match them; batch size, the
 90/10 split, the chunk size, the VACA/CAREFL protocols and every seed are
-repo choices, labelled as such in each YAML:
+repo choices, labelled as such in each YAML.
+
+**Each config takes its architecture from *its own* reference script**, and the
+reference uses two different ones. The triangle experiments
+(`summerof24/triangle_structured_*.R`): `hidden_features_I = hidden_features_CS`
+= `c(2,25,25,2)` continuous / `c(2,2,2,2)` mixed, **sigmoid** (the ReLU line is
+commented out), `len_theta = 20`. The VACA/CAREFL comparisons
+(`comparison/utils.R::make_model`): one net per node, `dense(10, tanh) ->
+dense(100, tanh) -> dense(len_theta)`, `M = 30`. Applying the triangle net to
+CAREFL — which an earlier revision did — costs a factor of 4 on the
+counterfactual MAE; the 2-unit bottleneck cannot carry it. On `sin-cs` that same
+bottleneck saturates at both ends of the grid, which is the reference
+architecture's capacity and not a fit failure (see the ground-truth note).
+Note also that `n_coeffs` counts *unconstrained* coefficients: zuko ties two
+extra control points on, so `n_coeffs=20` is order 21 where the reference's
+`len_theta=20` is order 19. The free-parameter count is what matches.
 
 - **Paper DGPs**: `triangle` true coefficients β12=+2, β13=−0.2 (+0.3 on x2 for
   `linear`); a fitted `cs` learns −f(x2)+const. `triangle-mixed` cutpoints

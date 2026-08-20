@@ -13,6 +13,10 @@
 #     repository's pre-0.4 script and is kept so the numbers stay comparable
 #     across the restructure.
 
+# The model architecture below IS the reference's: comparison/utils.R's
+# make_model, one net per node, dense(10, tanh) -> dense(100, tanh) ->
+# dense(len_theta). The training protocol is not, as noted above.
+#
 variants:
   # all conditionals complex intercepts; the Laplace noise is additive, so
   # the counterfactual truth is analytic and the errors below are exact
@@ -23,9 +27,13 @@ variants:
     learning_rate: 0.01
     batch_size: 512
     transform: bernstein        # stated rather than inherited
-    n_coeffs: 20                # Bernstein order M
-    intercept_units: [2, 25, 25, 2]   # as the reference's hidden_features_I
-    activation: sigmoid         # as the reference's create_param_net
+    # from the reference comparison script: M = 30, len_theta = M + 1 = 31
+    # unconstrained coefficients. zuko ties two extra control points onto
+    # those to smooth the extrapolation, so the polynomial is order 32 where
+    # the reference's is order 30; the free-parameter count is what matches.
+    n_coeffs: 31
+    intercept_units: [10, 100]  # make_model's two dense layers
+    activation: tanh            # make_model's activation
     chunk_epochs: 50            # each fit call restarts Adam: a warm-restart
                                 # schedule, and it matters (see helpers.py)
     polish_epochs: 100          # second phase at a lower rate

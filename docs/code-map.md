@@ -42,8 +42,12 @@ are the same object, so `LS is linear_shift`.
 
 ## `conditioners.py` — the networks behind the terms
 
-Architectures replicate the original Keras implementation, so fitted models
-stay comparable to it.
+Default architectures replicate the PyTorch reference this package grew out of
+([buehlpa/TramDag](https://github.com/buehlpa/TramDag), `tram_models.py`), so a
+fitted model stays comparable to it. They are **not** the TRAM-DAG paper's nets:
+the paper's R code uses `c(2, 25, 25, 2)` with sigmoid for the triangle
+experiments and a 10-100 tanh net for its CAREFL/VACA comparisons, so each
+config in `experiments/paper/` states `units=` and `activation=` itself.
 
 | Name | Term | Role |
 |---|---|---|
@@ -122,6 +126,8 @@ default you can read at the call site. Nothing numeric is buried.
 | VC stage-1 proxy fits | `fit(vc_oof_fit=)` | `{"epochs": 300, "learning_rate": 1e-2, "batch_size": 512}` |
 | VC penalty and centering | `VC(penalty=, center=, center_folds=)` | 1.0 / False / 5 |
 | L-BFGS budget | `fit_classical(max_iter=, tol=, chunk=, history_size=)` | 400 / 1e-6 / 25 / 50 |
-| network widths | `units=` on `I`/`CS`/`VC` | (8, 8) / (64, 128, 64) / (16,) — Keras-parity architecture defaults |
-| transform basis | `I(transform=, **kwargs)` (extra kwargs go to the transform class) | `"bernstein"`, `n_coeffs=20`; spline `bins=8` (the domain is fixed at [-5, 5], `transforms.BOUND`) |
+| training budget | `fit(epochs=)` | **required** — a fixed default is wrong in both directions ([training-speed](training-speed.md)) |
+| network widths | `units=` on `I`/`CS`/`VC` | (8, 8) / (64, 128, 64) / (16,) — parity with the PyTorch reference's default classes |
+| activation | `activation=` on `I`/`CS`/`VC` | `"relu"` (the reference default classes); `"sigmoid"` and `"tanh"` are the paper's |
+| transform basis | `I(transform=, **kwargs)` (extra kwargs go to the transform class) | `"bernstein"`, `n_coeffs=20` unconstrained coefficients (zuko ties two more control points on, so order 21); spline `bins=8` = zuko's NSF default (the domain is fixed at [-5, 5], `transforms.BOUND`) |
 | shuffling / weight init | `fit(seed=)` / `CausalFlowDAG(seed=)` | init happens at construction — the constructor seed is the reproducibility knob |

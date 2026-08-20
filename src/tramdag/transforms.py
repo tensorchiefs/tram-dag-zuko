@@ -52,6 +52,11 @@ BOUND = 5.0
 # only calibrate each other if they use the same level.
 RANGE_Q = 0.05
 
+# floor on an empirical class frequency, and on the gap between two initial
+# cutpoints, in ordinal_marginal_init_theta. 1e-3 bounds the initial cutpoints
+# at +-logit(1e-3) ~ +-6.9, so an empty class starts implausible but finite.
+_CDF_EPS = 1e-3
+
 # clamp margin of the uniform draw in StandardLogistic. 1e-7 keeps u off 0 and 1
 # at float32 resolution, capping |z| at ~16.1 -- past any latent a fitted shift
 # reaches.
@@ -335,7 +340,8 @@ class SplineUT(_ScaledUT):
     Parameters
     ----------
     bins : int, optional
-        Number of spline bins, by default 8.
+        Number of spline bins, by default 8 — zuko's own NSF default, so a
+        spline node reproduces upstream unless asked otherwise.
     """
 
     def __init__(self, bins: int = 8):
@@ -431,7 +437,7 @@ def ordinal_cutpoints(theta_tilde: Tensor) -> Tensor:
     return torch.cat([neg_inf, first, rest, pos_inf], dim=1)
 
 
-def ordinal_marginal_init_theta(counts, eps: float = 1e-3) -> Tensor:
+def ordinal_marginal_init_theta(counts) -> Tensor:
     """Give the unconstrained cutpoint parameters that match class counts.
 
     The marginal ``P(Y<=k) = sigmoid(cutpoint_k)`` of the result matches
@@ -440,10 +446,8 @@ def ordinal_marginal_init_theta(counts, eps: float = 1e-3) -> Tensor:
     Parameters
     ----------
     counts : array-like
-        Per-class count vector, length K.
-    eps : float, optional
-        Clamp margin for the empirical CDF and the cutpoint differences,
-        by default 1e-3. It guards empty classes.
+        Per-class count vector, length K. An empty class is handled by
+        ``_CDF_EPS``.
 
     Returns
     -------
@@ -463,10 +467,10 @@ def ordinal_marginal_init_theta(counts, eps: float = 1e-3) -> Tensor:
 
     counts = np.asarray(counts, dtype=np.float64)
     p = counts / counts.sum()
-    F = np.clip(np.cumsum(p)[:-1], eps, 1 - eps)  # P(Y<=k), k=0..K-2
+    F = np.clip(np.cumsum(p)[:-1], _CDF_EPS, 1 - _CDF_EPS)  # P(Y<=k), k=0..K-2
     c = np.log(F) - np.log1p(-F)  # logit -> increasing
     c = np.maximum.accumulate(c)  # guard ties (empty classes)
-    diffs = np.maximum(np.diff(c), eps)
+    diffs = np.maximum(np.diff(c), _CDF_EPS)
     tt = np.empty_like(c)
     tt[0] = c[0]
     tt[1:] = np.log(diffs)

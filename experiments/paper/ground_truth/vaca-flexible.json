@@ -1,11 +1,11 @@
 {
-  "_note": "Paper Sec. 5.1-5.2. The interventional means are analytic (E[x3|do(x2=a)] = -0.25 + 0.25a); do(x2=-3) is off-manifold extrapolation, which is why its error is the largest of the three. The flow means carry a wide tolerance on purpose: across shuffle seeds 0-3 this fit spans 0.19 for do(x2=-3), so the entry is the midpoint of that measured range, not one draw.",
+  "_note": "Paper Sec. 5.1-5.2. The interventional means are analytic (E[x3|do(x2=a)] = -0.25 + 0.25a); do(x2=-3) is off-manifold extrapolation, which is why its error is the largest of the three. Measured with the reference implementation's own comparison net (comparison/utils.R::make_model: dense(10, tanh) -> dense(100, tanh)), M = 30. The flow means keep a wide tolerance: across shuffle seeds 0-3 this fit spans 0.19 for do(x2=-3).",
   "val_nll_x3": {
     "value": 1.434114933013916,
     "atol": 0.05
   },
   "mean_x3_flow_do_x2_-3": {
-    "value": -1.2135,
+    "value": -1.037383,
     "atol": 0.1735
   },
   "mean_x3_analytic_do_x2_-3": {
@@ -13,7 +13,7 @@
     "atol": 1e-09
   },
   "mean_x3_abs_err_do_x2_-3": {
-    "max": 0.454965
+    "max": 0.093458
   },
   "mean_x3_flow_do_x2_-1": {
     "value": -0.5605,
@@ -24,7 +24,7 @@
     "atol": 1e-09
   },
   "mean_x3_abs_err_do_x2_-1": {
-    "max": 0.2408
+    "max": 0.032373
   },
   "mean_x3_flow_do_x2_+0": {
     "value": -0.275,
@@ -35,7 +35,7 @@
     "atol": 1e-09
   },
   "mean_x3_abs_err_do_x2_+0": {
-    "max": 0.190148
+    "max": 0.0299
   },
   "std_x1_dgp": {
     "value": 2.068924230638997,
