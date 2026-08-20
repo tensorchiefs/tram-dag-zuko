@@ -288,3 +288,34 @@ def test_vc_modifiers_are_positional_t_is_keyword():
     assert t.parents == ("T", "X2", "X3")  # internal layout: treatment first
     with pytest.raises(ValueError, match="cannot be both"):
         VC("T", t="T")
+
+
+def test_the_0_3_transform_kwargs_spelling_says_what_to_do():
+    """It is swallowed by **kwargs, so without a guard it fails later.
+
+    The unguarded failure is a TypeError from the transform class at flow
+    construction, which names SplineUT rather than the call that is wrong.
+    """
+    for build in (
+        lambda: SI(transform="spline", transform_kwargs={"bins": 6}),
+        lambda: CI("x1", transform="spline", transform_kwargs={"bins": 6}),
+    ):
+        with pytest.raises(TypeError, match="transform_kwargs= is gone"):
+            build()
+
+
+def test_a_pre_0_4_spec_says_it_is_too_old():
+    """0.3 wrote a term's settings as sibling keys, not in "options".
+
+    Without this the loader raises a bare KeyError('options') from inside the
+    comprehension, which does not tell the reader their checkpoint is stale.
+    """
+    old_format = {
+        "x1": {"kind": "continuous", "terms": []},
+        "y": {
+            "kind": "continuous",
+            "terms": [{"effect": "VC", "parents": ["t", "x1"], "penalty": 2.5}],
+        },
+    }
+    with pytest.raises(ValueError, match="predates 0.4"):
+        spec_from_dict(old_format)

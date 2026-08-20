@@ -134,11 +134,12 @@
 - **`Term.slot`** — derived from `effect`, and its only user in the repo
   was a test assertion.
 
-- The `terms=` keyword (use the first positional argument), node-level
-  `ContinuousNode(transform=/transform_kwargs=)` (choose the basis on the
-  intercept term, `I(..., transform="spline")`), the unused
-  `Intercept`/`LinShift`/`CShift` aliases, and the `parents={...}`
-  checkpoint loader.
+- Node-level `ContinuousNode(transform=/transform_kwargs=)` (choose the
+  basis on the intercept term instead, `I(..., transform="spline")`), the
+  unused `Intercept`/`LinShift`/`CShift` aliases, and the `parents={...}`
+  checkpoint loader. The terms argument itself is unchanged and still
+  accepts its name: `ContinuousNode(terms=[...])` and
+  `ContinuousNode([...])` are the same call.
 - The unmaintained notebooks and experiment scripts moved to
   `notebooks/stale/` and `experiments/stale/`; the maintained set is
   the intro and Colab demo notebooks plus `sim_flow.py` and

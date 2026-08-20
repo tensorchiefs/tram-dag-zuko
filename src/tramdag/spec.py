@@ -139,6 +139,25 @@ class Term:
         return NotImplemented
 
 
+def _reject_transform_kwargs(kwargs: dict) -> None:
+    """Catch the 0.3 spelling, which now becomes a bogus transform argument.
+
+    ``transform_kwargs={...}`` used to be a parameter. It is now swallowed by
+    ``**transform_kwargs`` and forwarded to the transform class, which fails
+    much later with a message naming that class rather than the call.
+
+    Raises
+    ------
+    TypeError
+        If a ``transform_kwargs`` keyword is present.
+    """
+    if "transform_kwargs" in kwargs:
+        raise TypeError(
+            "transform_kwargs= is gone: pass the transform's arguments "
+            'directly, for example I("x1", transform="spline", bins=6).'
+        )
+
+
 def simple_intercept(transform: str | None = None, **transform_kwargs) -> Term:
     """Build the simple-intercept baseline term — the paper's SI.
 
@@ -161,6 +180,7 @@ def simple_intercept(transform: str | None = None, **transform_kwargs) -> Term:
     Term
         The intercept term.
     """
+    _reject_transform_kwargs(transform_kwargs)
     kw = tuple(sorted(transform_kwargs.items())) or None
     return Term("I", (), _options(transform=transform, transform_kwargs=kw))
 
@@ -212,6 +232,7 @@ def complex_intercept(
             "complex_intercept() needs at least one parent. The parentless "
             "baseline is simple_intercept() / SI."
         )
+    _reject_transform_kwargs(transform_kwargs)
     kw = tuple(sorted(transform_kwargs.items())) or None
     return Term(
         "I",
@@ -754,6 +775,15 @@ def spec_from_dict(d: dict) -> dict[str, NodeSpec]:
     """
     spec: dict[str, NodeSpec] = {}
     for name, nd in d.items():
+        for t in nd["terms"]:
+            if "options" not in t:
+                # 0.3 wrote each setting as its own key next to "effect"
+                raise ValueError(
+                    f"node '{name}': this spec predates 0.4, whose terms carry "
+                    'their settings in an "options" mapping. Checkpoints and '
+                    "specs written by earlier versions do not load — refit and "
+                    "save again."
+                )
         terms = [
             Term(
                 t["effect"],
