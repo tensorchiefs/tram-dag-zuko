@@ -20,7 +20,6 @@ property needs, and sharing them would couple unrelated acceptance bars.
 import numpy as np
 import pandas as pd
 import pytest
-import torch
 
 from tramdag import CausalFlowDAG, ContinuousNode
 
@@ -159,7 +158,6 @@ def fit_x3_nll():
     """
 
     def _fit(terms, train, val) -> float:
-        torch.manual_seed(0)
         flow = CausalFlowDAG(
             {
                 "x1": ContinuousNode(),

@@ -3,7 +3,7 @@
 
 Reads the tool-call JSON on stdin and exits 2 (block) when the call would:
   * EDIT the measurement — anything under tests/ or data/, or the benchmark
-    harness experiments/bench_training.py; or
+    harness experiments/benchmarks/bench_training.py; or
   * READ the *target values* — test assertions (tests/test_*.py),
     reference numbers (data/**/truth.json, data/**/ref_ls/**), incl. obvious
     shell reads of them.
@@ -41,7 +41,7 @@ ti = event.get("tool_input", {}) or {}
 WRITE_DENY = (
     re.compile(r"(^|/)tests/"),
     re.compile(r"(^|/)data/"),
-    re.compile(r"(^|/)experiments/bench_training\.py$"),
+    re.compile(r"(^|/)experiments/benchmarks/bench_training\.py$"),
 )
 READ_DENY = (
     re.compile(r"(^|/)tests/test_[^/]*\.py$"),

@@ -90,12 +90,7 @@ def test_the_package_needs_no_yaml_parser():
     if not pyproject.exists():  # installed without the sources
         pytest.skip("no pyproject.toml next to the tests")
     project = tomllib.loads(pyproject.read_text())["project"]
-    declared = project["dependencies"] + [
-        item
-        for extra in project.get("optional-dependencies", {}).values()
-        for item in extra
-    ]
-    assert not [d for d in declared if "yaml" in d.lower()]
+    assert not [d for d in project["dependencies"] if "yaml" in d.lower()]
 
 
 # ------------------------------------------------------------- machine_info

@@ -55,8 +55,9 @@ def load_variant(
         The keys the script reads. A config that does not match this set
         exactly is an error: a missing key would otherwise become a hidden
         default, an extra key a silently ignored setting. ``None`` skips the
-        check, for the one case that needs to read a value (the model family)
-        before it knows which keys apply.
+        check, for the two scripts that read a value (the model family) before
+        they know which keys apply — ``triangle`` and ``triangle_mixed``, which
+        then call again with the full set.
 
     Returns
     -------

@@ -228,17 +228,16 @@ def run(variant: str) -> dict:
         f"using the {config['fitter']} fitter ..."
     )
 
-    spec = build_spec(config)
-    # the design matrix comes from the flow, so both fits see the same encoding
-    design = CausalFlowDAG(spec, seed=config["init_seed"]).design_matrix(
-        observed, "mRS_3m", drop_first=True
-    )
+    flow = fit_flow(build_spec(config), observed, config)
+    flow.save(out / "flow.pt")
+
+    # the design matrix comes from the flow, so both fits see the same encoding.
+    # It reads no parameter -- only the parent encoding -- so the fitted flow
+    # answers it as well as a fresh one would.
+    design = flow.design_matrix(observed, "mRS_3m", drop_first=True)
     statsmodels_result = OrderedModel(
         observed["mRS_3m"].astype(int), design, distr="logit"
     ).fit(method="bfgs", disp=False)
-
-    flow = fit_flow(spec, observed, config)
-    flow.save(out / "flow.pt")
 
     metrics, rows = compare_coefficients(flow, statsmodels_result, reference)
     print(f"\n{'coefficient':<22}{'flow':>10}{'statsmodels':>13}{'|diff|':>9}")

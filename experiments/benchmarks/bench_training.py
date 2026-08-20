@@ -367,7 +367,7 @@ def main():
                 t,
                 np.maximum(gap, 1e-5),
                 lw=1.4,
-                color=sched_color.get(sched, "C9"),
+                color=sched_color[sched],
                 ls="-" if b == "b512" else ":",
                 label=label,
             )

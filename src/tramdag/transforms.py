@@ -264,9 +264,7 @@ class _ScaledUT(torch.nn.Module):
         T = self._build(theta)
         B = torch.tensor(self.bound, dtype=z0.dtype, device=z0.device)
         with torch.no_grad():
-            t = _expanding_bisection(
-                T, z0, -B.expand_as(z0).clone(), B.expand_as(z0).clone()
-            )
+            t = _expanding_bisection(T, z0, -B.expand_as(z0), B.expand_as(z0))
         return self._unscale(t)
 
 
