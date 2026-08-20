@@ -56,8 +56,9 @@ def fit_with_snapshots(
 
     Fitting in pieces of ``chunk_epochs`` epochs is what produces the
     coefficient-against-epoch trajectories of paper Fig. 14, 15 and 19.
-    Consecutive ``fit`` calls continue from the current weights, so the
-    trajectory is one training run, not several.
+    Consecutive ``fit`` calls continue from the current **weights** but not
+    from the optimizer state, which is what makes the chunk size matter (see
+    ``chunk_epochs``).
 
     Parameters
     ----------

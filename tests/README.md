@@ -38,8 +38,8 @@ Five kinds of test, in rough order of how much trust they carry:
    an all-`ls` model *is* a classical transformation model, so it must match
    software written by other people in other languages.
    - vs. **`statsmodels`** `OrderedModel` (computed at test time):
-     `test_all_ls_flow_is_exact_mle`, `test_ls_node_equals_proportional_odds`,
-     `test_matches_statsmodels_mle`;
+     `test_ls_node_equals_proportional_odds`, `test_matches_statsmodels_mle`,
+     `test_plateau_freeze_preserves_exact_mle`;
    - the two optimizers agree on the same optimum: `test_agrees_with_adam_mle`.
 
 3. **Known-truth recovery** — because the inline DGPs (see `conftest.py`) *are*
@@ -67,7 +67,7 @@ Five kinds of test, in rough order of how much trust they carry:
    - schedules/freezing don't break the exact-MLE property
      (`test_plateau_freeze_preserves_exact_mle`);
    - DAG validation catches cycles and orders correctly
-     (`test_cycle_detection`, `test_topological_order`).
+     (`test_cycle_detected`, `test_topological_order`).
 
 ## How the ground truth is obtained
 

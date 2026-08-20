@@ -37,7 +37,7 @@ HERE = Path(__file__).resolve().parent
 AREAS = ("paper", "misc")
 
 
-def compare(area: str, name: str) -> tuple[list[str], list[str]]:
+def compare(area: str, name: str) -> tuple[list[str], list[str], list[str]]:
     """Compare one result directory against its ground truth.
 
     Parameters
@@ -49,8 +49,9 @@ def compare(area: str, name: str) -> tuple[list[str], list[str]]:
 
     Returns
     -------
-    tuple[list[str], list[str]]
-        The failure lines and the informational lines.
+    tuple[list[str], list[str], list[str]]
+        The failures, the metrics that passed, and the metrics with no
+        ground-truth entry.
 
     Raises
     ------
@@ -70,12 +71,16 @@ def compare(area: str, name: str) -> tuple[list[str], list[str]]:
     metrics = json.loads(metrics_path.read_text())
     truth = json.loads(truth_path.read_text())
 
-    failures, notes = [], []
+    failures, notes, unchecked = [], [], []
     for metric, expected in truth.items():
         if metric.startswith("_"):
             continue  # a note for the reader, not a metric
         if metric not in metrics:
-            failures.append(f"{metric}: the run produced no such metric")
+            failures.append(
+                f"{metric}: the run produced no such metric. Either the "
+                f"experiment stopped computing it, or the entry belongs in "
+                f"neither {area}/ground_truth/{name}.json nor the run."
+            )
             continue
         measured = metrics[metric]
         if "max" in expected:
@@ -100,15 +105,17 @@ def compare(area: str, name: str) -> tuple[list[str], list[str]]:
             notes.append(f"{metric}: {measured:+.4f} (within {expected['atol']})")
     for metric in metrics:
         if metric not in truth:
-            notes.append(f"{metric}: {metrics[metric]} (not checked)")
-    return failures, notes
+            unchecked.append(f"{metric}: {metrics[metric]}")
+    return failures, notes, unchecked
 
 
 def main(area: str, name: str) -> int:
     """Print the comparison and give the process exit code."""
-    failures, notes = compare(area, name)
+    failures, notes, unchecked = compare(area, name)
     for note in notes:
         print(f"  ok   {note}")
+    for item in unchecked:
+        print(f"  --   {item} (no ground-truth entry)")
     for failure in failures:
         print(f"  FAIL {failure}")
     if failures:

@@ -12,7 +12,6 @@ What it guarantees:
 """
 
 import math
-from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -22,8 +21,6 @@ import torch
 from tramdag import LS, CausalFlowDAG, ContinuousNode, I, OrdinalNode
 from tramdag.conditioners import ComplexIntercept, SimpleIntercept
 from tramdag.transforms import BernsteinUT, ordinal_marginal_init_theta, ordinal_pmf
-
-DATA = Path(__file__).resolve().parents[1] / "data"
 
 
 # ------------------------------------------------------------------ fast
@@ -107,11 +104,11 @@ def test_marginal_init_off_by_default_leaves_roots_at_zero():
 
 # ------------------------------------------------------------------ slow
 @pytest.mark.slow
-def test_marginal_init_is_pure_init_same_optimum():
+def test_marginal_init_is_pure_init_same_optimum(ls_chain):
     """A marginal-init fit and a default fit converge to the same NLL — proving
     it only moves the starting point, not the optimum.
     """
-    obs = pd.read_csv(DATA / "vaca" / "obs.csv")[["x1", "x2"]]
+    obs = ls_chain["draw"](5000, 11)[["x1", "x2"]]
     spec = {"x1": ContinuousNode(), "x2": ContinuousNode([LS("x1")])}
 
     def converged_nll(marginal_init):

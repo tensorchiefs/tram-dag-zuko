@@ -15,7 +15,7 @@
 # # Additive vs joint complex intercept — interpreting per-parent effects
 #
 # A node whose transform parameters depend on its parents (a **complex
-# intercept**, `I`) can group those parents two ways:
+# intercept**, `CI`) can group those parents two ways:
 #
 # - **joint** — `CI("x1", "x2")`: *one* network over both parents. It can
 #   represent **interactions** (the effect of `x1` may depend on `x2`), but the
@@ -48,9 +48,6 @@ import pandas as pd
 import torch
 
 from tramdag import CI, CausalFlowDAG, ContinuousNode
-
-torch.manual_seed(0)
-
 
 # %% [markdown]
 # ## The data

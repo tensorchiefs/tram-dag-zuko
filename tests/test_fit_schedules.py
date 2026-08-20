@@ -66,7 +66,7 @@ def test_freeze_stops_early_and_records(ls_chain):
         assert 1 <= ep <= n_epochs
 
 
-def test_frozen_node_parameters_stop_moving(ls_chain):
+def test_a_fresh_fit_call_unfreezes(ls_chain):
     df = ls_chain["draw"](800, 2)[["x1", "x2"]]
     torch.manual_seed(0)
     flow = CausalFlowDAG(_two_node_spec())

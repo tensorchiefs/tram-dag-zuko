@@ -108,12 +108,14 @@ class _Node(nn.Module):
         self.parents = tuple(node_parents(node))  # ordered parent names
         i_term = next((t for t in terms if t.effect == "I" and t.parents), None)
         if i_term is None:
-            i_groups, i_units = [], []
+            i_groups, i_units, i_acts = [], [], []
         elif i_term.allow_interaction:
-            i_groups, i_units = [tuple(i_term.parents)], [i_term.units]
+            i_groups = [tuple(i_term.parents)]
+            i_units, i_acts = [i_term.units], [i_term.activation]
         else:  # additive intercept: one net per parent, coefficients summed
             i_groups = [(p,) for p in i_term.parents]
             i_units = [i_term.units] * len(i_groups)
+            i_acts = [i_term.activation] * len(i_groups)
         self._intercept_groups = i_groups
         self.ci_parents = [
             p for grp in i_groups for p in grp
@@ -134,21 +136,27 @@ class _Node(nn.Module):
 
         # intercept: no I-terms -> free SimpleIntercept theta_0; one I-term (single
         # or joint multi-parent) -> one ComplexIntercept IS theta (unchanged); two+
-        # separate I-terms -> additive CI: one net per term summed in unconstrained
+        # one I-term with allow_interaction=False -> one net per parent, their
+        # outputs summed in unconstrained
         # coefficient space (each parent reshapes the transform independently).
         if not i_groups:
             self.intercept = SimpleIntercept(n_params)
             self.intercept_nets = None
         elif len(i_groups) == 1:
             self.intercept = ComplexIntercept(
-                sum(width(p) for p in i_groups[0]), n_params, units=i_units[0]
+                sum(width(p) for p in i_groups[0]),
+                n_params,
+                units=i_units[0],
+                activation=i_acts[0],
             )
             self.intercept_nets = None
         else:
             self.intercept = None
             self.intercept_nets = nn.ModuleList(
-                ComplexIntercept(sum(width(p) for p in grp), n_params, units=u)
-                for grp, u in zip(i_groups, i_units, strict=True)
+                ComplexIntercept(
+                    sum(width(p) for p in grp), n_params, units=u, activation=a
+                )
+                for grp, u, a in zip(i_groups, i_units, i_acts, strict=True)
             )
 
         # shift terms: one network per term, over the term's (possibly joint)
@@ -167,6 +175,7 @@ class _Node(nn.Module):
                     sum(width(p) for p in mods),
                     penalty=term.penalty,
                     units=term.units,
+                    activation=term.activation,
                 )
                 self._vc_groups.append(
                     _VCGroup(
@@ -186,7 +195,9 @@ class _Node(nn.Module):
             self.shifts[key] = (
                 LinearShift(feat_width)
                 if term.effect == "LS"
-                else ComplexShift(feat_width, units=term.units)
+                else ComplexShift(
+                    feat_width, units=term.units, activation=term.activation
+                )
             )
             self._shift_groups.append((key, ps))
 
@@ -621,7 +632,7 @@ class CausalFlowDAG(nn.Module):
         Raises
         ------
         ValueError
-            If ``schedule`` is not one of the four options.
+            If ``schedule`` is neither ``None`` nor ``"plateau"``.
 
         Notes
         -----
@@ -1033,7 +1044,7 @@ class CausalFlowDAG(nn.Module):
             if len(vcs) > 1:
                 raise ValueError(
                     f"node {node!r} has several VC terms ({sorted(vcs)}). "
-                    "Pass on=<treatment name>."
+                    "Pass t=<treatment name>."
                 )
             t = next(iter(vcs))
         if t not in vcs:
@@ -1337,7 +1348,7 @@ class CausalFlowDAG(nn.Module):
         drifting along near-zero-curvature valleys long after the
         likelihood and the well-identified coefficients reach the MLE.
         Correctness is therefore verified by comparison to classical
-        software (see ``experiments/validate_ls.py``), not by this flag.
+        software (see ``experiments/misc/validate_ls.py``), not by this flag.
         """
         if not self._is_all_ls():
             raise ValueError(
@@ -1598,9 +1609,7 @@ class CausalFlowDAG(nn.Module):
 
     # ------------------------------------------------------------------ scores
     @torch.no_grad()
-    def scores(
-        self, df: pd.DataFrame, node: str, params: str = "shift"
-    ) -> pd.DataFrame:
+    def scores(self, df: pd.DataFrame, node: str) -> pd.DataFrame:
         """Give the per-observation scores ``psi_i = d l_i / d theta``.
 
         The scores belong to the interpretable shift coefficients of a node
@@ -1621,23 +1630,13 @@ class CausalFlowDAG(nn.Module):
             propensity inputs of centered VC terms.
         node : str
             Name of the node whose coefficients are scored.
-        params : str, optional
-            ``"shift"`` is the only option. It covers every ``LS`` weight
-            and the ``beta0`` of every ``VC`` term.
 
         Returns
         -------
         pd.DataFrame
             One column per coefficient, one row per observation. See
             :func:`tramdag.scores.node_scores` for the column naming.
-
-        Raises
-        ------
-        ValueError
-            If ``params`` is not ``"shift"``.
         """
-        if params != "shift":
-            raise ValueError(f"params='shift' is the only option, got {params!r}.")
         from .scores import node_scores
 
         return node_scores(self, df, node)

@@ -29,7 +29,6 @@ import json
 from pathlib import Path
 
 import pandas as pd
-import torch
 from common import (
     load_variant,
     make_output_dir,
@@ -212,7 +211,6 @@ def run(variant: str) -> dict:
         observed["mRS_3m"].astype(int), design, distr="logit"
     ).fit(method="bfgs", disp=False)
 
-    torch.manual_seed(config["init_seed"])
     flow = fit_flow(spec, observed, config)
     flow.save(out / "flow.pt")
 

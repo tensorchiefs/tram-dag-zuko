@@ -52,7 +52,7 @@ What ``h`` looks like per transformation, for a continuous ``x3``:
 ``[I("X1", "X2")]``                      ``h_theta(x1,x2)(x3)``  (joint)
 ``[I("X1","X2", allow_interaction=       ``h_theta(x1)+theta(x2)(x3)``  (additive:
 False)]``                                one net per parent, summed coefficients)
-``[I, CS("X1"), VC("T", "X2")]``         ``h_theta(x3) + g_1(x1) + beta(x2)*t``
+``[I, CS("X1"), VC("X2", t="T")]``       ``h_theta(x3) + g_1(x1) + beta(x2)*t``
 ======================================== =======================================
 
 Each parent enters through exactly one *edge-owning* term (I/LS/CS parents, and
@@ -77,6 +77,7 @@ _OPTION_DEFAULTS = {
     "transform": None,  # I: basis of the monotone transform
     "transform_kwargs": None,  # I: kwargs of the basis, as sorted pairs
     "units": None,  # I/CS/VC: hidden layers of the term's network
+    "activation": None,  # I/CS/VC: hidden activation of that network
     "allow_interaction": True,  # I: one joint net, or one net per parent
 }
 
@@ -139,25 +140,6 @@ class Term:
         return NotImplemented
 
 
-def _reject_transform_kwargs(kwargs: dict) -> None:
-    """Catch the 0.3 spelling, which now becomes a bogus transform argument.
-
-    ``transform_kwargs={...}`` used to be a parameter. It is now swallowed by
-    ``**transform_kwargs`` and forwarded to the transform class, which fails
-    much later with a message naming that class rather than the call.
-
-    Raises
-    ------
-    TypeError
-        If a ``transform_kwargs`` keyword is present.
-    """
-    if "transform_kwargs" in kwargs:
-        raise TypeError(
-            "transform_kwargs= is gone: pass the transform's arguments "
-            'directly, for example I("x1", transform="spline", bins=6).'
-        )
-
-
 def simple_intercept(transform: str | None = None, **transform_kwargs) -> Term:
     """Build the simple-intercept baseline term — the paper's SI.
 
@@ -180,7 +162,6 @@ def simple_intercept(transform: str | None = None, **transform_kwargs) -> Term:
     Term
         The intercept term.
     """
-    _reject_transform_kwargs(transform_kwargs)
     kw = tuple(sorted(transform_kwargs.items())) or None
     return Term("I", (), _options(transform=transform, transform_kwargs=kw))
 
@@ -189,6 +170,7 @@ def complex_intercept(
     *parents: str,
     allow_interaction: bool = True,
     units: list[int] | tuple[int, ...] | None = None,
+    activation: str | None = None,
     transform: str | None = None,
     **transform_kwargs,
 ) -> Term:
@@ -232,7 +214,6 @@ def complex_intercept(
             "complex_intercept() needs at least one parent. The parentless "
             "baseline is simple_intercept() / SI."
         )
-    _reject_transform_kwargs(transform_kwargs)
     kw = tuple(sorted(transform_kwargs.items())) or None
     return Term(
         "I",
@@ -241,6 +222,7 @@ def complex_intercept(
             transform=transform,
             transform_kwargs=kw,
             units=tuple(units) if units is not None else None,
+            activation=activation,
             allow_interaction=bool(allow_interaction) or len(parents) < 2,
         ),
     )
@@ -298,7 +280,9 @@ def linear_shift(*parents: str) -> Term:
 
 
 def complex_shift(
-    *parents: str, units: list[int] | tuple[int, ...] | None = None
+    *parents: str,
+    units: list[int] | tuple[int, ...] | None = None,
+    activation: str | None = None,
 ) -> Term:
     """Build a complex-shift term: an additive MLP ``g(x)``.
 
@@ -325,7 +309,14 @@ def complex_shift(
     """
     if not parents:
         raise ValueError("CS() needs at least one parent.")
-    return Term("CS", tuple(parents), _options(units=tuple(units) if units else None))
+    return Term(
+        "CS",
+        tuple(parents),
+        _options(
+            units=tuple(units) if units else None,
+            activation=activation,
+        ),
+    )
 
 
 def varying_coefficient(
@@ -335,6 +326,7 @@ def varying_coefficient(
     center: bool = False,
     center_folds: int = 5,
     units: list[int] | tuple[int, ...] | None = None,
+    activation: str | None = None,
 ) -> Term:
     """Build a varying-coefficient shift term ``beta(modifiers) * x_t``.
 
@@ -425,6 +417,7 @@ def varying_coefficient(
             center=center,
             center_folds=int(center_folds),
             units=tuple(units) if units else None,
+            activation=activation,
         ),
     )
 
@@ -473,6 +466,9 @@ def _normalize_terms(value):
     return [_as_term(element) for element in items]
 
 
+DEFAULT_TRANSFORM = "bernstein"
+
+
 def _check_intercepts(terms, *, ordinal: bool):
     """Validate the intercept slot and read the basis choice off it.
 
@@ -508,20 +504,25 @@ def _check_intercepts(terms, *, ordinal: bool):
             + ", ".join(repr(p) for t in parented for p in t.parents)
             + ", allow_interaction=False)."
         )
-    carriers = [t for t in i_terms if t.transform]
+    # a term that only passes basis arguments is a carrier too — otherwise
+    # SI(n_coeffs=40) would be silently ignored and the default used
+    carriers = [t for t in i_terms if t.transform or t.transform_kwargs]
     if len(carriers) > 1:
         raise ValueError(
-            "only one I term per node may set transform=, got "
-            f"{[t.transform for t in carriers]}."
+            "only one I term per node may configure the transform, got "
+            f"{[(t.transform, t.transform_kwargs) for t in carriers]}."
         )
     if carriers and ordinal:
         raise ValueError(
             "I(transform=...) is for continuous nodes. An ordinal node's "
             "intercept is the cutpoint vector, it has no basis to choose."
         )
-    if carriers:
-        return carriers[0].transform, dict(carriers[0].transform_kwargs or ())
-    return "bernstein", {}
+    if not carriers:
+        return DEFAULT_TRANSFORM, {}
+    # the arguments go straight to the transform class; if they are wrong,
+    # that class says so — this layer does not second-guess it
+    name = carriers[0].transform or DEFAULT_TRANSFORM
+    return name, dict(carriers[0].transform_kwargs or ())
 
 
 class ContinuousNode:

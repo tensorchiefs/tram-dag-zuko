@@ -7,6 +7,12 @@
 # main experiments (App. C.2), with no numbers, so every value below is this
 # repository's choice, carried over unchanged from the pre-0.4 script.
 
+#   * the reference implementation's own CAREFL comparison
+#     (comparison/carefl_fig5.r) used M = 30, 7000 epochs and nTrain = 2500 —
+#     a different protocol from the one below, which comes from this
+#     repository's pre-0.4 script and is kept so the numbers stay comparable
+#     across the restructure.
+
 variants:
   # all conditionals complex intercepts; the Laplace noise is additive, so
   # the counterfactual truth is analytic and the errors below are exact
@@ -16,6 +22,10 @@ variants:
     epochs: 300
     learning_rate: 0.01
     batch_size: 512
+    transform: bernstein        # stated rather than inherited
+    n_coeffs: 20                # Bernstein order M
+    intercept_units: [2, 25, 25, 2]   # as the reference's hidden_features_I
+    activation: sigmoid         # as the reference's create_param_net
     chunk_epochs: 50            # each fit call restarts Adam: a warm-restart
                                 # schedule, and it matters (see helpers.py)
     polish_epochs: 100          # second phase at a lower rate

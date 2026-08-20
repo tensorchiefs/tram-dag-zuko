@@ -37,10 +37,14 @@ from paper.helpers import (
     split_train_val,
 )
 from paper.simulations.vaca import DO_X2_VALUES, VacaTriangle
-from tramdag import ContinuousNode, I
+from tramdag import CI, SI, ContinuousNode
 
 CONFIG_KEYS = {
     "n_train",
+    "transform",
+    "n_coeffs",
+    "intercept_units",
+    "activation",
     "n_val",
     "epochs",
     "chunk_epochs",
@@ -58,12 +62,18 @@ CONFIG_KEYS = {
 }
 
 
-def build_spec() -> dict:
-    """Give the all-complex-intercept spec: every conditional fully flexible."""
+def build_spec(config: dict) -> dict:
+    """Give the all-complex-intercept spec: every conditional fully flexible.
+
+    Every network and transform setting comes from the config, so nothing is
+    inherited from a framework default.
+    """
+    basis = dict(transform=config["transform"], n_coeffs=config["n_coeffs"])
+    net = dict(units=config["intercept_units"], activation=config["activation"])
     return {
-        "x1": ContinuousNode(),
-        "x2": ContinuousNode([I("x1")]),
-        "x3": ContinuousNode([I("x1", "x2")]),
+        "x1": ContinuousNode([SI(**basis)]),
+        "x2": ContinuousNode([CI("x1", **basis, **net)]),
+        "x3": ContinuousNode([CI("x1", "x2", **basis, **net)]),
     }
 
 
@@ -156,7 +166,7 @@ def run(variant: str) -> dict:
         f"{config['polish_epochs']} at lr {config['polish_learning_rate']:g} ..."
     )
     flow, _ = fit_with_snapshots(
-        build_spec(),
+        build_spec(config),
         train,
         val,
         epochs=config["epochs"],

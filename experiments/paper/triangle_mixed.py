@@ -43,11 +43,13 @@ from paper.helpers import (
     split_train_val,
 )
 from paper.simulations.triangle import TriangleMixed
-from tramdag import CS, LS, ContinuousNode, OrdinalNode
+from tramdag import CS, LS, SI, ContinuousNode, OrdinalNode
 
 CONFIG_KEYS = {
     "f",
     "shift",
+    "transform",
+    "n_coeffs",
     "n_train",
     "n_val",
     "epochs",
@@ -71,26 +73,36 @@ CONFIG_KEYS = {
     "cf_draws",
     "cf_seed",
 }
+# only a complex shift has a network to configure
+MLP_KEYS = {"shift_units", "activation"}
 
 
-def build_spec(shift: str, levels: int) -> dict:
+def build_spec(config: dict) -> dict:
     """Give the DAG spec with an ordinal x3.
+
+    Every network and transform setting comes from the config, so the
+    architecture is visible in one file. The ordinal node has no monotone
+    basis — its intercept is the cutpoint vector.
 
     Raises
     ------
     ValueError
         If ``shift`` is neither ``"ls"`` nor ``"cs"``.
     """
+    shift = config["shift"]
     if shift == "ls":
         x2_to_x3 = LS("x2")
     elif shift == "cs":
-        x2_to_x3 = CS("x2")
+        x2_to_x3 = CS(
+            "x2", units=config["shift_units"], activation=config["activation"]
+        )
     else:
         raise ValueError(f"shift must be 'ls' or 'cs', got '{shift}'")
+    basis = dict(transform=config["transform"], n_coeffs=config["n_coeffs"])
     return {
-        "x1": ContinuousNode(),
-        "x2": ContinuousNode([LS("x1")]),
-        "x3": OrdinalNode(levels, [LS("x1"), x2_to_x3]),
+        "x1": ContinuousNode([SI(**basis)]),
+        "x2": ContinuousNode([SI(**basis), LS("x1")]),
+        "x3": OrdinalNode(config["levels"], [LS("x1"), x2_to_x3]),
     }
 
 
@@ -221,7 +233,10 @@ def plot_counterfactual_pmfs(flow_pmf, analytic, path, title):
 
 def run(variant: str) -> dict:
     """Run one variant end to end and give its metrics."""
-    config = load_variant(__file__, variant, CONFIG_KEYS)
+    # an ls variant has no network, so its key set is smaller: read, then check
+    config = load_variant(__file__, variant)
+    keys = CONFIG_KEYS | (MLP_KEYS if config["shift"] == "cs" else set())
+    config = load_variant(__file__, variant, keys)
     out = make_output_dir(__file__, f"triangle-mixed-{variant}")
     figures = []
 
@@ -234,7 +249,7 @@ def run(variant: str) -> dict:
         f"on n={len(train)} for {config['epochs']} epochs ..."
     )
     flow, trajectory = fit_with_snapshots(
-        build_spec(config["shift"], config["levels"]),
+        build_spec(config),
         train,
         val,
         epochs=config["epochs"],

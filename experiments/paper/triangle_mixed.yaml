@@ -3,9 +3,15 @@
 # Every value the script uses is in this file: it reads no defaults of its
 # own and rejects a variant whose keys do not match exactly.
 
-# As triangle.yaml: the paper (App. C.4) states 40000 samples, 500 epochs and
-# Adam at lr 0.001. The cutpoints of the ordinal node, the batch size, the
-# split, the chunk size and the seeds are this repository's choices.
+# Provenance, from two sources:
+#   * the paper (App. C.4) states 40000 samples, 500 epochs, Adam at lr 0.001;
+#   * the paper's own implementation
+#     (tensorchiefs/tram-dag, summerof24/triangle_structured_mixed.R) adds
+#     hidden_features_CS = c(2, 2, 2, 2), sigmoid activations, len_theta = 20,
+#     and the ordinal cutpoints theta_k = c(-2, 0.42, 1.02) that this
+#     repository's generator reproduces exactly.
+# The batch size, the split, the chunk size and the seeds are this
+# repository's choices.
 
 paper_protocol: &paper_protocol
   # from the paper: n = 40000 (split 90/10 below), 500 epochs, Adam at lr 1e-3
@@ -15,6 +21,9 @@ paper_protocol: &paper_protocol
   learning_rate: 0.001
   batch_size: 512
   chunk_epochs: 10        # epochs per fit call; snapshots ride on the boundaries
+  # the continuous nodes' transform, stated rather than inherited
+  transform: bernstein    # from the paper: Bernstein polynomials
+  n_coeffs: 20            # from the reference implementation: len_theta = 20
   dgp_seed: 42            # the paper's generator seed
   init_seed: 7            # flow weight initialization
   shuffle_seed: 0         # minibatch shuffling
@@ -32,6 +41,12 @@ paper_protocol: &paper_protocol
   cf_draws: 200                # abduction draws averaged into a per-row PMF
   cf_seed: 1000
 
+# the shift network, from the reference implementation; only a complex-shift
+# variant has one, so these keys appear only there
+reference_net: &reference_net
+  shift_units: [2, 2, 2, 2]     # hidden_features_CS in the reference
+  activation: sigmoid           # create_param_net's activation
+
 variants:
   # the paper's headline mixed case (Fig. 9/19 + the C.4 odds-ratio check);
   # the only variant with a true beta23 (+0.3 in the flow's convention)
@@ -42,6 +57,6 @@ variants:
 
   # a nonlinear f on the ordinal node: the complex shift must recover -f(x2)
   exp-cs:
-    <<: *paper_protocol
+    <<: [*paper_protocol, *reference_net]
     f: exp
     shift: cs

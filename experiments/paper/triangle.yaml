@@ -1,15 +1,19 @@
 # Hyperparameters of the continuous-triangle replication (triangle.py).
 #
-# Every value the script uses is in this file: it reads no defaults of its
-# own and rejects a variant whose keys do not match exactly. The shared
-# block is written once and merged into each variant with YAML's << key,
-# so what a run uses stays readable at the point of use.
-
-# Provenance matters here. The paper (App. C.3.1) states exactly four numbers:
-# 40000 samples, 500 epochs, Adam at lr 0.001, Bernstein order M = 20 (the
-# framework default). Everything else below — the batch size, the 90/10 split,
-# the chunk size and every seed — is this repository's choice, carried over
-# from the pre-0.4 scripts so the numbers stay comparable.
+# Every value the script uses is in this file. It reads no defaults of its own,
+# and the loader rejects a variant whose keys do not match what the script
+# declares — so nothing can be silently inherited from the framework.
+#
+# Provenance, from two sources:
+#   * the paper (App. C.3.1) states 40000 samples, 500 epochs, Adam at lr 0.001
+#     and Bernstein order M = 20;
+#   * the paper's own implementation
+#     (tensorchiefs/tram-dag, summerof24/triangle_structured_continous.R) adds
+#     hidden_features_CS = c(2, 25, 25, 2) and, in create_param_net, sigmoid
+#     activations — its ReLU line is commented out.
+# Everything else — the batch size, the 90/10 split, the chunk size and every
+# seed — is this repository's choice, carried over from the pre-0.4 scripts so
+# the numbers stay comparable.
 
 paper_protocol: &paper_protocol
   # from the paper: n = 40000 (split 90/10 below), 500 epochs, Adam at lr 1e-3
@@ -19,6 +23,9 @@ paper_protocol: &paper_protocol
   learning_rate: 0.001
   batch_size: 512
   chunk_epochs: 10        # epochs per fit call; snapshots ride on the boundaries
+  # the monotone transform, stated rather than inherited
+  transform: bernstein    # from the paper: Bernstein polynomials
+  n_coeffs: 20            # from the paper: order M = 20
   dgp_seed: 42            # the paper's generator seed
   init_seed: 7            # flow weight initialization
   shuffle_seed: 0         # minibatch shuffling
@@ -28,6 +35,13 @@ paper_protocol: &paper_protocol
   grid_low: -1.0          # x2 grid of the complex-shift overlay (Fig. 7 right)
   grid_high: 1.0
   grid_points: 81
+
+# the shift network, from the reference implementation. Only a complex-shift
+# variant has a network, so these keys appear only there — an ls variant that
+# carried them would be claiming a setting it never uses.
+reference_net: &reference_net
+  shift_units: [2, 25, 25, 2]   # hidden_features_CS in the reference
+  activation: sigmoid           # create_param_net's activation
 
 variants:
   # the linear DGP is the only one with a true beta23 (+0.3) to recover
@@ -40,18 +54,18 @@ variants:
   # effect is linear, but it is fitted with a complex shift, which must
   # recover that straight line instead of bending to noise
   linear-cs:
-    <<: *paper_protocol
+    <<: [*paper_protocol, *reference_net]
     f: linear
     shift: cs
 
   # the headline complex-shift experiment (Fig. 7/15/16)
   atan-cs:
-    <<: *paper_protocol
+    <<: [*paper_protocol, *reference_net]
     f: atan
     shift: cs
 
   # a second nonlinear f, to show the shift recovery is not atan-specific
   sin-cs:
-    <<: *paper_protocol
+    <<: [*paper_protocol, *reference_net]
     f: sin
     shift: cs

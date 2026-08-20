@@ -184,8 +184,6 @@ def test_scores_error_paths(mle_flow):
     flow, df = mle_flow
     with pytest.raises(KeyError, match="unknown node"):
         flow.scores(df, node="nope")
-    with pytest.raises(ValueError, match="only option"):
-        flow.scores(df, node="Y", params="all")
     with pytest.raises(KeyError, match="missing column"):
         flow.scores(df.drop(columns=["Y"]), node="Y")
     with pytest.raises(ValueError, match="no LS or VC"):

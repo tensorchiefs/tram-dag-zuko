@@ -37,10 +37,14 @@ from paper.helpers import (
     split_train_val,
 )
 from paper.simulations.carefl import ALPHA_GRID, X_OBS, Carefl4
-from tramdag import ContinuousNode, I
+from tramdag import CI, SI, ContinuousNode
 
 CONFIG_KEYS = {
     "n_train",
+    "transform",
+    "n_coeffs",
+    "intercept_units",
+    "activation",
     "n_val",
     "epochs",
     "chunk_epochs",
@@ -57,13 +61,19 @@ CONFIG_KEYS = {
 }
 
 
-def build_spec() -> dict:
-    """Give the all-complex-intercept spec of the 4-variable SCM."""
+def build_spec(config: dict) -> dict:
+    """Give the all-complex-intercept spec of the 4-variable SCM.
+
+    Every network and transform setting comes from the config, so nothing is
+    inherited from a framework default.
+    """
+    basis = dict(transform=config["transform"], n_coeffs=config["n_coeffs"])
+    net = dict(units=config["intercept_units"], activation=config["activation"])
     return {
-        "x1": ContinuousNode(),
-        "x2": ContinuousNode(),
-        "x3": ContinuousNode([I("x1", "x2")]),
-        "x4": ContinuousNode([I("x1", "x2")]),
+        "x1": ContinuousNode([SI(**basis)]),
+        "x2": ContinuousNode([SI(**basis)]),
+        "x3": ContinuousNode([CI("x1", "x2", **basis, **net)]),
+        "x4": ContinuousNode([CI("x1", "x2", **basis, **net)]),
     }
 
 
@@ -146,7 +156,7 @@ def run(variant: str) -> dict:
         f"{config['polish_epochs']} at lr {config['polish_learning_rate']:g} ..."
     )
     flow, _ = fit_with_snapshots(
-        build_spec(),
+        build_spec(config),
         train,
         val,
         epochs=config["epochs"],

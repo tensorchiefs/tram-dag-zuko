@@ -71,7 +71,8 @@ def simulate(n, seed):
     x1, x2, x3 = (rng.normal(size=n) for _ in range(3))
     t = (rng.logistic(size=n) > -(0.4 * x1 + 0.4 * x2)).astype(float)
     g = 0.5 * x1**2 + x2 - 0.5 * x3
-    y = (rng.logistic(size=n) - g - (B0 + B2 * x2 + B3 * x3) * t) / 2.0
+    beta = B0 + B2 * x2 + B3 * x3  # the same expression true_beta reports
+    y = (rng.logistic(size=n) - g - beta * t) / 2.0
     return pd.DataFrame({"X1": x1, "X2": x2, "X3": x3, "T": t, "Y": y})
 
 

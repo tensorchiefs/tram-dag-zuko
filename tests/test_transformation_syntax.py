@@ -290,20 +290,6 @@ def test_vc_modifiers_are_positional_t_is_keyword():
         VC("T", t="T")
 
 
-def test_the_0_3_transform_kwargs_spelling_says_what_to_do():
-    """It is swallowed by **kwargs, so without a guard it fails later.
-
-    The unguarded failure is a TypeError from the transform class at flow
-    construction, which names SplineUT rather than the call that is wrong.
-    """
-    for build in (
-        lambda: SI(transform="spline", transform_kwargs={"bins": 6}),
-        lambda: CI("x1", transform="spline", transform_kwargs={"bins": 6}),
-    ):
-        with pytest.raises(TypeError, match="transform_kwargs= is gone"):
-            build()
-
-
 def test_a_pre_0_4_spec_says_it_is_too_old():
     """0.3 wrote a term's settings as sibling keys, not in "options".
 
@@ -319,3 +305,17 @@ def test_a_pre_0_4_spec_says_it_is_too_old():
     }
     with pytest.raises(ValueError, match="predates 0.4"):
         spec_from_dict(old_format)
+
+
+def test_basis_arguments_apply_without_naming_the_basis():
+    """SI(n_coeffs=40) must configure the default basis, not be ignored.
+
+    The effective transform used to be read only from a term that also set
+    `transform=`, so basis arguments on their own were silently dropped and
+    the reader got the default order with no indication.
+    """
+    node = ContinuousNode([SI(n_coeffs=40)])
+    assert node.transform == "bernstein"
+    assert node.transform_kwargs == {"n_coeffs": 40}
+    flow = CausalFlowDAG({"x": node}, seed=0)
+    assert flow.nodes["x"].ut.n_params == 40

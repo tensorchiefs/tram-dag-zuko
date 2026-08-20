@@ -33,7 +33,9 @@ import yaml
 from tramdag.utils import config_section
 
 
-def load_variant(script: str, variant: str, expected_keys: set[str]) -> dict:
+def load_variant(
+    script: str, variant: str, expected_keys: set[str] | None = None
+) -> dict:
     """Read one variant's hyperparameters from the script's own YAML file.
 
     The file lists every value the experiment uses, one section per variant
@@ -48,10 +50,12 @@ def load_variant(script: str, variant: str, expected_keys: set[str]) -> dict:
         with the same stem and a ``.yaml`` suffix.
     variant : str
         Key under ``variants:``.
-    expected_keys : set[str]
+    expected_keys : set[str] | None, optional
         The keys the script reads. A config that does not match this set
         exactly is an error: a missing key would otherwise become a hidden
-        default, an extra key a silently ignored setting.
+        default, an extra key a silently ignored setting. ``None`` skips the
+        check, for the one case that needs to read a value (the model family)
+        before it knows which keys apply.
 
     Returns
     -------

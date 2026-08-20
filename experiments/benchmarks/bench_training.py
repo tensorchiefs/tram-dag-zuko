@@ -3,12 +3,14 @@
 How fast can a CausalFlowDAG reach a *known-good* fit? Two workloads with
 exact targets:
 
-- **W1 stroke-ls** — all-`ls` stroke DAG on the frozen synthetic cohort
-  (data/magic-mrclean/ls/obs.csv, n=1275, full-data fit). The optimum is the
-  classical proportional-odds MLE (pinned vs statsmodels/R-polr in tests);
+- **W1 stroke-ls** — all-`ls` 5-node DAG on the frozen synthetic cohort
+  (experiments/misc/data/magic-mrclean/ls/obs.csv, n=1275, full-data fit). The
+  optimum is the classical proportional-odds MLE (pinned against
+  statsmodels in tests);
   target = train NLL within 1e-3 of a cached long-run reference.
-- **W2 vaca-ci** — all-`ci` flow on the frozen VACA cohort (data/vaca/obs.csv,
-  n=5000, 90/10 split); target = val NLL within 2e-3 of a cached reference.
+- **W2 vaca-ci** — all-`ci` flow on the frozen VACA cohort
+  (experiments/paper/data/vaca/obs.csv, n=5000, 90/10 split); target = val NLL
+  within 2e-3 of a cached reference.
 
 Because ``fit`` records per-epoch val NLL *and* wall-clock time in
 ``flow.history``, every config runs once and time-to-target is read off the
@@ -19,7 +21,7 @@ Usage (from experiments/)::
     uv run python -m benchmarks.bench_training            # full grid (~30-45 min)
     uv run python -m benchmarks.bench_training --quick    # 1 seed, cpu only
 
-Outputs -> results/bench-training/{results.csv, ranking.md, nll_vs_time_*.png,
+Outputs -> results/bench-training/{results.csv, ranking.csv, nll_vs_time_*.png,
 reference.json}.
 """
 
@@ -130,7 +132,7 @@ CONFIGS = {
 }
 
 
-def total_val(history) -> np.ndarray:
+def total_monitored_nll(history) -> np.ndarray:
     return np.array([sum(ep.values()) for ep in history["val"]])
 
 
@@ -181,7 +183,7 @@ def reference_nll(workload: str) -> float:
             freeze_patience=120,
         )
         flow.fit(train, val, epochs=300, learning_rate=1e-3, batch_size=512, verbose=0)
-    refs[workload] = float(total_val(flow.history).min())
+    refs[workload] = float(total_monitored_nll(flow.history).min())
     OUT.mkdir(parents=True, exist_ok=True)
     cache.write_text(json.dumps(refs, indent=2) + "\n")
     return refs[workload]
@@ -282,7 +284,7 @@ def main():
                         t0 = time.perf_counter()
                         flow = run_config(workload, phases, extra, batch, device, seed)
                         wall = time.perf_counter() - t0
-                        nll = total_val(flow.history)
+                        nll = total_monitored_nll(flow.history)
                         times = np.array(flow.history["time"])
                         hit_t = np.nonzero(nll <= ref + TOL_TIGHT[workload])[0]
                         hit_p = np.nonzero(nll <= ref + TOL_PRACT[workload])[0]
@@ -372,7 +374,7 @@ def main():
         ax.axhline(TOL_TIGHT[workload], color="k", ls="--", lw=1, label="tight tol")
         ax.axhline(TOL_PRACT[workload], color="k", ls=":", lw=1, label="practical tol")
         ax.set_yscale("log"), ax.set_xlabel("wall-clock seconds")
-        ax.set_ylabel("val NLL − reference")
+        ax.set_ylabel("monitored NLL − reference\n(train for stroke-ls)")
         ax.set_title(
             f"{workload}: convergence vs wall-clock (seed {seeds[0]}, cpu; "
             "solid = batch 512, dotted = full batch)"
