@@ -153,7 +153,6 @@ def run(variant: str) -> dict:
         batch_size=config["batch_size"],
         init_seed=config["init_seed"],
         shuffle_seed=config["shuffle_seed"],
-        record_every=config["epochs"],  # no snapshots needed here
     )
     flow.fit(
         train,

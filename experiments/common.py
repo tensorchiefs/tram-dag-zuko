@@ -33,22 +33,6 @@ import yaml
 from tramdag.utils import config_section
 
 
-def config_path(script: str) -> Path:
-    """Give the YAML file belonging to a script: same directory, same stem.
-
-    Parameters
-    ----------
-    script : str
-        The calling script's ``__file__``.
-
-    Returns
-    -------
-    Path
-        The sibling ``.yaml`` file.
-    """
-    return Path(script).resolve().with_suffix(".yaml")
-
-
 def load_variant(script: str, variant: str, expected_keys: set[str]) -> dict:
     """Read one variant's hyperparameters from the script's own YAML file.
 
@@ -79,7 +63,7 @@ def load_variant(script: str, variant: str, expected_keys: set[str]) -> dict:
     FileNotFoundError
         If the config file does not exist.
     """
-    path = config_path(script)
+    path = Path(script).resolve().with_suffix(".yaml")
     if not path.exists():
         raise FileNotFoundError(f"no config next to {Path(script).name}: {path}")
     document = yaml.safe_load(path.read_text())
@@ -92,7 +76,8 @@ def variants_of(script: str) -> list[str]:
     ``argparse`` takes its choices from this, so adding a variant to the
     config file is enough to make it runnable.
     """
-    document = yaml.safe_load(config_path(script).read_text())
+    path = Path(script).resolve().with_suffix(".yaml")
+    document = yaml.safe_load(path.read_text())
     return sorted(document["variants"])
 
 

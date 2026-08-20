@@ -49,8 +49,8 @@ def fit_with_snapshots(
     batch_size: int,
     init_seed: int,
     shuffle_seed: int,
-    record_every: int,
     record=None,
+    record_every: int | None = None,
 ) -> tuple[CausalFlowDAG, list[dict]]:
     """Fit in pieces and read out coefficients between them.
 
@@ -76,11 +76,12 @@ def fit_with_snapshots(
     shuffle_seed : int
         Seeds the minibatch shuffling of the first round. Later rounds
         continue the stream, so the whole trajectory is one training run.
-    record_every : int
-        Epochs between snapshots.
     record : callable | None, optional
         ``record(flow)`` gives a dict of numbers to store for this
-        snapshot. With ``None`` no snapshots are taken.
+        snapshot. With ``None`` (the default) the fit runs in one call and
+        no snapshots are taken.
+    record_every : int | None, optional
+        Epochs between snapshots. Required when ``record`` is given.
 
     Returns
     -------
@@ -90,9 +91,11 @@ def fit_with_snapshots(
     """
     flow = CausalFlowDAG(spec, seed=init_seed)
     trajectory: list[dict] = []
+    # without a recorder there is nothing to stop for: fit in one go
+    chunk = record_every if record is not None else epochs
     done = 0
     while done < epochs:
-        this_round = min(record_every, epochs - done)
+        this_round = min(chunk, epochs - done)
         flow.fit(
             train,
             val,
