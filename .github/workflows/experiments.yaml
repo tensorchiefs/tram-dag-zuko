@@ -108,7 +108,13 @@ jobs:
         uv run --group experiments python -m check
         ${{ matrix.area }} ${{ steps.result.outputs.name }}
 
+    # Best effort: the action's npm install tries to build `canvas`, an
+    # optional native dependency used for vega rendering, and that build fails
+    # on the runner image — while still leaving a working `cml` binary behind.
+    # The comment step below keeps its own conclusion, so a genuinely missing
+    # cml still turns the job red.
     - if: always()               # a drifted run is when the figures matter most
+      continue-on-error: true
       uses: iterative/setup-cml@v3
     - name: post the report as a commit comment
       if: always()
