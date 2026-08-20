@@ -102,7 +102,6 @@ class _Node(nn.Module):
 
     def __init__(self, name: str, node: NodeSpec, spec: dict[str, NodeSpec]):
         super().__init__()
-        self.name = name
         self.kind = node.kind
         terms = node_terms(node)
         self.parents = tuple(node_parents(node))  # ordered parent names
@@ -473,7 +472,7 @@ class CausalFlowDAG(nn.Module):
 
     # ------------------------------------------------------------------- fit
     def _set_ranges(self, train_df: pd.DataFrame, marginal_init: bool = False) -> None:
-        """Map the train 5%/95% quantiles onto the transform domain.
+        """Map the train ``RANGE_Q``/1-``RANGE_Q`` quantiles onto the domain.
 
         This is the min-max scaling of the original implementation.
 
@@ -481,12 +480,12 @@ class CausalFlowDAG(nn.Module):
         on the first fit (the same ``not ut._fitted`` guard as range-setting), so a
         multi-phase fit does not reset a partially-trained intercept.
         """
-        from .transforms import BernsteinUT, ordinal_marginal_init_theta
+        from .transforms import RANGE_Q, BernsteinUT, ordinal_marginal_init_theta
 
         for name in self.order:
             node = self.nodes[name]
             if node.kind == "continuous" and not node.ut._fitted:
-                q = train_df[name].quantile([0.05, 0.95])
+                q = train_df[name].quantile([RANGE_Q, 1.0 - RANGE_Q])
                 node.ut.set_range(q.iloc[0], q.iloc[1])
                 if (
                     marginal_init
@@ -1322,8 +1321,7 @@ class CausalFlowDAG(nn.Module):
         -------
         dict
             A convergence report: ``converged``, ``n_iter``, ``final_nll``,
-            ``grad_norm``, ``coef_delta`` (largest coefficient change at
-            the last round), ``seconds``, and the fitted ``coefficients``
+            ``grad_norm``, ``seconds``, and the fitted ``coefficients``
             from :meth:`ls_coefficients`.
 
         Raises
@@ -1359,7 +1357,6 @@ class CausalFlowDAG(nn.Module):
         self._set_ranges(train_df)
 
         self.double()  # parameters + buffers (xmin/xmax) -> float64, one call
-        assert next(self.parameters()).dtype == torch.float64
         t0 = time.perf_counter()
         # chunk: inner L-BFGS iterations per round; we stop on NLL change
         try:
@@ -1383,28 +1380,15 @@ class CausalFlowDAG(nn.Module):
                 nll.backward()
                 return nll
 
-            def flat_coefs() -> np.ndarray:
-                cs = self.ls_coefficients()
-                return (
-                    np.concatenate([w for node in cs.values() for w in node.values()])
-                    if cs
-                    else np.zeros(1)
-                )
-
-            prev_nll, prev_c, final_nll, n_iter, converged, coef_delta = (
+            prev_nll, final_nll, n_iter, converged = (
                 float("inf"),
-                flat_coefs(),
                 float("nan"),
                 0,
                 False,
-                float("inf"),
             )
             for _ in range(max(1, max_iter // chunk)):
                 final_nll = float(opt.step(closure))
                 n_iter += chunk
-                cur_c = flat_coefs()
-                coef_delta = float(np.abs(cur_c - prev_c).max())
-                prev_c = cur_c
                 if abs(prev_nll - final_nll) < tol * (1.0 + abs(final_nll)):
                     converged = True
                     break
@@ -1428,7 +1412,6 @@ class CausalFlowDAG(nn.Module):
             "n_iter": n_iter,
             "final_nll": final_nll,
             "grad_norm": grad_norm,
-            "coef_delta": coef_delta,
             "seconds": time.perf_counter() - t0,
             "coefficients": coefs,
         }

@@ -38,7 +38,7 @@ from common import (
 )
 from statsmodels.miscmodels.ordinal_model import OrderedModel
 
-from tramdag import LS, CausalFlowDAG, ContinuousNode, OrdinalNode
+from tramdag import LS, SI, CausalFlowDAG, ContinuousNode, OrdinalNode
 
 CONFIG_KEYS = {
     "cohort",
@@ -49,21 +49,35 @@ CONFIG_KEYS = {
     "shuffle_seed",
     "classical_max_iter",
     "good_outcome_levels",
+    "transform",
+    "n_coeffs",
+    "levels_mrs_pre",
+    "levels_treatment",
+    "levels_outcome",
 }
 
 
-def build_spec() -> dict:
+def build_spec(config: dict) -> dict:
     """Give the fully-connected all-``ls`` spec of the cohort.
 
-    Every edge is a linear shift, which is what makes each node
-    conditional a classical transformation model.
+    Every edge is a linear shift, which is what makes each node conditional a
+    classical transformation model. The continuous nodes' basis comes from the
+    config rather than from a framework default, so this file plus its YAML
+    describe the model completely. The ordinal nodes have no basis: their
+    intercept is the cutpoint vector.
     """
+    basis = dict(transform=config["transform"], n_coeffs=config["n_coeffs"])
     return {
-        "Age": ContinuousNode(),
-        "mRS_pre": OrdinalNode(6, [LS("Age")]),
-        "NIHSSa": ContinuousNode([LS("Age"), LS("mRS_pre")]),
-        "T": OrdinalNode(2, [LS("Age"), LS("mRS_pre"), LS("NIHSSa")]),
-        "mRS_3m": OrdinalNode(7, [LS("Age"), LS("mRS_pre"), LS("NIHSSa"), LS("T")]),
+        "Age": ContinuousNode([SI(**basis)]),
+        "mRS_pre": OrdinalNode(config["levels_mrs_pre"], [LS("Age")]),
+        "NIHSSa": ContinuousNode([SI(**basis), LS("Age"), LS("mRS_pre")]),
+        "T": OrdinalNode(
+            config["levels_treatment"], [LS("Age"), LS("mRS_pre"), LS("NIHSSa")]
+        ),
+        "mRS_3m": OrdinalNode(
+            config["levels_outcome"],
+            [LS("Age"), LS("mRS_pre"), LS("NIHSSa"), LS("T")],
+        ),
     }
 
 
@@ -202,7 +216,7 @@ def run(variant: str) -> dict:
         f"using the {config['fitter']} fitter ..."
     )
 
-    spec = build_spec()
+    spec = build_spec(config)
     # the design matrix comes from the flow, so both fits see the same encoding
     design = CausalFlowDAG(spec, seed=config["init_seed"]).design_matrix(
         observed, "mRS_3m", drop_first=True

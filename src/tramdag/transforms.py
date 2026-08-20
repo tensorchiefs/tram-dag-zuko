@@ -46,6 +46,17 @@ __all__ = [
 # and the quantile pre-map makes one canonical domain work for any data scale.
 BOUND = 5.0
 
+# quantile level of the range pre-map. ``CausalFlowDAG._set_ranges`` scales the
+# train q/1-q quantiles onto [-BOUND, BOUND], and ``marginal_init_theta`` maps
+# that domain onto the latent's q/1-q quantiles -- one constant, because the two
+# only calibrate each other if they use the same level.
+RANGE_Q = 0.05
+
+# clamp margin of the uniform draw in StandardLogistic. 1e-7 keeps u off 0 and 1
+# at float32 resolution, capping |z| at ~16.1 -- past any latent a fitted shift
+# reaches.
+_U_EPS = 1e-7
+
 
 class StandardLogistic:
     """Standard logistic base distribution (the TRAM latent)."""
@@ -67,7 +78,7 @@ class StandardLogistic:
         return -z - 2.0 * torch.nn.functional.softplus(-z)
 
     @staticmethod
-    def sample(shape, device=None, eps: float = 1e-7, generator=None) -> Tensor:
+    def sample(shape, device=None, generator=None) -> Tensor:
         """Draw samples of the given ``shape``.
 
         Parameters
@@ -76,9 +87,6 @@ class StandardLogistic:
             Shape of the sample tensor.
         device : torch.device | str | None, optional
             Target device, by default ``None``.
-        eps : float, optional
-            Clamp margin that keeps the uniform draw off 0 and 1, by
-            default 1e-7.
         generator : torch.Generator | None, optional
             Random source for a reproducible draw, by default ``None``.
 
@@ -88,25 +96,23 @@ class StandardLogistic:
             The samples.
         """
         u = torch.rand(shape, device=device, generator=generator)
-        return StandardLogistic.icdf(u, eps)
+        return StandardLogistic.icdf(u)
 
     @staticmethod
-    def icdf(u: Tensor, eps: float = 1e-7) -> Tensor:
+    def icdf(u: Tensor) -> Tensor:
         """Give the quantile at probability ``u``.
 
         Parameters
         ----------
         u : Tensor
-            Probabilities in (0, 1).
-        eps : float, optional
-            Clamp margin that keeps ``u`` off 0 and 1, by default 1e-7.
+            Probabilities in (0, 1). Clamped off 0 and 1 by ``_U_EPS``.
 
         Returns
         -------
         Tensor
             The quantiles, same shape as ``u``.
         """
-        u = u.clamp(eps, 1.0 - eps)
+        u = u.clamp(_U_EPS, 1.0 - _U_EPS)
         return torch.log(u) - torch.log1p(-u)
 
 
@@ -280,17 +286,12 @@ class BernsteinUT(_ScaledUT):
     def _build(self, theta: Tensor):
         return BernsteinTransform(theta, bound=self.bound)
 
-    def marginal_init_theta(self, q: float = 0.05) -> Tensor:
+    def marginal_init_theta(self) -> Tensor:
         """Give the unconstrained Bernstein coefficients of the calibrated map.
 
         The coefficients describe the linear map from the pre-scaled domain
         ``[-B, B]`` onto the standard-logistic quantiles
-        ``[logit(q), logit(1-q)]``.
-
-        Parameters
-        ----------
-        q : float, optional
-            Quantile level of the calibration, by default 0.05.
+        ``[logit(RANGE_Q), logit(1-RANGE_Q)]``.
 
         Returns
         -------
@@ -312,7 +313,8 @@ class BernsteinUT(_ScaledUT):
         import math
 
         n = self._n
-        a = math.log(q) - math.log(1.0 - q)  # logit(q), e.g. -2.9444 at q=.05
+        q = RANGE_Q
+        a = math.log(q) - math.log(1.0 - q)  # logit(q) = -2.9444 at q=.05
         span = -2.0 * a  # logit(1-q) - logit(q)
         order = n + 1  # constrained control points: n+2
         b = span / order  # per-step increment (constant)

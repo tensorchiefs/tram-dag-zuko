@@ -100,8 +100,8 @@ def machine_info() -> dict:
     Returns
     -------
     dict
-        One key per property. A property that cannot be read is ``None``.
-        This function never raises.
+        One key per property. ``ram_gb`` is ``None`` off POSIX, where the
+        page-count call does not exist.
     """
     import os
     import platform
@@ -122,18 +122,12 @@ def machine_info() -> dict:
             getattr(torch.backends, "mps", None) and torch.backends.mps.is_available()
         ),
     }
-    try:
-        import zuko
+    import zuko  # a hard dependency: tramdag cannot import without it
 
-        info["zuko"] = zuko.__version__
-    except Exception:
-        info["zuko"] = None
-    try:
-        from . import __version__
+    from . import __version__
 
-        info["tramdag"] = __version__
-    except Exception:
-        info["tramdag"] = None
+    info["zuko"] = zuko.__version__
+    info["tramdag"] = __version__
     try:  # total RAM (POSIX)
         info["ram_gb"] = round(
             os.sysconf("SC_PAGE_SIZE") * os.sysconf("SC_PHYS_PAGES") / 1e9, 1

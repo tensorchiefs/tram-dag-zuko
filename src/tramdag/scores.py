@@ -119,15 +119,12 @@ def node_scores(flow, df: pd.DataFrame, node: str) -> pd.DataFrame:
     dlds = _dl_ds(nd, feats, values[node], len(df), vc_ehat=ehat)
 
     cols: dict[str, np.ndarray] = {}
-    for key, ps in ls_groups:
-        feat = (
-            feats[ps[0]] if len(ps) == 1 else torch.cat([feats[p] for p in ps], dim=1)
-        )
-        psi = (dlds.unsqueeze(1) * feat).cpu().numpy()
-        if len(ps) == 1 and isinstance(flow.spec[ps[0]], OrdinalNode):
-            for k in range(psi.shape[1]):
-                cols[f"{ps[0]}[{k}]"] = psi[:, k]
-        else:  # LS is single-parent, so a non-ordinal parent is one column
+    for key, (parent,) in ls_groups:  # an LS term has exactly one parent
+        psi = (dlds.unsqueeze(1) * feats[parent]).cpu().numpy()
+        if isinstance(flow.spec[parent], OrdinalNode):
+            for k in range(psi.shape[1]):  # one column per one-hot level
+                cols[f"{parent}[{k}]"] = psi[:, k]
+        else:
             cols[key] = psi[:, 0]
     for g in nd._vc_groups:
         t = feats[g.on][:, -1:] if g.on_is_ord else feats[g.on]
@@ -137,15 +134,13 @@ def node_scores(flow, df: pd.DataFrame, node: str) -> pd.DataFrame:
     return pd.DataFrame(cols, index=df.index)
 
 
-def sup_bb_pvalue(stat: float, terms: int = 100) -> float:
+def sup_bb_pvalue(stat: float) -> float:
     """Give ``P(sup |Brownian bridge| > stat)``, the Kolmogorov series.
 
     Parameters
     ----------
     stat : float
         Observed supremum statistic.
-    terms : int, optional
-        Number of series terms, by default 100.
 
     Returns
     -------
@@ -153,10 +148,10 @@ def sup_bb_pvalue(stat: float, terms: int = 100) -> float:
         The p-value, clipped to [0, 1].
     """
     if stat <= 0:
-        return 1.0
+        return 1.0  # the series alternates to 0.0 here, which is the wrong tail
+    # 100 terms: the k-th is exp(-2k^2 stat^2), so past k ~ 10 it underflows
     s = sum(
-        (-1) ** (k + 1) * math.exp(-2.0 * k * k * stat * stat)
-        for k in range(1, terms + 1)
+        (-1) ** (k + 1) * math.exp(-2.0 * k * k * stat * stat) for k in range(1, 101)
     )
     return min(1.0, max(0.0, 2.0 * s))
 
