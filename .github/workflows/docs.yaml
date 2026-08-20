@@ -29,8 +29,7 @@ jobs:
       UV_NO_DEFAULT_GROUPS: '1'   # dev drags in editor tooling; name groups
       # the notebooks to execute and publish; add a name to add a notebook
       # (and mirror it in .github/pdoc-templates/module.html.jinja2)
-      NOTEBOOKS: demo_tram_dag_colab intro_tram_dag additive_vs_joint_ci
-        varying_coefficients
+      NOTEBOOKS: demo_tram_dag_colab intro_tram_dag additive_vs_joint_ci varying_coefficients
     steps:
     - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1
     - uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9   # v9.0.0

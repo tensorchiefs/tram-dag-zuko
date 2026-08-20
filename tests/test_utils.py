@@ -82,7 +82,9 @@ def test_the_package_needs_no_yaml_parser():
     Checked against the declared dependencies, which is the actual contract a
     user gets; the experiments keep pyyaml in their own dependency group.
     """
-    import tomllib
+    tomllib = pytest.importorskip(
+        "tomllib", reason="python 3.10 has no tomllib; the check runs on 3.11+"
+    )
 
     pyproject = pathlib.Path(__file__).resolve().parents[1] / "pyproject.toml"
     if not pyproject.exists():  # installed without the sources

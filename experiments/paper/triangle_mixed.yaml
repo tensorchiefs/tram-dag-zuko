@@ -24,6 +24,9 @@ paper_protocol: &paper_protocol
   odds_ratio_threshold: -1.0   # the App. C.4 check looks at odds(x2 <= -1)
   odds_ratio_n: 40000          # rows of the shared-latent DGP comparison
   odds_ratio_seed: 99
+  cf_n: 2000                   # rows scored for ordinal counterfactuals (App. B)
+  cf_draws: 200                # abduction draws averaged into a per-row PMF
+  cf_seed: 1000
 
 variants:
   # the paper's headline mixed case (Fig. 9/19 + the C.4 odds-ratio check);

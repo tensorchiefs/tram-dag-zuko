@@ -1,5 +1,5 @@
 {
-  "_note": "As triangle-mixed-linear-ls with a nonlinear f on the ordinal node.",
+  "_note": "As triangle-mixed-linear-ls with a nonlinear f on the ordinal node. The cf_* entries score ordinal counterfactuals against the analytic counterfactual law (paper App. B): an observed level pins the latent to an interval, so only a distribution is identified, and cf_prob_true_level_ceiling is the best any model could do.",
   "beta12": {
     "value": 1.9825026988983154,
     "atol": 0.05
@@ -23,5 +23,17 @@
   "odds_ratio_dgp": {
     "value": 7.189438678974828,
     "atol": 0.5
+  },
+  "cf_pmf_tv_vs_analytic": {
+    "value": 0.044575470005634166,
+    "atol": 0.03
+  },
+  "cf_prob_true_level_flow": {
+    "value": 0.9080900000000001,
+    "atol": 0.03
+  },
+  "cf_prob_true_level_ceiling": {
+    "value": 0.9208898876903038,
+    "atol": 1e-06
   }
 }

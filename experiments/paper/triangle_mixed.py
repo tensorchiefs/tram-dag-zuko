@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import argparse
 
+import matplotlib.pyplot as plt
 import numpy as np
 from common import (
     load_variant,
@@ -33,6 +34,7 @@ from common import (
 
 from paper.helpers import (
     cs_curve,
+    finish,
     fit_with_snapshots,
     ls_weight,
     plot_cs_curve,
@@ -65,6 +67,9 @@ CONFIG_KEYS = {
     "odds_ratio_threshold",
     "odds_ratio_n",
     "odds_ratio_seed",
+    "cf_n",
+    "cf_draws",
+    "cf_seed",
 }
 
 
@@ -127,6 +132,91 @@ def dgp_odds_ratio(generator, threshold: float, n: int, seed: int) -> float:
         latents=latents, do={"x1": observed["x1"].to_numpy() + 1.0}
     )
     return odds_below(shifted["x2"], threshold) / odds_below(observed["x2"], threshold)
+
+
+def counterfactual_pmf_from_flow(flow, factual, do, draws, seed, levels):
+    """Average the flow's counterfactual level over repeated abductions.
+
+    An ordinal latent is only interval-identified, so ``abduct`` draws it from
+    the truncated logistic and one pass gives one *sample* of the
+    counterfactual level. Averaging many passes turns that into the per-row
+    distribution, which is the object the analytic truth can be compared to.
+    """
+    counts = np.zeros((len(factual), levels))
+    for draw in range(draws):
+        latents = flow.abduct(factual, seed=seed + draw)
+        sampled = flow.sample(do=do, u=latents)["x3"].to_numpy().astype(int)
+        counts[np.arange(len(factual)), sampled] += 1.0
+    return counts / draws
+
+
+def score_counterfactuals(
+    flow, generator, config
+) -> tuple[dict, np.ndarray, np.ndarray]:
+    """Score the flow's ordinal counterfactuals against what is identifiable.
+
+    The paper's App. B (Fig. 10) makes the point that an individual
+    counterfactual is not identified for a variable produced by interval
+    censoring. So the flow is not scored against the realised counterfactual
+    level — nothing could get that right — but against the exact
+    counterfactual *distribution*, which is the ceiling.
+    """
+    do = {"x1": config["do_x1"]}
+    factual, realised = generator.counterfactual_pair(config["cf_n"], do)
+    analytic = generator.true_counterfactual_pmf(factual, do)
+    flow_pmf = counterfactual_pmf_from_flow(
+        flow, factual, do, config["cf_draws"], config["cf_seed"], config["levels"]
+    )
+
+    rows = np.arange(len(factual))
+    true_level = realised["x3"].to_numpy().astype(int)
+    metrics = {
+        # half the L1 distance between the two distributions, averaged
+        "cf_pmf_tv_vs_analytic": float(
+            0.5 * np.abs(flow_pmf - analytic).sum(axis=1).mean()
+        ),
+        # probability each assigns to the level that actually happened
+        "cf_prob_true_level_flow": float(flow_pmf[rows, true_level].mean()),
+        "cf_prob_true_level_ceiling": float(analytic[rows, true_level].mean()),
+    }
+    print(
+        f"ordinal counterfactuals ({config['cf_n']} rows, "
+        f"{config['cf_draws']} abduction draws):"
+    )
+    print(
+        f"  P(true level): flow {metrics['cf_prob_true_level_flow']:.3f}  "
+        f"vs identification ceiling {metrics['cf_prob_true_level_ceiling']:.3f}"
+    )
+    total_variation = metrics["cf_pmf_tv_vs_analytic"]
+    print(f"  total-variation from the analytic law: {total_variation:.3f}")
+    return metrics, flow_pmf, analytic
+
+
+def plot_counterfactual_pmfs(flow_pmf, analytic, path, title):
+    """Compare the two counterfactual distributions, averaged per level."""
+    levels = np.arange(flow_pmf.shape[1])
+    fig, ax = plt.subplots(figsize=(6.4, 3.8))
+    ax.bar(
+        levels - 0.18,
+        analytic.mean(0),
+        width=0.36,
+        alpha=0.6,
+        label="identifiable truth",
+    )
+    ax.bar(
+        levels + 0.18,
+        flow_pmf.mean(0),
+        width=0.36,
+        alpha=0.85,
+        color="C3",
+        label="flow (averaged abductions)",
+    )
+    ax.set_xticks(levels)
+    ax.set_xlabel("counterfactual $x_3$")
+    ax.set_ylabel("probability")
+    ax.set_title(title)
+    ax.legend(fontsize=8)
+    finish(fig, path)
 
 
 def run(variant: str) -> dict:
@@ -221,6 +311,17 @@ def run(variant: str) -> dict:
         f"predicted {predicted:.2f}, DGP {measured:.2f}, "
         f"theory exp(2) = {np.exp(2.0):.2f}"
     )
+
+    cf_metrics, flow_pmf, analytic_pmf = score_counterfactuals(flow, generator, config)
+    metrics.update(cf_metrics)
+    plot_counterfactual_pmfs(
+        flow_pmf,
+        analytic_pmf,
+        out / "plots" / "counterfactual_pmf.png",
+        f"ordinal counterfactuals under do(x1={config['do_x1']:+.0f})\n"
+        "only a distribution is identified (App. B)",
+    )
+    figures.append("counterfactual_pmf.png")
 
     save_metrics(out, metrics)
     write_report(

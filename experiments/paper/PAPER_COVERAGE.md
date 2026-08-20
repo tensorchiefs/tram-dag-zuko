@@ -21,7 +21,7 @@ is a drawing of a model or DAG, not a result: nothing to compute.
 
 | Figure | Subject | Reproduced by |
 |---|---|---|
-| 10 | Why counterfactuals fail for interval-censored discrete variables | argument, not a fit — see gaps |
+| 10 | Why counterfactuals fail for interval-censored discrete variables | `triangle_mixed.py` (either variant) → `plots/counterfactual_pmf.png`, scored against the analytic counterfactual law |
 | 11 | DAG of the original VACA DGP | schematic |
 | 12 | VACA observational fit with a Neural Spline Flow | **not reproduced** — a competing method, see gaps |
 | 13 | DAG of the four-variable counterfactual experiment | schematic |
@@ -45,11 +45,14 @@ in the DGP under `do(x1 += 1)`, theory `e² ≈ 7.39`).
    implementation; it reproduces the TRAM-DAG side of each comparison and the
    ground truth both sides are measured against. Reproducing the baselines
    would mean vendoring two more model families.
-2. **Figure 10 is an argument, not an experiment** — it illustrates why an
-   individual counterfactual is not identified for a discretized variable. The
-   consequence *is* implemented and tested: ordinal abduction is
-   truncated-logistic, so `sample(u=abduct(df))` reproduces ordinal values
-   level-exactly rather than pointwise.
+2. **Figure 10's point is now measured, not just argued.** It illustrates why
+   an individual counterfactual is not identified for a discretized variable.
+   `triangle_mixed.py` turns that into a number: an observed ordinal level pins
+   the latent to an interval, so the generator can state the exact
+   counterfactual *distribution* (`TriangleMixed.true_counterfactual_pmf`, itself
+   checked against realised counterfactuals in `paper/tests/`), and the flow's
+   averaged abduction draws are scored against that ceiling rather than against
+   a level no model could predict.
 3. **The `cubic` f variant** exists in the generator but has no experiment
    variant: the paper's C.3 uses `linear`, `atan` and `sin`. Add a section to
    `paper/triangle.yaml` if it is ever wanted.

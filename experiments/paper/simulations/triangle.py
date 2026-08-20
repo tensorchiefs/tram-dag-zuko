@@ -42,7 +42,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from ._common import DatasetDraws, logistic, resolve_latents
+from ._common import DatasetDraws, logistic, resolve_latents, sigmoid
 
 F_VARIANTS = {
     "linear": (lambda x: -0.3 * x, "-0.3*x"),
@@ -266,6 +266,76 @@ class TriangleMixed(_TriangleBase):
             [np.zeros((len(cdf), 1)), cdf, np.ones((len(cdf), 1))], axis=1
         )
         return np.diff(cdf, axis=1)
+
+    def true_counterfactual_pmf(
+        self, observed: pd.DataFrame, do: dict[str, float]
+    ) -> np.ndarray:
+        """Give the exact counterfactual distribution of x3, row by row.
+
+        For a **discretized** variable the individual counterfactual is not
+        identified (paper App. B): observing ``x3 = k`` pins the latent only
+        to the interval between two cutpoints, not to a value. What *is*
+        identified is a distribution — the truncated-logistic mass of that
+        interval, redistributed over the cutpoints of the intervened world.
+        This is therefore the ceiling any model can reach, and the object a
+        flow's averaged abduction draws should be compared against.
+
+        Parameters
+        ----------
+        observed : pd.DataFrame
+            Factual rows, with ``x1``, ``x2`` and the observed ``x3`` level.
+        do : dict[str, float]
+            The intervention, for example ``{"x1": -1.0}``.
+
+        Returns
+        -------
+        np.ndarray
+            Class probabilities, shape ``(n, 4)``, one row per observation.
+        """
+        x1 = observed["x1"].to_numpy(dtype=float)
+        x2 = observed["x2"].to_numpy(dtype=float)
+        level = observed["x3"].to_numpy(dtype=int)
+
+        factual_cuts = self.theta[None, :] + (0.2 * x1 + self.f_callable(x2))[:, None]
+        # x2 is a *descendant* of x1, so intervening on x1 moves it too. Its
+        # latent is recoverable from the structural equation h(x2|x1) =
+        # 5 x2 + 2 x1, which gives x2_cf = x2 + 0.4 (x1 - a) under do(x1 = a).
+        if "x1" in do:
+            x1_cf = np.full_like(x1, float(do["x1"]))
+            x2_cf = x2 + 0.4 * (x1 - x1_cf)
+        else:
+            x1_cf = x1
+            x2_cf = x2
+        if "x2" in do:  # a direct intervention overrides the propagated value
+            x2_cf = np.full_like(x2, float(do["x2"]))
+        cf_cuts = self.theta[None, :] + (0.2 * x1_cf + self.f_callable(x2_cf))[:, None]
+
+        # the observed level says the latent lies in [lo, hi)
+        padded = np.concatenate(
+            [
+                np.full((len(x1), 1), -np.inf),
+                factual_cuts,
+                np.full((len(x1), 1), np.inf),
+            ],
+            axis=1,
+        )
+        lo = padded[np.arange(len(x1)), level]
+        hi = padded[np.arange(len(x1)), level + 1]
+        mass = sigmoid(hi) - sigmoid(lo)  # logistic mass of the known interval
+
+        # redistribute that interval over the intervened cutpoints
+        cf_padded = np.concatenate(
+            [
+                np.full((len(x1), 1), -np.inf),
+                cf_cuts,
+                np.full((len(x1), 1), np.inf),
+            ],
+            axis=1,
+        )
+        lo_c = np.maximum(cf_padded[:, :-1], lo[:, None])
+        hi_c = np.minimum(cf_padded[:, 1:], hi[:, None])
+        overlap = np.clip(sigmoid(hi_c) - sigmoid(lo_c), 0.0, None)
+        return overlap / mass[:, None]
 
     def paper_truth(self) -> dict:
         """State the true parameters of this data-generating process.

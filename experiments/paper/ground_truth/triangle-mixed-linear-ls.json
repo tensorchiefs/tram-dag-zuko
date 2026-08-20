@@ -1,5 +1,5 @@
 {
-  "_note": "Paper Sec. 6.2 in the flow's sign convention (the paper adds the ordinal shift, the flow subtracts it): expected -0.2 and +0.3. The App. C.4 check is convention-free, theory exp(2) = 7.39.",
+  "_note": "Paper Sec. 6.2 in the flow's sign convention (the paper adds the ordinal shift, the flow subtracts it): expected -0.2 and +0.3. The App. C.4 check is convention-free, theory exp(2) = 7.39. The cf_* entries score ordinal counterfactuals against the analytic counterfactual law (paper App. B): an observed level pins the latent to an interval, so only a distribution is identified, and cf_prob_true_level_ceiling is the best any model could do.",
   "beta12": {
     "value": 1.9825026988983154,
     "atol": 0.05
@@ -23,5 +23,17 @@
   "odds_ratio_dgp": {
     "value": 7.189438678974828,
     "atol": 0.5
+  },
+  "cf_pmf_tv_vs_analytic": {
+    "value": 0.054191417032043374,
+    "atol": 0.03
+  },
+  "cf_prob_true_level_flow": {
+    "value": 0.7138175,
+    "atol": 0.03
+  },
+  "cf_prob_true_level_ceiling": {
+    "value": 0.7284035068240207,
+    "atol": 1e-06
   }
 }

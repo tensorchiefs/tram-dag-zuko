@@ -117,3 +117,38 @@ def test_frozen_csv_regenerates(subdir):
             regenerated[column].to_numpy(dtype=float),
             atol=1e-9,
         )
+
+
+@pytest.mark.parametrize("f", ["linear", "exp"])
+def test_mixed_counterfactual_pmf_matches_simulation(f):
+    """The analytic counterfactual distribution of the ordinal node is right.
+
+    An observed level pins the latent to an interval, so the individual
+    counterfactual is a *distribution*, not a value (paper App. B). This
+    checks that distribution against realised counterfactuals drawn with the
+    same latents — including the part that is easy to get wrong: intervening
+    on x1 also moves x2, which shifts the cutpoints.
+    """
+    gen = TriangleMixed(f=f, seed=42)
+    factual, counterfactual = gen.counterfactual_pair(40_000, {"x1": -1.0})
+    pmf = gen.true_counterfactual_pmf(factual, {"x1": -1.0})
+
+    assert pmf.shape == (len(factual), 4)
+    np.testing.assert_allclose(pmf.sum(axis=1), 1.0, atol=1e-12)
+
+    realised = counterfactual["x3"].to_numpy().astype(int)
+    for level in range(4):
+        rows = factual["x3"].to_numpy() == level
+        if rows.sum() < 300:  # too few to compare frequencies
+            continue
+        empirical = np.bincount(realised[rows], minlength=4) / rows.sum()
+        np.testing.assert_allclose(empirical, pmf[rows].mean(axis=0), atol=0.02)
+
+
+def test_mixed_counterfactual_pmf_is_a_no_op_without_an_intervention():
+    """With nothing intervened, the observed level keeps all the mass."""
+    gen = TriangleMixed(f="linear", seed=42)
+    factual = gen.observational(2000)
+    pmf = gen.true_counterfactual_pmf(factual, {})
+    observed = factual["x3"].to_numpy().astype(int)
+    np.testing.assert_allclose(pmf[np.arange(len(factual)), observed], 1.0, atol=1e-9)
