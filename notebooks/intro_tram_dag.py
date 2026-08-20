@@ -336,8 +336,17 @@ flow.nll(val_df)
 # %% [markdown]
 # ## 4. Anatomy: the spec *is* the additive decomposition
 #
-# Section 1 showed the decomposition on paper. Here we read it directly from the
-# **fitted** flow. Two small helpers do the job. `describe_node` reports which
+# Before the per-node detail, the whole model at a glance. `flow.to_matrix()`
+# labels every edge with the term that carries it — this is the paper's
+# **meta-adjacency matrix** (Fig. 3), and it is generated from the fitted
+# object rather than drawn by hand, so it cannot disagree with the model:
+
+# %%
+print(flow.to_matrix())
+
+# %% [markdown]
+# Rows are parents, columns children; an empty cell means no edge. Now read the
+# same structure node by node, directly from the **fitted** flow. Two small helpers do the job. `describe_node` reports which
 # network carries each parent (the structural view). `decompose_row` prints the
 # actual numbers for one observation and verifies that they rebuild the per-node
 # log-likelihood **exactly**. The equation $u = h_{\boldsymbol{\vartheta}}(x) + \sum \text{shifts}$ is an
