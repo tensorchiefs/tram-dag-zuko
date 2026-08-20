@@ -3,6 +3,10 @@
 # Every value the script uses is in this file: it reads no defaults of its
 # own and rejects a variant whose keys do not match exactly.
 
+# The paper says only "the same architecture and training procedure" as its
+# main experiments (App. C.2), with no numbers, so every value below is this
+# repository's choice, carried over unchanged from the pre-0.4 script.
+
 variants:
   # all conditionals complex intercepts; the Laplace noise is additive, so
   # the counterfactual truth is analytic and the errors below are exact
@@ -12,6 +16,8 @@ variants:
     epochs: 300
     learning_rate: 0.01
     batch_size: 512
+    chunk_epochs: 50            # each fit call restarts Adam: a warm-restart
+                                # schedule, and it matters (see helpers.py)
     polish_epochs: 100          # second phase at a lower rate
     polish_learning_rate: 0.001
     dgp_seed: 42                # the paper's generator seed

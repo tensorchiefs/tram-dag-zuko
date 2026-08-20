@@ -5,14 +5,20 @@
 # block is written once and merged into each variant with YAML's << key,
 # so what a run uses stays readable at the point of use.
 
+# Provenance matters here. The paper (App. C.3.1) states exactly four numbers:
+# 40000 samples, 500 epochs, Adam at lr 0.001, Bernstein order M = 20 (the
+# framework default). Everything else below — the batch size, the 90/10 split,
+# the chunk size and every seed — is this repository's choice, carried over
+# from the pre-0.4 scripts so the numbers stay comparable.
+
 paper_protocol: &paper_protocol
-  # paper App. C.3: n = 40000, 500 epochs, Adam at lr 1e-3
+  # from the paper: n = 40000 (split 90/10 below), 500 epochs, Adam at lr 1e-3
   n_train: 36000
   n_val: 4000
   epochs: 500
   learning_rate: 0.001
   batch_size: 512
-  record_every: 10        # epochs between coefficient snapshots (Fig. 14/15)
+  chunk_epochs: 10        # epochs per fit call; snapshots ride on the boundaries
   dgp_seed: 42            # the paper's generator seed
   init_seed: 7            # flow weight initialization
   shuffle_seed: 0         # minibatch shuffling

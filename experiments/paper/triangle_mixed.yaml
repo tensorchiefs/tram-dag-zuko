@@ -3,14 +3,18 @@
 # Every value the script uses is in this file: it reads no defaults of its
 # own and rejects a variant whose keys do not match exactly.
 
+# As triangle.yaml: the paper (App. C.4) states 40000 samples, 500 epochs and
+# Adam at lr 0.001. The cutpoints of the ordinal node, the batch size, the
+# split, the chunk size and the seeds are this repository's choices.
+
 paper_protocol: &paper_protocol
-  # paper App. C.4: n = 40000, 500 epochs, Adam at lr 1e-3
+  # from the paper: n = 40000 (split 90/10 below), 500 epochs, Adam at lr 1e-3
   n_train: 36000
   n_val: 4000
   epochs: 500
   learning_rate: 0.001
   batch_size: 512
-  record_every: 10        # epochs between coefficient snapshots (Fig. 19)
+  chunk_epochs: 10        # epochs per fit call; snapshots ride on the boundaries
   dgp_seed: 42            # the paper's generator seed
   init_seed: 7            # flow weight initialization
   shuffle_seed: 0         # minibatch shuffling

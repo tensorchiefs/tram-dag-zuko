@@ -124,11 +124,16 @@ Framework tests (inline DGPs, `tests/conftest.py`):
 - `confounded` — constant effect τ = −1 with a quadratic prognostic part;
   propensity centering must cut the bias of `beta_hat` by ≥ 2× (measured 5–10×).
 
-Experiments (`experiments/`, seed 42 unless stated, arXiv:2503.16206):
+Experiments (`experiments/`, seed 42 unless stated, arXiv:2503.16206). The
+paper states only four training numbers — n=40000, 500 epochs, Adam lr 1e-3,
+Bernstein order 20 — and the triangle configs match them; batch size, the
+90/10 split, the chunk size, the VACA/CAREFL protocols and every seed are
+repo choices, labelled as such in each YAML:
 
 - **Paper DGPs**: `triangle` true coefficients β12=+2, β13=−0.2 (+0.3 on x2 for
   `linear`); a fitted `cs` learns −f(x2)+const. `triangle-mixed` cutpoints
-  θ=(−2, 0.42, 1.02); **ordinal sign flip**: the paper ADDS the ordinal shift, the
+  θ=(−2, 0.42, 1.02) — a repo choice, the paper does not state them;
+  **ordinal sign flip**: the paper ADDS the ordinal shift, the
   flow SUBTRACTS → fitted weights −0.2 / +0.3; the C.4 odds-ratio check gives
   OR ≈ e² ≈ 7.4. `vaca`: E[x3|do(x2=a)] = −0.25 + 0.25a (do(x2=−3) is off-manifold
   extrapolation — looser tolerance). `carefl`: counterfactuals are analytic

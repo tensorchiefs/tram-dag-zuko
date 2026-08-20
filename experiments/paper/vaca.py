@@ -43,6 +43,7 @@ CONFIG_KEYS = {
     "n_train",
     "n_val",
     "epochs",
+    "chunk_epochs",
     "learning_rate",
     "batch_size",
     "polish_epochs",
@@ -161,6 +162,7 @@ def run(variant: str) -> dict:
         epochs=config["epochs"],
         learning_rate=config["learning_rate"],
         batch_size=config["batch_size"],
+        chunk_epochs=config["chunk_epochs"],
         init_seed=config["init_seed"],
         shuffle_seed=config["shuffle_seed"],
     )

@@ -53,7 +53,7 @@ CONFIG_KEYS = {
     "epochs",
     "learning_rate",
     "batch_size",
-    "record_every",
+    "chunk_epochs",
     "dgp_seed",
     "init_seed",
     "shuffle_seed",
@@ -242,7 +242,7 @@ def run(variant: str) -> dict:
         batch_size=config["batch_size"],
         init_seed=config["init_seed"],
         shuffle_seed=config["shuffle_seed"],
-        record_every=config["record_every"],
+        chunk_epochs=config["chunk_epochs"],
         record=lambda flow: snapshot(flow, config["shift"]),
     )
     flow.save(out / "flow.pt")
