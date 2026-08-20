@@ -11,7 +11,8 @@ cohort_and_model: &cohort_and_model
   good_outcome_levels: 3     # a "good" outcome is level 0, 1 or 2
   # the model, stated rather than inherited from the framework
   transform: bernstein       # basis of the continuous nodes
-  n_coeffs: 20               # its order
+  n_coeffs: 20               # unconstrained coefficients (zuko ties two
+                             # more control points on, so order 21)
   # the ordinal nodes' level counts, matching the frozen cohort's columns
   levels_mrs_pre: 6
   levels_treatment: 2

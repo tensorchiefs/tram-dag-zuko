@@ -143,6 +143,51 @@ def test_training_ehat_is_out_of_fold(confounded):
     assert np.abs(e_oof - e_in).max() > 1e-4
 
 
+def test_treatment_with_a_bare_intercept_takes_the_classical_oof_path(confounded):
+    """A parentless ``I()`` on the treatment does not force the Adam proxy.
+
+    ``[I, LS("X")]`` is an all-``ls`` conditional with its simple intercept
+    written out (the spelling that carries ``transform=``), so stage 1 must use
+    the deterministic ``fit_classical``, exactly as ``[LS("X")]`` does. The
+    per-node test used to demand ``effect == "LS"`` for every term and sent this
+    spec down the 300-epoch Adam path instead.
+
+    Determinism is the observable: the classical fit is reproducible to the last
+    bits, the Adam proxy is not run twice from the same state.
+    """
+    df = confounded["draw"](600, 3)
+    spec = {
+        "X": ContinuousNode([I(transform="affine")]),
+        "T": OrdinalNode(2, [I, LS("X")]),
+        "Y": ContinuousNode([I("X"), VC(t="T", center=True, center_folds=3)]),
+    }
+    runs = []
+    for _ in range(2):
+        flow = CausalFlowDAG(spec, seed=0)
+        flow.fit(df, epochs=2, verbose=0, seed=0)
+        runs.append(np.array(flow.vc_center_info[("Y", "T")]["e_oof"]))
+    assert np.array_equal(runs[0], runs[1])
+
+    # and it agrees with the classical fit of the same conditional, out of fold
+    info = CausalFlowDAG(spec, seed=0)
+    info.fit(df, epochs=2, verbose=0, seed=0)
+    book = info.vc_center_info[("Y", "T")]
+    fold_id = book["fold_id"]
+    proxy = CausalFlowDAG(
+        {
+            "X": ContinuousNode([I(transform="affine")]),
+            "T": OrdinalNode(2, [I, LS("X")]),
+        },
+        seed=0,
+    )
+    proxy.fit_classical(df.iloc[fold_id != 0][["X", "T"]], verbose=False)
+    np.testing.assert_allclose(
+        book["e_oof"][fold_id == 0],
+        proxy._predict_p1("T", df.iloc[fold_id == 0]),
+        atol=1e-7,
+    )
+
+
 # ------------------------------------- acceptance: do() recomputes t - e_hat
 def test_do_recomputes_centered_regressor(confounded):
     """On FRESH rows (nothing cacheable) the centered regressor is re-derived

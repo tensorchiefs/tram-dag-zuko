@@ -51,7 +51,7 @@ in the DGP under `do(x1 += 1)`, theory `e² ≈ 7.39`).
    the latent to an interval, so the generator can state the exact
    counterfactual *distribution* (`TriangleMixed.true_counterfactual_pmf`, itself
    checked against realised counterfactuals in `paper/tests/`), and the flow's
-   averaged abduction draws are scored against that ceiling rather than against
+   averaged abduction draws are scored against that distribution rather than against
    a level no model could predict.
 3. **The `cubic` f variant** exists in the generator but has no experiment
    variant: the paper's C.3 uses `linear`, `atan` and `sin`. Add a section to

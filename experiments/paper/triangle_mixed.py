@@ -171,7 +171,17 @@ def score_counterfactuals(
     counterfactual is not identified for a variable produced by interval
     censoring. So the flow is not scored against the realised counterfactual
     level — nothing could get that right — but against the exact
-    counterfactual *distribution*, which is the ceiling.
+    counterfactual *distribution*.
+
+    Two reference points come with the P(true level) score, because that score
+    is **not** maximized by the truth. Scoring the analytic law itself gives
+    ``E[p_true] = E[sum_i p_i^2]``: what a model that knew the identifiable
+    distribution exactly would score. The attainable maximum is
+    ``E[max_i p_i]``, reached by always naming the modal level — a strictly
+    worse *distribution* estimate that this score nonetheless rewards. A flow
+    slightly above the analytic reference is therefore sharper than the
+    identifiable law, not better than it, and ``cf_pmf_tv_vs_analytic`` is the
+    metric that cannot be gamed that way.
     """
     do = {"x1": config["do_x1"]}
     factual, realised = generator.counterfactual_pair(config["cf_n"], do)
@@ -189,15 +199,19 @@ def score_counterfactuals(
         ),
         # probability each assigns to the level that actually happened
         "cf_prob_true_level_flow": float(flow_pmf[rows, true_level].mean()),
-        "cf_prob_true_level_ceiling": float(analytic[rows, true_level].mean()),
+        # what predicting the identifiable law itself scores, and the most
+        # any prediction can score (by always naming the modal level)
+        "cf_prob_true_level_analytic": float(analytic[rows, true_level].mean()),
+        "cf_prob_true_level_mode_bound": float(analytic.max(axis=1).mean()),
     }
     print(
         f"ordinal counterfactuals ({config['cf_n']} rows, "
         f"{config['cf_draws']} abduction draws):"
     )
     print(
-        f"  P(true level): flow {metrics['cf_prob_true_level_flow']:.3f}  "
-        f"vs identification ceiling {metrics['cf_prob_true_level_ceiling']:.3f}"
+        f"  P(true level): flow {metrics['cf_prob_true_level_flow']:.3f}, "
+        f"analytic law {metrics['cf_prob_true_level_analytic']:.3f}, "
+        f"mode bound {metrics['cf_prob_true_level_mode_bound']:.3f}"
     )
     total_variation = metrics["cf_pmf_tv_vs_analytic"]
     print(f"  total-variation from the analytic law: {total_variation:.3f}")

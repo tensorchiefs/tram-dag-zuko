@@ -1,15 +1,15 @@
 {
-  "_note": "As triangle-mixed-linear-ls with a nonlinear f on the ordinal node. The cf_* entries score ordinal counterfactuals against the analytic counterfactual law (paper App. B): an observed level pins the latent to an interval, so only a distribution is identified, and cf_prob_true_level_ceiling is the best any model could do.",
+  "_note": "As triangle-mixed-linear-ls with a nonlinear f on the ordinal node. The cf_* entries score ordinal counterfactuals against the analytic counterfactual law (paper App. B): an observed level pins the latent to an interval, so only a distribution is identified, cf_prob_true_level_analytic is what predicting that law scores (E[sum p_i^2]) and cf_prob_true_level_mode_bound is the most any prediction can score (always naming the modal level) -- so the flow sitting slightly above the analytic reference means it is sharper than the identifiable law, not better than it. cf_pmf_tv_vs_analytic is the metric that cannot be gamed that way.",
   "beta12": {
     "value": 1.9825026988983154,
     "atol": 0.05
   },
   "beta13_flow": {
-    "value": -0.22230106592178345,
+    "value": -0.226693,
     "atol": 0.05
   },
   "val_nll_x3": {
-    "value": 1.1988784074783325,
+    "value": 1.197869,
     "atol": 0.05
   },
   "cs_curve_max_abs_err": {
@@ -27,11 +27,15 @@
     "max": 0.07457547
   },
   "cf_prob_true_level_flow": {
-    "value": 0.9080900000000001,
+    "value": 0.924303,
     "atol": 0.03
   },
-  "cf_prob_true_level_ceiling": {
-    "value": 0.9208898876903038,
+  "cf_prob_true_level_analytic": {
+    "value": 0.92089,
+    "atol": 1e-06
+  },
+  "cf_prob_true_level_mode_bound": {
+    "value": 0.954321,
     "atol": 1e-06
   }
 }

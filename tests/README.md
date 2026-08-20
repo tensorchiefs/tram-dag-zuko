@@ -16,9 +16,9 @@ uv run pytest tests/test_flow.py -q     # one file
   acceptance number (the `VC` recovery bar, the centering bias reduction) trains
   one deliberately in the fast subset, so every run measures it.
 - **CI** ([`.github/workflows/ci.yml`](../.github/workflows/ci.yml)) runs the fast
-  subset on every pull request and push to `main`, and the **full** suite nightly
-  and on demand (Actions → CI → *Run workflow*). The split exists because the full
-  suite is ~25–40 min on the 2-core runners.
+  subset (160 tests) on every pull request and push to `main`, and the **full**
+  suite (165) nightly and on demand (Actions → CI → *Run workflow*). The split
+  exists because the full suite is ~25–40 min on the 2-core runners.
 - **Determinism** — tests seed `torch` before constructing the flow (weight init
   happens at construction), so fits are reproducible.
 

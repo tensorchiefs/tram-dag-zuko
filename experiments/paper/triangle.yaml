@@ -5,8 +5,8 @@
 # declares — so nothing can be silently inherited from the framework.
 #
 # Provenance, from two sources:
-#   * the paper (App. C.3.1) states 40000 samples, 500 epochs, Adam at lr 0.001
-#     and Bernstein order M = 20;
+#   * the paper (App. C.3 preamble) states 40000 samples, 500 epochs, Adam at
+#     lr 0.001 and Bernstein order M = 20;
 #   * the paper's own implementation
 #     (tensorchiefs/tram-dag, summerof24/triangle_structured_continous.R) adds
 #     hidden_features_CS = c(2, 25, 25, 2) and, in create_param_net, sigmoid

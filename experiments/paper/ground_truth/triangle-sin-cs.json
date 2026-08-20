@@ -5,11 +5,11 @@
     "atol": 0.05
   },
   "beta13": {
-    "value": -0.1475939303636551,
+    "value": -0.185066,
     "atol": 0.05
   },
   "val_nll_x3": {
-    "value": 2.460585832595825,
+    "value": 2.473055,
     "atol": 0.05
   },
   "cs_curve_max_abs_err": {
@@ -20,7 +20,7 @@
     "atol": 0.1
   },
   "mean_x3_flow_do_x1": {
-    "value": 2.184403,
+    "value": 2.184408,
     "atol": 0.1
   }
 }

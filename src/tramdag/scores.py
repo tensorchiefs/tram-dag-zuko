@@ -104,7 +104,7 @@ def node_scores(flow, df: pd.DataFrame, node: str) -> pd.DataFrame:
     ]
     if not ls_groups and not nd._vc_groups:
         raise ValueError(
-            f"node {node!r} has no LS or VC terms. params='shift' scores need "
+            f"node {node!r} has no LS or VC terms. Shift scores need "
             "at least one interpretable shift coefficient."
         )
 

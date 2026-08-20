@@ -69,6 +69,30 @@
 
 ### Fixed
 
+- **The ordinal counterfactual score had a reference point that was not a
+  bound.** `cf_prob_true_level_ceiling` was documented as "the best any model
+  could do". It is `E[p_true] = E[sum_i p_i^2]`: what a model that knew the
+  identifiable law exactly would score. `P(realised level)` is maximized by
+  always naming the *modal* level, which scores `E[max_i p_i]` — a strictly
+  worse distribution estimate. The metric is now
+  `cf_prob_true_level_analytic`, with `cf_prob_true_level_mode_bound`
+  alongside it (0.921 and 0.954 on the mixed DGP). This surfaced when the
+  corrected architecture pushed the flow to 0.924, i.e. *above* its own
+  stated ceiling: the flow is slightly sharper than the identifiable law, and
+  `cf_pmf_tv_vs_analytic` is the metric that cannot be gamed that way.
+
+- **Ground-truth centers now follow the code.** The architecture change moved
+  every complex-shift variant, but only two files were re-pinned, so several
+  `{value}` centers described a net that no longer runs — `triangle-atan-cs`'s
+  interventional mean had consumed 62% of its tolerance, `triangle-sin-cs`'s
+  beta13 75%. All centers are re-measured. `{max}` bounds are now kept inside a
+  band instead of hand-tuned: useful between 1.5x and 4x the measurement, set
+  to 2.5x outside it. Below 1.5x is not hypothetical — one bound at 1.7x passed
+  locally at 0.028 and failed CI at 0.113, because its maximum is over a
+  coefficient with 7 of 1275 observations. That comparison is now split into
+  `max_abs_diff_named_coefs` (Age, NIHSSa, the treatment contrast: the
+  precision claim, ~1e-3) and the all-coefficient maximum (a sanity bound).
+
 - **Two of the four paper replications used the wrong reference
   architecture.** The reference implementation has two: the triangle
   scripts use `hidden_features_I = hidden_features_CS = c(2,25,25,2)` with
@@ -80,8 +104,10 @@
   number (counterfactual MAE 0.078/0.059/0.086 against bounds
   0.216/0.174/0.219) and VACA's off-manifold `do(x2=-3)` mean lands 0.037
   from the analytic truth instead of 0.21. Ground truth re-pinned, and the
-  `{max}` bounds tightened to 2.5x the measurement — several sat 4-10x
-  above it, checking nothing.
+  `{max}` bounds re-pinned at 2.5x the measurement, or measurement + 0.02
+  where that is larger so a near-zero error keeps usable headroom. They had
+  drifted to 2.6-19.5x, which checks nothing. The rule never loosens a bound:
+  where 2.5x exceeded the committed value, the committed value stands.
 
 - **The `conditioners` provenance claim was wrong.** The module, README,
   CLAUDE.md and `docs/code-map.md` all said the default architectures come
@@ -194,13 +220,20 @@
   ~1500 of 4000 budgeted epochs, the vaca fit is 0.03 nats short at 520 — so
   a package-level number could only be arbitrary. `fit()` without `epochs`
   now raises with that reason and names the alternative (a generous budget
-  with `schedule="plateau"` and `freeze_patience=`). 46 of the 48 `fit`
-  calls in this repo already passed it.
+  with `schedule="plateau"` and `freeze_patience=`). 50 of the 51 `fit`
+  calls in this repo already passed it — the exception is an internal proxy
+  fit that supplies its own.
 
 - **`fit(plateau_patience=)` default 15 -> 30**, the value
   `docs/training-speed.md` recommends after measuring the per-node plateau
   trainer against the hand-tuned two-phase schedule. No caller in the repo
   used the default.
+
+- **`make_univariate_transform` raises `KeyError`, not `ValueError`.** The
+  registry lookup speaks for itself; this package no longer re-words the
+  failure of the dict it owns. The docstring said `ValueError` even before,
+  so an `except ValueError` around a spec built from a hand-edited checkpoint
+  never caught anything.
 
 - **Single-value keyword arguments that no caller ever set became
   constants**: `StandardLogistic.sample(eps=)`/`icdf(eps=)` (`_U_EPS`),

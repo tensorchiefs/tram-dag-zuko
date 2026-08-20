@@ -128,6 +128,14 @@ def compare_coefficients(flow, statsmodels_result, reference) -> tuple[dict, lis
 
     Only differences between one-hot levels are identified in a cutpoint
     model, so an ordinal parent is compared as ``w[k] - w[0]``.
+
+    Two agreement metrics come out, because the coefficients are not equally
+    well determined. ``max_abs_diff_named_coefs`` covers Age, NIHSSa and the
+    treatment contrast — the three the paper reads — and holds to ~1e-3.
+    ``max_abs_diff_flow_vs_statsmodels`` also covers the five ``mRS_pre``
+    level contrasts, and level 5 has **7 of 1275 rows**: that coefficient is
+    barely identified, so where two optimizers stop differs by ~0.1 between
+    machines. It is kept as a sanity bound, not as a precision claim.
     """
     fitted = flow.ls_coefficients()["mRS_3m"]
     reference_outcome = reference[reference["node"] == "mRS_3m"].set_index("term")[
@@ -162,6 +170,10 @@ def compare_coefficients(flow, statsmodels_result, reference) -> tuple[dict, lis
         "coef_T_flow": rows[2][1],
         "coef_T_statsmodels": float(rows[2][2]),
         "coef_T_r": float(reference_outcome["T"]),
+        "max_abs_diff_named_coefs": max(
+            abs(flow_value - classical_value)
+            for _, flow_value, classical_value in rows[:3]
+        ),
         "max_abs_diff_flow_vs_statsmodels": max(
             abs(flow_value - classical_value) for _, flow_value, classical_value in rows
         ),

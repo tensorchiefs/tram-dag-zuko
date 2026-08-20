@@ -87,7 +87,7 @@ To change what a run does, edit the YAML. To add a variant, add a section —
 one of two forms:
 
 ```json
-{"beta12": {"value": 2.0012, "atol": 0.05},
+{"beta12": {"value": 1.9825, "atol": 0.05},
  "cs_curve_max_abs_err": {"max": 0.23}}
 ```
 
@@ -97,6 +97,18 @@ a better fit, not a drift, and must not fail the run. Tolerances are per metric
 because torch results differ slightly across operating systems and CPUs.
 `check.py` fails on a metric outside its tolerance or above its bound, and on a
 ground-truth entry the run no longer produces.
+
+A `{max}` bound is only informative in a band: below **1.5x** its measurement it
+fails on another machine for no reason, above **4x** it cannot catch a
+regression. `check.py` reports a bound outside that band — as a note, not a
+failure, because a tolerance is a judgement call. A bound that is *meant* to sit
+outside it says so in a `"why"` string, which is printed instead:
+
+```json
+"max_abs_diff_flow_vs_statsmodels": {
+  "max": 0.25,
+  "why": "the maximum is over a coefficient with 7 of 1275 observations: 0.028 here, 0.113 on the CI runner"}
+```
 
 Regenerating ground truth is a deliberate act: run the experiment, review the
 figures, then write the new values with a commit message that says what moved

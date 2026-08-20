@@ -141,8 +141,10 @@ reference uses two different ones. The triangle experiments
 commented out), `len_theta = 20`. The VACA/CAREFL comparisons
 (`comparison/utils.R::make_model`): one net per node, `dense(10, tanh) ->
 dense(100, tanh) -> dense(len_theta)`, `M = 30`. Applying the triangle net to
-CAREFL — which an earlier revision did — costs a factor of 4 on the
-counterfactual MAE; the 2-unit bottleneck cannot carry it. On `sin-cs` that same
+CAREFL — which an earlier revision did — cost an order of magnitude on the
+counterfactual MAE (x4, measured: 0.968 / 0.515 / 0.986 against 0.078 / 0.059 /
+0.086, though that run also used M = 20 rather than the comparison scripts'
+M = 30); the 2-unit bottleneck cannot carry it. On `sin-cs` that same
 bottleneck saturates at both ends of the grid, which is the reference
 architecture's capacity and not a fit failure (see the ground-truth note).
 Note also that `n_coeffs` counts *unconstrained* coefficients: zuko ties two
@@ -151,7 +153,8 @@ extra control points on, so `n_coeffs=20` is order 21 where the reference's
 
 - **Paper DGPs**: `triangle` true coefficients β12=+2, β13=−0.2 (+0.3 on x2 for
   `linear`); a fitted `cs` learns −f(x2)+const. `triangle-mixed` cutpoints
-  θ=(−2, 0.42, 1.02) — a repo choice, the paper does not state them;
+  θ=(−2, 0.42, 1.02) from `triangle_structured_mixed.R`; the paper's text does
+  not state them;
   **ordinal sign flip**: the paper ADDS the ordinal shift, the
   flow SUBTRACTS → fitted weights −0.2 / +0.3; the C.4 odds-ratio check gives
   OR ≈ e² ≈ 7.4. `vaca`: E[x3|do(x2=a)] = −0.25 + 0.25a (do(x2=−3) is off-manifold
@@ -167,6 +170,11 @@ extra control points on, so `n_coeffs=20` is order 21 where the reference's
 - Committed expectations live in `experiments/<area>/ground_truth/<name>.json`;
   `check.py` enforces them. Two entry forms: `{value, atol}` (two-sided) and
   `{max}` (an upper bound, for error measures, so a better fit cannot fail).
+  A `{max}` bound belongs in a band — 1.5x to 4x its measurement — and
+  `check.py` notes one that is not, unless the entry carries a `"why"` saying
+  why it is deliberately wide. Centers are re-pinned whenever the code moves
+  them: a stale center is how a variant ends up passing while describing a
+  model that no longer runs.
 
 ## Testing policy
 
@@ -183,7 +191,7 @@ extra control points on, so `n_coeffs=20` is order 21 where the reference's
   `pre-experiments-cut` if it ever needs regenerating.
 - Fit checks for the paper DGPs train on the paper protocol (n=40k, 500 epochs),
   not the frozen n=5k CSVs — β13 multiplies x1, whose two mixture components sit at 0.25 and 0.73
-  (sd 0.254 against unit-scale x2), so it is
+  (sd 0.254, against 0.375 for x2 and 2.918 for x3), so it is
   is too weakly identified at n=5k.
 
 ## Roadmap notes

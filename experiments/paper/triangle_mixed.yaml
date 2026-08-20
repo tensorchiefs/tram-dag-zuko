@@ -4,7 +4,9 @@
 # own and rejects a variant whose keys do not match exactly.
 
 # Provenance, from two sources:
-#   * the paper (App. C.4) states 40000 samples, 500 epochs, Adam at lr 0.001;
+#   * the paper states 40000 samples, 500 epochs and Adam at lr 0.001 in its
+#     App. C.3 preamble (C.4 repeats the sample size and the 500-epoch
+#     figures but states no learning rate);
 #   * the paper's own implementation
 #     (tensorchiefs/tram-dag, summerof24/triangle_structured_mixed.R) adds
 #     hidden_features_CS = c(2, 2, 2, 2), sigmoid activations, len_theta = 20,

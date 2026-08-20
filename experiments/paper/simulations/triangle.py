@@ -277,8 +277,10 @@ class TriangleMixed(_TriangleBase):
         to the interval between two cutpoints, not to a value. What *is*
         identified is a distribution — the truncated-logistic mass of that
         interval, redistributed over the cutpoints of the intervened world.
-        This is therefore the ceiling any model can reach, and the object a
-        flow's averaged abduction draws should be compared against.
+        That distribution is the object a flow's averaged abduction draws
+        should be compared against. It is not an upper bound on every score:
+        ``P(realised level)`` is maximized by naming the modal level, not by
+        reporting this law (see ``triangle_mixed.score_counterfactuals``).
 
         Parameters
         ----------

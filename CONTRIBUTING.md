@@ -24,9 +24,9 @@ flow — some acceptance criteria (the `VC` recovery bar, the centering bias
 reduction) train a flow deliberately in the fast subset, because a feature's
 acceptance number is worth measuring on every run.
 
-CI runs the fast subset on pull requests and on pushes to `main` and `dev-*`
-(a feature branch triggers `pre-commit` and `experiments`, not `ci`), and the
-full suite nightly.
+CI runs the fast subset on every pull request and on pushes to `main` and
+`dev-*`, and the full suite nightly. A push to a feature branch with no open PR
+runs `pre-commit` and `experiments` but not `ci`.
 
 What the suite guarantees, and where each reference number comes from, is
 documented in [`tests/README.md`](tests/README.md). Two rules matter most:
