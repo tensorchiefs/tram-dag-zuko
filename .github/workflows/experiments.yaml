@@ -39,7 +39,7 @@ jobs:
       include: ${{ steps.pick.outputs.include }}
     steps:
     - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1
-    - uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9   # v9.0.0
+    - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d   # v10.0.1
       with:
         enable-cache: true
     - id: pick
@@ -89,7 +89,7 @@ jobs:
       OMP_NUM_THREADS: '2'       # the runners have 2 cores; avoid thread thrash
     steps:
     - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1
-    - uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9   # v9.0.0
+    - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d   # v10.0.1
       with:
         enable-cache: true
 
@@ -113,16 +113,12 @@ jobs:
         uv run --group experiments python -m check
         ${{ matrix.area }} ${{ steps.result.outputs.name }}
 
-    # Best effort: the action's npm install tries to build `canvas`, an
-    # optional native dependency used for vega rendering, and that build fails
-    # on the runner image — while still leaving a working `cml` binary behind.
-    # The comment step below keeps its own conclusion, so a genuinely missing
-    # cml still turns the job red.
     - if: always()               # a drifted run is when the figures matter most
-      continue-on-error: true
-      uses: iterative/setup-cml@v3
-    - name: post the report as a commit comment
-      if: always()
+      name: post the report as a commit comment
+      uses: iterative/setup-cml@e5f9f4673e0a8f275c45cc66dbbfd29c8469fb4e # v2.1.0
+      with:
+        vega: false
+    - if: always()               # a drifted run is when the figures matter most
       working-directory: >-
         experiments/${{ matrix.area }}/results/${{ steps.result.outputs.name }}
       env:
