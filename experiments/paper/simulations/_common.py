@@ -54,15 +54,13 @@ class DatasetDraws:
         rng = np.random.default_rng(self.seed + 1 + seed_offset)
         return self.simulate(n, rng=rng)
 
-    def interventional(
-        self, n: int, do: dict[str, float], seed_offset: int = 0
-    ) -> pd.DataFrame:
+    def interventional(self, n: int, do: dict[str, float]) -> pd.DataFrame:
         """Draw ``n`` rows from the mutilated SCM — the L2 ground truth."""
-        rng = np.random.default_rng(self.seed + 501 + seed_offset)
+        rng = np.random.default_rng(self.seed + 501)
         return self.simulate(n, rng=rng, do=do)
 
     def counterfactual_pair(
-        self, n: int, do: dict[str, float], seed_offset: int = 0
+        self, n: int, do: dict[str, float]
     ) -> tuple[pd.DataFrame, pd.DataFrame]:
         """Draw a factual sample and its counterfactual under ``do``.
 
@@ -70,6 +68,6 @@ class DatasetDraws:
         counterfactuals — which real data can never supply. Use it to score
         a flow's abduction.
         """
-        rng = np.random.default_rng(self.seed + 2 + seed_offset)
+        rng = np.random.default_rng(self.seed + 2)
         latents = self.draw_latents(n, rng)
         return self.simulate(latents=latents), self.simulate(latents=latents, do=do)

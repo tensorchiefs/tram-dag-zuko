@@ -84,6 +84,15 @@ class _VCGroup(NamedTuple):
     folds: int
 
 
+def _covered_by_classical(term) -> bool:
+    """Say whether the exact classical fit handles this term.
+
+    It handles an ``LS``, and a parentless ``I()`` — the simple-intercept
+    baseline made explicit, for example as the carrier of ``transform=``.
+    """
+    return term.effect == "LS" or (term.effect == "I" and not term.parents)
+
+
 class _Node(nn.Module):
     """One dimension of the flow: an intercept plus additive shift terms.
 
@@ -92,29 +101,24 @@ class _Node(nn.Module):
 
     Parameters
     ----------
-    name : str
-        Name of the node.
     node : NodeSpec
         Specification of the node.
     spec : dict[str, NodeSpec]
         The full DAG specification. Needed for the parent feature widths.
     """
 
-    def __init__(self, name: str, node: NodeSpec, spec: dict[str, NodeSpec]):
+    def __init__(self, node: NodeSpec, spec: dict[str, NodeSpec]):
         super().__init__()
         self.kind = node.kind
         terms = node_terms(node)
         self.parents = tuple(node_parents(node))  # ordered parent names
         i_term = next((t for t in terms if t.effect == "I" and t.parents), None)
         if i_term is None:
-            i_groups, i_units, i_acts = [], [], []
+            i_groups = []
         elif i_term.allow_interaction:
             i_groups = [tuple(i_term.parents)]
-            i_units, i_acts = [i_term.units], [i_term.activation]
         else:  # additive intercept: one net per parent, coefficients summed
             i_groups = [(p,) for p in i_term.parents]
-            i_units = [i_term.units] * len(i_groups)
-            i_acts = [i_term.activation] * len(i_groups)
         self._intercept_groups = i_groups
         self.ci_parents = [
             p for grp in i_groups for p in grp
@@ -133,11 +137,11 @@ class _Node(nn.Module):
             pn = spec[parent]
             return pn.levels if isinstance(pn, OrdinalNode) else 1
 
-        # intercept: no I-terms -> free SimpleIntercept theta_0; one I-term (single
-        # or joint multi-parent) -> one ComplexIntercept IS theta (unchanged); two+
-        # one I-term with allow_interaction=False -> one net per parent, their
-        # outputs summed in unconstrained
-        # coefficient space (each parent reshapes the transform independently).
+        # intercept, by group count: none -> the free SimpleIntercept theta_0;
+        # one (a single parent, or a joint multi-parent term) -> one
+        # ComplexIntercept that IS theta; several (allow_interaction=False) ->
+        # one net per parent, their outputs summed in unconstrained coefficient
+        # space, so each parent reshapes the transform independently.
         if not i_groups:
             self.intercept = SimpleIntercept(n_params)
             self.intercept_nets = None
@@ -145,17 +149,20 @@ class _Node(nn.Module):
             self.intercept = ComplexIntercept(
                 sum(width(p) for p in i_groups[0]),
                 n_params,
-                units=i_units[0],
-                activation=i_acts[0],
+                units=i_term.units,
+                activation=i_term.activation,
             )
             self.intercept_nets = None
         else:
             self.intercept = None
             self.intercept_nets = nn.ModuleList(
                 ComplexIntercept(
-                    sum(width(p) for p in grp), n_params, units=u, activation=a
+                    sum(width(p) for p in grp),
+                    n_params,
+                    units=i_term.units,
+                    activation=i_term.activation,
                 )
-                for grp, u, a in zip(i_groups, i_units, i_acts, strict=True)
+                for grp in i_groups
             )
 
         # shift terms: one network per term, over the term's (possibly joint)
@@ -199,6 +206,20 @@ class _Node(nn.Module):
                 )
             )
             self._shift_groups.append((key, ps))
+
+    def vc_column(self, g, feats: dict, vc_ehat: dict | None) -> Tensor:
+        """Give the ``(n, 1)`` regressor a VC term multiplies its ``beta`` by.
+
+        The treatment enters raw: the one-hot level-1 indicator for a binary
+        ordinal treatment, the value itself for a continuous one. A centered
+        term subtracts the propensity, which is the Robinson regressor
+        ``t - e_hat(x)``. It is also the score of ``beta0``, so
+        :mod:`tramdag.scores` reads it from here.
+        """
+        t = feats[g.on][:, -1:] if g.on_is_ord else feats[g.on]
+        if g.center:
+            t = t - vc_ehat[g.on].view(-1, 1)
+        return t
 
     def theta_shift(
         self, feats: dict[str, Tensor], n: int, vc_ehat: dict[str, Tensor] | None = None
@@ -250,17 +271,13 @@ class _Node(nn.Module):
             )
             shift = shift + self.shifts[key](feat)
         for g in self._vc_groups:
-            # treatment column raw: one-hot level-1 indicator for a binary
-            # ordinal on; the (n, 1) value itself for a continuous on
-            t = feats[g.on][:, -1:] if g.on_is_ord else feats[g.on]
-            if g.center:
-                if vc_ehat is None or g.on not in vc_ehat:
-                    raise RuntimeError(
-                        f"centered VC term on {g.on!r} needs e_hat. Internal "
-                        "callers must supply vc_ehat. Never evaluate a centered "
-                        "term without its propensity."
-                    )
-                t = t - vc_ehat[g.on].view(-1, 1)  # regressor t - e_hat(x)
+            if g.center and (vc_ehat is None or g.on not in vc_ehat):
+                raise RuntimeError(
+                    f"centered VC term on {g.on!r} needs e_hat. Internal "
+                    "callers must supply vc_ehat. Never evaluate a centered "
+                    "term without its propensity."
+                )
+            t = self.vc_column(g, feats, vc_ehat)
             mod_feat = torch.cat([feats[p] for p in g.mods], dim=1) if g.mods else None
             shift = shift + self.shifts[g.on](t, mod_feat)
         return theta, shift
@@ -292,7 +309,7 @@ class CausalFlowDAG(nn.Module):
         self.spec = spec
         self.order = validate_and_sort(spec)
         self.nodes = nn.ModuleDict(
-            {name: _Node(name, spec[name], spec) for name in self.order}
+            {name: _Node(spec[name], spec) for name in self.order}
         )
         self.device = torch.device(device)
         self.history: dict = {"train": [], "val": [], "lr": [], "time": []}
@@ -338,6 +355,24 @@ class CausalFlowDAG(nn.Module):
             for c in (self.order if cols is None else cols)
         }
 
+    def _generator(self, seed: int | None) -> torch.Generator | None:
+        """Give a seeded generator on this flow's device, or None for unseeded."""
+        if seed is None:
+            return None
+        return torch.Generator(device=self.device).manual_seed(seed)
+
+    @torch.no_grad()
+    def _binary_p1(self, nd: _Node, values: dict[str, Tensor], n: int) -> Tensor:
+        """Give ``P(node = 1 | parents)`` for a binary ordinal node.
+
+        ``P(x <= 0) = sigmoid(theta_0 - s)``, so the answer is
+        ``sigmoid(s - theta_0)``. No ``vc_ehat``: chained centering is refused
+        at fit time, so a treatment node never carries a centered term itself.
+        """
+        feats = self._features({p: values[p] for p in nd.parents})
+        theta, shift = nd.theta_shift(feats, n)
+        return torch.sigmoid(shift - theta[:, 0])
+
     def _node(self, name: str) -> _Node:
         """Look a node up by name, with the same error everywhere."""
         if name not in self.nodes:
@@ -368,14 +403,7 @@ class CausalFlowDAG(nn.Module):
         for g in nd._vc_groups:
             if not g.center:
                 continue
-            on_nd = self.nodes[g.on]
-            feats = self._features({p: values[p] for p in on_nd.parents})
-            # chained centering is refused at fit time, so the treatment node
-            # itself never has a centered term and needs no e_hat of its own
-            theta, shift = on_nd.theta_shift(feats, n)
-            # binary ordinal on: P(on <= 0) = sigmoid(theta_0 - s),
-            # so e = sigmoid(s - theta_0)
-            out[g.on] = torch.sigmoid(shift - theta[:, 0]).detach()
+            out[g.on] = self._binary_p1(self.nodes[g.on], values, n).detach()
         return out or None
 
     def _vc_ehat_columns(self, nd: _Node) -> list[str]:
@@ -911,11 +939,7 @@ class CausalFlowDAG(nn.Module):
         """
         nd = self.nodes[on]
         values = self._tensorize(df, nd.parents)
-        feats = self._features(values)
-        theta, shift = nd.theta_shift(
-            feats, len(df), vc_ehat=self._vc_ehat_live(nd, values, len(df))
-        )
-        return torch.sigmoid(shift - theta[:, 0]).cpu().numpy()
+        return self._binary_p1(nd, values, len(df)).cpu().numpy()
 
     def _vc_oof_stage(
         self, train_df: pd.DataFrame, vc_oof_fit: dict | None = None
@@ -988,7 +1012,7 @@ class CausalFlowDAG(nn.Module):
         proxy_spec = self._source_proxies(on_nd.parents)
         terms = node_terms(node_spec) or None
         proxy_spec[on] = OrdinalNode(2, terms)
-        all_ls = all(t.effect == "LS" for t in (terms or []))
+        all_ls = all(map(_covered_by_classical, terms or []))
         cols = [*on_nd.parents, on]
 
         n = len(train_df)
@@ -1097,10 +1121,8 @@ class CausalFlowDAG(nn.Module):
 
     # --------------------------------------------------------- classical fit
     def _is_all_ls(self) -> bool:
-        # a parentless I() is the simple-intercept baseline made explicit
-        # (e.g. as the carrier of transform=) -- classical fitting covers it
         return all(
-            term.effect == "LS" or (term.effect == "I" and not term.parents)
+            _covered_by_classical(term)
             for node in self.spec.values()
             for term in node_terms(node)
         )
@@ -1147,7 +1169,6 @@ class CausalFlowDAG(nn.Module):
             as a suffix. When several terms share a cell, their tags join
             with ``"+"``.
         """
-        labels = {"I": "CI", "LS": "LS", "CS": "CS"}
         m = pd.DataFrame("", index=list(self.order), columns=list(self.order))
         for child in self.order:
             for term in node_terms(self.spec[child]):
@@ -1156,7 +1177,7 @@ class CausalFlowDAG(nn.Module):
                         (p, "VCm") for p in term.parents[1:]
                     ]
                 else:
-                    tag = labels[term.effect]
+                    tag = "CI" if term.effect == "I" else term.effect
                     if len(term.parents) > 1:
                         tag = f"{tag}{list(term.parents)}"
                     cells = [(p, tag) for p in term.parents]
@@ -1497,21 +1518,10 @@ class CausalFlowDAG(nn.Module):
             If both ``n`` and ``u`` are omitted.
         """
         do = do or {}
-        gen = (
-            None
-            if seed is None
-            else torch.Generator(device=self.device).manual_seed(seed)
-        )
-
-        np_dtype = self._np_dtype
+        gen = self._generator(seed)
         if u is not None:
             n = len(u)
-            u_vals = {
-                name: torch.as_tensor(
-                    u[name].to_numpy(dtype=np_dtype, copy=True), device=self.device
-                )
-                for name in self.order
-            }
+            u_vals = self._tensorize(u)
         elif n is not None:
             u_vals = {
                 name: StandardLogistic.sample((n,), device=self.device, generator=gen)
@@ -1564,11 +1574,7 @@ class CausalFlowDAG(nn.Module):
             The latents, one column per node, aligned with the rows of
             ``df``.
         """
-        gen = (
-            None
-            if seed is None
-            else torch.Generator(device=self.device).manual_seed(seed)
-        )
+        gen = self._generator(seed)
         values = self._tensorize(df)
         feats = self._features(values)
         n = len(df)

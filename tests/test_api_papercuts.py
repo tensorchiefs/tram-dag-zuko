@@ -37,9 +37,12 @@ def test_constructor_seed_differs_across_seeds():
 
 
 def test_no_seed_still_works():
-    # default (no seed) constructs fine; just not pinned across processes
-    flow = CausalFlowDAG(_spec())
-    assert flow.order  # built
+    # default (no seed) constructs fine, and is deliberately not pinned:
+    # two unseeded models differ, which is what makes seed= the only knob
+    a, b = CausalFlowDAG(_spec()), CausalFlowDAG(_spec())
+    assert any(
+        not torch.equal(pa, pb) for pa, pb in zip(a.parameters(), b.parameters())
+    )
 
 
 # ------------------------------------------- #2 history persists through io

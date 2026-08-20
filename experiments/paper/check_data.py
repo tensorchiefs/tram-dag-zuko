@@ -50,20 +50,31 @@ DATASETS = {
 }
 
 
-def worst_deviation(frozen: pd.DataFrame, regenerated: pd.DataFrame) -> float:
-    """Give the largest absolute difference over all columns.
+def worst_deviation(subdir: str) -> float:
+    """Regenerate one frozen dataset and give its largest absolute deviation.
+
+    ``experiments/paper/tests/test_generators.py`` asserts on this same
+    function, so the CLI and the test cannot drift apart.
 
     Raises
     ------
     ValueError
-        If the two frames do not have the same shape and columns.
+        If the regenerated frame no longer has the frozen one's shape and
+        columns — a changed generator, not a changed last bit.
     """
+    directory = DATA / subdir
+    truth = json.loads((directory / "truth.json").read_text())
+    frozen = pd.read_csv(directory / "obs.csv")
+    regenerated = DATASETS[subdir](truth).observational(truth["n_obs"])
     if list(frozen.columns) != list(regenerated.columns):
         raise ValueError(
             f"columns changed: {list(frozen.columns)} vs {list(regenerated.columns)}"
         )
-    if len(frozen) != len(regenerated):
-        raise ValueError(f"row count changed: {len(frozen)} vs {len(regenerated)}")
+    if len(frozen) != truth["n_obs"] or len(regenerated) != truth["n_obs"]:
+        raise ValueError(
+            f"row count changed: {len(frozen)} / {len(regenerated)} "
+            f"against n_obs {truth['n_obs']}"
+        )
     return max(
         float(
             np.abs(
@@ -78,12 +89,8 @@ def worst_deviation(frozen: pd.DataFrame, regenerated: pd.DataFrame) -> float:
 def main() -> int:
     """Check every dataset and give the process exit code."""
     failures = 0
-    for name, make_generator in DATASETS.items():
-        directory = DATA / name
-        truth = json.loads((directory / "truth.json").read_text())
-        frozen = pd.read_csv(directory / "obs.csv")
-        regenerated = make_generator(truth).observational(truth["n_obs"])
-        deviation = worst_deviation(frozen, regenerated)
+    for name in DATASETS:
+        deviation = worst_deviation(name)
         if deviation > ATOL:
             failures += 1
             print(f"  FAIL {name}: max |diff| = {deviation:.2e} > {ATOL:.0e}")

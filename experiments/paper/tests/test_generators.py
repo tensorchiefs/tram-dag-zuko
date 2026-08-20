@@ -10,19 +10,13 @@ What the flow *does* with these DGPs is measured by the experiment scripts and
 their committed ground truth (see ``paper/ground_truth/``), not here.
 """
 
-import json
-from pathlib import Path
-
 import numpy as np
-import pandas as pd
 import pytest
-from paper.check_data import DATASETS
+from paper.check_data import ATOL, DATASETS, worst_deviation
 from paper.simulations.carefl import X_OBS, Carefl4
 from paper.simulations.triangle import TriangleContinuous, TriangleMixed
 from paper.simulations.vaca import VacaTriangle
 from scipy import stats
-
-DATA = Path(__file__).resolve().parents[1] / "data"
 
 
 @pytest.mark.parametrize(
@@ -98,20 +92,10 @@ def test_frozen_csv_regenerates(subdir):
     """Each committed CSV still comes out of its generator, to 1e-9.
 
     Not bit equality: numpy's transcendental functions move their last bits
-    between releases. ``paper/check_data.py`` runs the same comparison over
-    every dataset from the command line.
+    between releases. ``worst_deviation`` is the function ``paper.check_data``
+    runs from the command line, so the two cannot drift apart.
     """
-    directory = DATA / subdir
-    truth = json.loads((directory / "truth.json").read_text())
-    frozen = pd.read_csv(directory / "obs.csv")
-    regenerated = DATASETS[subdir](truth).observational(truth["n_obs"])
-    assert len(frozen) == truth["n_obs"]
-    for column in frozen.columns:
-        np.testing.assert_allclose(
-            frozen[column].to_numpy(dtype=float),
-            regenerated[column].to_numpy(dtype=float),
-            atol=1e-9,
-        )
+    assert worst_deviation(subdir) <= ATOL
 
 
 @pytest.mark.parametrize("f", ["linear", "exp"])

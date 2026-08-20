@@ -315,8 +315,6 @@ class BernsteinUT(_ScaledUT):
         ``BernsteinTransform._constrain_theta`` (cumsum of softplus
         diffs).
         """
-        import math
-
         n = self._n
         q = RANGE_Q
         a = math.log(q) - math.log(1.0 - q)  # logit(q) = -2.9444 at q=.05

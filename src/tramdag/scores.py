@@ -126,10 +126,8 @@ def node_scores(flow, df: pd.DataFrame, node: str) -> pd.DataFrame:
                 cols[f"{parent}[{k}]"] = psi[:, k]
         else:
             cols[key] = psi[:, 0]
-    for g in nd._vc_groups:
-        t = feats[g.on][:, -1:] if g.on_is_ord else feats[g.on]
-        if g.center:  # d s / d beta0 = t - e_hat(x)
-            t = t - ehat[g.on].view(-1, 1)
+    for g in nd._vc_groups:  # d s / d beta0 is the term's own regressor
+        t = nd.vc_column(g, feats, ehat)
         cols[g.on] = (dlds * t.squeeze(-1)).cpu().numpy()
     return pd.DataFrame(cols, index=df.index)
 

@@ -97,9 +97,8 @@ def test_to_matrix_labels_every_effect_and_leaves_non_edges_empty():
     spec = {
         "a": ContinuousNode(),
         "b": ContinuousNode(),
-        "y": OrdinalNode(3, [I("a"), CS("b"), LS("a")]),
+        "y": OrdinalNode(3, [I("a"), CS("b")]),  # one edge-owning term each
     }
-    spec["y"] = OrdinalNode(3, [I("a"), CS("b")])  # one edge-owning term each
     m = CausalFlowDAG(spec, seed=0).to_matrix()
     assert list(m.index) == list(m.columns)  # square, node-ordered
     assert m.loc["a", "y"] == "CI"  # an I term reads as CI

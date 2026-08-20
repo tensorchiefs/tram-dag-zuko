@@ -17,17 +17,17 @@
   argparse call selects the variant — and each reading **every**
   hyperparameter from a sibling `<script>.yaml`. The loader rejects a
   variant with a missing or unknown key, so a value cannot quietly become
-  a default. `experiments/PAPER_COVERAGE.md` maps every figure of
+  a default. `experiments/paper/PAPER_COVERAGE.md` maps every figure of
   arXiv:2503.16206 to the variant that reproduces it, including the
   paper's misspecified case (Fig. 17, new variant `triangle linear-cs`)
   and the two competing baselines that are deliberately not reimplemented.
 
 - **An experiments workflow** (`.github/workflows/experiments.yaml`) runs
-  all replication variants as a matrix on pull requests into `main` and on
-  demand, compares each run's `metrics.json` against the committed
-  `experiments/ground_truth/<name>.json` (a `{value, atol}` entry per
-  metric), and posts the run's report — metrics table plus figures — as a
-  commit comment through CML. `experiments/check_data.py` additionally
+  all replication variants as a matrix on every push and on demand,
+  compares each run's `metrics.json` against the committed
+  `experiments/<area>/ground_truth/<name>.json` (a `{value, atol}` entry
+  per metric, or `{max}` for an error measure), and posts the run's report — metrics table plus figures — as a
+  commit comment through CML. `experiments/paper/check_data.py` additionally
   verifies that every frozen dataset still regenerates from its stored
   seed, at 1e-9 rather than bit equality.
 
@@ -54,10 +54,6 @@
   memory). The plateau lr floor (`1e-3 * learning_rate`) and the freeze
   guard (`1e-2 * learning_rate`) are documented in the `fit` docstring.
 
-- **Paper-aligned intercept constructors**: `simple_intercept`/`SI`
-  (parentless baseline) and `complex_intercept`/`CI` (needs parents);
-  `intercept`/`I` stays as the fallback and dispatches on its arguments.
-
 - **Pythonic names for every term constructor**, with the short
   notation kept as an alias of the same object: `intercept`/`I`,
   `linear_shift`/`LS`, `complex_shift`/`CS` and
@@ -70,6 +66,40 @@
   networks now build through one `_mlp()` helper.
 
 ### Fixed
+
+- **Two of the four paper replications used the wrong reference
+  architecture.** The reference implementation has two: the triangle
+  scripts use `hidden_features_I = hidden_features_CS = c(2,25,25,2)` with
+  sigmoid, while its own CAREFL and VACA comparisons use
+  `comparison/utils.R::make_model` — one net per node,
+  `dense(10, tanh) -> dense(100, tanh) -> dense(len_theta)`, with `M = 30`.
+  `vaca.yaml` and `carefl.yaml` cited the first while replicating the
+  second. On the correct net CAREFL improves on every previously committed
+  number (counterfactual MAE 0.078/0.059/0.086 against bounds
+  0.216/0.174/0.219) and VACA's off-manifold `do(x2=-3)` mean lands 0.037
+  from the analytic truth instead of 0.21. Ground truth re-pinned, and the
+  `{max}` bounds tightened to 2.5x the measurement — several sat 4-10x
+  above it, checking nothing.
+
+- **The `conditioners` provenance claim was wrong.** The module, README,
+  CLAUDE.md and `docs/code-map.md` all said the default architectures come
+  from "the original Keras implementation (`tram_models.py` in
+  tensorchiefs/tram-dag)". That repository is pure R and has no Python in
+  it. The defaults come from the PyTorch reference this package grew out
+  of (buehlpa/TramDag, `tram_models.py`:
+  `ComplexShiftDefaultTabular` 64-128-64 ReLU,
+  `ComplexInterceptDefaultTabular` 8-8 ReLU, `n_thetas=20`) — which is
+  also why `DEFAULT_ACTIVATION` is relu. Corrected in all four places,
+  each of which now also says these are *not* the paper's nets, so a
+  replication states `units=` and `activation=` itself.
+
+- **The `n_coeffs` documentation was off by two control points.** zuko
+  constrains `n` unconstrained coefficients into `n + 2` monotone control
+  points, duplicating the end differences for a smooth extrapolation, so
+  `n_coeffs=20` is a degree-21 polynomial where the reference's
+  `len_theta=20` is degree 19. The configs claimed "order M = 20 from the
+  paper"; they now state the mapping and that the free-parameter count is
+  what matches.
 
 - **`ls_coefficients()` crashed on a node mixing `LS` and `CS` terms.** It
   read `.weight` off every shift module, but a `CS` shift is a network and
@@ -155,6 +185,29 @@
   `experiments/common.py::build_spec`).
 
 ### Changed (breaking)
+
+- **`fit(epochs=)` is required.** There is no default training budget any
+  more. `docs/training-speed.md` measures a fixed budget going wrong in both
+  directions on this repo's own workloads — the stroke fit converges after
+  ~1500 of 4000 budgeted epochs, the vaca fit is 0.03 nats short at 520 — so
+  a package-level number could only be arbitrary. `fit()` without `epochs`
+  now raises with that reason and names the alternative (a generous budget
+  with `schedule="plateau"` and `freeze_patience=`). 46 of the 48 `fit`
+  calls in this repo already passed it.
+
+- **`fit(plateau_patience=)` default 15 -> 30**, the value
+  `docs/training-speed.md` recommends after measuring the per-node plateau
+  trainer against the hand-tuned two-phase schedule. No caller in the repo
+  used the default.
+
+- **Single-value keyword arguments that no caller ever set became
+  constants**: `StandardLogistic.sample(eps=)`/`icdf(eps=)` (`_U_EPS`),
+  `BernsteinUT.marginal_init_theta(q=)` (`RANGE_Q`),
+  `ordinal_marginal_init_theta(eps=)` (`_CDF_EPS`) and
+  `scores.sup_bb_pvalue(terms=)`. `RANGE_Q` is now shared with
+  `_set_ranges`, which hard-coded the same 0.05: the two only calibrate
+  each other when they agree, so any other `q` was a silent
+  miscalibration rather than a setting.
 
 - **`VC(*modifiers, t=...)`**: the positional arguments are the
   covariates that enter `b_theta`; the treatment `t` is a required

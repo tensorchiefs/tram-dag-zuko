@@ -100,11 +100,8 @@ def test_the_package_needs_no_yaml_parser():
 
 # ------------------------------------------------------------- machine_info
 def test_machine_info_has_expected_fields():
+    assert td.machine_info is machine_info  # the package re-export
     info = machine_info()
     for key in ("hostname", "os", "python", "torch", "tramdag", "cpu_count"):
         assert key in info
     assert info["torch"] and info["python"]
-
-
-def test_machine_info_is_reachable_from_the_package():
-    assert td.machine_info() is not None

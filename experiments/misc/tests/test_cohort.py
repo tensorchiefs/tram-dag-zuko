@@ -34,7 +34,7 @@ def test_observational_schema_and_size(truth):
         assert len(np.unique(values)) == levels
 
 
-def test_trial_arm_is_balanced_and_complete(truth):
+def test_trial_arm_is_balanced_and_complete():
     trial = pd.read_csv(COHORT / "rct.csv")
     assert list(trial.columns) == COLUMNS
     assert not trial.isna().to_numpy().any()

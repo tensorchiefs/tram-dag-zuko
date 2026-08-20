@@ -40,3 +40,6 @@ docs/*.html
 
 # working ledger of the 2026-08 review — local only
 REVIEW.md
+
+# emacs lock files
+.#*
