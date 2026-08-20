@@ -28,7 +28,12 @@ Age ──▶ mRS_pre ──▶ NIHSSa ──▶ T ──▶ mRS_3m      (every 
 "Good outcome" = `mRS_3m <= 2`. Latents are iid **standard logistic** (the TRAM base
 distribution), so the data lives natively in the family the flow fits.
 
-## Two variants
+## Two variants, one of them committed here
+
+Only **`ls/`** is in this repository. The `nl/` variant belongs to the stroke
+storyline and left with it — recover its data and generator with
+`git checkout pre-experiments-cut -- <path>`. It is described below because the
+contrast is what makes `ls` the *baseline* rather than the only case.
 
 | variant | each parent effect | role |
 |---------|--------------------|------|
@@ -96,9 +101,9 @@ uv run python -m tramdag.simulations.magic_mrclean --out data/magic-mrclean --se
 Run it per variant (requires `tram`, `MASS`):
 
 ```bash
-Rscript fit_ls.R ls
-Rscript fit_ls.R nl
+Rscript fit_ls.R ls     # nl is not committed here (see above)
 ```
 
-The committed `ref_ls/` outputs let `tests/test_simulations.py` check the Python flow
-against the R fit without R installed.
+The committed `ref_ls/` outputs let `experiments/misc/validate_ls.py` check the
+Python flow against the R fit without R installed, and
+`experiments/misc/tests/test_cohort.py` pins the cohort's schema.

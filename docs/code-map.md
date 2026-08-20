@@ -117,8 +117,8 @@ default you can read at the call site. Nothing numeric is buried.
 
 | Knob | Where | Default |
 |---|---|---|
-| epochs, learning rate, batch size | `fit()` | 500 / 1e-2 / 512 (in-repo examples always state them explicitly) |
-| schedule, plateau patience, plateau decay factor | `fit(schedule=, plateau_patience=, plateau_factor=)` | None / 15 / 0.3 (lr floor `1e-3 * learning_rate`, stated in the docstring) |
+| learning rate, batch size | `fit()` | 1e-2 / 512 (in-repo callers state them explicitly anyway) |
+| schedule, plateau patience, plateau decay factor | `fit(schedule=, plateau_patience=, plateau_factor=)` | None / 30 / 0.3 (lr floor `1e-3 * learning_rate`, stated in the docstring) |
 | per-node freezing | `fit(freeze_patience=, min_delta=)` | off / 1e-4 (freeze guard `1e-2 * learning_rate`) |
 | early stopping | `fit(restore_best=)` | False = exact MLE |
 | calibrated init | `fit(marginal_init=)` | False (pure init, MLE unchanged) |

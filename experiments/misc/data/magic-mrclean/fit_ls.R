@@ -13,9 +13,9 @@
 # The interventional ATE is computed analytically: predict mRS_3m class
 # probabilities on the RCT covariates under do(T=0) and do(T=1), average
 # P(mRS_3m <= 2), take the difference -- the same recipe as the Python
-# evaluate_rct().
+# validate_ls.py::treatment_effect().
 #
-# Usage:  Rscript fit_ls.R <variant>      # variant = ls | nl
+# Usage:  Rscript fit_ls.R <variant>      # only `ls` is committed here
 # Writes: <variant>/ref_ls/coefficients.csv   (node, term, estimate, std_error)
 #         <variant>/ref_ls/ate.csv            (p_good_do_T0, p_good_do_T1, ate)
 

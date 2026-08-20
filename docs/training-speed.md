@@ -19,7 +19,7 @@ is a local run artifact and is not committed.
 | value | behavior |
 |---|---|
 | `None` (default) | constant lr — the classic behavior, exactly as before this PR |
-| `"plateau"` | **per-node**: a node whose own validation NLL hasn't improved by `min_delta` (default 1e-4) for `plateau_patience` epochs (default 15) gets its lr × 0.3, floored at 1e-3 × the initial lr. Each node decays independently — valid because the per-node losses have independent gradients. |
+| `"plateau"` | **per-node**: a node whose own validation NLL hasn't improved by `min_delta` (default 1e-4) for `plateau_patience` epochs (default 30) gets its lr × 0.3, floored at 1e-3 × the initial lr. Each node decays independently — valid because the per-node losses have independent gradients. |
 
 `"onecycle"` and `"cosine"` were part of this benchmark and lost to
 `"plateau"` on every workload; 0.4.0 removed both. The result tables below
@@ -161,7 +161,9 @@ The generous `epochs` value is only a ceiling. The fit stops itself. For exact c
 comparisons where the last 1e-3 matters, append a short constant-lr polish phase
 (`epochs=500, learning_rate=1e-3`) after the plateau fit. Or run the old two-phase recipe.
 
-The benchmark deliberately changed no `fit()`/`run_experiment` defaults. Default
-changes are their own reviewed decision (see the `restore_best` episode in
-CHANGELOG.md). `run_experiment` still uses the two-phase constant-lr recipe; the
-switch to the plateau recipe remains an open 3-line follow-up.
+The benchmark itself changed no defaults — that is its own reviewed decision (see
+the `restore_best` episode in CHANGELOG.md). Two of its findings have since been
+adopted: `plateau_patience` defaults to the 30 recommended here, and `epochs` has no
+default at all, because finding 6 is precisely that a fixed budget cannot be right for
+every workload. The experiment scripts still run the two-phase constant-lr recipe,
+which each states in its own YAML.

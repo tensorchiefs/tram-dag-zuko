@@ -590,18 +590,21 @@ class CausalFlowDAG(nn.Module):
             ``schedule="plateau"`` with ``freeze_patience`` stop the fit.
         learning_rate : float, optional
             Adam learning rate, by default 1e-2 — the rate every row of the
-            ``docs/training-speed.md`` benchmark and every worked example in
-            the docs uses.
+            ``docs/training-speed.md`` benchmark runs at, and the one its
+            recommended recipe uses. The paper replications in
+            ``experiments/`` run at 1e-3, which is the paper's own value.
         batch_size : int, optional
             Minibatch size, by default 512. Measured: full-batch loses on
             time-to-target despite higher epoch throughput, and 16k batches
             only helped raw throughput at n=50k
             (``docs/training-speed.md``, finding 4).
         verbose : int, optional
-            Print progress every ``verbose`` epochs, by default 50. On the
-            fits this package is for, minutes pass between epochs 0 and
-            500, and silence is indistinguishable from a hang. 0 turns the
-            output off.
+            Emit a progress record every ``verbose`` epochs, by default 50.
+            On the fits this package is for, minutes pass between epochs 0
+            and 500, and silence is indistinguishable from a hang. These are
+            INFO records on the ``tramdag.flow`` logger, so a caller sees
+            them only after configuring logging
+            (``logging.basicConfig(level=logging.INFO)``). 0 turns them off.
         seed : int | None, optional
             Seeds the minibatch shuffling only. Weight initialization
             happens at construction, see the class docstring.

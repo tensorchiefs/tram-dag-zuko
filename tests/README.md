@@ -11,8 +11,10 @@ uv run pytest tests/ -q -m "not slow"   # fast subset (~2-3 min) — unit + cont
 uv run pytest tests/test_flow.py -q     # one file
 ```
 
-- **`slow` marker** — the long fit/training tests (they train flows) are marked
-  `@pytest.mark.slow`. `-m "not slow"` skips them.
+- **`slow` marker** — five long fits carry `@pytest.mark.slow`, which
+  `-m "not slow"` skips. It is not "everything that trains a flow": a feature's
+  acceptance number (the `VC` recovery bar, the centering bias reduction) trains
+  one deliberately in the fast subset, so every run measures it.
 - **CI** ([`.github/workflows/ci.yml`](../.github/workflows/ci.yml)) runs the fast
   subset on every pull request and push to `main`, and the **full** suite nightly
   and on demand (Actions → CI → *Run workflow*). The split exists because the full
@@ -111,8 +113,8 @@ unrelated acceptance bars.
 - New causal features should be validated against an inline DGP's **known
   truth** (add one to `conftest.py` if none fits), not just "runs without
   error".
-- Mark anything that trains a flow for long `@pytest.mark.slow` so PR CI stays
-  fast.
+- Mark a long fit `@pytest.mark.slow` so PR CI stays fast — unless it *is* the
+  acceptance measurement for a feature, which is worth having on every run.
 - Framework tests must not depend on `experiments/`: the research generators
   and their frozen CSVs live there and are checked by the experiments
   workflow — see the testing policy in [`CLAUDE.md`](../CLAUDE.md).

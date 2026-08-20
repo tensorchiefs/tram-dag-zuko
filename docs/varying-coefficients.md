@@ -143,6 +143,7 @@ hardest. Acceptance (`tests/test_vc_term.py`) requires three results:
 recovery corr ≥ 0.9 at n = 5000 (measured ≈ 0.99, min over 3 seeds 0.986), a
 fitted `beta0` that matches `fit_classical` under a large penalty, and the
 read-out identities. The centering claims are measured against the
-`confounded` DGP in the same file. Candidate follow-ups are separate issues:
-propensity-centered `beta(x)·(t − ê(x))` (#30), and per-observation scores
-for effect-modifier scans (#29).
+`confounded` DGP in the same file. Both former follow-ups have since
+shipped: propensity centering (#30) is `center=True`, documented above, and the
+per-observation scores for effect-modifier scans (#29) are `flow.scores` and
+`flow.effect_modifier_scan` — see [scores.md](scores.md).

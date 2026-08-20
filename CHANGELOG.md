@@ -35,8 +35,10 @@
   positional argument and can be written as a `+` sum — the formula reads
   like the math (`ContinuousNode(I("x1") + CS("x2"))`,
   `OrdinalNode(4, [I, LS("x1")])`). New on `I`:
-  `allow_interaction=False` (multi-parent intercept becomes additive,
-  `I("a","b", allow_interaction=False) == I("a") + I("b")`) and
+  `allow_interaction=False` (a multi-parent intercept becomes additive: one net
+  per parent, their coefficient vectors summed — written
+  `CI("a","b", allow_interaction=False)`, since a node takes at most one
+  intercept term with parents) and
   `transform=` (the monotone basis moves onto the intercept term,
   e.g. `I("x1", transform="spline")`; extra keyword arguments pass
   straight to the transform class, `I("x1", transform="spline", bins=6)`).
@@ -241,7 +243,7 @@
   substance — an all-`ls` outcome node is an ordered-logit model, so the
   flow's MLE must equal `statsmodels` on the same design matrix — but it is
   now measured on inline data at test time instead of against a committed R
-  reference; the R comparison lives on in `experiments/validate_ls.py`. The
+  reference; the R comparison lives on in `experiments/misc/validate_ls.py`. The
   generator-pinning and frozen-CSV tests moved to the experiments workflow.
 
 - **The stacked ternaries in the `vaca` and `carefl` generators' `simulate`
@@ -257,13 +259,14 @@
   load path — a malformed checkpoint is rejected there
   (`tests/test_transformation_syntax.py`).
 
-- **The five SCM generators share one layer.** `simulations/_common.py`
-  holds `logistic`, `sigmoid`, `resolve_latents`, and the `DatasetDraws`
-  mixin (`observational`, `interventional`, `counterfactual_pair`) — with
-  it the seed offsets behind the frozen CSVs in `data/` (`+1`, `+501`,
-  `+2`) are defined once instead of five times. Every generator now
-  exposes the same three named draws. `simulations/` drops from 1663 to
-  1377 lines with the frozen-CSV contract unchanged.
+- **The SCM generators share one layer.** `simulations/_common.py` holds
+  `logistic`, `sigmoid`, `resolve_latents`, and the `DatasetDraws` mixin
+  (`observational`, `interventional`, `counterfactual_pair`) — with it the
+  seed offsets behind the frozen CSVs in `data/` (`+1`, `+501`, `+2`) are
+  defined once instead of once per generator. Every generator exposes the
+  same three named draws. What is left of the package after the stroke
+  storyline moved out is 916 lines for the four paper generators, with the
+  frozen-CSV contract unchanged.
 
 ### Added (staged earlier as an unreleased 0.3.1)
 

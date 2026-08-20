@@ -35,9 +35,10 @@ uv run python -m paper.check_data            # frozen data still regenerates
 Every experiment reads its hyperparameters from its sibling `<script>.yaml` and
 has **no defaults in code**; `experiments/common.py::load_variant` parses it and
 `tramdag.utils.config_section` rejects a variant with a missing or unknown key. `experiments/` is split into `paper/`, `benchmarks/` and
-`misc/`, each with its own `data/`, `ground_truth/`, `tests/` and `results/`;
-only `common.py` (output layout) and `check.py` (ground-truth comparison) are
-shared. The area tests run in the ordinary `uv run pytest`.
+`misc/`. `paper` and `misc` each own their `data/`, `ground_truth/`, `tests/`
+and `results/`; `benchmarks/` measures speed on the other two's data and pins
+no ground truth, writing up its numbers in `docs/` instead. Only `common.py`
+(output layout) and `check.py` (ground-truth comparison) are shared. The area tests run in the ordinary `uv run pytest`.
 See `experiments/README.md`.
 
 ## Architecture (src/tramdag/)
@@ -155,7 +156,8 @@ extra control points on, so `n_coeffs=20` is order 21 where the reference's
   flow SUBTRACTS → fitted weights −0.2 / +0.3; the C.4 odds-ratio check gives
   OR ≈ e² ≈ 7.4. `vaca`: E[x3|do(x2=a)] = −0.25 + 0.25a (do(x2=−3) is off-manifold
   extrapolation — looser tolerance). `carefl`: counterfactuals are analytic
-  (`Carefl4.true_counterfactual`); the paper's x_obs has a ~4σ abducted noise, so
+  (`Carefl4.true_counterfactual`); the paper's x_obs has a ~2.9σ abducted noise (4.07 in units of the Laplace
+  scale b = 1/√2), so
   typical held-out rows are scored instead of that single point.
 - **`validate_ls`** (`experiments/misc/data/magic-mrclean/ls`, seed 7, n=1275, full data,
   `restore_best=False`): flow = statsmodels = R polr at Age 0.0526, NIHSSa 0.1630,
@@ -180,7 +182,8 @@ extra control points on, so `n_coeffs=20` is order 21 where the reference's
   stroke storyline); it is frozen input data. Recover the generator from
   `pre-experiments-cut` if it ever needs regenerating.
 - Fit checks for the paper DGPs train on the paper protocol (n=40k, 500 epochs),
-  not the frozen n=5k CSVs — β13 multiplies the low-variance x1 ∈ [0.25, 0.73] and
+  not the frozen n=5k CSVs — β13 multiplies x1, whose two mixture components sit at 0.25 and 0.73
+  (sd 0.254 against unit-scale x2), so it is
   is too weakly identified at n=5k.
 
 ## Roadmap notes

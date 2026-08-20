@@ -1,5 +1,5 @@
 {
-  "_note": "Paper Sec. 6.1 truth: beta12 +2, beta13 -0.2, beta23 +0.3. beta13 multiplies the low-variance x1 in [0.25, 0.73] and is weakly identified, so the fitted value sits above the truth.",
+  "_note": "Paper Sec. 6.1 truth: beta12 +2, beta13 -0.2, beta23 +0.3. beta13 multiplies x1, a two-component mixture at 0.25 and 0.73 with sd 0.254 against unit-scale x2, so it is weakly identified and the fitted value sits above the truth.",
   "beta12": {
     "value": 1.9825026988983154,
     "atol": 0.05

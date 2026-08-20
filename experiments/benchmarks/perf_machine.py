@@ -7,8 +7,10 @@ stopping — identical work on every machine), on every available device
 - **intro**  (n=5,000):  the 4-node SCM from ``notebooks/intro_tram_dag.py``
   (mixed continuous + ordinal, ls/cs terms) — measures per-step overhead,
   the regime of typical tabular fits.
-- **large**  (n=50,000): all-``ci`` flow on the bimodal VACA benchmark
-  (ships with the package) — measures throughput, the regime where GPUs help.
+- **large**  (n=50,000): all-``ci`` flow on the bimodal VACA benchmark, whose
+  generator is copied into this file (the wheel ships ``src/tramdag`` only, and
+  this script has to run from a bare ``curl``) — measures throughput, the
+  regime where GPUs help.
 
 Usage on any machine (no repo clone needed)::
 

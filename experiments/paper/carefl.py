@@ -6,7 +6,7 @@ is the one benchmark where a flow's abduction can be scored against exact
 values instead of a second sample.
 
 Two things are measured. The paper's Fig. 6 curves at its single observation
-``x_obs``, and — because that observation sits at a roughly 4-sigma abducted
+``x_obs``, and — because that observation sits at a roughly 2.9-sigma abducted
 noise value and is therefore a hard extrapolation — the mean absolute
 counterfactual error over a sample of typical held-out rows, which is the
 number to watch for regressions.

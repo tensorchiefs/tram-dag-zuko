@@ -1,5 +1,5 @@
 {
-  "_note": "Paper Sec. 5.3. Counterfactuals are analytic. The Fig. 6 errors are at the paper's single x_obs, whose abducted noise is ~4 sigma; the cf_mae values over typical held-out rows are the regression signal. Measured with the reference implementation's own comparison net (comparison/utils.R::make_model: dense(10, tanh) -> dense(100, tanh)), M = 30 as in comparison/carefl_fig5.r.",
+  "_note": "Paper Sec. 5.3. Counterfactuals are analytic. The Fig. 6 errors are at the paper's single x_obs, whose abducted noise is -2.88, i.e. ~2.9 sigma (the Laplace scale is b = 1/sqrt(2), so sigma = 1.0; in units of b it is 4.07); the cf_mae values over typical held-out rows are the regression signal. Measured with the reference implementation's own comparison net (comparison/utils.R::make_model: dense(10, tanh) -> dense(100, tanh)), M = 30 as in comparison/carefl_fig5.r.",
   "fig6_max_abs_err_x3": {
     "max": 4.098363
   },

@@ -9,8 +9,12 @@ Research code, kept out of the installed `tramdag` package. One directory per
 | [`benchmarks/`](benchmarks/) | training-speed and cross-machine measurements |
 | [`misc/`](misc/) | everything else — currently the classical-MLE validation |
 
-An area contains its own `data/`, `ground_truth/`, `results/` (gitignored),
-`tests/` and whatever helpers only it needs. Only two files are shared:
+A `paper`/`misc` area contains its own `data/`, `ground_truth/`, `results/`
+(gitignored), `tests/` and whatever helpers only it needs. `benchmarks/` is the
+exception by nature: it measures training speed *on* the other areas' data, so
+it reads `misc/data/` and `paper/data/` and commits no ground truth of its own —
+its output is a write-up in `docs/`, not a pinned number. Only two files are
+shared:
 [`common.py`](common.py) (the output layout the workflow reads) and
 [`check.py`](check.py) (the ground-truth comparison).
 
@@ -28,7 +32,8 @@ uv run pytest experiments                                        # the area chec
 
 Every run writes to `<area>/results/<name>/`: `metrics.json` (the numbers CI
 checks), `report.md` (the table plus figures, posted as a commit comment by the
-experiments workflow), `plots/*.png` and `flow.pt`.
+experiments workflow), `flow.pt`, and `plots/*.png` for the runs that draw
+figures — `validate_ls` is a numbers-only comparison and draws none.
 
 ## The scripts
 

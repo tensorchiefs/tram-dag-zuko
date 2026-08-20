@@ -25,9 +25,13 @@ parameters*. Each node owns the pieces for its own conditional `p(x_i | pa(x_i))
   The transform itself carries **no learnable weights**, only the fitted
   range buffers `xmin`/`xmax`. The `θ` from the intercept sets its shape
   entirely.
-- a `ModuleDict` of **shift modules**, one per parent edge:
-  [`LinearShift`](../src/tramdag/conditioners.py) (`ls`, a single weight) or
-  [`ComplexShift`](../src/tramdag/conditioners.py) (`cs`, an MLP).
+- a `ModuleDict` of **shift modules**, one per shift *term* — which is one per
+  parent edge except for a joint `CS("a","b")`, a single module keyed `"a+b"`
+  that owns both edges:
+  [`LinearShift`](../src/tramdag/conditioners.py) (`LS`, a single weight),
+  [`ComplexShift`](../src/tramdag/conditioners.py) (`CS`, an MLP) or
+  [`VaryingCoef`](../src/tramdag/conditioners.py) (`VC`, `beta0` plus a
+  penalized head).
 
 So is this one network or several? It is **one module, several independent per-node
 sub-models** (each itself a small intercept + shifts assembly). One module bundles

@@ -5,7 +5,10 @@
 
 # The paper does not state a training protocol for this benchmark (App. C.1
 # describes the DGP only), so every number below is this repository's choice,
-# carried over unchanged from the pre-0.4 script.
+# carried over from the pre-0.4 script. One deliberate difference: that script
+# drew the observational sample at seed 0 and the interventional ones at seed 1;
+# here sample_seed covers both, which is why the interventional means moved
+# slightly when the restructure landed.
 
 #   * the reference implementation's own VACA comparison
 #     (comparison/Figure_Triangle_Linear_Bimodal.R) used M = 30, 10000 epochs

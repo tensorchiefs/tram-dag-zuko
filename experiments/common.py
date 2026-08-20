@@ -2,9 +2,10 @@
 
 Experiments live in one directory per area — ``paper/`` (the replications of
 arXiv:2503.16206), ``benchmarks/`` (training and machine speed) and ``misc/``
-(everything else, currently the classical-MLE validation). Each area owns its
-own ``data/``, ``ground_truth/``, ``results/``, ``tests/`` and whatever
-helpers only it needs.
+(everything else, currently the classical-MLE validation). ``paper`` and
+``misc`` each own their ``data/``, ``ground_truth/``, ``results/``, ``tests/``
+and whatever helpers only they need. ``benchmarks`` measures speed on the other
+two's data, so it reads theirs and pins no ground truth of its own.
 
 What is left here is the output layout the experiments workflow reads:
 ``results/<name>/`` with ``metrics.json``, ``report.md`` and ``plots/``.

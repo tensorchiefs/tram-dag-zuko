@@ -94,7 +94,7 @@ def test_ls_coefficients_skips_network_shifts():
 
     Reading `.weight` off every shift module used to raise an
     AttributeError on a ComplexShift, which broke the paper's headline
-    complex-shift replication (`experiments/triangle.py atan-cs`).
+    complex-shift replication (`experiments/paper/triangle.py atan-cs`).
     """
     from tramdag import CS, LS, VC, CausalFlowDAG, ContinuousNode, OrdinalNode
 

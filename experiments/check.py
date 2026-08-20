@@ -4,7 +4,7 @@ The experiments workflow calls this after each run. Ground truth lives in
 ``<area>/ground_truth/<result-dir>.json`` as one entry per metric::
 
     {"_note": "what these numbers mean",
-     "beta12": {"value": 2.0012, "atol": 0.05},
+     "beta12": {"value": 1.9825, "atol": 0.05},
      "cs_curve_max_abs_err": {"max": 0.23}}
 
 Two forms. ``{value, atol}`` is two-sided, for a quantity that should stay
@@ -43,7 +43,8 @@ def compare(area: str, name: str) -> tuple[list[str], list[str], list[str]]:
     Parameters
     ----------
     area : str
-        Experiment area: ``paper``, ``benchmarks`` or ``misc``.
+        Experiment area: ``paper`` or ``misc`` — the two that commit ground
+        truth (see ``AREAS``).
     name : str
         Name of the results directory, for example ``"triangle-atan-cs"``.
 

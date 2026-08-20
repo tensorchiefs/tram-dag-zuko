@@ -5,9 +5,12 @@
 [![CI](https://github.com/tensorchiefs/tramdag/actions/workflows/ci.yml/badge.svg)](https://github.com/tensorchiefs/tramdag/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-> ⚠️ **Status: beta (0.x), under active development.** The API may change between
-> releases until 1.0; pin a version (`tramdag==0.3.*`, the current release)
-> for reproducibility.
+> ⚠️ **Status: beta (0.x), under active development.** The API may change
+> between releases until 1.0, so pin a version for reproducibility. Note that
+> this README documents the **unreleased 0.4** API: the term constructors
+> (`SI`/`CI`/`VC`), `scores`, `varying_coef` and `intercept_contributions` are
+> not in `0.3.0` on PyPI. Until 0.4 ships, install from git to follow the docs
+> below.
 
 **TRAM-DAGs** model each variable of a structural causal model with a
 (transformation-model) flow: one triangular normalizing flow from iid
@@ -190,8 +193,9 @@ experiments/            research code, one directory per area, each self-contain
                           paper/       the replications + generators + frozen data
                           benchmarks/  training-speed and machine measurements
                           misc/        the classical-MLE validation
-                        each area: <name>.py + <name>.yaml, data/, ground_truth/,
-                        tests/, results/
+                        paper/misc: <name>.py + <name>.yaml, data/,
+                        ground_truth/, tests/, results/ (benchmarks reads the
+                        other areas' data and pins no ground truth)
 notebooks/              four executed examples: didactic intro, Colab demo,
                         additive-vs-joint intercepts, varying coefficients
 docs/                   code-map.md (every class/function + all knobs),

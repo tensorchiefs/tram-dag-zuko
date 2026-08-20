@@ -393,7 +393,7 @@ def make_univariate_transform(name: str, **kwargs) -> _ScaledUT:
 
     Raises
     ------
-    ValueError
+    KeyError
         If ``name`` is not registered.
     """
     return _TRANSFORMS[name](**kwargs)
