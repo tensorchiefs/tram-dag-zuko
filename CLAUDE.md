@@ -35,8 +35,8 @@ uv run python -m paper.check_data            # frozen data still regenerates
 Every experiment reads its hyperparameters from its sibling `<script>.yaml` and
 has **no defaults in code**; `experiments/common.py::load_variant` parses it and
 `tramdag.utils.config_section` rejects a variant with a missing or unknown key. `experiments/` is split into `paper/`, `benchmarks/` and
-`misc/`. `paper` and `misc` each own their `data/`, `ground_truth/`, `tests/`
-and `results/`; `benchmarks/` measures speed on the other two's data and pins
+`misc/`, with `experiments/tests/` for the shared `check.py`. `paper` and `misc`
+each own their `data/`, `ground_truth/`, `tests/` and `results/`; `benchmarks/` measures speed on the other two's data and pins
 no ground truth, writing up its numbers in `docs/` instead. Only `common.py`
 (output layout) and `check.py` (ground-truth comparison) are shared. The area tests run in the ordinary `uv run pytest`.
 See `experiments/README.md`.

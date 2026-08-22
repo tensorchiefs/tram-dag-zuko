@@ -16,13 +16,21 @@ fails on another machine for no reason (measured: one such bound passed at
 0.028 here and failed CI at 0.113). Above **4x** it cannot catch a regression.
 A bound outside the band is reported as ``note`` — not a failure, because a
 tolerance is a judgement call, but visibly, so it gets re-pinned deliberately
-rather than drifting. A bound that is *meant* to sit outside it carries a
-``"why"`` string, which is printed in place of the note::
+rather than drifting. A bound that is *meant* to be wide carries a ``"why"``
+string, which is printed in place of the note::
 
     "max_abs_diff_flow_vs_statsmodels": {
       "max": 0.25,
       "why": "the max is over a coefficient with 7 of 1275 observations: 0.028
               here, 0.113 on the CI runner"}
+
+A ``"why"`` excuses width only. The *too tight* note always fires, because no
+argument makes a bound below 1.5x its measurement survive another machine.
+
+A ``{value, atol}`` center decays the other way: it keeps passing while
+describing an older run, drifting through its tolerance until one machine
+tips it over. A measurement past **half** its ``atol`` is reported the same
+way, so the center gets re-pinned while it still passes.
 
 A key starting with an underscore is a note for the reader and is skipped.
 
@@ -110,9 +118,9 @@ def compare(area: str, name: str) -> tuple[list[str], list[str], list[str]]:
                 if "why" in expected:
                     bound += f", deliberately wide: {expected['why']}"
                 notes.append(f"{metric}: {measured:+.4f} ({bound})")
-                if measured > 0 and "why" not in expected:
+                if measured > 0:
                     ratio = expected["max"] / abs(measured)
-                    if ratio > 4.0:
+                    if ratio > 4.0 and "why" not in expected:
                         loose.append(
                             f"{metric}: bound {expected['max']} is {ratio:.1f}x the "
                             f"measurement — too loose to catch a regression"
@@ -132,6 +140,13 @@ def compare(area: str, name: str) -> tuple[list[str], list[str], list[str]]:
             )
         else:
             notes.append(f"{metric}: {measured:+.4f} (within {expected['atol']})")
+            if deviation > 0.5 * expected["atol"]:
+                share = deviation / expected["atol"]
+                loose.append(
+                    f"{metric}: {measured:+.6f} sits {share:.0%} of the way to "
+                    f"its tolerance — the center describes an older run, "
+                    f"re-pin it from this one"
+                )
     for metric in metrics:
         if metric not in truth:
             unchecked.append(f"{metric}: {metrics[metric]}")

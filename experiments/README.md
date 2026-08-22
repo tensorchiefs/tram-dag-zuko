@@ -28,6 +28,7 @@ uv run --group experiments python -m paper.triangle atan-cs      # fit + figures
 uv run --group experiments python -m check paper triangle-atan-cs  # vs ground truth
 uv run --group experiments python -m paper.check_data             # frozen data regenerates
 uv run pytest experiments                                        # the area checks (seconds)
+uv run pytest experiments/tests                                  # the shared check.py
 ```
 
 Every run writes to `<area>/results/<name>/`: `metrics.json` (the numbers CI
@@ -100,9 +101,12 @@ ground-truth entry the run no longer produces.
 
 A `{max}` bound is only informative in a band: below **1.5x** its measurement it
 fails on another machine for no reason, above **4x** it cannot catch a
-regression. `check.py` reports a bound outside that band — as a note, not a
-failure, because a tolerance is a judgement call. A bound that is *meant* to sit
-outside it says so in a `"why"` string, which is printed instead:
+regression. A `{value, atol}` center decays the other way — it keeps passing
+while describing an older run. `check.py` reports both as notes, not failures,
+because a tolerance is a judgement call: a bound outside the band, and a
+measurement more than half-way to its `atol`. A bound that is *meant* to be wide
+says so in a `"why"` string, which is printed instead (it excuses width only —
+the too-tight note always fires):
 
 ```json
 "max_abs_diff_flow_vs_statsmodels": {

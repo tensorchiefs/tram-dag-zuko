@@ -176,12 +176,17 @@ def score_counterfactuals(
     Two reference points come with the P(true level) score, because that score
     is **not** maximized by the truth. Scoring the analytic law itself gives
     ``E[p_true] = E[sum_i p_i^2]``: what a model that knew the identifiable
-    distribution exactly would score. The attainable maximum is
-    ``E[max_i p_i]``, reached by always naming the modal level — a strictly
-    worse *distribution* estimate that this score nonetheless rewards. A flow
-    slightly above the analytic reference is therefore sharper than the
-    identifiable law, not better than it, and ``cf_pmf_tv_vs_analytic`` is the
-    metric that cannot be gamed that way.
+    distribution exactly would score. The largest *expected* score is
+    ``E[max_i p_i]``, from always naming the modal level — a strictly worse
+    *distribution* estimate that this score nonetheless rewards.
+
+    Both are expectations, and this metric is one finite draw of ``cf_n`` rows,
+    so neither is a per-run ceiling: on the ``linear`` DGP the mode predictor
+    itself scores 0.829 against its own 0.806 expectation. Read them as
+    reference points a run should sit between, and read
+    ``cf_pmf_tv_vs_analytic`` as the metric that cannot be gamed by sharpening
+    a prediction — a flow slightly above the analytic reference is sharper than
+    the identifiable law, not better than it.
     """
     do = {"x1": config["do_x1"]}
     factual, realised = generator.counterfactual_pair(config["cf_n"], do)

@@ -69,17 +69,58 @@
 
 ### Fixed
 
+- **`check.py` had no test, and the escape hatch it grew hid the thing it was
+  meant to expose.** A `"why"` on a `{max}` entry silenced *both* edges of the
+  band check, so three `validate_ls` bounds sat 12x, 141x and 566x above their
+  measurements — one of them the entry introduced as "the precision claim" —
+  and a fabricated 560x regression passed with an `ok`. A `"why"` now excuses
+  width only; no argument survives a bound below 1.5x its measurement. The
+  three bounds are re-derived from a stated floor (1e-3, the accuracy any
+  comparison here claims) rather than inherited from the classical variant,
+  whose scale they do not share.
+
+  The other decay mode had no check at all: a `{value, atol}` center keeps
+  passing while drifting through its tolerance, which is exactly how two
+  centers reached 62% and 75% before anyone noticed. A measurement past half
+  its `atol` is now reported the same way.
+
+  `experiments/tests/test_check.py` covers all of it — including that a better
+  fit never fails a `{max}`, that a `"why"` cannot silence a too-tight bound,
+  and that a truth entry whose metric disappeared is an error. It is the first
+  test the file has had, and the band logic had never run on a real input:
+  every committed bound was inside the band.
+
+- **vaca's ground truth pinned each flow mean *and* bounded its error against
+  the analytic truth.** Those are two windows on one number, offset by
+  `|center - analytic|`, and they disagreed: a run landing exactly on the
+  pinned `do(x2=-3)` mean would have failed its own paired bound (error 0.0605
+  against a bound of 0.0324). Setting the `atol` to the bound, as a first
+  attempt did, does not fix it unless the center *is* the analytic value. The
+  three centers are gone; the analytic value and the error bound determine the
+  flow mean between them, and the run report still prints it.
+
+- **The autoresearch write guard did not cover the numbers.** It denied edits
+  to `tests/`, `data/` and the benchmark harness — but the target values moved
+  to `experiments/*/ground_truth/` in this release, and that path was
+  unguarded.
+
 - **The ordinal counterfactual score had a reference point that was not a
   bound.** `cf_prob_true_level_ceiling` was documented as "the best any model
   could do". It is `E[p_true] = E[sum_i p_i^2]`: what a model that knew the
-  identifiable law exactly would score. `P(realised level)` is maximized by
-  always naming the *modal* level, which scores `E[max_i p_i]` — a strictly
-  worse distribution estimate. The metric is now
-  `cf_prob_true_level_analytic`, with `cf_prob_true_level_mode_bound`
-  alongside it (0.921 and 0.954 on the mixed DGP). This surfaced when the
-  corrected architecture pushed the flow to 0.924, i.e. *above* its own
-  stated ceiling: the flow is slightly sharper than the identifiable law, and
-  `cf_pmf_tv_vs_analytic` is the metric that cannot be gamed that way.
+  identifiable law exactly would score. The largest *expected* score is
+  `E[max_i p_i]`, from always naming the *modal* level — a strictly worse
+  distribution estimate. The metric is now `cf_prob_true_level_analytic`, with
+  `cf_prob_true_level_mode_bound` alongside it (0.921 and 0.954 on the mixed
+  DGP). This surfaced when the corrected architecture pushed the flow to 0.924,
+  i.e. *above* its own stated ceiling.
+
+  Both references are expectations while the metric is one finite draw, so
+  neither is a per-run ceiling either: on the `linear` DGP the mode predictor
+  scores **0.829** against its own 0.806 expectation, an overshoot larger than
+  the 0.003 gap the metric was introduced to explain. Measured, after a review
+  called the first wording ("the attainable maximum") false. Read the two as
+  reference points a run sits between, and `cf_pmf_tv_vs_analytic` as the
+  metric that cannot be gamed by sharpening a prediction.
 
 - **Ground-truth centers now follow the code.** The architecture change moved
   every complex-shift variant, but only two files were re-pinned, so several
@@ -104,10 +145,8 @@
   number (counterfactual MAE 0.078/0.059/0.086 against bounds
   0.216/0.174/0.219) and VACA's off-manifold `do(x2=-3)` mean lands 0.037
   from the analytic truth instead of 0.21. Ground truth re-pinned, and the
-  `{max}` bounds re-pinned at 2.5x the measurement, or measurement + 0.02
-  where that is larger so a near-zero error keeps usable headroom. They had
-  drifted to 2.6-19.5x, which checks nothing. The rule never loosens a bound:
-  where 2.5x exceeded the committed value, the committed value stands.
+  `{max}` bounds re-pinned into a band — see the later entry on ground-truth
+  centers for the rule that replaced this pass's first attempt at one.
 
 - **The `conditioners` provenance claim was wrong.** The module, README,
   CLAUDE.md and `docs/code-map.md` all said the default architectures come

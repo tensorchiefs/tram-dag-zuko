@@ -37,8 +37,8 @@
     "atol": 0.0001
   },
   "max_abs_diff_flow_vs_statsmodels": {
-    "max": 0.0054347694,
-    "why": "same sparse level as the classical variant, and an Adam fit at float32 is the least machine-stable path in the repo"
+    "max": 0.004348,
+    "why": "a floor, not a multiple: this Adam fit agrees to 4.3e-04, far below the 1e-3 that any comparison in this repo claims, and nothing has measured its cross-machine spread. Tightening to 2.5x a 1e-5 measurement would fail on another machine for no reason"
   },
   "ate_flow": {
     "value": 0.14285694062709808,
@@ -57,11 +57,11 @@
     "atol": 1e-09
   },
   "ate_abs_diff_flow_vs_statsmodels": {
-    "max": 0.0020142968,
-    "why": "an Adam fit at float32 against statsmodels: nothing has measured this agreement's cross-machine spread, so the headroom stays"
+    "max": 0.001,
+    "why": "a floor, not a multiple: this Adam fit agrees to 1.4e-05, far below the 1e-3 that any comparison in this repo claims, and nothing has measured its cross-machine spread. Tightening to 2.5x a 1e-5 measurement would fail on another machine for no reason"
   },
   "max_abs_diff_named_coefs": {
-    "max": 0.01,
-    "why": "kept at the classical variant's bound, so the two variants are compared on one scale"
+    "max": 0.001,
+    "why": "a floor, not a multiple: this Adam fit agrees to 1.8e-05, far below the 1e-3 that any comparison in this repo claims, and nothing has measured its cross-machine spread. Tightening to 2.5x a 1e-5 measurement would fail on another machine for no reason"
   }
 }
