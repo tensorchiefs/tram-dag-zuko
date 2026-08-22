@@ -13,12 +13,12 @@ import matplotlib
 
 matplotlib.use("Agg")  # headless: the scripts only write files
 
-import matplotlib.pyplot as plt  # noqa: E402
-import numpy as np  # noqa: E402
-import pandas as pd  # noqa: E402
-import torch  # noqa: E402
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+import torch
 
-from tramdag import CausalFlowDAG  # noqa: E402
+from tramdag import CausalFlowDAG
 
 
 # ------------------------------------------------------------------ fitting
@@ -183,6 +183,7 @@ def plot_cs_curve(grid, fitted, true, path: Path, title: str) -> float:
     return float(np.max(np.abs(anchored - true)))
 
 
+# complexipy: ignore - split planned in the complexity-reduction PR
 def plot_hist_grid(
     dgp_samples: dict,
     flow_samples: dict,

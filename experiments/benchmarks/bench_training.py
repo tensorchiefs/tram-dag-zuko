@@ -35,12 +35,12 @@ from pathlib import Path
 import matplotlib
 
 matplotlib.use("Agg")
-import matplotlib.pyplot as plt  # noqa: E402
-import numpy as np  # noqa: E402
-import pandas as pd  # noqa: E402
-import torch  # noqa: E402
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+import torch
 
-from tramdag import LS, CausalFlowDAG, ContinuousNode, I, OrdinalNode  # noqa: E402
+from tramdag import LS, CausalFlowDAG, ContinuousNode, I, OrdinalNode
 
 HERE = Path(__file__).resolve().parent
 EXPERIMENTS = HERE.parent
@@ -226,7 +226,9 @@ def run_lbfgs(seed: int, warm_epochs: int = 0) -> dict:
 
     t_tight = t_pract = None
     loss = float("inf")
-    for it in range(15):  # up to 15 x 40 inner iterations
+    iters = 0
+    for _ in range(15):  # up to 15 x 40 inner iterations
+        iters += 1
         loss = float(opt.step(closure))
         t = time.perf_counter() - t0
         if t_pract is None and loss <= ref + TOL_PRACT["stroke-ls"]:
@@ -244,14 +246,15 @@ def run_lbfgs(seed: int, warm_epochs: int = 0) -> dict:
         "time_to_target_s": t_tight,
         "time_to_practical_s": t_pract,
         "total_time_s": time.perf_counter() - t0,
-        "epochs_run": warm_epochs + (it + 1) * 40,
+        "epochs_run": warm_epochs + iters * 40,
         "final_nll": loss,
         "epochs_to_target": None,
     }
 
 
 # ----------------------------------------------------------------------- main
-def main():
+# complexipy: ignore
+def main():  # noqa: C901 - split planned in the complexity-reduction PR
     ap = argparse.ArgumentParser()
     ap.add_argument("--quick", action="store_true", help="1 seed, cpu only")
     ap.add_argument(
@@ -315,7 +318,7 @@ def main():
                         tt = f"{t_tight:6.1f}s" if t_tight else "  MISS "
                         tp = f"{t_pract:6.1f}s" if t_pract else "  MISS "
                         print(
-                            f"  {label:16s} b={str(batch):5s} {device:3s} "
+                            f"  {label:16s} b={batch!s:5s} {device:3s} "
                             f"seed {seed}: practical @ {tp}  tight @ {tt}  "
                             f"(ran {len(nll)} ep, {wall:.1f}s)"
                         )

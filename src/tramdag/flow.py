@@ -107,6 +107,7 @@ class _Node(nn.Module):
         The full DAG specification. Needed for the parent feature widths.
     """
 
+    # complexipy: ignore - split planned in the complexity-reduction PR
     def __init__(self, node: NodeSpec, spec: dict[str, NodeSpec]):
         super().__init__()
         self.kind = node.kind
@@ -221,6 +222,7 @@ class _Node(nn.Module):
             t = t - vc_ehat[g.on].view(-1, 1)
         return t
 
+    # complexipy: ignore - split planned in the complexity-reduction PR
     def theta_shift(
         self, feats: dict[str, Tensor], n: int, vc_ehat: dict[str, Tensor] | None = None
     ) -> tuple[Tensor, Tensor]:
@@ -537,7 +539,8 @@ class CausalFlowDAG(nn.Module):
                     node.intercept.theta.copy_(ordinal_marginal_init_theta(counts))
                 node.intercept._marginal_inited = True
 
-    def fit(
+    # complexipy: ignore
+    def fit(  # noqa: C901 - split planned in the complexity-reduction PR
         self,
         train_df: pd.DataFrame,
         val_df: pd.DataFrame | None = None,
@@ -888,6 +891,7 @@ class CausalFlowDAG(nn.Module):
             )
         return out
 
+    # complexipy: ignore - split planned in the complexity-reduction PR
     def _vc_warm_start(self, train_df: pd.DataFrame) -> None:
         """Initialize every VC term's ``beta0`` from the classical solution.
 
@@ -1157,6 +1161,7 @@ class CausalFlowDAG(nn.Module):
                 out[name] = linear
         return out
 
+    # complexipy: ignore - split planned in the complexity-reduction PR
     def to_matrix(self) -> pd.DataFrame:
         """Give the labeled adjacency matrix of term effects.
 
@@ -1621,7 +1626,10 @@ class CausalFlowDAG(nn.Module):
             If ``node`` is continuous.
         """
         if not isinstance(self.spec[node], OrdinalNode):
-            raise ValueError(f"pmf() requires an ordinal node, '{node}' is continuous.")
+            # a domain error (wrong node kind), not a Python type error
+            raise ValueError(  # noqa: TRY004
+                f"pmf() requires an ordinal node, '{node}' is continuous."
+            )
         df_local = df.copy()
         for col, val in (do or {}).items():
             df_local[col] = val

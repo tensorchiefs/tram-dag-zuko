@@ -26,23 +26,22 @@ from .spec import (
 from .utils import machine_info
 
 __all__ = [
+    "CI",
+    "CS",
+    "LS",
+    "SI",
+    "VC",
     "CausalFlowDAG",
     "ContinuousNode",
-    "OrdinalNode",
-    "machine_info",
-    # term-formula notation: short aliases and their definitions
-    "Term",
     "I",
-    "intercept",
-    "SI",
-    "simple_intercept",
-    "CI",
+    "OrdinalNode",
+    "Term",
     "complex_intercept",
-    "LS",
-    "linear_shift",
-    "CS",
     "complex_shift",
-    "VC",
+    "intercept",
+    "linear_shift",
+    "machine_info",
+    "simple_intercept",
     "varying_coefficient",
 ]
 __version__ = version("tramdag")

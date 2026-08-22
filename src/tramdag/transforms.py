@@ -29,17 +29,17 @@ from zuko.transforms import (
 )
 
 __all__ = [
-    "StandardLogistic",
+    "AffineUT",
     "BernsteinUT",
     "SplineUT",
-    "AffineUT",
+    "StandardLogistic",
     "make_univariate_transform",
+    "ordinal_abduct",
     "ordinal_cutpoints",
-    "ordinal_marginal_init_theta",
     "ordinal_log_prob",
+    "ordinal_marginal_init_theta",
     "ordinal_pmf",
     "ordinal_sample",
-    "ordinal_abduct",
 ]
 
 # half-width B of the pre-scaled domain [-B, B]. Fixed: nothing ever set it,

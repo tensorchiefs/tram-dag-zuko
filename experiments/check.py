@@ -58,7 +58,10 @@ HERE = Path(__file__).resolve().parent
 AREAS = ("paper", "misc")
 
 
-def compare(area: str, name: str) -> tuple[list[str], list[str], list[str]]:
+# complexipy: ignore
+def compare(  # noqa: C901 - split planned in the complexity-reduction PR
+    area: str, name: str
+) -> tuple[list[str], list[str], list[str]]:
     """Compare one result directory against its ground truth.
 
     Parameters
@@ -147,9 +150,9 @@ def compare(area: str, name: str) -> tuple[list[str], list[str], list[str]]:
                     f"its tolerance — the center describes an older run, "
                     f"re-pin it from this one"
                 )
-    for metric in metrics:
-        if metric not in truth:
-            unchecked.append(f"{metric}: {metrics[metric]}")
+    unchecked.extend(
+        f"{metric}: {metrics[metric]}" for metric in metrics if metric not in truth
+    )
     return failures, notes, unchecked, loose
 
 

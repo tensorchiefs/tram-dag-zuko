@@ -92,7 +92,7 @@ def plot_curves(alphas, flow_x3, flow_x4, truth, path) -> dict:
         (flow_x4, truth["x4_cf_do_x1"], "would $x_1$ have been $\\alpha$", "$x_4$"),
     ]
     fig, axes = plt.subplots(1, 2, figsize=(9, 3.6))
-    for ax, (fitted, true, xlabel, ylabel) in zip(axes, panels):
+    for ax, (fitted, true, xlabel, ylabel) in zip(axes, panels, strict=True):
         ax.plot(alphas, true, "-", color="C3", lw=2, label="DGP (analytic)")
         ax.plot(alphas, fitted, "o", ms=3, color="C0", label="flow")
         ax.set_xlabel(xlabel)

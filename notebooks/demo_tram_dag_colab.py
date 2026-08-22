@@ -132,7 +132,7 @@ df = sample_dgp(50_000, seed=43)
 train, val = df.iloc[:45_000], df.iloc[45_000:]
 
 fig, axes = plt.subplots(1, 3, figsize=(11, 3))
-for ax, c in zip(axes, df.columns):
+for ax, c in zip(axes, df.columns, strict=True):
     ax.hist(df[c], bins=80, density=True, alpha=0.7)
     ax.set_title(f"observed ${c[0]}_{c[1]}$")
 fig.suptitle("50,000 observational samples — note the bimodal $x_1$")
@@ -190,7 +190,7 @@ tot_va = np.array([sum(d.values()) for d in hist["val"]])
 fig, ax = plt.subplots(figsize=(7.5, 3.6))
 ax.plot(ep, tot_tr, label="train NLL (total)")
 ax.plot(ep, tot_va, label="val NLL (total)")
-for i, (name, e) in enumerate(
+for _, (name, e) in enumerate(
     sorted(hist.get("frozen", {}).items(), key=lambda kv: kv[1])
 ):
     ax.axvline(e, ls="--", lw=1, color="gray")
@@ -249,7 +249,7 @@ plt.show()
 # %%
 fig, axes = plt.subplots(1, 3, figsize=(11, 3.2), sharey=True)
 print("E[x3 | do(x2=a)]:   analytic    TRAM-DAG")
-for ax, a in zip(axes, (-3.0, -1.0, 0.0)):
+for ax, a in zip(axes, (-3.0, -1.0, 0.0), strict=True):
     truth = sample_dgp(50_000, seed=543, do={"x2": a})
     fl = flow.sample(50_000, do={"x2": a}, seed=2)
     bins = np.linspace(truth["x3"].quantile(0.001), truth["x3"].quantile(0.999), 70)
@@ -294,7 +294,7 @@ print(f"abduction -> reconstruction: max |error| = {err:.2e}  (exact recovery)")
 
 cf_flow = flow.sample(do={"x1": 0.0}, u=u)
 fig, axes = plt.subplots(1, 2, figsize=(9, 3.6))
-for ax, c in zip(axes, ["x2", "x3"]):
+for ax, c in zip(axes, ["x2", "x3"], strict=True):
     ax.scatter(cf_true[c], cf_flow[c], s=4, alpha=0.4)
     lims = [cf_true[c].min(), cf_true[c].max()]
     ax.plot(lims, lims, "k--", lw=1)

@@ -37,7 +37,7 @@ from .conditioners import LinearShift
 from .spec import OrdinalNode
 from .transforms import _bounds
 
-__all__ = ["node_scores", "effect_modifier_scan", "sup_bb_pvalue"]
+__all__ = ["effect_modifier_scan", "node_scores", "sup_bb_pvalue"]
 
 # 5% critical value of sup |Brownian bridge| (Kolmogorov distribution)
 CRIT_5PCT = 1.3581
@@ -60,6 +60,7 @@ def _dl_ds(
     return (sl * (1 - sl) - su * (1 - su)) / (su - sl)
 
 
+# complexipy: ignore - split planned in the complexity-reduction PR
 def node_scores(flow, df: pd.DataFrame, node: str) -> pd.DataFrame:
     """Compute the per-observation scores of the interpretable coefficients.
 

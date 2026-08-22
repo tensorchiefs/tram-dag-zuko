@@ -151,14 +151,14 @@ def compare_coefficients(flow, statsmodels_result, reference) -> tuple[dict, lis
             statsmodels_result.params["T[1]"],
         ),
     ]
-    for level in range(1, 6):
-        rows.append(
-            (
-                f"mRS_pre_{level} (vs 0)",
-                float(fitted["mRS_pre"][level] - fitted["mRS_pre"][0]),
-                statsmodels_result.params[f"mRS_pre[{level}]"],
-            )
+    rows.extend(
+        (
+            f"mRS_pre_{level} (vs 0)",
+            float(fitted["mRS_pre"][level] - fitted["mRS_pre"][0]),
+            statsmodels_result.params[f"mRS_pre[{level}]"],
         )
+        for level in range(1, 6)
+    )
 
     metrics = {
         "coef_Age_flow": rows[0][1],

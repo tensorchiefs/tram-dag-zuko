@@ -274,7 +274,7 @@ for center in (False, True):
     )
     b = fc.varying_coef("Y", c_test)
     print(
-        f"center={str(center):5s}  mean |beta - tau| = {np.abs(b - TAU).mean():.3f}"
+        f"center={center!s:5s}  mean |beta - tau| = {np.abs(b - TAU).mean():.3f}"
         f"   mean beta = {b.mean():+.3f}  (true tau {TAU:+.1f})"
     )
 

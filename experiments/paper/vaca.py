@@ -77,6 +77,7 @@ def build_spec(config: dict) -> dict:
     }
 
 
+# complexipy: ignore - split planned in the complexity-reduction PR
 def plot_pairs(observed, sampled, columns, bins, n_scatter, path):
     """Pairs plot: marginals on the diagonal, scatters off it (Fig. 4)."""
     fig, axes = plt.subplots(3, 3, figsize=(9, 9))
@@ -121,7 +122,7 @@ def plot_interventional(generator, flow, config, truth, path) -> dict:
     """Interventional densities per do(x2) value (Fig. 5); give the moments."""
     fig, axes = plt.subplots(1, len(DO_X2_VALUES), figsize=(11, 3.2), sharey=True)
     moments = {}
-    for ax, value in zip(axes, DO_X2_VALUES):
+    for ax, value in zip(axes, DO_X2_VALUES, strict=True):
         dgp = generator.interventional(config["n_compare"], {"x2": value})
         sampled = flow.sample(
             config["n_compare"], do={"x2": value}, seed=config["sample_seed"]

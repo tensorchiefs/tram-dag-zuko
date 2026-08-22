@@ -669,7 +669,10 @@ def node_parents(node: NodeSpec) -> list[str]:
     return list(seen)
 
 
-def validate_and_sort(spec: dict[str, NodeSpec]) -> list[str]:
+# complexipy: ignore
+def validate_and_sort(  # noqa: C901 - split planned in the complexity-reduction PR
+    spec: dict[str, NodeSpec],
+) -> list[str]:
     """Validate the spec and return a topological ordering of the nodes.
 
     Edge ownership: every parent must enter through exactly one

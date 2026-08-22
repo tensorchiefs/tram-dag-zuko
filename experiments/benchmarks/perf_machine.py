@@ -122,7 +122,7 @@ def code_version() -> dict:
                 stderr=subprocess.DEVNULL,
             ).strip()
         )
-    except Exception:
+    except Exception:  # noqa: BLE001, S110 - fail open: provenance is best effort
         pass  # pip-installed / curl'd outside a repo: package version only
     return v
 
@@ -177,6 +177,7 @@ def run_workload(name: str, device: str) -> dict:
 
 
 # -------------------------------------------------------------------- report
+# complexipy: ignore - split planned in the complexity-reduction PR
 def report(directory: str) -> None:
     rows = []
     for f in sorted(Path(directory).glob("*.json")):
@@ -248,6 +249,7 @@ def report(directory: str) -> None:
     print(f"-> {md}")
 
 
+# complexipy: ignore - split planned in the complexity-reduction PR
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument(
@@ -293,7 +295,7 @@ def main() -> None:
                     f"sample {r['sample_100k_s']:.1f}s  "
                     f"NLL {r['final_val_nll']}"
                 )
-            except Exception as e:  # e.g. an op unsupported on mps
+            except Exception as e:  # noqa: BLE001 - record and continue: e.g. mps op gaps
                 results.append(
                     {"workload": wl, "device": dev, "error": f"{type(e).__name__}: {e}"}
                 )

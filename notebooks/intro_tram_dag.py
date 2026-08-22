@@ -291,7 +291,7 @@ df.describe().round(2)
 
 # %%
 fig, axes = plt.subplots(1, 3, figsize=(11, 3.2))
-for ax, (a, b) in zip(axes, [("X1", "X2"), ("X1", "X3"), ("X2", "X3")]):
+for ax, (a, b) in zip(axes, [("X1", "X2"), ("X1", "X3"), ("X2", "X3")], strict=True):
     ax.scatter(df[a], df[b], s=3, alpha=0.25)
     ax.set_xlabel(a), ax.set_ylabel(b)
 axes[2].set_title("the U-shape of the complex shift", fontsize=9)
@@ -430,7 +430,7 @@ for nm in ["X2", "X3", "Y"]:
 samp = flow.sample(len(df), seed=0)
 
 fig, axes = plt.subplots(1, 4, figsize=(13, 3))
-for ax, col in zip(axes[:3], ["X1", "X2", "X3"]):
+for ax, col in zip(axes[:3], ["X1", "X2", "X3"], strict=True):
     bins = np.linspace(df[col].min(), df[col].max(), 60)
     ax.hist(df[col], bins=bins, density=True, alpha=0.45, label="data")
     ax.hist(
@@ -581,7 +581,7 @@ print(
 # %%
 rng_iv = np.random.default_rng(123)
 fig, axes = plt.subplots(1, 2, figsize=(10, 3.4), sharey=True)
-for ax, a in zip(axes, [-1.0, 1.0]):
+for ax, a in zip(axes, [-1.0, 1.0], strict=True):
     truth, _ = simulate(20000, rng_iv, x1=a)
     fl = flow.sample(20000, do={"X1": a}, seed=5)
     fls = flow_ls.sample(20000, do={"X1": a}, seed=5)
@@ -667,7 +667,7 @@ u_val = {k: v[5000:] for k, v in u_obs.items()}
 cf_true, _ = simulate(len(val_df), rng, x1=0.0, u=u_val)
 
 fig, axes = plt.subplots(1, 2, figsize=(9, 3.4))
-for ax, col in zip(axes, ["X2", "X3"]):
+for ax, col in zip(axes, ["X2", "X3"], strict=True):
     ax.scatter(cf_true[col], cf_flow[col], s=5, alpha=0.4)
     lims = [cf_true[col].min(), cf_true[col].max()]
     ax.plot(lims, lims, "k--", lw=1)

@@ -65,7 +65,8 @@ def config_section(document: dict, *keys: str, require: set[str] | None = None) 
     node = document
     for depth, key in enumerate(keys):
         if not isinstance(node, dict):
-            raise ValueError(
+            # malformed config data, not a wrongly typed argument
+            raise ValueError(  # noqa: TRY004
                 f"{' -> '.join(keys[:depth]) or 'the document'} is "
                 f"{type(node).__name__}, not a mapping"
             )
@@ -78,7 +79,8 @@ def config_section(document: dict, *keys: str, require: set[str] | None = None) 
 
     where = " -> ".join(keys) or "the document"
     if not isinstance(node, dict):
-        raise ValueError(f"{where} is {type(node).__name__}, not a mapping")
+        # malformed config data, not a wrongly typed argument
+        raise ValueError(f"{where} is {type(node).__name__}, not a mapping")  # noqa: TRY004
 
     section = dict(node)
     if require is not None:

@@ -124,7 +124,9 @@ feats = flow_add._features(flow_add._tensorize(train))
 with torch.no_grad():
     theta = sum(
         net(torch.cat([feats[p] for p in g], 1))
-        for net, g in zip(nd.intercept_nets, nd._intercept_groups)
+        for net, g in zip(
+            nd.intercept_nets, nd._intercept_groups, strict=False
+        )  # library internals: one net per group by construction, not checked here
     ).numpy()
 recon = res_add["baseline"][None] + sum(res_add["contributions"].values())
 print("max |reconstruction - theta| :", np.abs(recon - theta).max())
