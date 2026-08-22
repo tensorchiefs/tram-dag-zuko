@@ -2,8 +2,9 @@
 """PreToolUse guard for the autoresearch run — protect the measurement.
 
 Reads the tool-call JSON on stdin and exits 2 (block) when the call would:
-  * EDIT the measurement — anything under tests/ or data/, or the benchmark
-    harness experiments/benchmarks/bench_training.py; or
+  * EDIT the measurement — anything under tests/ or data/, the committed
+    expectations in experiments/*/ground_truth/, or the benchmark harness
+    experiments/benchmarks/bench_training.py; or
   * READ the *target values* — test assertions (tests/test_*.py),
     reference numbers (data/**/truth.json, data/**/ref_ls/**), incl. obvious
     shell reads of them.
@@ -42,6 +43,7 @@ WRITE_DENY = (
     re.compile(r"(^|/)tests/"),
     re.compile(r"(^|/)data/"),
     re.compile(r"(^|/)experiments/benchmarks/bench_training\.py$"),
+    re.compile(r"(^|/)experiments/[^/]+/ground_truth/"),
 )
 READ_DENY = (
     re.compile(r"(^|/)tests/test_[^/]*\.py$"),
@@ -53,8 +55,9 @@ if tool in ("Write", "Edit", "NotebookEdit"):
     p = str(ti.get("file_path", "")).replace("\\", "/")
     if any(rx.search(p) for rx in WRITE_DENY):
         block(
-            "BLOCKED (autoresearch integrity): tests/, data/, and the benchmark "
-            "harness are the measurement — you may not edit them. If a test "
+            "BLOCKED (autoresearch integrity): tests/, data/, "
+            "experiments/*/ground_truth/ and the benchmark harness are the "
+            "measurement — you may not edit them. If a test "
             "fails, your change is wrong, not the test. Changing the measurement "
             "is not a result."
         )
