@@ -27,7 +27,8 @@ def test_univariate_roundtrip(ut):
     theta = torch.randn(n, ut.n_params)
     x = torch.linspace(-6.0, 10.0, n)  # includes values outside the fitted range
     z0, ladj = ut.forward(theta, x)
-    assert torch.isfinite(z0).all() and torch.isfinite(ladj).all()
+    assert torch.isfinite(z0).all()
+    assert torch.isfinite(ladj).all()
     x_rec = ut.inverse(theta, z0)
     assert torch.allclose(x_rec, x, atol=1e-3), (x_rec - x).abs().max()
 
@@ -56,7 +57,8 @@ def test_ordinal_log_prob_gradient_survives_saturation():
     lp = ordinal_log_prob(theta, shift, y)
     assert torch.isfinite(lp).all()
     lp.sum().backward()
-    assert torch.isfinite(theta.grad).all() and torch.isfinite(shift.grad).all()
+    assert torch.isfinite(theta.grad).all()
+    assert torch.isfinite(shift.grad).all()
     assert theta.grad.abs().max() > 1e-3
     assert shift.grad.abs().max() > 1e-3
 

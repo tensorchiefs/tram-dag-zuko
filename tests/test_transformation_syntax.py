@@ -252,12 +252,12 @@ def test_short_aliases_are_the_definitions():
     """LS is linear_shift, and both spellings build the same spec."""
     import tramdag as td
 
-    assert (I, LS, CS, VC) == (
+    assert (
         td.intercept,
         td.linear_shift,
         td.complex_shift,
         td.varying_coefficient,
-    )
+    ) == (I, LS, CS, VC)
     short = ContinuousNode(I("x") + LS("y") + CS("z") + VC("z", t="y"))
     long = ContinuousNode(
         td.intercept("x")
@@ -312,7 +312,7 @@ def test_a_pre_0_4_spec_says_it_is_too_old():
             "terms": [{"effect": "VC", "parents": ["t", "x1"], "penalty": 2.5}],
         },
     }
-    with pytest.raises(ValueError, match="predates 0.4"):
+    with pytest.raises(ValueError, match=r"predates 0\.4"):
         spec_from_dict(old_format)
 
 

@@ -57,7 +57,8 @@ def test_triangle_mixed_pmf_matches_frequencies():
     """The analytic ordinal PMF agrees with simulated level frequencies."""
     gen = TriangleMixed(f="exp", seed=3)
     pmf = gen.true_pmf(np.array([0.5]), np.array([-0.4]))[0]
-    assert pmf.shape == (4,) and abs(pmf.sum() - 1.0) < 1e-12
+    assert pmf.shape == (4,)
+    assert abs(pmf.sum() - 1.0) < 1e-12
     simulated = gen.simulate(
         200_000, rng=np.random.default_rng(4), do={"x1": 0.5, "x2": -0.4}
     )

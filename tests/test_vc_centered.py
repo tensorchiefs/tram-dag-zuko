@@ -84,7 +84,9 @@ def test_center_false_is_bit_identical_to_plain_vc(vc_hetero):
     a = fit_with(VC("X2", "X3", t="T"))
     b = fit_with(VC("X2", "X3", center=False, t="T"))
     assert VC("X2", t="T") == VC("X2", center=False, t="T")  # Term equality
-    for (ka, pa), (kb, pb) in zip(a.state_dict().items(), b.state_dict().items()):
+    for (ka, pa), (kb, pb) in zip(
+        a.state_dict().items(), b.state_dict().items(), strict=True
+    ):
         assert ka == kb
         assert torch.equal(pa, pb), ka
     assert a.vc_center_info == {}  # stage 1 never ran
@@ -124,7 +126,8 @@ def test_training_ehat_is_out_of_fold(confounded):
     info = flow.vc_center_info[("Y", "T")]
     assert info["folds"] == 5
     fold_id, e_oof = info["fold_id"], info["e_oof"]
-    assert fold_id.shape == (len(df),) and set(fold_id) == set(range(5))
+    assert fold_id.shape == (len(df),)
+    assert set(fold_id) == set(range(5))
 
     # (a) fold-0 values equal an independent refit WITHOUT fold 0 (deterministic)
     proxy_spec = {

@@ -29,7 +29,8 @@ def test_additive_ci_runs_and_finite():
         seed=0,
     )
     lp = flow.node_log_prob(flow._tensorize(df))["x3"]
-    assert lp.shape == (64,) and torch.isfinite(lp).all()
+    assert lp.shape == (64,)
+    assert torch.isfinite(lp).all()
 
 
 # --------------------------------------------------------------- validation

@@ -37,12 +37,15 @@ def area(tmp_path, monkeypatch):
 
 def test_value_entry_passes_inside_atol_and_fails_outside(area):
     name = area({"beta": 1.02}, {"beta": {"value": 1.0, "atol": 0.05}})
-    failures, notes, unchecked, loose = check_module.compare("paper", name)
-    assert not failures and len(notes) == 1 and not unchecked
+    failures, notes, unchecked, _loose = check_module.compare("paper", name)
+    assert not failures
+    assert len(notes) == 1
+    assert not unchecked
 
     name = area({"beta": 1.2}, {"beta": {"value": 1.0, "atol": 0.05}}, "toy2")
     failures, _, _, _ = check_module.compare("paper", name)
-    assert len(failures) == 1 and "deviation" in failures[0]
+    assert len(failures) == 1
+    assert "deviation" in failures[0]
 
 
 def test_max_entry_only_fails_upward(area):
@@ -58,37 +61,44 @@ def test_max_entry_only_fails_upward(area):
 
     name = area({"err": 0.3}, truth, "over")
     failures, _, _, _ = check_module.compare("paper", name)
-    assert len(failures) == 1 and "exceeds its bound" in failures[0]
+    assert len(failures) == 1
+    assert "exceeds its bound" in failures[0]
 
 
 def test_a_bound_far_above_its_measurement_is_reported(area):
     name = area({"err": 0.01}, {"err": {"max": 0.2}})  # 20x
     _, _, _, loose = check_module.compare("paper", name)
-    assert len(loose) == 1 and "too loose" in loose[0]
+    assert len(loose) == 1
+    assert "too loose" in loose[0]
 
 
 def test_a_bound_hugging_its_measurement_is_reported(area):
     name = area({"err": 0.19}, {"err": {"max": 0.2}})  # 1.05x
     _, _, _, loose = check_module.compare("paper", name)
-    assert len(loose) == 1 and "another machine" in loose[0]
+    assert len(loose) == 1
+    assert "another machine" in loose[0]
 
 
 def test_why_excuses_a_wide_bound_but_never_a_tight_one(area):
     """The asymmetry matters: no argument survives a bound below 1.5x."""
     name = area({"err": 0.01}, {"err": {"max": 0.2, "why": "measured elsewhere"}})
     _, notes, _, loose = check_module.compare("paper", name)
-    assert not loose and "deliberately wide" in notes[0]
+    assert not loose
+    assert "deliberately wide" in notes[0]
 
     name = area({"err": 0.19}, {"err": {"max": 0.2, "why": "measured"}}, "tight")
     _, _, _, loose = check_module.compare("paper", name)
-    assert len(loose) == 1 and "another machine" in loose[0]
+    assert len(loose) == 1
+    assert "another machine" in loose[0]
 
 
 def test_a_center_drifting_through_its_tolerance_is_reported(area):
     """The failure mode that let a stale center pass: 62% of atol consumed."""
     name = area({"beta": 1.031}, {"beta": {"value": 1.0, "atol": 0.05}})
     failures, _, _, loose = check_module.compare("paper", name)
-    assert not failures and len(loose) == 1 and "older run" in loose[0]
+    assert not failures
+    assert len(loose) == 1
+    assert "older run" in loose[0]
 
     name = area({"beta": 1.01}, {"beta": {"value": 1.0, "atol": 0.05}}, "fresh")
     _, _, _, loose = check_module.compare("paper", name)
@@ -98,19 +108,23 @@ def test_a_center_drifting_through_its_tolerance_is_reported(area):
 def test_a_truth_entry_the_run_stopped_producing_is_an_error(area):
     name = area({"beta": 1.0}, {"gone": {"value": 1.0, "atol": 0.05}})
     failures, _, _, _ = check_module.compare("paper", name)
-    assert len(failures) == 1 and "no such metric" in failures[0]
+    assert len(failures) == 1
+    assert "no such metric" in failures[0]
 
 
 def test_a_metric_without_an_entry_is_reported_not_failed(area):
     name = area({"beta": 1.0, "extra": 7.0}, {"beta": {"value": 1.0, "atol": 0.05}})
     failures, _, unchecked, _ = check_module.compare("paper", name)
-    assert not failures and len(unchecked) == 1 and "extra" in unchecked[0]
+    assert not failures
+    assert len(unchecked) == 1
+    assert "extra" in unchecked[0]
 
 
 def test_underscore_keys_are_notes_for_the_reader(area):
     name = area({"beta": 1.0}, {"_note": "prose", "beta": {"value": 1.0, "atol": 0.05}})
     failures, notes, _, _ = check_module.compare("paper", name)
-    assert not failures and len(notes) == 1
+    assert not failures
+    assert len(notes) == 1
 
 
 def test_a_missing_ground_truth_file_says_what_to_do(area, tmp_path):

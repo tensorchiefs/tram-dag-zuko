@@ -99,4 +99,5 @@ def test_machine_info_has_expected_fields():
     info = machine_info()
     for key in ("hostname", "os", "python", "torch", "tramdag", "cpu_count"):
         assert key in info
-    assert info["torch"] and info["python"]
+    assert info["torch"]
+    assert info["python"]

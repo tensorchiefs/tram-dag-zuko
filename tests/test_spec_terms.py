@@ -48,12 +48,12 @@ def test_node_internal_structure_matches():
 
 # ---------------------------------------------------------------- validation
 def test_ls_requires_exactly_one_parent():
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match=r"LS\(\) takes exactly one parent"):
         LS("X1", "X2")
 
 
 @pytest.mark.parametrize(
-    "term,n_shift,n_ci", [(CS("X1", "X2"), 1, 0), (I("X1", "X2"), 0, 2)]
+    ("term", "n_shift", "n_ci"), [(CS("X1", "X2"), 1, 0), (I("X1", "X2"), 0, 2)]
 )
 def test_joint_terms_build(term, n_shift, n_ci):
     """Joint (multi-parent) terms build one network over the parent group."""

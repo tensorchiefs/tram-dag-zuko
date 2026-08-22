@@ -38,9 +38,11 @@ def test_vc_constructor():
     t = VC("X2", "X3", penalty=2.5, t="T")
     assert (t.effect, t.parents, t.penalty) == ("VC", ("T", "X2", "X3"), 2.5)
     assert VC(t="T").penalty == 1.0  # the documented default
-    with pytest.raises(ValueError):
+    with pytest.raises(
+        ValueError, match=r"cannot be both the treatment \(t\) and a modifier"
+    ):
         VC("T", t="T")  # on cannot be a modifier
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="penalty must be >= 0"):
         VC(penalty=-1.0, t="T")  # negative penalty
 
 
@@ -138,7 +140,8 @@ def test_varying_coef_deterministic_and_y_free(small_fitted):
     b1 = flow.varying_coef("Y", new)
     b2 = flow.varying_coef("Y", new.drop(columns=["Y", "T", "X1"]))  # modifiers only
     np.testing.assert_array_equal(b1, b2)
-    assert b1.shape == (300,) and b1.std() > 0
+    assert b1.shape == (300,)
+    assert b1.std() > 0
 
 
 def test_varying_coef_equals_abduct_difference(small_fitted):

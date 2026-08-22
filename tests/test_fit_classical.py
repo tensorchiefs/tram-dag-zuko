@@ -30,17 +30,18 @@ def _ls_spec() -> dict:
 def test_rejects_non_all_ls():
     spec = {"x1": ContinuousNode(), "x2": ContinuousNode([CS("x1")])}
     flow = CausalFlowDAG(spec)
-    df = pd.DataFrame({"x1": np.random.randn(50), "x2": np.random.randn(50)})
+    rng = np.random.default_rng(0)
+    df = pd.DataFrame({"x1": rng.standard_normal(50), "x2": rng.standard_normal(50)})
     with pytest.raises(ValueError, match="all-`ls`"):
         flow.fit_classical(df)
 
 
 def test_rejects_ci_too():
     spec = {"x1": ContinuousNode(), "x2": ContinuousNode([I("x1")])}
-    with pytest.raises(ValueError):
-        CausalFlowDAG(spec).fit_classical(
-            pd.DataFrame({"x1": np.random.randn(50), "x2": np.random.randn(50)})
-        )
+    rng = np.random.default_rng(0)
+    df = pd.DataFrame({"x1": rng.standard_normal(50), "x2": rng.standard_normal(50)})
+    with pytest.raises(ValueError, match="requires an all-`ls` spec"):
+        CausalFlowDAG(spec).fit_classical(df)
 
 
 def test_same_seed_is_bit_identical(ls_chain):
@@ -86,7 +87,8 @@ def test_chunk_and_history_size_reach_the_solver(ls_chain):
     rep = CausalFlowDAG(_ls_spec(), seed=0).fit_classical(
         obs, max_iter=10, chunk=5, history_size=7, verbose=False
     )
-    assert rep["n_iter"] % 5 == 0 and 0 < rep["n_iter"] <= 10
+    assert rep["n_iter"] % 5 == 0
+    assert 0 < rep["n_iter"] <= 10
     with pytest.raises(TypeError):
         CausalFlowDAG(_ls_spec(), seed=0).fit_classical(obs, not_a_kwarg=1)
 

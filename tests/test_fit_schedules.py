@@ -34,7 +34,8 @@ def test_schedules_smoke_and_improve(ls_chain, schedule):
     nll0 = sum(flow.nll(df).values())  # untrained (ranges set lazily in fit)
     flow.fit(df, epochs=60, learning_rate=1e-2, verbose=0, schedule=schedule)
     nll1 = sum(flow.nll(df).values())
-    assert np.isfinite(nll1) and nll1 < nll0
+    assert np.isfinite(nll1)
+    assert nll1 < nll0
     assert len(flow.history["lr"]) == len(flow.history["val"])
 
 
@@ -62,7 +63,7 @@ def test_freeze_stops_early_and_records(ls_chain):
     n_epochs = len(flow.history["val"])
     assert n_epochs < 3000, "expected early exit once all nodes froze"
     assert set(flow.history["frozen"]) == {"x1", "x2"}
-    for _name, ep in flow.history["frozen"].items():
+    for ep in flow.history["frozen"].values():
         assert 1 <= ep <= n_epochs
 
 

@@ -104,7 +104,7 @@ def test_scores_match_finite_differences():
             ("T", {"X1": flow.nodes["T"].shifts["X1"].fc.weight}),
         ]:
             psi = flow.scores(df, node=node)
-            needed = list(flow.nodes[node].parents) + [node]
+            needed = [*list(flow.nodes[node].parents), node]
             np_vals = {
                 c: torch.as_tensor(df[c].to_numpy(dtype=np.float64)) for c in needed
             }
@@ -134,9 +134,8 @@ def test_effect_modifier_scan_flags_true_modifiers(mle_flow):
     flow, df = mle_flow
     scan = flow.effect_modifier_scan(df, node="Y", t="T")
     assert set(scan.index) == {"X1", "X2", "X3"}, scan.to_string()  # default cands
-    assert bool(scan.loc["X2", "flag"]) and bool(scan.loc["X3", "flag"]), (
-        scan.to_string()
-    )
+    assert bool(scan.loc["X2", "flag"]), scan.to_string()
+    assert bool(scan.loc["X3", "flag"]), scan.to_string()
     assert not bool(scan.loc["X1", "flag"]), scan.to_string()
     # the modifiers clearly dominate the ranking
     assert scan.loc[["X2", "X3"], "stat"].min() > 2 * scan.loc["X1", "stat"]

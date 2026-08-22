@@ -24,7 +24,7 @@ def _spec():
 def test_constructor_seed_makes_init_reproducible():
     a = CausalFlowDAG(_spec(), seed=42)
     b = CausalFlowDAG(_spec(), seed=42)
-    for pa, pb in zip(a.parameters(), b.parameters()):
+    for pa, pb in zip(a.parameters(), b.parameters(), strict=True):
         assert torch.equal(pa, pb)
 
 
@@ -32,7 +32,8 @@ def test_constructor_seed_differs_across_seeds():
     a = CausalFlowDAG(_spec(), seed=42)
     c = CausalFlowDAG(_spec(), seed=7)
     assert any(
-        not torch.equal(pa, pc) for pa, pc in zip(a.parameters(), c.parameters())
+        not torch.equal(pa, pc)
+        for pa, pc in zip(a.parameters(), c.parameters(), strict=True)
     )
 
 
@@ -41,17 +42,19 @@ def test_no_seed_still_works():
     # two unseeded models differ, which is what makes seed= the only knob
     a, b = CausalFlowDAG(_spec()), CausalFlowDAG(_spec())
     assert any(
-        not torch.equal(pa, pb) for pa, pb in zip(a.parameters(), b.parameters())
+        not torch.equal(pa, pb)
+        for pa, pb in zip(a.parameters(), b.parameters(), strict=True)
     )
 
 
 # ------------------------------------------- #2 history persists through io
 def test_save_load_round_trips_history(tmp_path):
+    rng = np.random.default_rng(0)
     df = pd.DataFrame(
         {
-            "x1": np.random.randn(200),
-            "x2": np.random.randn(200),
-            "y": np.random.randint(0, 3, 200).astype(float),
+            "x1": rng.standard_normal(200),
+            "x2": rng.standard_normal(200),
+            "y": rng.integers(0, 3, 200).astype(float),
         }
     )
     flow = CausalFlowDAG(_spec(), seed=0)

@@ -29,7 +29,8 @@ def test_observational_schema_and_size(truth):
     assert len(observed) == truth["n_obs"]
     for column, levels in LEVELS.items():
         values = observed[column].to_numpy()
-        assert values.min() >= 0 and values.max() <= levels - 1
+        assert values.min() >= 0
+        assert values.max() <= levels - 1
         # every level must be populated, or a one-hot column would be all-zero
         assert len(np.unique(values)) == levels
 

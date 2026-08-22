@@ -41,7 +41,8 @@ def test_all_ls_spec_builds_and_is_classical():
     target the benchmark can measure time-to-accuracy against.
     """
     flow = CausalFlowDAG(all_ls_spec(), seed=0)
-    assert flow.order[0] == "Age" and flow.order[-1] == "mRS_3m"
+    assert flow.order[0] == "Age"
+    assert flow.order[-1] == "mRS_3m"
     observed, validation = stroke_data()
     assert validation is None  # full-data MLE fit
     assert len(observed) == 1275
