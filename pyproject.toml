@@ -115,7 +115,36 @@ line-length = 88
 target-version = "py310"
 
 [tool.ruff.lint]
-select = ["I", "E", "F", "D", "UP"]
+# ruff's default set stays active (in 0.16 that is more than the historical
+# E4/E7/E9/F: it includes e.g. S110, BLE001, TRY004); these add to it
+extend-select = [
+  "I",  # import order
+  "E",  # the full pycodestyle errors, beyond the default E4/E7/E9
+  "D",  # docstrings (numpy convention below)
+  "UP",  # modern syntax
+  "B",  # bugbear: real bug patterns (B905: zip truncates silently)
+  "C4",  # comprehension misuse
+  "C90",  # cyclomatic complexity (cognitive complexity: complexipy hook)
+  "NPY",  # numpy pitfalls (legacy random API)
+  "PERF",  # accidental quadratic/copy patterns
+  "PT",  # pytest style: composite asserts hide which clause failed
+  "RUF",  # ruff-native checks (unused noqa, __all__ order)
+  "SIM"  # simplifiable constructs
+]
+ignore = [
+  # em-dashes and Greek letters in prose are deliberate (docs/notation.md)
+  "RUF001",
+  "RUF002",
+  "RUF003",
+  # dict(arrowstyle=...) as kwargs-style collection literals is deliberate
+  # matplotlib idiom in the experiments' plotting code
+  "C408",
+  # a ternary is not automatically clearer than if/else; keep it a choice
+  "SIM108"
+]
+
+[tool.ruff.lint.mccabe]
+max-complexity = 12
 
 [tool.ruff.lint.per-file-ignores]
 # D1xx: scripts, notebooks and tests document themselves in prose and in
