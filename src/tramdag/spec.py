@@ -28,8 +28,11 @@ object, so use whichever reads better:
   ``beta(x) = beta0 + b_theta(x)`` and ``b_theta`` a small, **penalized** network
   — a treatment-effect head with its own bias–variance budget (issue #28).
 
-The intercept slot sums in coefficient space; the shift slot sums on the latent
-scale. "Joint vs additive" is argument grouping: a multi-parent term such as
+A formula holds **exactly one intercept term, first** — written, or added as
+``SI()`` when the formula only lists shifts — so ``node.terms[0]`` is always
+the intercept. The intercept slot sums in coefficient space; the shift slot
+sums on the latent scale. "Joint vs additive" is argument grouping: a
+multi-parent term such as
 ``CS("a","b")`` is one **joint** network over both parents (an interaction),
 whereas ``CS("a") + CS("b")`` are two **additive** terms. For intercepts the
 grouping is said explicitly: ``I("a", "b", allow_interaction=False)`` is the
@@ -66,6 +69,11 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 EFFECTS = ("I", "LS", "CS", "VC")
+
+# bernstein, because zuko's spline extrapolates with a fixed slope outside
+# [-B, B] while bernstein follows its own boundary derivative -- see the
+# `transform` parameter of simple_intercept.
+DEFAULT_TRANSFORM = "bernstein"
 
 
 # defaults of the effect-specific options; a constructor value equal to its
@@ -464,11 +472,16 @@ def _as_term(value) -> Term:
 
 
 def _normalize_terms(value):
-    """Flatten a node's formula into a plain term list.
+    """Flatten a node's formula into its canonical term list.
 
     Accepted: ``None`` (a source node), one term, a ``+`` sum, the bare
     name ``I``, or a list of any of those. A ``+`` sum is already flat, so
     a list of lists is a mistake rather than a shape to flatten.
+
+    The canonical form starts with the intercept: a formula written
+    without one gets ``SI()`` prepended, so ``terms[0]`` is always the
+    intercept term. Exactly one intercept is allowed, and it must come
+    first when written.
 
     Parameters
     ----------
@@ -478,31 +491,46 @@ def _normalize_terms(value):
     Returns
     -------
     list[Term] | None
-        The term list, or ``None`` for a source node.
+        The canonical term list, or ``None`` for a source node.
     """
     if value is None:
         return None
-    items = value if isinstance(value, (list, tuple)) else [value]
-    return [_as_term(element) for element in items]
+    written = value if isinstance(value, (list, tuple)) else [value]
+    items = [_as_term(e) for e in written]
+    intercepts = [i for i, t in enumerate(items) if t.effect == "I"]
+    if len(intercepts) > 1:
+        parented = [t for t in items if t.effect == "I" and t.parents]
+        if len(parented) > 1:
+            raise ValueError(
+                "a formula takes exactly one intercept term. For an additive "
+                "intercept write CI("
+                + ", ".join(repr(p) for t in parented for p in t.parents)
+                + ", allow_interaction=False), not several intercept terms."
+            )
+        raise ValueError(
+            "a formula takes exactly one intercept term, and CI(...) already "
+            "contains the baseline — drop the extra I/SI."
+        )
+    if not intercepts:
+        return [simple_intercept(), *items]  # canonical form: intercept first
+    if intercepts[0] != 0:
+        raise ValueError(
+            "the intercept term comes first: write "
+            "I(...) + <shifts>, not the other way around."
+        )
+    return items
 
 
-# bernstein, because zuko's spline extrapolates with a fixed slope outside
-# [-B, B] while bernstein follows its own boundary derivative -- see the
-# `transform` parameter of simple_intercept.
-DEFAULT_TRANSFORM = "bernstein"
+def _intercept_basis(terms, *, ordinal: bool):
+    """Read the basis choice off the intercept term.
 
-
-def _check_intercepts(terms, *, ordinal: bool):
-    """Validate the intercept slot and read the basis choice off it.
-
-    A node takes at most one ``I`` term with parents — an additive
-    intercept is said with ``allow_interaction=False`` on one term, not by
-    listing several — and at most one ``I`` term may name the basis.
+    Normalization guarantees exactly one intercept, at ``terms[0]``, so the
+    basis has exactly one possible carrier.
 
     Parameters
     ----------
     terms : list[Term] | None
-        The node's normalized term list.
+        The node's canonical term list.
     ordinal : bool
         ``True`` for an ordinal node, whose intercept is the cutpoint
         vector and therefore has no basis to choose.
@@ -515,37 +543,23 @@ def _check_intercepts(terms, *, ordinal: bool):
     Raises
     ------
     ValueError
-        If several ``I`` terms carry parents, if several set a basis, or if
-        an ordinal node sets one.
+        If an ordinal node's intercept configures a basis.
     """
-    i_terms = [t for t in terms or [] if t.effect == "I"]
-    parented = [t for t in i_terms if t.parents]
-    if len(parented) > 1:
-        raise ValueError(
-            "a node takes at most one I term with parents. For an additive "
-            "intercept write I("
-            + ", ".join(repr(p) for t in parented for p in t.parents)
-            + ", allow_interaction=False)."
-        )
-    # a term that only passes basis arguments is a carrier too — otherwise
-    # SI(n_coeffs=40) would be silently ignored and the default used
-    carriers = [t for t in i_terms if t.transform or t.transform_kwargs]
-    if len(carriers) > 1:
-        raise ValueError(
-            "only one I term per node may configure the transform, got "
-            f"{[(t.transform, t.transform_kwargs) for t in carriers]}."
-        )
-    if carriers and ordinal:
+    intercept_term = terms[0] if terms else None
+    configured = intercept_term is not None and (
+        intercept_term.transform or intercept_term.transform_kwargs
+    )
+    if configured and ordinal:
         raise ValueError(
             "I(transform=...) is for continuous nodes. An ordinal node's "
             "intercept is the cutpoint vector, it has no basis to choose."
         )
-    if not carriers:
+    if not configured:
         return DEFAULT_TRANSFORM, {}
     # the arguments go straight to the transform class; if they are wrong,
     # that class says so — this layer does not second-guess it
-    name = carriers[0].transform or DEFAULT_TRANSFORM
-    return name, dict(carriers[0].transform_kwargs or ())
+    name = intercept_term.transform or DEFAULT_TRANSFORM
+    return name, dict(intercept_term.transform_kwargs or ())
 
 
 class ContinuousNode:
@@ -564,7 +578,7 @@ class ContinuousNode:
 
     def __init__(self, terms=None):
         self.terms = _normalize_terms(terms)
-        self.transform, self.transform_kwargs = _check_intercepts(
+        self.transform, self.transform_kwargs = _intercept_basis(
             self.terms, ordinal=False
         )
 
@@ -598,7 +612,7 @@ class OrdinalNode:
     def __init__(self, levels: int, terms=None):
         self.levels = int(levels)
         self.terms = _normalize_terms(terms)
-        _check_intercepts(self.terms, ordinal=True)
+        _intercept_basis(self.terms, ordinal=True)
 
     def __repr__(self):
         """Show the levels and the terms."""

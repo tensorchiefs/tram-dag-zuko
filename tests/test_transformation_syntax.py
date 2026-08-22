@@ -28,7 +28,16 @@ def test_sum_chains_flatten_in_order():
 def test_bare_i_and_single_term():
     assert ContinuousNode([I]).terms == [I()]
     assert ContinuousNode(I).terms == [I()]
-    assert ContinuousNode(LS("x1")).terms == [LS("x1")]
+    # a shifts-only formula gets the implicit simple intercept, first
+    assert ContinuousNode(LS("x1")).terms == [SI(), LS("x1")]
+    assert ContinuousNode(LS("x1")) == ContinuousNode([SI(), LS("x1")])
+
+
+def test_exactly_one_intercept_and_first():
+    with pytest.raises(ValueError, match="exactly one intercept"):
+        ContinuousNode([SI(), CI("a")])
+    with pytest.raises(ValueError, match="comes first"):
+        ContinuousNode(LS("a") + CI("b"))
 
 
 def test_ordinal_takes_transformation_positionally():
@@ -91,8 +100,8 @@ def test_bare_i_can_carry_the_source_basis():
 
 
 def test_two_i_transforms_conflict():
-    # a bare carrier plus a parented I is legal -- two bases are not
-    with pytest.raises(ValueError, match="only one I term"):
+    # two intercepts is the error now, whatever they carry
+    with pytest.raises(ValueError, match="exactly one intercept"):
         ContinuousNode(I(transform="spline") + I("a", transform="affine"))
 
 
@@ -280,7 +289,7 @@ def test_units_survive_the_roundtrip():
         "b": ContinuousNode(CS("a", units=[16])),
     }
     back = spec_from_dict(spec_to_dict(spec))
-    assert back["b"].terms[0].units == (16,)
+    assert back["b"].terms[1].units == (16,)  # [0] is the canonical SI()
 
 
 def test_vc_modifiers_are_positional_t_is_keyword():

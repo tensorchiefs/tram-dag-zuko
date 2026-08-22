@@ -168,7 +168,8 @@ def test_save_load_roundtrip_vc(tmp_path, small_fitted):
     p = tmp_path / "vc.pt"
     flow.save(p)
     flow2 = CausalFlowDAG.load(p)
-    assert flow2.spec["Y"].terms[1].penalty == 1.0
+    vc = next(t for t in flow2.spec["Y"].terms if t.effect == "VC")
+    assert vc.penalty == 1.0
     assert bool(flow2.nodes["Y"].shifts["T"].warm_started)  # buffer survives
     np.testing.assert_allclose(
         flow2.varying_coef("Y", new), flow.varying_coef("Y", new), atol=1e-7
@@ -178,7 +179,7 @@ def test_save_load_roundtrip_vc(tmp_path, small_fitted):
 
 def test_serialization_roundtrip_spec():
     spec2 = spec_from_dict(spec_to_dict(_vc_spec(penalty=3.0)))
-    t = spec2["Y"].terms[1]
+    t = next(t for t in spec2["Y"].terms if t.effect == "VC")
     assert t == VC("X2", "X3", penalty=3.0, t="T")
 
 

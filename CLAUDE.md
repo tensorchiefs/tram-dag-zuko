@@ -62,7 +62,7 @@ See `experiments/README.md`.
   *additive* intercept (one net per parent, coefficient vectors summed). For
   shifts, grouping decides: `CS("a","b")` is joint, `CS("a")+CS("b")` additive.
   When the effect type comes from config or the CLI, put the constructor itself
-  in the table (`{"x2": CS}`). No intercept term → `SimpleIntercept` baseline.
+  in the table (`{"x2": CS}`). A formula without an intercept gets `SI()` prepended during normalization, so `node.terms[0]` is always the intercept.
   Every parent enters through exactly one edge-owning term (VC modifiers exempt —
   they may also appear prognostically).
 - `transforms.py` — monotone 1-D transforms wrapping zuko (`BernsteinUT`, `SplineUT`,
