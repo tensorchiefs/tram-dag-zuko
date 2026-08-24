@@ -3,6 +3,7 @@
 __pycache__/
 *.py[cod]
 .pytest_cache/
+.coverage
 *.egg-info/
 
 # Experiment outputs — regenerable, and (for the clinical 'magic' source) derived

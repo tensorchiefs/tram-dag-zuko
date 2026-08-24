@@ -35,6 +35,7 @@ notebooks = [
 ]
 test = [
   "pytest",
+  "pytest-cov",  # the CI coverage gate ([tool.coverage] + `pytest --cov`)
   "pytest-xdist",
   # testpaths covers experiments/ too, so this group must be able to import
   # what those tests import: the generators (scipy) and, through the benchmark
@@ -88,6 +89,19 @@ Homepage = "https://github.com/tensorchiefs/tramdag"
 "Method paper (CLeaR 2025)" = "https://arxiv.org/abs/2503.16206"
 "Stroke case study" = "https://arxiv.org/abs/2606.12623"
 
+[tool.coverage.report]
+# the fast suite alone measures 97% (2026-08-24); 95 leaves room for noise
+# while still failing on an untested new code path
+fail_under = 95
+
+[tool.coverage.run]
+source = ["src/tramdag"]
+
+[tool.hatch.build.targets.sdist]
+# without this, the sdist ships experiments/ (~2 MB frozen CSVs) and tests/;
+# README, LICENSE and pyproject.toml ride along automatically
+only-include = ["src"]
+
 [tool.hatch.build.targets.wheel]
 packages = ["src/tramdag"]
 
@@ -129,7 +143,19 @@ extend-select = [
   "PERF",  # accidental quadratic/copy patterns
   "PT",  # pytest style: composite asserts hide which clause failed
   "RUF",  # ruff-native checks (unused noqa, __all__ order)
-  "SIM"  # simplifiable constructs
+  "SIM",  # simplifiable constructs
+  # the following are clean today (measured 2026-08-24) and bind new code only
+  "A",  # builtin shadowing
+  "DTZ",  # naive datetimes
+  "FURB",  # modernization (refurb)
+  "G",  # logging format strings
+  "ICN",  # import-alias conventions (np, pd, plt, mpl)
+  "ISC",  # implicit string concatenation hides missing commas
+  "LOG",  # logging misuse
+  "PIE",  # misc correctness/duplication
+  "PLW1641",  # __eq__ without __hash__ makes a class silently unhashable
+  "PTH",  # pathlib over os.path
+  "RET"  # return-statement hygiene
 ]
 ignore = [
   # em-dashes and Greek letters in prose are deliberate (docs/notation.md)
