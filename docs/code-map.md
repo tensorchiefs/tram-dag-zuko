@@ -24,6 +24,7 @@ are the same object, so `LS is linear_shift`.
 | `validate_and_sort()` | Edge-ownership validation plus Kahn topological sort. The returned order makes the flow triangular. |
 | `spec_to_dict()` / `spec_from_dict()` | Checkpoint (de)serialization. A term serializes as `{effect, parents, options}` and nothing else, since `options` is already canonical. No compatibility shims, and `spec_from_dict` builds `Term` directly — so `validate_and_sort` is the only guard on that path. |
 | (`_normalize_terms`, `_as_term`, `_intercept_basis`, `_options`, `_OPTION_DEFAULTS`) | Formula flattening and per-entry validation (a `+` sum nested in a list is rejected), the one-parented-`I` rule plus basis hoisting in one pass, canonical option storage. |
+| (`_check_term`, `_check_node`, `_check_vc_term`, `_kahn_sort`) | The stages behind `validate_and_sort`: per-term validation (effect, LS arity, unknown parents), per-node edge-ownership bookkeeping, the VC-specific checks, and the topological sort. |
 
 ## `transforms.py` — the monotone map h and the ordinal transform
 
@@ -74,13 +75,15 @@ config in `experiments/paper/` states `units=` and `activation=` itself.
 | `scores()` / `effect_modifier_scan()` | Analytic per-observation scores and the CUSUM modifier scan (delegate to `scores.py`). |
 | `intercept_contributions()` | Post-hoc GAM-style decomposition of a complex intercept into mean-centered per-term parts. |
 | `ls_coefficients()` | The per-node linear-shift weights — the interpretable coefficients. |
+| `design_matrix()` | Parent encoding as a DataFrame (`drop_first=` gives the classical statsmodels/`polr` design). |
 | `to_matrix()` | The labeled meta-adjacency matrix of term effects. |
 | `save()` / `load()` | Checkpoints with history and machine provenance. `load` requires a complete checkpoint and fails loudly otherwise. |
-| (`_Node`, `_VCGroup`) | Per-node module (intercept + shift `ModuleDict` + VC bookkeeping); `theta_shift()` computes `(theta, shift)`. |
-| (`_node`, `_encode_parent`, `_features`, `_tensorize`, `_dtype`, `_np_dtype`) | Node lookup with one shared error; parent encoding (continuous raw, ordinal one-hot); `_tensorize(df, cols=None)` for any column subset; dtype plumbing. |
+| (`_Node`, `_VCGroup`) | Per-node module (intercept + shift `ModuleDict` + VC bookkeeping); construction is `_build_intercept`/`_build_shifts`, and `theta_shift()` computes `(theta, shift)` through `_theta`/`_vc_shift`/`vc_column`. |
+| (`_FitSchedule`, `_fit_epoch`, `_end_epoch`, `_make_optimizer`, `_val_nll`, `_vc_penalized`, `_log_epoch`, `_snapshot_best`, `_load_best_weights`, `_best_store`) | The fit loop, decomposed: per-node plateau/freeze bookkeeping, one minibatch epoch (with the frozen carry-forward), the per-epoch record/schedule/snapshot/log step, and the restore-best store that persists across `fit` calls. |
+| (`_node`, `_encode_parent`, `_features`, `_tensorize`, `_generator`, `_dtype`, `_np_dtype`, `_feat_width`, `_slice_ehat`, `_term_cells`) | Node lookup with one shared error; parent encoding (continuous raw, ordinal one-hot); `_tensorize(df, cols=None)` for any column subset; seeded-generator, dtype, feature-width and adjacency-cell plumbing. |
 | (`_set_ranges`) | Train 5%/95% quantiles onto the transform domain, plus the optional marginal initialization. First fit only. |
-| (`_vc_warm_start`, `_vc_oof_stage`, `_vc_oof_propensity`, `_predict_p1`, `_vc_ehat_live`, `_vc_ehat_columns`, `_recenter_vc`, `_source_proxies`) | The VC machinery: classical `beta0` warm start; frozen out-of-fold propensities for training (DML); live full-fit propensities for inference (recomputed under `do`, never cached); post-fit re-centering. |
-| (`_is_all_ls`) | Guard for `fit_classical`. |
+| (`_vc_warm_start`, `_ls_proxy_spec`, `_vc_oof_stage`, `_vc_oof_propensity`, `_predict_p1`, `_binary_p1`, `_vc_ehat_live`, `_vc_ehat_columns`, `_recenter_vc`, `_source_proxies`) | The VC machinery: classical `beta0` warm start; frozen out-of-fold propensities for training (DML); live full-fit propensities for inference (recomputed under `do`, never cached); post-fit re-centering. |
+| (`_is_all_ls`, `_covered_by_classical`) | Guard for `fit_classical`: every term an `LS`, or a parentless `I()` basis carrier. |
 
 ## `scores.py` — effect-modifier detection (issue #29)
 
@@ -89,7 +92,7 @@ config in `experiments/paper/` states `units=` and `activation=` itself.
 | `node_scores()` | Analytic, exact per-observation scores `psi_i = d l_i / d theta` for every `LS` weight and VC `beta0`. No autograd. |
 | `effect_modifier_scan()` | Zeileis-Hornik fluctuation scan: order the treatment scores by each candidate, `sup|CUSUM|` against the Kolmogorov 5% value. A measured shortlist for VC modifiers from a seconds-long classical fit. |
 | `sup_bb_pvalue()` | `P(sup |Brownian bridge| > stat)`, the Kolmogorov series. |
-| (`_dl_ds`, `CRIT_5PCT`) | Closed-form latent-scale derivative; the 5% critical value 1.3581. |
+| (`_dl_ds`, `_ls_score_columns`, `CRIT_5PCT`) | Closed-form latent-scale derivative; the LS/one-hot score-column builder; the 5% critical value 1.3581. |
 
 ## `utils.py` — helpers that are not about modelling
 

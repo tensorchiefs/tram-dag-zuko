@@ -58,10 +58,10 @@ False)]``                                one net per parent, summed coefficients
 ``[I, CS("X1"), VC("X2", t="T")]``       ``h_theta(x3) + g_1(x1) + beta(x2)*t``
 ======================================== =======================================
 
-Each parent enters through exactly one *edge-owning* term (I/LS/CS parents, and
-a VC term's ``on``). VC **modifiers** are exempt: ``CS("x2")`` + ``VC("t", "x2")``
-is the intended pattern — ``x2`` acts prognostically through the shift *and*
-modifies the treatment effect.
+Each parent enters through exactly one *edge-owning* term (I/LS/CS parents,
+and a VC term's treatment ``t``). VC **modifiers** are exempt:
+``CS("x2")`` + ``VC("x2", t="T")`` is the intended pattern — ``x2`` acts
+prognostically through the shift *and* modifies the treatment effect.
 """
 
 # %% imports ---------------------------------------------------------------------------

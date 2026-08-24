@@ -308,6 +308,13 @@
 
 ### Changed (internal, no API surface)
 
+- **Every complexity hotspot is dissolved into named stages** — `fit`
+  (cognitive complexity 103 → 10), `validate_and_sort` (65 → 1),
+  `_Node.__init__`, `to_matrix`, `check.compare`, `bench_training.main` and
+  seven more — and every module follows one `# %% <section>` layout. Verified
+  behavior-identical: a fixed-seed harness compares state dicts, history and
+  samples bit-equal before and after, and all error messages moved verbatim.
+
 - **The framework tests carry their own data.** Three inline numpy DGPs in
   `tests/conftest.py` (an all-`ls` chain, a heterogeneous-effect DGP and a
   confounded DGP with a prognostic misfit) replace the generator package the

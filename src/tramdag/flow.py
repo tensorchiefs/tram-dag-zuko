@@ -718,17 +718,19 @@ class CausalFlowDAG(nn.Module):
         epochs: int,
         train_acc: dict[str, float],
         val_vals: dict[str, Tensor],
-        elapsed: float,
+        t_start: tuple[float, float],
     ) -> bool:
         """Record one epoch, update the schedules, snapshot, and log.
 
         Returns ``True`` when every node froze, which stops the fit.
         """
         val_per_node = self._val_nll(val_vals)
+        t0, t_offset = t_start
         self.history["train"].append(train_acc)
         self.history["val"].append(val_per_node)
         self.history["lr"].append(max(g["lr"] for g in opt.param_groups))
-        self.history["time"].append(elapsed)
+        # after the val pass, so an epoch's record includes its own monitoring
+        self.history["time"].append(t_offset + time.perf_counter() - t0)
         sched.step(opt, val_per_node, self.history)
         if best is not None:
             self._snapshot_best(best, val_per_node)
@@ -767,10 +769,9 @@ class CausalFlowDAG(nn.Module):
             )
             node_nlls = {k: -v.mean() for k, v in per_node.items()}
             loss = torch.stack(list(node_nlls.values())).sum()
-            # VC penalty joins the loss (never the history)
-            loss = loss + sum(
-                m.penalty * m.l2() / n for name in active for m in vc_penalized[name]
-            )
+            for name in active:  # VC penalty joins the loss (never the history)
+                for m in vc_penalized[name]:
+                    loss = loss + m.penalty * m.l2() / n
             opt.zero_grad()
             loss.backward()
             opt.step()
@@ -1029,7 +1030,7 @@ class CausalFlowDAG(nn.Module):
                 epochs=epochs,
                 train_acc=train_acc,
                 val_vals=val_vals,
-                elapsed=t_offset + time.perf_counter() - t0,
+                t_start=(t0, t_offset),
             ):
                 break
 
