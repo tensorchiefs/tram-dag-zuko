@@ -12,11 +12,13 @@ Causal queries:
     flow.pmf(df, node, do=...)        analytic per-row interventional PMF
 """
 
+# %% imports ---------------------------------------------------------------------------
 from __future__ import annotations
 
 import copy
 import logging
 import time
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import NamedTuple
 
@@ -32,6 +34,8 @@ from .conditioners import (
     SimpleIntercept,
     VaryingCoef,
 )
+from .scores import effect_modifier_scan as _effect_modifier_scan
+from .scores import node_scores as _node_scores
 from .spec import (
     LS,
     ContinuousNode,
@@ -45,17 +49,125 @@ from .spec import (
     validate_and_sort,
 )
 from .transforms import (
+    RANGE_Q,
+    BernsteinUT,
     StandardLogistic,
     make_univariate_transform,
     ordinal_abduct,
     ordinal_log_prob,
+    ordinal_marginal_init_theta,
     ordinal_pmf,
     ordinal_sample,
 )
+from .utils import machine_info
 
+# %% global variables ------------------------------------------------------------------
 __all__ = ["CausalFlowDAG"]
 
 logger = logging.getLogger(__name__)
+
+
+# %% private functions -----------------------------------------------------------------
+def _slice_ehat(
+    vc_ehat: dict[str, dict[str, Tensor]] | None, idx: Tensor
+) -> dict[str, dict[str, Tensor]] | None:
+    """Slice the frozen out-of-fold propensities down to one minibatch."""
+    if vc_ehat is None:
+        return None
+    return {nm: {on: e[idx] for on, e in d.items()} for nm, d in vc_ehat.items()}
+
+
+def _feat_width(spec: dict[str, NodeSpec], parents) -> int:
+    """Total feature width of the parents (ordinal one-hot, continuous raw)."""
+    return sum(
+        spec[p].levels if isinstance(spec[p], OrdinalNode) else 1 for p in parents
+    )
+
+
+def _term_cells(term) -> list[tuple[str, str]]:
+    """Give a term's adjacency cells as ``(parent, tag)`` pairs.
+
+    A VC term tags its treatment cell ``"VC"`` and its modifiers ``"VCm"``.
+    A multi-parent term carries its parent group as a suffix.
+    """
+    if term.effect == "VC":
+        return [(term.parents[0], "VC")] + [(p, "VCm") for p in term.parents[1:]]
+    tag = "CI" if term.effect == "I" else term.effect
+    if len(term.parents) > 1:
+        tag = f"{tag}{list(term.parents)}"
+    return [(p, tag) for p in term.parents]
+
+
+def _covered_by_classical(term) -> bool:
+    """Say whether the exact classical fit handles this term.
+
+    It handles an ``LS``, and a parentless ``I()`` — the simple-intercept
+    baseline made explicit, for example as the carrier of ``transform=``.
+    """
+    return term.effect == "LS" or (term.effect == "I" and not term.parents)
+
+
+# %% private classes -------------------------------------------------------------------
+class _FitSchedule:
+    """Per-node plateau decay and freezing bookkeeping for one ``fit`` call.
+
+    The per-node losses have independent gradients, so per-node learning
+    rates and freezing are exactly equivalent to independent per-node
+    training. ``step`` runs once per epoch on the validation NLLs.
+    """
+
+    def __init__(
+        self,
+        order: list[str],
+        schedule: str | None,
+        learning_rate: float,
+        plateau_patience: int,
+        plateau_factor: float,
+        freeze_patience: int | None,
+        min_delta: float,
+    ):
+        self.schedule = schedule
+        self.lr = learning_rate
+        self.patience = plateau_patience
+        self.factor = plateau_factor
+        self.freeze_patience = freeze_patience
+        self.min_delta = min_delta
+        self.best = dict.fromkeys(order, float("inf"))
+        self.bad = dict.fromkeys(order, 0)
+        self.frozen: set[str] = set()
+
+    def step(self, opt, val_per_node: dict[str, float], history: dict) -> None:
+        """Decay plateaued learning rates and freeze converged nodes."""
+        for g in opt.param_groups:
+            name = g["node"]
+            if name in self.frozen:
+                continue
+            if val_per_node[name] < self.best[name] - self.min_delta:
+                self.best[name] = val_per_node[name]
+                self.bad[name] = 0
+            else:
+                self.bad[name] += 1
+            if (
+                self.schedule == "plateau"
+                and self.bad[name] > 0
+                and self.bad[name] % self.patience == 0
+            ):
+                g["lr"] = max(g["lr"] * self.factor, self.lr * 1e-3)
+            # under "plateau", only freeze nodes whose lr has already been
+            # decayed substantially — otherwise a node can freeze while a
+            # smaller lr would still make progress toward the optimum
+            lr_decayed = self.schedule != "plateau" or g["lr"] <= self.lr * 1e-2 * (
+                1 + 1e-9
+            )
+            if (
+                self.freeze_patience is not None
+                and lr_decayed
+                and self.bad[name] >= self.freeze_patience
+            ):
+                self.frozen.add(name)
+                history.setdefault("frozen", {}).setdefault(
+                    name, len(history["val"])
+                )  # 1-based global epoch
 
 
 class _VCGroup(NamedTuple):
@@ -84,15 +196,6 @@ class _VCGroup(NamedTuple):
     folds: int
 
 
-def _covered_by_classical(term) -> bool:
-    """Say whether the exact classical fit handles this term.
-
-    It handles an ``LS``, and a parentless ``I()`` — the simple-intercept
-    baseline made explicit, for example as the carrier of ``transform=``.
-    """
-    return term.effect == "LS" or (term.effect == "I" and not term.parents)
-
-
 class _Node(nn.Module):
     """One dimension of the flow: an intercept plus additive shift terms.
 
@@ -107,7 +210,6 @@ class _Node(nn.Module):
         The full DAG specification. Needed for the parent feature widths.
     """
 
-    # complexipy: ignore - split planned in the complexity-reduction PR
     def __init__(self, node: NodeSpec, spec: dict[str, NodeSpec]):
         super().__init__()
         self.kind = node.kind
@@ -133,22 +235,25 @@ class _Node(nn.Module):
             self.ut = None
             self.levels = node.levels
             n_params = node.levels - 1
+        self._build_intercept(i_term, n_params, spec)
+        self._build_shifts(terms, spec)
 
-        def width(parent: str) -> int:
-            pn = spec[parent]
-            return pn.levels if isinstance(pn, OrdinalNode) else 1
+    def _build_intercept(self, i_term, n_params: int, spec: dict[str, NodeSpec]):
+        """Build the intercept module(s) from the intercept groups.
 
-        # intercept, by group count: none -> the free SimpleIntercept theta_0;
-        # one (a single parent, or a joint multi-parent term) -> one
-        # ComplexIntercept that IS theta; several (allow_interaction=False) ->
-        # one net per parent, their outputs summed in unconstrained coefficient
-        # space, so each parent reshapes the transform independently.
+        By group count: none -> the free SimpleIntercept theta_0; one (a
+        single parent, or a joint multi-parent term) -> one ComplexIntercept
+        that IS theta; several (``allow_interaction=False``) -> one net per
+        parent, their outputs summed in unconstrained coefficient space, so
+        each parent reshapes the transform independently.
+        """
+        i_groups = self._intercept_groups
         if not i_groups:
             self.intercept = SimpleIntercept(n_params)
             self.intercept_nets = None
         elif len(i_groups) == 1:
             self.intercept = ComplexIntercept(
-                sum(width(p) for p in i_groups[0]),
+                _feat_width(spec, i_groups[0]),
                 n_params,
                 units=i_term.units,
                 activation=i_term.activation,
@@ -158,7 +263,7 @@ class _Node(nn.Module):
             self.intercept = None
             self.intercept_nets = nn.ModuleList(
                 ComplexIntercept(
-                    sum(width(p) for p in grp),
+                    _feat_width(spec, grp),
                     n_params,
                     units=i_term.units,
                     activation=i_term.activation,
@@ -166,12 +271,16 @@ class _Node(nn.Module):
                 for grp in i_groups
             )
 
-        # shift terms: one network per term, over the term's (possibly joint)
-        # parents. Single-parent terms key the ModuleDict by the parent name (so
-        # ls_coefficients/introspection keep working); a joint CS over several
-        # parents keys by "a+b" and runs over their concatenated features. A VC
-        # term keys by its treatment (on) name — validation guarantees `on` owns
-        # that edge — and carries (on, modifiers, on-is-ordinal) in _vc_groups.
+    def _build_shifts(self, terms, spec: dict[str, NodeSpec]):
+        """Build one shift network per LS/CS/VC term.
+
+        Single-parent terms key the ModuleDict by the parent name (so
+        ls_coefficients/introspection keep working); a joint CS over several
+        parents keys by "a+b" and runs over their concatenated features. A VC
+        term keys by its treatment (on) name — validation guarantees ``on``
+        owns that edge — and carries (on, modifiers, on-is-ordinal) in
+        ``_vc_groups``.
+        """
         self.shifts = nn.ModuleDict()
         self._shift_groups: list[tuple[str, tuple[str, ...]]] = []
         self._vc_groups: list[_VCGroup] = []
@@ -179,7 +288,7 @@ class _Node(nn.Module):
             if term.effect == "VC":
                 on, mods = term.parents[0], tuple(term.parents[1:])
                 self.shifts[on] = VaryingCoef(
-                    sum(width(p) for p in mods),
+                    _feat_width(spec, mods),
                     penalty=term.penalty,
                     units=term.units,
                     activation=term.activation,
@@ -193,20 +302,18 @@ class _Node(nn.Module):
                         term.center_folds,
                     )
                 )
-                continue
-            if term.effect not in ("LS", "CS"):
-                continue
-            ps = tuple(term.parents)
-            key = ps[0] if len(ps) == 1 else "+".join(ps)
-            feat_width = sum(width(p) for p in ps)
-            self.shifts[key] = (
-                LinearShift(feat_width)
-                if term.effect == "LS"
-                else ComplexShift(
-                    feat_width, units=term.units, activation=term.activation
+            elif term.effect in ("LS", "CS"):
+                ps = tuple(term.parents)
+                key = ps[0] if len(ps) == 1 else "+".join(ps)
+                feat_width = _feat_width(spec, ps)
+                self.shifts[key] = (
+                    LinearShift(feat_width)
+                    if term.effect == "LS"
+                    else ComplexShift(
+                        feat_width, units=term.units, activation=term.activation
+                    )
                 )
-            )
-            self._shift_groups.append((key, ps))
+                self._shift_groups.append((key, ps))
 
     def vc_column(self, g, feats: dict, vc_ehat: dict | None) -> Tensor:
         """Give the ``(n, 1)`` regressor a VC term multiplies its ``beta`` by.
@@ -222,7 +329,31 @@ class _Node(nn.Module):
             t = t - vc_ehat[g.on].view(-1, 1)
         return t
 
-    # complexipy: ignore - split planned in the complexity-reduction PR
+    def _theta(self, feats: dict[str, Tensor], n: int) -> Tensor:
+        """Evaluate the intercept: the transform parameters, shape ``(n, P)``."""
+        if self.intercept_nets is not None:  # additive complex intercept
+            return sum(
+                net(torch.cat([feats[p] for p in grp], dim=1))
+                for net, grp in zip(
+                    self.intercept_nets, self._intercept_groups, strict=True
+                )
+            )
+        if self.ci_parents:  # single or joint complex intercept
+            return self.intercept(torch.cat([feats[p] for p in self.ci_parents], dim=1))
+        return self.intercept(n)  # simple (free) intercept
+
+    def _vc_shift(self, g, feats: dict, vc_ehat: dict | None) -> Tensor:
+        """Give one VC term's contribution to the shift, shape ``(n,)``."""
+        if g.center and (vc_ehat is None or g.on not in vc_ehat):
+            raise RuntimeError(
+                f"centered VC term on {g.on!r} needs e_hat. Internal "
+                "callers must supply vc_ehat. Never evaluate a centered "
+                "term without its propensity."
+            )
+        t = self.vc_column(g, feats, vc_ehat)
+        mod_feat = torch.cat([feats[p] for p in g.mods], dim=1) if g.mods else None
+        return self.shifts[g.on](t, mod_feat)
+
     def theta_shift(
         self, feats: dict[str, Tensor], n: int, vc_ehat: dict[str, Tensor] | None = None
     ) -> tuple[Tensor, Tensor]:
@@ -251,19 +382,7 @@ class _Node(nn.Module):
         RuntimeError
             If a centered VC term is evaluated without its propensity.
         """
-        if self.intercept_nets is not None:  # additive complex intercept
-            theta = sum(
-                net(torch.cat([feats[p] for p in grp], dim=1))
-                for net, grp in zip(
-                    self.intercept_nets, self._intercept_groups, strict=True
-                )
-            )
-        elif self.ci_parents:  # single or joint complex intercept
-            theta = self.intercept(
-                torch.cat([feats[p] for p in self.ci_parents], dim=1)
-            )
-        else:  # simple (free) intercept
-            theta = self.intercept(n)
+        theta = self._theta(feats, n)
         shift = torch.zeros(n, dtype=theta.dtype, device=theta.device)
         for key, ps in self._shift_groups:
             feat = (
@@ -273,18 +392,11 @@ class _Node(nn.Module):
             )
             shift = shift + self.shifts[key](feat)
         for g in self._vc_groups:
-            if g.center and (vc_ehat is None or g.on not in vc_ehat):
-                raise RuntimeError(
-                    f"centered VC term on {g.on!r} needs e_hat. Internal "
-                    "callers must supply vc_ehat. Never evaluate a centered "
-                    "term without its propensity."
-                )
-            t = self.vc_column(g, feats, vc_ehat)
-            mod_feat = torch.cat([feats[p] for p in g.mods], dim=1) if g.mods else None
-            shift = shift + self.shifts[g.on](t, mod_feat)
+            shift = shift + self._vc_shift(g, feats, vc_ehat)
         return theta, shift
 
 
+# %% public classes --------------------------------------------------------------------
 class CausalFlowDAG(nn.Module):
     """A causal normalizing flow defined by a DAG specification.
 
@@ -319,7 +431,6 @@ class CausalFlowDAG(nn.Module):
         self.vc_center_info: dict = {}  # OOF bookkeeping of centered VC terms (fit)
         self.to(self.device)
 
-    # ------------------------------------------------------------------ data
     def _encode_parent(self, name: str, values: Tensor) -> Tensor:
         """Encode the values of a node for use as a parent feature.
 
@@ -386,7 +497,6 @@ class CausalFlowDAG(nn.Module):
     def _features(self, values: dict[str, Tensor]) -> dict[str, Tensor]:
         return {name: self._encode_parent(name, vals) for name, vals in values.items()}
 
-    # ------------------------------------------- centered-VC propensity (e_hat)
     def _vc_ehat_live(
         self, nd: _Node, values: dict[str, Tensor], n: int
     ) -> dict[str, Tensor] | None:
@@ -420,7 +530,6 @@ class CausalFlowDAG(nn.Module):
         cols = [p for g in nd._vc_groups if g.center for p in self.nodes[g.on].parents]
         return [c for c in dict.fromkeys(cols) if c not in nd.parents]
 
-    # ------------------------------------------------------------- likelihood
     def node_log_prob(
         self,
         values: dict[str, Tensor],
@@ -502,7 +611,6 @@ class CausalFlowDAG(nn.Module):
             per_node = self.node_log_prob(self._tensorize(df))
         return {k: float(-v.mean()) for k, v in per_node.items()}
 
-    # ------------------------------------------------------------------- fit
     def _set_ranges(self, train_df: pd.DataFrame, marginal_init: bool = False) -> None:
         """Map the train ``RANGE_Q``/1-``RANGE_Q`` quantiles onto the domain.
 
@@ -512,8 +620,6 @@ class CausalFlowDAG(nn.Module):
         on the first fit (the same ``not ut._fitted`` guard as range-setting), so a
         multi-phase fit does not reset a partially-trained intercept.
         """
-        from .transforms import RANGE_Q, BernsteinUT, ordinal_marginal_init_theta
-
         for name in self.order:
             node = self.nodes[name]
             if node.kind == "continuous" and not node.ut._fitted:
@@ -541,8 +647,156 @@ class CausalFlowDAG(nn.Module):
                     node.intercept.theta.copy_(ordinal_marginal_init_theta(counts))
                 node.intercept._marginal_inited = True
 
-    # complexipy: ignore
-    def fit(  # noqa: C901 - split planned in the complexity-reduction PR
+    def _best_store(self, restore_best: bool) -> dict | None:
+        """Give the cross-call best-weights store, creating it on first use."""
+        if not restore_best:
+            return None
+        if not hasattr(self, "_best"):
+            self._best = {name: (float("inf"), None) for name in self.order}
+        return self._best
+
+    def _make_optimizer(self, learning_rate: float) -> torch.optim.Adam:
+        """Build Adam with one parameter group per node, tagged by name."""
+        return torch.optim.Adam(
+            [
+                {
+                    "params": list(self.nodes[name].parameters()),
+                    "lr": learning_rate,
+                    "node": name,
+                }
+                for name in self.order
+            ]
+        )
+
+    def _val_nll(self, val_vals: dict[str, Tensor]) -> dict[str, float]:
+        """Give the mean validation NLL per node, for the epoch monitor."""
+        with torch.no_grad():
+            return {
+                k: float(-v.mean()) for k, v in self.node_log_prob(val_vals).items()
+            }
+
+    def _vc_penalized(self) -> dict[str, list]:
+        """List the VC effect heads whose L2 penalty joins the loss, per node."""
+        return {
+            name: [
+                self.nodes[name].shifts[g.on]
+                for g in self.nodes[name]._vc_groups
+                if g.mods and self.nodes[name].shifts[g.on].penalty > 0
+            ]
+            for name in self.order
+        }
+
+    def _log_epoch(
+        self,
+        verbose: int,
+        epoch: int,
+        epochs: int,
+        train_acc: dict[str, float],
+        val_per_node: dict[str, float],
+        frozen: set[str],
+    ) -> None:
+        """Emit the periodic progress record (INFO on the ``tramdag.flow`` logger)."""
+        if not verbose or (epoch % verbose and epoch != epochs - 1):
+            return
+        logger.info(
+            "[epoch %5d/%d] train NLL %.4f  val NLL %.4f%s",
+            epoch + 1,
+            epochs,
+            sum(train_acc.values()),
+            sum(val_per_node.values()),
+            f"  frozen {sorted(frozen)}" if frozen else "",
+        )
+
+    def _end_epoch(
+        self,
+        *,
+        opt: torch.optim.Optimizer,
+        sched: _FitSchedule,
+        best: dict | None,
+        verbose: int,
+        epoch: int,
+        epochs: int,
+        train_acc: dict[str, float],
+        val_vals: dict[str, Tensor],
+        elapsed: float,
+    ) -> bool:
+        """Record one epoch, update the schedules, snapshot, and log.
+
+        Returns ``True`` when every node froze, which stops the fit.
+        """
+        val_per_node = self._val_nll(val_vals)
+        self.history["train"].append(train_acc)
+        self.history["val"].append(val_per_node)
+        self.history["lr"].append(max(g["lr"] for g in opt.param_groups))
+        self.history["time"].append(elapsed)
+        sched.step(opt, val_per_node, self.history)
+        if best is not None:
+            self._snapshot_best(best, val_per_node)
+        self._log_epoch(verbose, epoch, epochs, train_acc, val_per_node, sched.frozen)
+        if len(sched.frozen) < len(self.order):
+            return False
+        if verbose:
+            logger.info("[epoch %5d] all nodes frozen — stopping.", epoch + 1)
+        return True
+
+    def _fit_epoch(
+        self,
+        train_vals: dict[str, Tensor],
+        prev_acc: dict[str, float],
+        frozen: set[str],
+        opt: torch.optim.Optimizer,
+        batch_size: int,
+        vc_ehat_train: dict[str, dict[str, Tensor]] | None,
+        vc_penalized: dict[str, list],
+    ) -> dict[str, float]:
+        """Run one epoch of minibatch training over the non-frozen nodes.
+
+        Returns the epoch-mean train NLL per node; a frozen node carries
+        its last computed value forward. The VC penalty joins the loss but
+        never the returned NLLs.
+        """
+        active = [name for name in self.order if name not in frozen]
+        n = len(next(iter(train_vals.values())))
+        perm = torch.randperm(n, device=self.device)
+        acc = dict.fromkeys(active, 0.0)
+        for start in range(0, n, batch_size):
+            idx = perm[start : start + batch_size]
+            batch = {k: v[idx] for k, v in train_vals.items()}
+            per_node = self.node_log_prob(
+                batch, nodes=active, vc_ehat=_slice_ehat(vc_ehat_train, idx)
+            )
+            node_nlls = {k: -v.mean() for k, v in per_node.items()}
+            loss = torch.stack(list(node_nlls.values())).sum()
+            # VC penalty joins the loss (never the history)
+            loss = loss + sum(
+                m.penalty * m.l2() / n for name in active for m in vc_penalized[name]
+            )
+            opt.zero_grad()
+            loss.backward()
+            opt.step()
+            w = len(idx) / n
+            for k, v in node_nlls.items():
+                acc[k] += float(v.detach()) * w
+        return {
+            name: acc.get(name, prev_acc.get(name, float("nan"))) for name in self.order
+        }
+
+    def _snapshot_best(self, best: dict, val_per_node: dict[str, float]) -> None:
+        """Deep-copy a node's weights whenever its validation NLL improves."""
+        for name in self.order:
+            if val_per_node[name] < best[name][0]:
+                best[name] = (
+                    val_per_node[name],
+                    copy.deepcopy(self.nodes[name].state_dict()),
+                )
+
+    def _load_best_weights(self, best: dict) -> None:
+        """Restore each node's best-validation snapshot, where one exists."""
+        for name, (_, state) in best.items():
+            if state is not None:
+                self.nodes[name].load_state_dict(state)
+
+    def fit(
         self,
         train_df: pd.DataFrame,
         val_df: pd.DataFrame | None = None,
@@ -730,15 +984,7 @@ class CausalFlowDAG(nn.Module):
         self._set_ranges(train_df, marginal_init=marginal_init)
         if vc_warm_start:
             self._vc_warm_start(train_df)
-        # VC effect heads whose L2 penalty joins the loss, per owning node
-        vc_penalized = {
-            name: [
-                self.nodes[name].shifts[g.on]
-                for g in self.nodes[name]._vc_groups
-                if g.mods and self.nodes[name].shifts[g.on].penalty > 0
-            ]
-            for name in self.order
-        }
+        vc_penalized = self._vc_penalized()
         # stage 1 for centered VC terms (issue #30): frozen OUT-OF-FOLD e_hat
         # for the training rows — a plain tensor, so the Y-node loss has no
         # gradient path into the treatment node (per-node factorization intact).
@@ -746,136 +992,53 @@ class CausalFlowDAG(nn.Module):
 
         train_vals = self._tensorize(train_df)
         val_vals = self._tensorize(val_df) if val_df is not None else train_vals
-        n = len(train_df)
 
-        opt = torch.optim.Adam(
-            [
-                {
-                    "params": list(self.nodes[name].parameters()),
-                    "lr": learning_rate,
-                    "node": name,
-                }
-                for name in self.order
-            ]
+        opt = self._make_optimizer(learning_rate)
+        best = self._best_store(restore_best)
+        sched = _FitSchedule(
+            self.order,
+            schedule,
+            learning_rate,
+            plateau_patience,
+            plateau_factor,
+            freeze_patience,
+            min_delta,
         )
-        if restore_best and not hasattr(self, "_best"):
-            self._best = {name: (float("inf"), None) for name in self.order}
-        best = self._best if restore_best else None
-        # per-node plateau/freeze bookkeeping (local to this fit call)
-        node_best = {name: float("inf") for name in self.order}
-        node_bad = dict.fromkeys(self.order, 0)
-        frozen: set[str] = set()
         t0 = time.perf_counter()
         t_offset = self.history["time"][-1] if self.history.get("time") else 0.0
-        prev_train: dict[str, float] = {}
+        train_acc: dict[str, float] = {}
 
         for epoch in range(epochs):
             self.train()
-            active = [name for name in self.order if name not in frozen]
-            perm = torch.randperm(n, device=self.device)
-            train_acc = {name: prev_train.get(name, float("nan")) for name in frozen}
-            train_acc.update(dict.fromkeys(active, 0.0))
-            for start in range(0, n, batch_size):
-                idx = perm[start : start + batch_size]
-                batch = {k: v[idx] for k, v in train_vals.items()}
-                ehat_batch = (
-                    None
-                    if vc_ehat_train is None
-                    else {
-                        nm: {on: e[idx] for on, e in d.items()}
-                        for nm, d in vc_ehat_train.items()
-                    }
-                )
-                per_node = self.node_log_prob(batch, nodes=active, vc_ehat=ehat_batch)
-                node_nlls = {k: -v.mean() for k, v in per_node.items()}
-                loss = torch.stack(list(node_nlls.values())).sum()
-                for name in active:  # VC penalty (excluded from history)
-                    for m in vc_penalized[name]:
-                        loss = loss + m.penalty * m.l2() / n
-                opt.zero_grad()
-                loss.backward()
-                opt.step()
-                w = len(idx) / n
-                for k, v in node_nlls.items():
-                    train_acc[k] += float(v.detach()) * w
-            prev_train = train_acc
-
+            train_acc = self._fit_epoch(
+                train_vals,
+                train_acc,
+                sched.frozen,
+                opt,
+                batch_size,
+                vc_ehat_train,
+                vc_penalized,
+            )
             self.eval()
-            with torch.no_grad():
-                val_per_node = {
-                    k: float(-v.mean()) for k, v in self.node_log_prob(val_vals).items()
-                }
-            self.history["train"].append(train_acc)
-            self.history["val"].append(val_per_node)
-            self.history["lr"].append(max(g["lr"] for g in opt.param_groups))
-            self.history["time"].append(t_offset + time.perf_counter() - t0)
-
-            # per-node improvement tracking (plateau decay + freezing)
-            for g in opt.param_groups:
-                name = g["node"]
-                if name in frozen:
-                    continue
-                if val_per_node[name] < node_best[name] - min_delta:
-                    node_best[name] = val_per_node[name]
-                    node_bad[name] = 0
-                else:
-                    node_bad[name] += 1
-                if (
-                    schedule == "plateau"
-                    and node_bad[name] > 0
-                    and node_bad[name] % plateau_patience == 0
-                ):
-                    g["lr"] = max(g["lr"] * plateau_factor, learning_rate * 1e-3)
-                # under "plateau", only freeze nodes whose lr has already been
-                # decayed substantially — otherwise a node can freeze while a
-                # smaller lr would still make progress toward the optimum
-                lr_decayed = schedule != "plateau" or g[
-                    "lr"
-                ] <= learning_rate * 1e-2 * (1 + 1e-9)
-                if (
-                    freeze_patience is not None
-                    and lr_decayed
-                    and node_bad[name] >= freeze_patience
-                ):
-                    frozen.add(name)
-                    self.history.setdefault("frozen", {}).setdefault(
-                        name, len(self.history["val"])
-                    )  # 1-based global epoch
-
-            if restore_best:
-                for name in self.order:
-                    if val_per_node[name] < best[name][0]:
-                        best[name] = (
-                            val_per_node[name],
-                            copy.deepcopy(self.nodes[name].state_dict()),
-                        )
-
-            if verbose and (epoch % verbose == 0 or epoch == epochs - 1):
-                tot_t = sum(train_acc.values())
-                tot_v = sum(val_per_node.values())
-                logger.info(
-                    "[epoch %5d/%d] train NLL %.4f  val NLL %.4f%s",
-                    epoch + 1,
-                    epochs,
-                    tot_t,
-                    tot_v,
-                    f"  frozen {sorted(frozen)}" if frozen else "",
-                )
-
-            if len(frozen) == len(self.order):  # everything converged
-                if verbose:
-                    logger.info("[epoch %5d] all nodes frozen — stopping.", epoch + 1)
+            if self._end_epoch(
+                opt=opt,
+                sched=sched,
+                best=best,
+                verbose=verbose,
+                epoch=epoch,
+                epochs=epochs,
+                train_acc=train_acc,
+                val_vals=val_vals,
+                elapsed=t_offset + time.perf_counter() - t0,
+            ):
                 break
 
-        if restore_best:  # restore per-node best-validation weights
-            for name, (_, state) in best.items():
-                if state is not None:
-                    self.nodes[name].load_state_dict(state)
+        if best is not None:  # restore per-node best-validation weights
+            self._load_best_weights(best)
         self._recenter_vc(train_vals)
         self.eval()
         return self
 
-    # ------------------------------------------------- varying-coefficient (VC)
     def _source_proxies(self, parents) -> dict[str, NodeSpec]:
         """Give a proxy spec whose parents are sources.
 
@@ -893,7 +1056,30 @@ class CausalFlowDAG(nn.Module):
             )
         return out
 
-    # complexipy: ignore - split planned in the complexity-reduction PR
+    def _ls_proxy_spec(self, name: str) -> dict[str, NodeSpec]:
+        """Give a throwaway all-``ls`` proxy spec of one node's conditional.
+
+        Same kind and transform, every parent an LS term, every parent a
+        source (their marginals cannot influence the conditional).
+        """
+        node_spec = self.spec[name]
+        nd = self.nodes[name]
+        proxy_spec = self._source_proxies(nd.parents)
+        ls_terms = [LS(p) for p in nd.parents]
+        if isinstance(node_spec, OrdinalNode):
+            proxy_spec[name] = OrdinalNode(node_spec.levels, ls_terms)
+        else:
+            proxy_spec[name] = ContinuousNode(
+                [
+                    I(
+                        transform=node_spec.transform,
+                        **dict(node_spec.transform_kwargs),
+                    ),
+                    *ls_terms,
+                ]
+            )
+        return proxy_spec
+
     def _vc_warm_start(self, train_df: pd.DataFrame) -> None:
         """Initialize every VC term's ``beta0`` from the classical solution.
 
@@ -914,22 +1100,7 @@ class CausalFlowDAG(nn.Module):
             todo = [g for g in nd._vc_groups if not bool(nd.shifts[g[0]].warm_started)]
             if not todo:
                 continue
-            node_spec = self.spec[name]
-            proxy_spec = self._source_proxies(nd.parents)
-            ls_terms = [LS(p) for p in nd.parents]
-            if isinstance(node_spec, OrdinalNode):
-                proxy_spec[name] = OrdinalNode(node_spec.levels, ls_terms)
-            else:
-                proxy_spec[name] = ContinuousNode(
-                    [
-                        I(
-                            transform=node_spec.transform,
-                            **dict(node_spec.transform_kwargs),
-                        ),
-                        *ls_terms,
-                    ]
-                )
-            proxy = CausalFlowDAG(proxy_spec, device=str(self.device))
+            proxy = CausalFlowDAG(self._ls_proxy_spec(name), device=str(self.device))
             proxy.fit_classical(train_df[[*nd.parents, name]], verbose=False)
             for g in todo:
                 w = proxy.nodes[name].shifts[g.on].weight.detach()
@@ -1119,16 +1290,12 @@ class CausalFlowDAG(nn.Module):
                 f"node {node!r} has no VC term on {t!r} (has {sorted(vcs)})."
             )
         mods = vcs[t]
-        missing = [p for p in mods if p not in data.columns]
-        if missing:
-            raise KeyError(f"data is missing modifier column(s): {missing}")
         mod_feat = None
         if mods:
             feats = self._features(self._tensorize(data, mods))
             mod_feat = torch.cat([feats[p] for p in mods], dim=1)
         return nd.shifts[t].beta(mod_feat, len(data)).cpu().numpy()
 
-    # --------------------------------------------------------- classical fit
     def _is_all_ls(self) -> bool:
         return all(
             _covered_by_classical(term)
@@ -1163,7 +1330,6 @@ class CausalFlowDAG(nn.Module):
                 out[name] = linear
         return out
 
-    # complexipy: ignore - split planned in the complexity-reduction PR
     def to_matrix(self) -> pd.DataFrame:
         """Give the labeled adjacency matrix of term effects.
 
@@ -1182,17 +1348,8 @@ class CausalFlowDAG(nn.Module):
         m = pd.DataFrame("", index=list(self.order), columns=list(self.order))
         for child in self.order:
             for term in node_terms(self.spec[child]):
-                if term.effect == "VC":  # treatment cell "VC", modifiers "VCm"
-                    cells = [(term.parents[0], "VC")] + [
-                        (p, "VCm") for p in term.parents[1:]
-                    ]
-                else:
-                    tag = "CI" if term.effect == "I" else term.effect
-                    if len(term.parents) > 1:
-                        tag = f"{tag}{list(term.parents)}"
-                    cells = [(p, tag) for p in term.parents]
-                for p, tag in cells:  # a VC modifier may share its cell with
-                    cur = m.loc[p, child]  # a prognostic term -> join with "+"
+                for p, tag in _term_cells(term):  # a VC modifier may share its
+                    cur = m.loc[p, child]  # cell with a prognostic term -> "+"
                     m.loc[p, child] = f"{cur}+{tag}" if cur else tag
         return m
 
@@ -1453,7 +1610,7 @@ class CausalFlowDAG(nn.Module):
                 False,
             )
             for _ in range(max(1, max_iter // chunk)):
-                final_nll = float(opt.step(closure))
+                final_nll = float(opt.step(closure).detach())
                 n_iter += chunk
                 if abs(prev_nll - final_nll) < tol * (1.0 + abs(final_nll)):
                     converged = True
@@ -1491,7 +1648,6 @@ class CausalFlowDAG(nn.Module):
             )
         return report
 
-    # ------------------------------------------------------- causal queries
     @torch.no_grad()
     def sample(
         self,
@@ -1528,11 +1684,11 @@ class CausalFlowDAG(nn.Module):
             If both ``n`` and ``u`` are omitted.
         """
         do = do or {}
-        gen = self._generator(seed)
         if u is not None:
             n = len(u)
             u_vals = self._tensorize(u)
         elif n is not None:
+            gen = self._generator(seed)
             u_vals = {
                 name: StandardLogistic.sample((n,), device=self.device, generator=gen)
                 for name in self.order
@@ -1644,7 +1800,6 @@ class CausalFlowDAG(nn.Module):
         )
         return ordinal_pmf(theta, shift).cpu().numpy()
 
-    # ------------------------------------------------------------------ scores
     @torch.no_grad()
     def scores(self, df: pd.DataFrame, node: str) -> pd.DataFrame:
         """Give the per-observation scores ``psi_i = d l_i / d theta``.
@@ -1674,9 +1829,7 @@ class CausalFlowDAG(nn.Module):
             One column per coefficient, one row per observation. See
             :func:`tramdag.scores.node_scores` for the column naming.
         """
-        from .scores import node_scores
-
-        return node_scores(self, df, node)
+        return _node_scores(self, df, node)
 
     @torch.no_grad()
     def effect_modifier_scan(
@@ -1709,11 +1862,8 @@ class CausalFlowDAG(nn.Module):
             columns ``stat``, ``p_value``, ``crit_5pct`` and ``flag``. See
             :func:`tramdag.scores.effect_modifier_scan`.
         """
-        from .scores import effect_modifier_scan
+        return _effect_modifier_scan(self, df, node, t, candidates=candidates)
 
-        return effect_modifier_scan(self, df, node, t, candidates=candidates)
-
-    # ------------------------------------------------------------------- io
     def save(self, path: str | Path) -> None:
         """Write the model, its history and its provenance to a checkpoint.
 
@@ -1728,10 +1878,7 @@ class CausalFlowDAG(nn.Module):
         path : str | Path
             Target file. Parent directories are created when missing.
         """
-        from datetime import datetime, timezone
-
-        from . import __version__
-        from .utils import machine_info
+        from . import __version__  # lazy: circular through the package root
 
         path = Path(path)
         path.parent.mkdir(parents=True, exist_ok=True)

@@ -5,6 +5,7 @@ specific to these experiments; what every area shares (config loading,
 output directories, reports) lives in ``experiments/common.py``.
 """
 
+# %% imports ---------------------------------------------------------------------------
 from __future__ import annotations
 
 from pathlib import Path
@@ -21,6 +22,34 @@ import torch
 from tramdag import CausalFlowDAG
 
 
+# %% private functions -----------------------------------------------------------------
+def _level_bars(ax, dgp_values, flow_values, n_levels: int) -> None:
+    """Draw side-by-side level-frequency bars for one ordinal panel."""
+    levels = np.arange(n_levels)
+    dgp_freq = dgp_values.value_counts(normalize=True).reindex(levels, fill_value=0)
+    flow_freq = flow_values.value_counts(normalize=True).reindex(levels, fill_value=0)
+    ax.bar(levels - 0.18, dgp_freq, width=0.36, alpha=0.6, label="DGP")
+    ax.bar(
+        levels + 0.18,
+        flow_freq,
+        width=0.36,
+        alpha=0.8,
+        color="C3",
+        label="flow",
+    )
+    ax.set_xticks(levels)
+
+
+def _continuous_hist(ax, dgp_values, flow_values) -> None:
+    """Draw one continuous panel, with bins from the DGP quantiles."""
+    low, high = np.quantile(dgp_values, [0.001, 0.999])
+    if high - low < 1e-9:
+        # a do-clamped column is constant: give the panel a width
+        low, high = low - 1.0, high + 1.0
+    hist_overlay(ax, dgp_values, flow_values, np.linspace(low, high, 50))
+
+
+# %% public functions ------------------------------------------------------------------
 # ------------------------------------------------------------------ fitting
 def split_train_val(df: pd.DataFrame, n_train: int, n_val: int) -> tuple:
     """Split positionally: the first rows train, the next ones validate.
@@ -183,7 +212,6 @@ def plot_cs_curve(grid, fitted, true, path: Path, title: str) -> float:
     return float(np.max(np.abs(anchored - true)))
 
 
-# complexipy: ignore - split planned in the complexity-reduction PR
 def plot_hist_grid(
     dgp_samples: dict,
     flow_samples: dict,
@@ -226,33 +254,13 @@ def plot_hist_grid(
             dgp_values = dgp_samples[scenario][column]
             flow_values = flow_samples[scenario][column]
             if column in ordinal_levels:
-                levels = np.arange(ordinal_levels[column])
-                dgp_freq = dgp_values.value_counts(normalize=True).reindex(
-                    levels, fill_value=0
-                )
-                flow_freq = flow_values.value_counts(normalize=True).reindex(
-                    levels, fill_value=0
-                )
-                ax.bar(levels - 0.18, dgp_freq, width=0.36, alpha=0.6, label="DGP")
-                ax.bar(
-                    levels + 0.18,
-                    flow_freq,
-                    width=0.36,
-                    alpha=0.8,
-                    color="C3",
-                    label="flow",
-                )
-                ax.set_xticks(levels)
+                _level_bars(ax, dgp_values, flow_values, ordinal_levels[column])
             else:
-                low, high = np.quantile(dgp_values, [0.001, 0.999])
-                if high - low < 1e-9:
-                    # a do-clamped column is constant: give the panel a width
-                    low, high = low - 1.0, high + 1.0
-                hist_overlay(ax, dgp_values, flow_values, np.linspace(low, high, 50))
-            if row == 0:
-                ax.set_title(column)
-            if col == 0:
-                ax.set_ylabel(scenario)
+                _continuous_hist(ax, dgp_values, flow_values)
+    for ax, column in zip(axes[0], columns, strict=True):
+        ax.set_title(column)
+    for ax_row, scenario in zip(axes, scenarios, strict=True):
+        ax_row[0].set_ylabel(scenario)
     axes[0][0].legend(fontsize=8)
     fig.suptitle(title)
     finish(fig, path)

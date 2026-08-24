@@ -64,10 +64,12 @@ is the intended pattern — ``x2`` acts prognostically through the shift *and*
 modifies the treatment effect.
 """
 
+# %% imports ---------------------------------------------------------------------------
 from __future__ import annotations
 
 from dataclasses import dataclass
 
+# %% global variables ------------------------------------------------------------------
 EFFECTS = ("I", "LS", "CS", "VC")
 
 # bernstein, because zuko's spline extrapolates with a fixed slope outside
@@ -90,64 +92,280 @@ _OPTION_DEFAULTS = {
 }
 
 
+# %% private functions -----------------------------------------------------------------
 def _options(**kwargs) -> tuple:
     """Canonicalize effect-specific options: sorted pairs, defaults dropped."""
     return tuple(sorted((k, v) for k, v in kwargs.items() if v != _OPTION_DEFAULTS[k]))
 
 
-@dataclass(frozen=True)
-class Term:
-    """One additive term of a node's transformation.
+def _as_term(value) -> Term:
+    """Take one entry of a formula to a :class:`Term`.
 
-    Terms add: ``I("a") + CS("b")`` is the same transformation as
-    ``[I("a"), CS("b")]``. Build terms with the constructors :func:`I`,
-    :func:`LS`, :func:`CS` and :func:`VC`, not directly.
+    The bare name ``I`` stands for ``I()``, the simple-intercept baseline.
 
-    Attributes
-    ----------
-    effect : str
-        One of ``"I"``, ``"LS"``, ``"CS"``, ``"VC"``.
-    parents : tuple[str, ...]
-        Ordered parent names the term depends on. Empty only for the bare
-        simple-intercept ``I()``. For a ``VC`` term, ``parents[0]`` is the
-        treatment (``on``) and the rest are the effect modifiers.
-    options : tuple[tuple[str, object], ...]
-        Effect-specific settings as canonical ``(key, value)`` pairs:
-        sorted by key, defaults omitted. Attribute access serves them
-        with their defaults, so ``term.penalty`` stays valid on every
-        term. Keys: ``penalty``, ``center`` and ``center_folds`` (VC,
-        see :func:`VC`); ``transform`` and ``transform_kwargs`` (I, the
-        basis of the monotone transform, kwargs stored as sorted pairs);
-        ``units`` (hidden layers of the term's network);
-        ``allow_interaction`` (multi-parent I: one joint net or one net
-        per parent).
+    Raises
+    ------
+    TypeError
+        If the entry is neither a term nor the bare ``I``.
     """
-
-    effect: str
-    parents: tuple[str, ...]
-    options: tuple = ()  # canonical (key, value) pairs, see _OPTION_DEFAULTS
-
-    def __getattr__(self, name: str):
-        """Serve the effect-specific options, with their defaults."""
-        if name in _OPTION_DEFAULTS:
-            return dict(self.options).get(name, _OPTION_DEFAULTS[name])
-        raise AttributeError(name)
-
-    def __add__(self, other: Term | list[Term]) -> list[Term]:
-        """Concatenate into a plain term list."""
-        if isinstance(other, Term):
-            return [self, other]
-        if isinstance(other, list):
-            return [self, *other]
-        return NotImplemented
-
-    def __radd__(self, other: list[Term]) -> list[Term]:
-        """Extend a term list from the right, for ``list + term`` chains."""
-        if isinstance(other, list):
-            return [*other, self]
-        return NotImplemented
+    if value in (intercept, simple_intercept):
+        return simple_intercept()
+    if isinstance(value, Term):
+        return value
+    raise TypeError(
+        "a transformation is built from terms (I/LS/CS/VC) — got "
+        f"{type(value).__name__}. A '+' sum is already a flat list, so do "
+        "not nest one inside another list: write either a list or a sum."
+    )
 
 
+def _normalize_terms(value):
+    """Flatten a node's formula into its canonical term list.
+
+    Accepted: ``None`` (a source node), one term, a ``+`` sum, the bare
+    name ``I``, or a list of any of those. A ``+`` sum is already flat, so
+    a list of lists is a mistake rather than a shape to flatten.
+
+    The canonical form starts with the intercept: a formula written
+    without one gets ``SI()`` prepended, so ``terms[0]`` is always the
+    intercept term. Exactly one intercept is allowed, and it must come
+    first when written.
+
+    Parameters
+    ----------
+    value : Term | list[Term] | None
+        The formula as written.
+
+    Returns
+    -------
+    list[Term] | None
+        The canonical term list, or ``None`` for a source node.
+    """
+    if value is None:
+        return None
+    written = value if isinstance(value, (list, tuple)) else [value]
+    items = [_as_term(e) for e in written]
+    intercepts = [i for i, t in enumerate(items) if t.effect == "I"]
+    if len(intercepts) > 1:
+        parented = [t for t in items if t.effect == "I" and t.parents]
+        if len(parented) > 1:
+            raise ValueError(
+                "a formula takes exactly one intercept term. For an additive "
+                "intercept write CI("
+                + ", ".join(repr(p) for t in parented for p in t.parents)
+                + ", allow_interaction=False), not several intercept terms."
+            )
+        raise ValueError(
+            "a formula takes exactly one intercept term, and CI(...) already "
+            "contains the baseline — drop the extra I/SI."
+        )
+    if not intercepts:
+        return [simple_intercept(), *items]  # canonical form: intercept first
+    if intercepts[0] != 0:
+        raise ValueError(
+            "the intercept term comes first: write "
+            "I(...) + <shifts>, not the other way around."
+        )
+    return items
+
+
+def _intercept_basis(terms, *, ordinal: bool):
+    """Read the basis choice off the intercept term.
+
+    Normalization guarantees exactly one intercept, at ``terms[0]``, so the
+    basis has exactly one possible carrier.
+
+    Parameters
+    ----------
+    terms : list[Term] | None
+        The node's canonical term list.
+    ordinal : bool
+        ``True`` for an ordinal node, whose intercept is the cutpoint
+        vector and therefore has no basis to choose.
+
+    Returns
+    -------
+    tuple[str, dict]
+        The effective ``(transform, transform_kwargs)`` of the node.
+
+    Raises
+    ------
+    ValueError
+        If an ordinal node's intercept configures a basis.
+    """
+    intercept_term = terms[0] if terms else None
+    configured = intercept_term is not None and (
+        intercept_term.transform or intercept_term.transform_kwargs
+    )
+    if configured and ordinal:
+        raise ValueError(
+            "I(transform=...) is for continuous nodes. An ordinal node's "
+            "intercept is the cutpoint vector, it has no basis to choose."
+        )
+    if not configured:
+        return DEFAULT_TRANSFORM, {}
+    # the arguments go straight to the transform class; if they are wrong,
+    # that class says so — this layer does not second-guess it
+    name = intercept_term.transform or DEFAULT_TRANSFORM
+    return name, dict(intercept_term.transform_kwargs or ())
+
+
+def _check_vc_term(name: str, term: Term, spec: dict[str, NodeSpec]) -> tuple[str, ...]:
+    """Validate a VC term and give its edge-owning parents.
+
+    Only the treatment ``parents[0]`` owns its edge; the modifiers are
+    exempt from edge ownership.
+
+    Parameters
+    ----------
+    name : str
+        Name of the node the term belongs to, for the error messages.
+    term : Term
+        The VC term.
+    spec : dict[str, NodeSpec]
+        The DAG specification, to look up the treatment node.
+
+    Returns
+    -------
+    tuple[str, ...]
+        The edge-owning parents: ``(treatment,)``.
+
+    Raises
+    ------
+    ValueError
+        If the term has no treatment, the treatment repeats as a modifier,
+        the penalty is negative, or the treatment is unsupported.
+    """
+    if not term.parents:
+        raise ValueError(f"Node '{name}': VC term needs a treatment parent.")
+    on = term.parents[0]
+    if on in term.parents[1:]:
+        raise ValueError(
+            f"Node '{name}': VC treatment '{on}' cannot also be a modifier."
+        )
+    if term.penalty is None or term.penalty < 0:
+        raise ValueError(f"Node '{name}': VC penalty must be >= 0.")
+    on_node = spec[on]
+    if isinstance(on_node, OrdinalNode) and on_node.levels != 2:
+        raise ValueError(
+            f"Node '{name}': VC treatment '{on}' is ordinal with "
+            f"{on_node.levels} levels. Only a 2-level (binary) "
+            "ordinal treatment is supported. Multi-level is a "
+            "follow-up."
+        )
+    if term.center and not isinstance(on_node, OrdinalNode):
+        raise ValueError(
+            f"Node '{name}': VC(center=...) needs a binary ordinal "
+            f"treatment, and '{on}' is continuous. E[T|x] centering "
+            "is a follow-up."
+        )
+    return (on,)
+
+
+def _check_term(name: str, term: Term, spec: dict[str, NodeSpec]) -> tuple[str, ...]:
+    """Validate one term of a node and give its edge-owning parents.
+
+    Parameters
+    ----------
+    name : str
+        Name of the node the term belongs to, for the error messages.
+    term : Term
+        The term to validate.
+    spec : dict[str, NodeSpec]
+        The DAG specification, to look up parent nodes.
+
+    Returns
+    -------
+    tuple[str, ...]
+        The edge-owning parents: all parents of an I/LS/CS term, only the
+        treatment of a VC term.
+
+    Raises
+    ------
+    ValueError
+        If the effect is unknown, an LS term has not exactly one parent,
+        a parent is unknown, or a VC term is malformed.
+    """
+    if term.effect not in EFFECTS:
+        raise ValueError(f"Node '{name}': unknown term effect '{term.effect}'.")
+    if term.effect == "LS" and len(term.parents) != 1:
+        raise ValueError(f"Node '{name}': LS term must have exactly one parent.")
+    for p in term.parents:
+        if p not in spec:
+            raise ValueError(f"Node '{name}': unknown parent '{p}'.")
+    if term.effect == "VC":
+        return _check_vc_term(name, term, spec)
+    return term.parents
+
+
+def _check_node(name: str, node: NodeSpec, spec: dict[str, NodeSpec]) -> None:
+    """Validate one node: its terms, edge ownership, and ordinal levels.
+
+    Parameters
+    ----------
+    name : str
+        Name of the node, for the error messages.
+    node : NodeSpec
+        The node specification.
+    spec : dict[str, NodeSpec]
+        The DAG specification, to look up parent nodes.
+
+    Raises
+    ------
+    ValueError
+        If a term is malformed, a parent enters through more than one
+        edge-owning term, or an ordinal node has fewer than 2 levels.
+    """
+    seen: set[str] = set()
+    for term in node_terms(node):
+        for p in _check_term(name, term, spec):
+            if p in seen:
+                raise ValueError(
+                    f"Node '{name}': parent '{p}' appears in more than one "
+                    "term. Each parent must enter through exactly one "
+                    "edge-owning term. Only VC modifiers may repeat."
+                )
+            seen.add(p)
+    if isinstance(node, OrdinalNode) and node.levels < 2:
+        raise ValueError(f"Node '{name}': ordinal levels must be >= 2.")
+
+
+def _kahn_sort(spec: dict[str, NodeSpec]) -> list[str]:
+    """Topologically sort the nodes with Kahn's algorithm.
+
+    Dependencies are ``pa(x_i)``, the union of all term parents. Ready
+    nodes are emitted in sorted batches, so the order is deterministic.
+
+    Parameters
+    ----------
+    spec : dict[str, NodeSpec]
+        The (already validated) DAG specification.
+
+    Returns
+    -------
+    list[str]
+        The node names in topological order.
+
+    Raises
+    ------
+    ValueError
+        If the graph has a cycle.
+    """
+    remaining = {name: set(node_parents(node)) for name, node in spec.items()}
+    order: list[str] = []
+    while remaining:
+        ready = sorted(n for n, deps in remaining.items() if not deps)
+        if not ready:
+            raise ValueError(f"Graph has a cycle among: {sorted(remaining)}")
+        for n in ready:
+            order.append(n)
+            del remaining[n]
+        for deps in remaining.values():
+            deps.difference_update(ready)
+    return order
+
+
+# %% public functions ------------------------------------------------------------------
 def simple_intercept(transform: str | None = None, **transform_kwargs) -> Term:
     """Build the simple-intercept baseline term — the paper's SI.
 
@@ -450,194 +668,6 @@ def varying_coefficient(
     )
 
 
-def _as_term(value) -> Term:
-    """Take one entry of a formula to a :class:`Term`.
-
-    The bare name ``I`` stands for ``I()``, the simple-intercept baseline.
-
-    Raises
-    ------
-    TypeError
-        If the entry is neither a term nor the bare ``I``.
-    """
-    if value in (intercept, simple_intercept):
-        return simple_intercept()
-    if isinstance(value, Term):
-        return value
-    raise TypeError(
-        "a transformation is built from terms (I/LS/CS/VC) — got "
-        f"{type(value).__name__}. A '+' sum is already a flat list, so do "
-        "not nest one inside another list: write either a list or a sum."
-    )
-
-
-def _normalize_terms(value):
-    """Flatten a node's formula into its canonical term list.
-
-    Accepted: ``None`` (a source node), one term, a ``+`` sum, the bare
-    name ``I``, or a list of any of those. A ``+`` sum is already flat, so
-    a list of lists is a mistake rather than a shape to flatten.
-
-    The canonical form starts with the intercept: a formula written
-    without one gets ``SI()`` prepended, so ``terms[0]`` is always the
-    intercept term. Exactly one intercept is allowed, and it must come
-    first when written.
-
-    Parameters
-    ----------
-    value : Term | list[Term] | None
-        The formula as written.
-
-    Returns
-    -------
-    list[Term] | None
-        The canonical term list, or ``None`` for a source node.
-    """
-    if value is None:
-        return None
-    written = value if isinstance(value, (list, tuple)) else [value]
-    items = [_as_term(e) for e in written]
-    intercepts = [i for i, t in enumerate(items) if t.effect == "I"]
-    if len(intercepts) > 1:
-        parented = [t for t in items if t.effect == "I" and t.parents]
-        if len(parented) > 1:
-            raise ValueError(
-                "a formula takes exactly one intercept term. For an additive "
-                "intercept write CI("
-                + ", ".join(repr(p) for t in parented for p in t.parents)
-                + ", allow_interaction=False), not several intercept terms."
-            )
-        raise ValueError(
-            "a formula takes exactly one intercept term, and CI(...) already "
-            "contains the baseline — drop the extra I/SI."
-        )
-    if not intercepts:
-        return [simple_intercept(), *items]  # canonical form: intercept first
-    if intercepts[0] != 0:
-        raise ValueError(
-            "the intercept term comes first: write "
-            "I(...) + <shifts>, not the other way around."
-        )
-    return items
-
-
-def _intercept_basis(terms, *, ordinal: bool):
-    """Read the basis choice off the intercept term.
-
-    Normalization guarantees exactly one intercept, at ``terms[0]``, so the
-    basis has exactly one possible carrier.
-
-    Parameters
-    ----------
-    terms : list[Term] | None
-        The node's canonical term list.
-    ordinal : bool
-        ``True`` for an ordinal node, whose intercept is the cutpoint
-        vector and therefore has no basis to choose.
-
-    Returns
-    -------
-    tuple[str, dict]
-        The effective ``(transform, transform_kwargs)`` of the node.
-
-    Raises
-    ------
-    ValueError
-        If an ordinal node's intercept configures a basis.
-    """
-    intercept_term = terms[0] if terms else None
-    configured = intercept_term is not None and (
-        intercept_term.transform or intercept_term.transform_kwargs
-    )
-    if configured and ordinal:
-        raise ValueError(
-            "I(transform=...) is for continuous nodes. An ordinal node's "
-            "intercept is the cutpoint vector, it has no basis to choose."
-        )
-    if not configured:
-        return DEFAULT_TRANSFORM, {}
-    # the arguments go straight to the transform class; if they are wrong,
-    # that class says so — this layer does not second-guess it
-    name = intercept_term.transform or DEFAULT_TRANSFORM
-    return name, dict(intercept_term.transform_kwargs or ())
-
-
-class ContinuousNode:
-    """Continuous variable, modelled by a monotone 1-D transform + shifts.
-
-    Parameters
-    ----------
-    terms : Term | list[Term] | None, optional
-        The additive formula for ``h``: a list of terms, a ``+`` sum, a
-        single term, or the bare ``I``. ``None`` (default) is a source node. The
-        basis of the monotone transform is chosen on the intercept term,
-        ``I(..., transform="spline")``; the default is ``"bernstein"``.
-    """
-
-    kind = "continuous"
-
-    def __init__(self, terms=None):
-        self.terms = _normalize_terms(terms)
-        self.transform, self.transform_kwargs = _intercept_basis(
-            self.terms, ordinal=False
-        )
-
-    def __repr__(self):
-        """Show the terms and the basis."""
-        return f"ContinuousNode({self.terms!r}, transform={self.transform!r})"
-
-    def __eq__(self, other):
-        """Compare the terms; the basis is derived from them."""
-        # transform/transform_kwargs are derived from the terms, so equal
-        # term lists already imply an equal basis
-        return isinstance(other, ContinuousNode) and self.terms == other.terms
-
-    def __hash__(self):
-        """Hash what ``__eq__`` compares, so nodes work in sets and as keys."""
-        return hash((self.kind, tuple(self.terms)))
-
-
-class OrdinalNode:
-    """Ordinal variable with ``levels`` ordered classes, stored 0 to levels-1.
-
-    An ordered logit models it: increasing cutpoints plus the shift terms.
-
-    Parameters
-    ----------
-    levels : int
-        Number of ordered classes.
-    terms : Term | list[Term] | None, optional
-        The additive formula, as for :class:`ContinuousNode`, by default
-        ``None``.
-    """
-
-    kind = "ordinal"
-
-    def __init__(self, levels: int, terms=None):
-        self.levels = int(levels)
-        self.terms = _normalize_terms(terms)
-        _intercept_basis(self.terms, ordinal=True)
-
-    def __repr__(self):
-        """Show the levels and the terms."""
-        return f"OrdinalNode({self.levels}, {self.terms!r})"
-
-    def __eq__(self, other):
-        """Compare levels and terms."""
-        return (
-            isinstance(other, OrdinalNode)
-            and self.levels == other.levels
-            and self.terms == other.terms
-        )
-
-    def __hash__(self):
-        """Hash what ``__eq__`` compares, so nodes work in sets and as keys."""
-        return hash((self.kind, self.levels, tuple(self.terms)))
-
-
-NodeSpec = ContinuousNode | OrdinalNode
-
-
 def node_terms(node: NodeSpec) -> list[Term]:
     """Give the canonical term list of a node.
 
@@ -677,10 +707,7 @@ def node_parents(node: NodeSpec) -> list[str]:
     return list(seen)
 
 
-# complexipy: ignore
-def validate_and_sort(  # noqa: C901 - split planned in the complexity-reduction PR
-    spec: dict[str, NodeSpec],
-) -> list[str]:
+def validate_and_sort(spec: dict[str, NodeSpec]) -> list[str]:
     """Validate the spec and return a topological ordering of the nodes.
 
     Edge ownership: every parent must enter through exactly one
@@ -708,70 +735,8 @@ def validate_and_sort(  # noqa: C901 - split planned in the complexity-reduction
         cycle.
     """
     for name, node in spec.items():
-        seen: set[str] = set()
-        for term in node_terms(node):
-            if term.effect not in EFFECTS:
-                raise ValueError(f"Node '{name}': unknown term effect '{term.effect}'.")
-            if term.effect == "LS" and len(term.parents) != 1:
-                raise ValueError(
-                    f"Node '{name}': LS term must have exactly one parent."
-                )
-            for p in term.parents:
-                if p not in spec:
-                    raise ValueError(f"Node '{name}': unknown parent '{p}'.")
-            if term.effect == "VC":
-                if not term.parents:
-                    raise ValueError(
-                        f"Node '{name}': VC term needs a treatment parent."
-                    )
-                on = term.parents[0]
-                if on in term.parents[1:]:
-                    raise ValueError(
-                        f"Node '{name}': VC treatment '{on}' cannot also be a modifier."
-                    )
-                if term.penalty is None or term.penalty < 0:
-                    raise ValueError(f"Node '{name}': VC penalty must be >= 0.")
-                on_node = spec[on]
-                if isinstance(on_node, OrdinalNode) and on_node.levels != 2:
-                    raise ValueError(
-                        f"Node '{name}': VC treatment '{on}' is ordinal with "
-                        f"{on_node.levels} levels. Only a 2-level (binary) "
-                        "ordinal treatment is supported. Multi-level is a "
-                        "follow-up."
-                    )
-                if term.center and not isinstance(on_node, OrdinalNode):
-                    raise ValueError(
-                        f"Node '{name}': VC(center=...) needs a binary ordinal "
-                        f"treatment, and '{on}' is continuous. E[T|x] centering "
-                        "is a follow-up."
-                    )
-                owners = (on,)
-            else:
-                owners = term.parents
-            for p in owners:
-                if p in seen:
-                    raise ValueError(
-                        f"Node '{name}': parent '{p}' appears in more than one "
-                        "term. Each parent must enter through exactly one "
-                        "edge-owning term. Only VC modifiers may repeat."
-                    )
-                seen.add(p)
-        if isinstance(node, OrdinalNode) and node.levels < 2:
-            raise ValueError(f"Node '{name}': ordinal levels must be >= 2.")
-
-    # Kahn's algorithm over pa(x_i) = union of all term parents
-    remaining = {name: set(node_parents(node)) for name, node in spec.items()}
-    order: list[str] = []
-    while remaining:
-        ready = sorted(n for n, deps in remaining.items() if not deps)
-        if not ready:
-            raise ValueError(f"Graph has a cycle among: {sorted(remaining)}")
-        for n in ready:
-            order.append(n)
-            del remaining[n]
-        for deps in remaining.values():
-            deps.difference_update(ready)
-    return order
+        _check_node(name, node, spec)
+    return _kahn_sort(spec)
 
 
 def spec_to_dict(spec: dict[str, NodeSpec]) -> dict:
@@ -848,6 +813,138 @@ def spec_from_dict(d: dict) -> dict[str, NodeSpec]:
     return spec
 
 
+# %% public classes --------------------------------------------------------------------
+@dataclass(frozen=True)
+class Term:
+    """One additive term of a node's transformation.
+
+    Terms add: ``I("a") + CS("b")`` is the same transformation as
+    ``[I("a"), CS("b")]``. Build terms with the constructors :func:`I`,
+    :func:`LS`, :func:`CS` and :func:`VC`, not directly.
+
+    Attributes
+    ----------
+    effect : str
+        One of ``"I"``, ``"LS"``, ``"CS"``, ``"VC"``.
+    parents : tuple[str, ...]
+        Ordered parent names the term depends on. Empty only for the bare
+        simple-intercept ``I()``. For a ``VC`` term, ``parents[0]`` is the
+        treatment (``on``) and the rest are the effect modifiers.
+    options : tuple[tuple[str, object], ...]
+        Effect-specific settings as canonical ``(key, value)`` pairs:
+        sorted by key, defaults omitted. Attribute access serves them
+        with their defaults, so ``term.penalty`` stays valid on every
+        term. Keys: ``penalty``, ``center`` and ``center_folds`` (VC,
+        see :func:`VC`); ``transform`` and ``transform_kwargs`` (I, the
+        basis of the monotone transform, kwargs stored as sorted pairs);
+        ``units`` (hidden layers of the term's network);
+        ``allow_interaction`` (multi-parent I: one joint net or one net
+        per parent).
+    """
+
+    effect: str
+    parents: tuple[str, ...]
+    options: tuple = ()  # canonical (key, value) pairs, see _OPTION_DEFAULTS
+
+    def __getattr__(self, name: str):
+        """Serve the effect-specific options, with their defaults."""
+        if name in _OPTION_DEFAULTS:
+            return dict(self.options).get(name, _OPTION_DEFAULTS[name])
+        raise AttributeError(name)
+
+    def __add__(self, other: Term | list[Term]) -> list[Term]:
+        """Concatenate into a plain term list."""
+        if isinstance(other, Term):
+            return [self, other]
+        if isinstance(other, list):
+            return [self, *other]
+        return NotImplemented
+
+    def __radd__(self, other: list[Term]) -> list[Term]:
+        """Extend a term list from the right, for ``list + term`` chains."""
+        if isinstance(other, list):
+            return [*other, self]
+        return NotImplemented
+
+
+class ContinuousNode:
+    """Continuous variable, modelled by a monotone 1-D transform + shifts.
+
+    Parameters
+    ----------
+    terms : Term | list[Term] | None, optional
+        The additive formula for ``h``: a list of terms, a ``+`` sum, a
+        single term, or the bare ``I``. ``None`` (default) is a source node. The
+        basis of the monotone transform is chosen on the intercept term,
+        ``I(..., transform="spline")``; the default is ``"bernstein"``.
+    """
+
+    kind = "continuous"
+
+    def __init__(self, terms=None):
+        self.terms = _normalize_terms(terms)
+        self.transform, self.transform_kwargs = _intercept_basis(
+            self.terms, ordinal=False
+        )
+
+    def __repr__(self):
+        """Show the terms and the basis."""
+        return f"ContinuousNode({self.terms!r}, transform={self.transform!r})"
+
+    def __eq__(self, other):
+        """Compare the terms; the basis is derived from them."""
+        # transform/transform_kwargs are derived from the terms, so equal
+        # term lists already imply an equal basis
+        return isinstance(other, ContinuousNode) and self.terms == other.terms
+
+    def __hash__(self):
+        """Hash what ``__eq__`` compares, so nodes work in sets and as keys."""
+        return hash((self.kind, tuple(self.terms)))
+
+
+class OrdinalNode:
+    """Ordinal variable with ``levels`` ordered classes, stored 0 to levels-1.
+
+    An ordered logit models it: increasing cutpoints plus the shift terms.
+
+    Parameters
+    ----------
+    levels : int
+        Number of ordered classes.
+    terms : Term | list[Term] | None, optional
+        The additive formula, as for :class:`ContinuousNode`, by default
+        ``None``.
+    """
+
+    kind = "ordinal"
+
+    def __init__(self, levels: int, terms=None):
+        self.levels = int(levels)
+        self.terms = _normalize_terms(terms)
+        _intercept_basis(self.terms, ordinal=True)
+
+    def __repr__(self):
+        """Show the levels and the terms."""
+        return f"OrdinalNode({self.levels}, {self.terms!r})"
+
+    def __eq__(self, other):
+        """Compare levels and terms."""
+        return (
+            isinstance(other, OrdinalNode)
+            and self.levels == other.levels
+            and self.terms == other.terms
+        )
+
+    def __hash__(self):
+        """Hash what ``__eq__`` compares, so nodes work in sets and as keys."""
+        return hash((self.kind, self.levels, tuple(self.terms)))
+
+
+# kept after the classes: the union is evaluated at definition time
+NodeSpec = ContinuousNode | OrdinalNode
+
+
+# %% alias -----------------------------------------------------------------------------
 # The short aliases are the notation of the docs and the paper, and the
 # spelling nearly every caller uses; the long names above are their
 # definitions, so `I is intercept` and the bare `I` sugar keeps working.

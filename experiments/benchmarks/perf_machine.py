@@ -25,6 +25,7 @@ Collecting results: copy each machine's JSON into the repo's ``docs/perf/``
     python -m benchmarks.perf_machine --report docs/perf   # table + docs/perf/REPORT.md
 """
 
+# %% imports ---------------------------------------------------------------------------
 from __future__ import annotations
 
 import argparse
@@ -40,9 +41,112 @@ import torch
 import tramdag as td
 from tramdag import CS, LS, CausalFlowDAG, ContinuousNode, I, OrdinalNode
 
+# %% global variables ------------------------------------------------------------------
 EPOCHS = 200  # fixed: every machine does identical work
 
+WORKLOADS = {
+    "intro": dict(
+        n=5_000,
+        batch=512,
+        data=lambda: intro_dgp(5_000),
+        spec=lambda: {
+            "X1": ContinuousNode(),
+            "X2": ContinuousNode([LS("X1")]),
+            "X3": ContinuousNode([LS("X1"), CS("X2")]),
+            "Y": OrdinalNode(4, [LS("X3")]),
+        },
+    ),
+    "large": dict(
+        n=50_000,
+        batch=4096,
+        data=lambda: vaca_dgp(50_000),
+        spec=lambda: {
+            "x1": ContinuousNode(),
+            "x2": ContinuousNode([I("x1")]),
+            "x3": ContinuousNode([I("x1", "x2")]),
+        },
+    ),
+}
 
+
+# %% private functions -----------------------------------------------------------------
+def _machine_row(d: dict, r: dict) -> dict:
+    """Flatten one result entry of one machine JSON into a table row."""
+    commit = (d.get("code") or {}).get("git_commit")
+    return {
+        "host": d["machine"]["hostname"],
+        "chip": d["machine"]["processor"],
+        "gpu": d["machine"]["cuda"] or ("mps" if d["machine"]["mps"] else "-"),
+        "code": commit or d.get("code", {}).get("tramdag", "?"),
+        **{
+            k: r[k]
+            for k in [
+                "workload",
+                "device",
+                "fit_s",
+                "epochs_per_s",
+                "sample_100k_s",
+                "final_val_nll",
+            ]
+        },
+    }
+
+
+def _collect_rows(directory: str) -> list[dict]:
+    """Read every machine JSON in the directory into table rows."""
+    rows = []
+    for f in sorted(Path(directory).glob("*.json")):
+        d = json.loads(f.read_text())
+        if "results" not in d:
+            continue
+        rows.extend(_machine_row(d, r) for r in d["results"] if "error" not in r)
+    return rows
+
+
+def _markdown_table(t: pd.DataFrame) -> str:
+    """Render the table as markdown without extra dependencies."""
+    cols = list(t.columns)
+    lines = ["| " + " | ".join(cols) + " |", "|" + "|".join("---" for _ in cols) + "|"]
+    lines += [
+        "| " + " | ".join(str(v) for v in row) + " |"
+        for row in t.itertuples(index=False)
+    ]
+    return "\n".join(lines)
+
+
+def _run_all(devices: list[str]) -> list[dict]:
+    """Run every workload on every device, recording failures as rows."""
+    results = []
+    for wl in WORKLOADS:
+        for dev in devices:
+            print(f"[{wl} / {dev}] {EPOCHS} epochs ...", end=" ", flush=True)
+            try:
+                r = run_workload(wl, dev)
+                results.append(r)
+                print(
+                    f"{r['fit_s']:7.1f}s  ({r['epochs_per_s']:.1f} ep/s)  "
+                    f"sample {r['sample_100k_s']:.1f}s  "
+                    f"NLL {r['final_val_nll']}"
+                )
+            except Exception as e:  # noqa: BLE001 - record and continue: e.g. mps op gaps
+                results.append(
+                    {"workload": wl, "device": dev, "error": f"{type(e).__name__}: {e}"}
+                )
+                print(f"FAILED — {type(e).__name__}: {e}")
+    return results
+
+
+def _output_dir(out_arg: str | None) -> Path:
+    """Give docs/perf inside a repo clone, else the current directory."""
+    if out_arg:
+        return Path(out_arg)
+    checkout = next(
+        (d for d in Path(__file__).resolve().parents if (d / ".git").exists()), None
+    )
+    return checkout / "docs" / "perf" if checkout else Path.cwd()
+
+
+# %% public functions ------------------------------------------------------------------
 def vaca_dgp(n: int, seed: int = 42) -> pd.DataFrame:
     """Draw the bimodal benchmark SCM, written out so this file stands alone.
 
@@ -75,31 +179,6 @@ def intro_dgp(n: int, seed: int = 1) -> pd.DataFrame:
     cut = np.array([-2.0, 0.0, 1.5])[None, :] - 1.0 * x3[:, None]
     y = (z["4"][:, None] > cut).sum(axis=1)
     return pd.DataFrame({"X1": x1, "X2": x2, "X3": x3, "Y": y.astype(float)})
-
-
-WORKLOADS = {
-    "intro": dict(
-        n=5_000,
-        batch=512,
-        data=lambda: intro_dgp(5_000),
-        spec=lambda: {
-            "X1": ContinuousNode(),
-            "X2": ContinuousNode([LS("X1")]),
-            "X3": ContinuousNode([LS("X1"), CS("X2")]),
-            "Y": OrdinalNode(4, [LS("X3")]),
-        },
-    ),
-    "large": dict(
-        n=50_000,
-        batch=4096,
-        data=lambda: vaca_dgp(50_000),
-        spec=lambda: {
-            "x1": ContinuousNode(),
-            "x2": ContinuousNode([I("x1")]),
-            "x3": ContinuousNode([I("x1", "x2")]),
-        },
-    ),
-}
 
 
 # ------------------------------------------------------------------- machine
@@ -177,56 +256,20 @@ def run_workload(name: str, device: str) -> dict:
 
 
 # -------------------------------------------------------------------- report
-# complexipy: ignore - split planned in the complexity-reduction PR
 def report(directory: str) -> None:
-    rows = []
-    for f in sorted(Path(directory).glob("*.json")):
-        d = json.loads(f.read_text())
-        if "results" not in d:
-            continue
-        commit = (d.get("code") or {}).get("git_commit")
-        for r in d["results"]:
-            if "error" in r:
-                continue
-            rows.append(
-                {
-                    "host": d["machine"]["hostname"],
-                    "chip": d["machine"]["processor"],
-                    "gpu": d["machine"]["cuda"]
-                    or ("mps" if d["machine"]["mps"] else "-"),
-                    "code": commit or d.get("code", {}).get("tramdag", "?"),
-                    **{
-                        k: r[k]
-                        for k in [
-                            "workload",
-                            "device",
-                            "fit_s",
-                            "epochs_per_s",
-                            "sample_100k_s",
-                            "final_val_nll",
-                        ]
-                    },
-                }
-            )
+    rows = _collect_rows(directory)
     if not rows:
         print(f"no benchmark JSONs found in {directory}")
         return
     t = pd.DataFrame(rows).sort_values(["workload", "fit_s"])
     print(t.to_string(index=False))
-    # markdown table without extra dependencies (tabulate not required)
-    cols = list(t.columns)
-    lines = ["| " + " | ".join(cols) + " |", "|" + "|".join("---" for _ in cols) + "|"]
-    lines += [
-        "| " + " | ".join(str(v) for v in row) + " |"
-        for row in t.itertuples(index=False)
-    ]
     md = Path(directory) / "REPORT.md"
     md.write_text(
         "# tramdag cross-machine benchmark\n\n"
         f"Fixed {EPOCHS}-epoch workloads (see "
         "`experiments/benchmarks/perf_machine.py`); "
         "`final_val_nll` must agree across machines (same seed & data).\n\n"
-        + "\n".join(lines)
+        + _markdown_table(t)
         + "\n\n"
         "## Add your machine\n\n"
         "```bash\n"
@@ -249,7 +292,6 @@ def report(directory: str) -> None:
     print(f"-> {md}")
 
 
-# complexipy: ignore - split planned in the complexity-reduction PR
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument(
@@ -283,30 +325,10 @@ def main() -> None:
         f"{info['ram_gb']} GB) | devices: {devices}\n"
     )
 
-    results = []
-    for wl in WORKLOADS:
-        for dev in devices:
-            print(f"[{wl} / {dev}] {EPOCHS} epochs ...", end=" ", flush=True)
-            try:
-                r = run_workload(wl, dev)
-                results.append(r)
-                print(
-                    f"{r['fit_s']:7.1f}s  ({r['epochs_per_s']:.1f} ep/s)  "
-                    f"sample {r['sample_100k_s']:.1f}s  "
-                    f"NLL {r['final_val_nll']}"
-                )
-            except Exception as e:  # noqa: BLE001 - record and continue: e.g. mps op gaps
-                results.append(
-                    {"workload": wl, "device": dev, "error": f"{type(e).__name__}: {e}"}
-                )
-                print(f"FAILED — {type(e).__name__}: {e}")
+    results = _run_all(devices)
 
     # default output: docs/perf/ when running inside a repo clone, else cwd
-    checkout = next(
-        (d for d in Path(__file__).resolve().parents if (d / ".git").exists()), None
-    )
-    default_out = checkout / "docs" / "perf" if checkout else Path.cwd()
-    out_dir = Path(args.out) if args.out else default_out
+    out_dir = _output_dir(args.out)
     out_dir.mkdir(parents=True, exist_ok=True)
     stamp = f"{datetime.now(timezone.utc):%Y-%m-%d-%H%M}"
     out = out_dir / f"{stamp}_{info['hostname']}.json"
@@ -330,5 +352,6 @@ def main() -> None:
     )
 
 
+# %% main ------------------------------------------------------------------------------
 if __name__ == "__main__":
     main()

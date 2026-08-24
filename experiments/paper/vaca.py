@@ -16,6 +16,7 @@ Usage (from experiments/)::
     uv run python -m paper.vaca flexible
 """
 
+# %% imports ---------------------------------------------------------------------------
 from __future__ import annotations
 
 import argparse
@@ -39,6 +40,7 @@ from paper.helpers import (
 from paper.simulations.vaca import DO_X2_VALUES, VacaTriangle
 from tramdag import CI, SI, ContinuousNode
 
+# %% global variables ------------------------------------------------------------------
 CONFIG_KEYS = {
     "n_train",
     "transform",
@@ -62,6 +64,34 @@ CONFIG_KEYS = {
 }
 
 
+# %% private functions -----------------------------------------------------------------
+def _marginal_panel(ax, observed, sampled, bins: int) -> None:
+    """Overlay one marginal histogram, binned from the DGP quantiles."""
+    low = observed.quantile(0.001)
+    high = observed.quantile(0.999)
+    hist_overlay(ax, observed, sampled, np.linspace(low, high, bins))
+
+
+def _scatter_panel(ax, observed, sampled, x: str, y: str, n_scatter: int) -> None:
+    """Scatter DGP and flow samples of one variable pair."""
+    ax.scatter(
+        observed[x][:n_scatter],
+        observed[y][:n_scatter],
+        s=2,
+        alpha=0.3,
+        label="DGP",
+    )
+    ax.scatter(
+        sampled[x][:n_scatter],
+        sampled[y][:n_scatter],
+        s=2,
+        alpha=0.3,
+        color="C3",
+        label="flow",
+    )
+
+
+# %% public functions ------------------------------------------------------------------
 def build_spec(config: dict) -> dict:
     """Give the all-complex-intercept spec: every conditional fully flexible.
 
@@ -77,7 +107,6 @@ def build_spec(config: dict) -> dict:
     }
 
 
-# complexipy: ignore - split planned in the complexity-reduction PR
 def plot_pairs(observed, sampled, columns, bins, n_scatter, path):
     """Pairs plot: marginals on the diagonal, scatters off it (Fig. 4)."""
     fig, axes = plt.subplots(3, 3, figsize=(9, 9))
@@ -85,34 +114,13 @@ def plot_pairs(observed, sampled, columns, bins, n_scatter, path):
         for col, col_column in enumerate(columns):
             ax = axes[row][col]
             if row == col:
-                low = observed[row_column].quantile(0.001)
-                high = observed[row_column].quantile(0.999)
-                hist_overlay(
-                    ax,
-                    observed[row_column],
-                    sampled[row_column],
-                    np.linspace(low, high, bins),
-                )
+                _marginal_panel(ax, observed[row_column], sampled[row_column], bins)
             else:
-                ax.scatter(
-                    observed[col_column][:n_scatter],
-                    observed[row_column][:n_scatter],
-                    s=2,
-                    alpha=0.3,
-                    label="DGP",
-                )
-                ax.scatter(
-                    sampled[col_column][:n_scatter],
-                    sampled[row_column][:n_scatter],
-                    s=2,
-                    alpha=0.3,
-                    color="C3",
-                    label="flow",
-                )
-            if row == len(columns) - 1:
-                ax.set_xlabel(col_column)
-            if col == 0:
-                ax.set_ylabel(row_column)
+                _scatter_panel(ax, observed, sampled, col_column, row_column, n_scatter)
+    for ax, column in zip(axes[-1], columns, strict=True):
+        ax.set_xlabel(column)
+    for ax_row, column in zip(axes, columns, strict=True):
+        ax_row[0].set_ylabel(column)
     axes[0][0].legend(fontsize=8)
     fig.suptitle("VACA triangle — observational joint, DGP vs flow (Fig. 4)")
     finish(fig, path)
@@ -220,6 +228,7 @@ def run(variant: str) -> dict:
     return metrics
 
 
+# %% main ------------------------------------------------------------------------------
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument(

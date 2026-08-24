@@ -45,6 +45,7 @@ Usage (from ``experiments/``)::
     uv run python -m check paper triangle-atan-cs
 """
 
+# %% imports ---------------------------------------------------------------------------
 from __future__ import annotations
 
 import argparse
@@ -52,16 +53,102 @@ import json
 import sys
 from pathlib import Path
 
+# %% global variables ------------------------------------------------------------------
 HERE = Path(__file__).resolve().parent
 # only areas that commit ground truth; the benchmarks are measured and
 # written up in docs/, not checked against a recorded value
 AREAS = ("paper", "misc")
 
 
-# complexipy: ignore
-def compare(  # noqa: C901 - split planned in the complexity-reduction PR
-    area: str, name: str
-) -> tuple[list[str], list[str], list[str], list[str]]:
+# %% private functions -----------------------------------------------------------------
+def _load_json_pair(area: str, name: str) -> tuple[dict, dict]:
+    """Load the run's metrics and its ground truth, or raise."""
+    metrics_path = HERE / area / "results" / name / "metrics.json"
+    truth_path = HERE / area / "ground_truth" / f"{name}.json"
+    if not metrics_path.exists():
+        raise FileNotFoundError(f"no metrics to check: {metrics_path}")
+    if not truth_path.exists():
+        raise FileNotFoundError(
+            f"no ground truth for '{area}/{name}': {truth_path}. Write one from "
+            "a reviewed run before wiring the experiment into CI."
+        )
+    return json.loads(metrics_path.read_text()), json.loads(truth_path.read_text())
+
+
+def _check_metric(area, name, metric, metrics, expected, failures, notes, loose):
+    """Check one ground-truth entry against the run's metrics."""
+    if metric not in metrics:
+        failures.append(
+            f"{metric}: the run produced no such metric. Either the "
+            f"experiment stopped computing it, or the entry belongs in "
+            f"neither {area}/ground_truth/{name}.json nor the run."
+        )
+        return
+    measured = metrics[metric]
+    if "max" in expected:
+        _check_bound(metric, measured, expected, failures, notes, loose)
+    else:
+        _check_center(metric, measured, expected, failures, notes, loose)
+
+
+def _check_bound(metric, measured, expected, failures, notes, loose) -> None:
+    """Check one ``{max}`` entry: an upper bound on an error measure.
+
+    Only exceeding the bound is a regression, because a smaller error is a
+    better fit, not a drifted one. A passing bound outside the useful band
+    (1.5x to 4x the measurement) goes to ``loose``, unless a ``"why"``
+    excuses its width.
+    """
+    if measured > expected["max"]:
+        failures.append(
+            f"{metric}: {measured:+.4f} exceeds its bound {expected['max']:+.4f}"
+        )
+        return
+    bound = f"bound {expected['max']}"
+    if "why" in expected:
+        bound += f", deliberately wide: {expected['why']}"
+    notes.append(f"{metric}: {measured:+.4f} ({bound})")
+    if measured <= 0:
+        return
+    ratio = expected["max"] / abs(measured)
+    if ratio > 4.0 and "why" not in expected:
+        loose.append(
+            f"{metric}: bound {expected['max']} is {ratio:.1f}x the "
+            f"measurement — too loose to catch a regression"
+        )
+    elif ratio < 1.5:
+        loose.append(
+            f"{metric}: bound {expected['max']} is only {ratio:.2f}x "
+            f"the measurement — will fail on another machine"
+        )
+
+
+def _check_center(metric, measured, expected, failures, notes, loose) -> None:
+    """Check one ``{value, atol}`` entry: a two-sided tolerance.
+
+    A measurement past half its ``atol`` goes to ``loose``, so the center
+    gets re-pinned while it still passes.
+    """
+    deviation = abs(measured - expected["value"])
+    if deviation > expected["atol"]:
+        failures.append(
+            f"{metric}: {measured:+.4f} vs expected "
+            f"{expected['value']:+.4f} (deviation {deviation:.4f} > "
+            f"atol {expected['atol']})"
+        )
+        return
+    notes.append(f"{metric}: {measured:+.4f} (within {expected['atol']})")
+    if deviation > 0.5 * expected["atol"]:
+        share = deviation / expected["atol"]
+        loose.append(
+            f"{metric}: {measured:+.6f} sits {share:.0%} of the way to "
+            f"its tolerance — the center describes an older run, "
+            f"re-pin it from this one"
+        )
+
+
+# %% public functions ------------------------------------------------------------------
+def compare(area: str, name: str) -> tuple[list[str], list[str], list[str], list[str]]:
     """Compare one result directory against its ground truth.
 
     Parameters
@@ -83,73 +170,13 @@ def compare(  # noqa: C901 - split planned in the complexity-reduction PR
     FileNotFoundError
         If the metrics or the ground-truth file is missing.
     """
-    metrics_path = HERE / area / "results" / name / "metrics.json"
-    truth_path = HERE / area / "ground_truth" / f"{name}.json"
-    if not metrics_path.exists():
-        raise FileNotFoundError(f"no metrics to check: {metrics_path}")
-    if not truth_path.exists():
-        raise FileNotFoundError(
-            f"no ground truth for '{area}/{name}': {truth_path}. Write one from "
-            "a reviewed run before wiring the experiment into CI."
-        )
-
-    metrics = json.loads(metrics_path.read_text())
-    truth = json.loads(truth_path.read_text())
+    metrics, truth = _load_json_pair(area, name)
 
     failures, notes, unchecked, loose = [], [], [], []
     for metric, expected in truth.items():
         if metric.startswith("_"):
             continue  # a note for the reader, not a metric
-        if metric not in metrics:
-            failures.append(
-                f"{metric}: the run produced no such metric. Either the "
-                f"experiment stopped computing it, or the entry belongs in "
-                f"neither {area}/ground_truth/{name}.json nor the run."
-            )
-            continue
-        measured = metrics[metric]
-        if "max" in expected:
-            # an error measure: only exceeding it is a regression, because a
-            # smaller error is a better fit, not a drifted one
-            if measured > expected["max"]:
-                failures.append(
-                    f"{metric}: {measured:+.4f} exceeds its bound "
-                    f"{expected['max']:+.4f}"
-                )
-            else:
-                bound = f"bound {expected['max']}"
-                if "why" in expected:
-                    bound += f", deliberately wide: {expected['why']}"
-                notes.append(f"{metric}: {measured:+.4f} ({bound})")
-                if measured > 0:
-                    ratio = expected["max"] / abs(measured)
-                    if ratio > 4.0 and "why" not in expected:
-                        loose.append(
-                            f"{metric}: bound {expected['max']} is {ratio:.1f}x the "
-                            f"measurement — too loose to catch a regression"
-                        )
-                    elif ratio < 1.5:
-                        loose.append(
-                            f"{metric}: bound {expected['max']} is only {ratio:.2f}x "
-                            f"the measurement — will fail on another machine"
-                        )
-            continue
-        deviation = abs(measured - expected["value"])
-        if deviation > expected["atol"]:
-            failures.append(
-                f"{metric}: {measured:+.4f} vs expected "
-                f"{expected['value']:+.4f} (deviation {deviation:.4f} > "
-                f"atol {expected['atol']})"
-            )
-        else:
-            notes.append(f"{metric}: {measured:+.4f} (within {expected['atol']})")
-            if deviation > 0.5 * expected["atol"]:
-                share = deviation / expected["atol"]
-                loose.append(
-                    f"{metric}: {measured:+.6f} sits {share:.0%} of the way to "
-                    f"its tolerance — the center describes an older run, "
-                    f"re-pin it from this one"
-                )
+        _check_metric(area, name, metric, metrics, expected, failures, notes, loose)
     unchecked.extend(
         f"{metric}: {metrics[metric]}" for metric in metrics if metric not in truth
     )
@@ -174,6 +201,7 @@ def main(area: str, name: str) -> int:
     return 0
 
 
+# %% main ------------------------------------------------------------------------------
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("area", choices=AREAS, help="experiment area")

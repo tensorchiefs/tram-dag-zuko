@@ -25,6 +25,7 @@ The public entry points are the ``CausalFlowDAG`` methods
 :meth:`~tramdag.CausalFlowDAG.effect_modifier_scan`. Both delegate here.
 """
 
+# %% imports ---------------------------------------------------------------------------
 from __future__ import annotations
 
 import math
@@ -37,12 +38,14 @@ from .conditioners import LinearShift
 from .spec import OrdinalNode
 from .transforms import _bounds
 
+# %% global variables ------------------------------------------------------------------
 __all__ = ["effect_modifier_scan", "node_scores", "sup_bb_pvalue"]
 
 # 5% critical value of sup |Brownian bridge| (Kolmogorov distribution)
 CRIT_5PCT = 1.3581
 
 
+# %% private functions -----------------------------------------------------------------
 def _dl_ds(
     nd, feats: dict, x: torch.Tensor, n: int, vc_ehat: dict | None = None
 ) -> torch.Tensor:
@@ -60,7 +63,42 @@ def _dl_ds(
     return (sl * (1 - sl) - su * (1 - su)) / (su - sl)
 
 
-# complexipy: ignore - split planned in the complexity-reduction PR
+def _ls_score_columns(
+    flow, ls_groups: list, feats: dict, dlds: torch.Tensor
+) -> dict[str, np.ndarray]:
+    """Give the score columns of the ``LS`` coefficients.
+
+    Parameters
+    ----------
+    flow : CausalFlowDAG
+        The fitted flow, to look up parent kinds.
+    ls_groups : list
+        The ``(key, parents)`` shift groups whose conditioner is a
+        :class:`~tramdag.conditioners.LinearShift`.
+    feats : dict
+        The encoded parent features.
+    dlds : torch.Tensor
+        ``d l_i / d s_i``, shape ``(n,)``.
+
+    Returns
+    -------
+    dict[str, np.ndarray]
+        One entry per coefficient: a continuous parent gives one column
+        named after the parent, an ordinal parent one column per one-hot
+        level, named ``"{parent}[{k}]"``.
+    """
+    cols: dict[str, np.ndarray] = {}
+    for key, (parent,) in ls_groups:  # an LS term has exactly one parent
+        psi = (dlds.unsqueeze(1) * feats[parent]).cpu().numpy()
+        if isinstance(flow.spec[parent], OrdinalNode):
+            for k in range(psi.shape[1]):  # one column per one-hot level
+                cols[f"{parent}[{k}]"] = psi[:, k]
+        else:
+            cols[key] = psi[:, 0]
+    return cols
+
+
+# %% public functions ------------------------------------------------------------------
 def node_scores(flow, df: pd.DataFrame, node: str) -> pd.DataFrame:
     """Compute the per-observation scores of the interpretable coefficients.
 
@@ -119,14 +157,7 @@ def node_scores(flow, df: pd.DataFrame, node: str) -> pd.DataFrame:
     ehat = flow._vc_ehat_live(nd, values, len(df))
     dlds = _dl_ds(nd, feats, values[node], len(df), vc_ehat=ehat)
 
-    cols: dict[str, np.ndarray] = {}
-    for key, (parent,) in ls_groups:  # an LS term has exactly one parent
-        psi = (dlds.unsqueeze(1) * feats[parent]).cpu().numpy()
-        if isinstance(flow.spec[parent], OrdinalNode):
-            for k in range(psi.shape[1]):  # one column per one-hot level
-                cols[f"{parent}[{k}]"] = psi[:, k]
-        else:
-            cols[key] = psi[:, 0]
+    cols = _ls_score_columns(flow, ls_groups, feats, dlds)
     for g in nd._vc_groups:  # d s / d beta0 is the term's own regressor
         t = nd.vc_column(g, feats, ehat)
         cols[g.on] = (dlds * t.squeeze(-1)).cpu().numpy()
