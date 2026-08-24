@@ -6,6 +6,7 @@ use case — on an SCM with a (X2, X3)-modified treatment effect and an inert X1
 the CUSUM of the treatment-coefficient scores flags X2 and X3 and not X1.
 """
 
+# %% imports ---------------------------------------------------------------------------
 import numpy as np
 import pandas as pd
 import pytest
@@ -14,6 +15,7 @@ import torch
 from tramdag import CS, LS, VC, CausalFlowDAG, ContinuousNode, I, OrdinalNode
 
 
+# %% private functions -----------------------------------------------------------------
 def _hetero_df(n: int, seed: int = 11) -> pd.DataFrame:
     """Randomized-treatment SCM with an (X2, X3)-modified effect, inert X1:
     Y = (u - (0.8 X1 + X2 - 0.5 X3) - (-1 + 0.8 X2 - 0.6 X3) T) / 2, u logistic.
@@ -38,6 +40,7 @@ def _ls_spec() -> dict:
     }
 
 
+# %% public functions ------------------------------------------------------------------
 @pytest.fixture(scope="module")
 def mle_flow():
     df = _hetero_df(4000)

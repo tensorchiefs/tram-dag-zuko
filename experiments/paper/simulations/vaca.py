@@ -20,6 +20,7 @@ CLI::
     uv run python -m paper.simulations.vaca --out paper/data/vaca --seed 42
 """
 
+# %% imports ---------------------------------------------------------------------------
 from __future__ import annotations
 
 import argparse
@@ -32,9 +33,44 @@ import pandas as pd
 
 from ._common import DatasetDraws, resolve_latents
 
+# %% global variables ------------------------------------------------------------------
 DO_X2_VALUES = (-3.0, -1.0, 0.0)  # the paper's Fig. 5 interventions
 
 
+# %% public functions ------------------------------------------------------------------
+def main(argv: list[str] | None = None) -> None:
+    """Regenerate the frozen CSV files of this data-generating process."""
+    p = argparse.ArgumentParser(description="Generate the VACA benchmark data.")
+    p.add_argument("--out", type=Path, default=Path("paper/data/vaca"))
+    p.add_argument("--seed", type=int, default=42)
+    p.add_argument("--n-obs", type=int, default=5000)
+    p.add_argument("--mc-n", type=int, default=1_000_000)
+    args = p.parse_args(argv)
+
+    gen = VacaTriangle(seed=args.seed)
+    args.out.mkdir(parents=True, exist_ok=True)
+    obs = gen.observational(args.n_obs)
+    obs.to_csv(args.out / "obs.csv", index=False)
+
+    truth = {
+        "source": "arXiv:2503.16206 App. C.1 (orig. Sanchez-Martin 2022 E.1)",
+        "seed": args.seed,
+        "n_obs": args.n_obs,
+        "scm": {
+            "x1": "0.5 N(-2,1.5) + 0.5 N(1.5,1)",
+            "x2": "-x1 + N(0,1)",
+            "x3": "x1 + 0.25*x2 + N(0,1)",
+        },
+        **gen.true_moments(args.mc_n),
+    }
+    (args.out / "truth.json").write_text(json.dumps(truth, indent=2) + "\n")
+    print(
+        f"[vaca] n={len(obs)}  x1 bimodal: mean={obs['x1'].mean():+.3f} "
+        f"std={obs['x1'].std():.3f}"
+    )
+
+
+# %% public classes --------------------------------------------------------------------
 @dataclass
 class VacaTriangle(DatasetDraws):
     """SCM generator for the VACA bimodal triangle."""
@@ -138,38 +174,6 @@ class VacaTriangle(DatasetDraws):
         return out
 
 
-# --------------------------------------------------------------------------- CLI
-def main(argv: list[str] | None = None) -> None:
-    """Regenerate the frozen CSV files of this data-generating process."""
-    p = argparse.ArgumentParser(description="Generate the VACA benchmark data.")
-    p.add_argument("--out", type=Path, default=Path("paper/data/vaca"))
-    p.add_argument("--seed", type=int, default=42)
-    p.add_argument("--n-obs", type=int, default=5000)
-    p.add_argument("--mc-n", type=int, default=1_000_000)
-    args = p.parse_args(argv)
-
-    gen = VacaTriangle(seed=args.seed)
-    args.out.mkdir(parents=True, exist_ok=True)
-    obs = gen.observational(args.n_obs)
-    obs.to_csv(args.out / "obs.csv", index=False)
-
-    truth = {
-        "source": "arXiv:2503.16206 App. C.1 (orig. Sanchez-Martin 2022 E.1)",
-        "seed": args.seed,
-        "n_obs": args.n_obs,
-        "scm": {
-            "x1": "0.5 N(-2,1.5) + 0.5 N(1.5,1)",
-            "x2": "-x1 + N(0,1)",
-            "x3": "x1 + 0.25*x2 + N(0,1)",
-        },
-        **gen.true_moments(args.mc_n),
-    }
-    (args.out / "truth.json").write_text(json.dumps(truth, indent=2) + "\n")
-    print(
-        f"[vaca] n={len(obs)}  x1 bimodal: mean={obs['x1'].mean():+.3f} "
-        f"std={obs['x1'].std():.3f}"
-    )
-
-
+# %% main ------------------------------------------------------------------------------
 if __name__ == "__main__":
     main()

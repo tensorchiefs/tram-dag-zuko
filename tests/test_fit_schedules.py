@@ -6,6 +6,7 @@ all-`ls` models, which is checked against statsmodels on the inline
 all-`ls` DGP (see conftest).
 """
 
+# %% imports ---------------------------------------------------------------------------
 import numpy as np
 import pytest
 import torch
@@ -13,6 +14,7 @@ import torch
 from tramdag import LS, CausalFlowDAG, ContinuousNode, OrdinalNode
 
 
+# %% private functions -----------------------------------------------------------------
 def _two_node_spec():
     return {"x1": ContinuousNode(), "x2": ContinuousNode([LS("x1")])}
 
@@ -26,6 +28,7 @@ def _ls_spec():
     }
 
 
+# %% public functions ------------------------------------------------------------------
 @pytest.mark.parametrize("schedule", [None, "plateau"])
 def test_schedules_smoke_and_improve(ls_chain, schedule):
     df = ls_chain["draw"](800, 0)[["x1", "x2"]]

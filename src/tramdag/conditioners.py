@@ -35,11 +35,13 @@ parent enters raw, in one column. An ordinal parent is one-hot encoded, in
 ``levels`` columns.
 """
 
+# %% imports ---------------------------------------------------------------------------
 from __future__ import annotations
 
 import torch
 from torch import Tensor, nn
 
+# %% global variables ------------------------------------------------------------------
 # the activations the reference implementations use: relu in the PyTorch
 # reference's default classes, sigmoid in the paper's create_param_net, tanh in
 # the paper's make_model for the CAREFL/VACA comparisons.
@@ -49,6 +51,7 @@ ACTIVATIONS = {"relu": nn.ReLU, "sigmoid": nn.Sigmoid, "tanh": nn.Tanh}
 DEFAULT_ACTIVATION = "relu"
 
 
+# %% private functions -----------------------------------------------------------------
 def _mlp(
     n_in: int,
     units: tuple[int, ...],
@@ -101,6 +104,7 @@ def _mlp(
     return nn.Sequential(*layers, out)
 
 
+# %% public classes --------------------------------------------------------------------
 class SimpleIntercept(nn.Module):
     """Free transform parameters that do not depend on the data.
 

@@ -7,6 +7,7 @@ zero column-mean over the centering data; and (c) purely post-hoc — it changes
 nothing about the model or its outputs.
 """
 
+# %% imports ---------------------------------------------------------------------------
 import numpy as np
 import pandas as pd
 import pytest
@@ -15,6 +16,7 @@ import torch
 from tramdag import LS, CausalFlowDAG, ContinuousNode, I, OrdinalNode
 
 
+# %% private functions -----------------------------------------------------------------
 def _data(n=400, seed=0):
     rng = np.random.default_rng(seed)
     x1 = rng.normal(size=n)
@@ -33,6 +35,7 @@ def _additive_ci_flow():
     return CausalFlowDAG(spec, seed=1)
 
 
+# %% public functions ------------------------------------------------------------------
 # ------------------------------------------------ exactness of the decomposition
 def test_baseline_plus_contributions_reproduces_theta():
     flow = _additive_ci_flow()

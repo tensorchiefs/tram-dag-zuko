@@ -21,6 +21,7 @@ CLI::
     uv run python -m paper.simulations.carefl --out paper/data/carefl --seed 42
 """
 
+# %% imports ---------------------------------------------------------------------------
 from __future__ import annotations
 
 import argparse
@@ -33,11 +34,47 @@ import pandas as pd
 
 from ._common import DatasetDraws, resolve_latents
 
+# %% global variables ------------------------------------------------------------------
 X_OBS = {"x1": 2.00, "x2": 1.50, "x3": 0.81, "x4": -0.28}  # the paper's observation
 ALPHA_GRID = np.round(np.linspace(-3.0, 3.0, 61), 4)
 _SCALE = 1.0 / np.sqrt(2.0)
 
 
+# %% public functions ------------------------------------------------------------------
+def main(argv: list[str] | None = None) -> None:
+    """Regenerate the frozen CSV files of this data-generating process."""
+    p = argparse.ArgumentParser(description="Generate the CAREFL benchmark data.")
+    p.add_argument("--out", type=Path, default=Path("paper/data/carefl"))
+    p.add_argument("--seed", type=int, default=42)
+    p.add_argument("--n-obs", type=int, default=5000)
+    args = p.parse_args(argv)
+
+    gen = Carefl4(seed=args.seed)
+    args.out.mkdir(parents=True, exist_ok=True)
+    obs = gen.observational(args.n_obs)
+    obs.to_csv(args.out / "obs.csv", index=False)
+
+    truth = {
+        "source": "arXiv:2503.16206 App. C.2 (orig. Khemakhem 2021 Fig. 5)",
+        "seed": args.seed,
+        "n_obs": args.n_obs,
+        "scm": {
+            "x1": "Laplace(0, 1/sqrt(2))",
+            "x2": "Laplace(0, 1/sqrt(2))",
+            "x3": "x1 + 0.5*x2^3 + Laplace",
+            "x4": "-x2 + 0.5*x1^2 + Laplace",
+        },
+        **gen.true_cf_curves(),
+    }
+    (args.out / "truth.json").write_text(json.dumps(truth, indent=2) + "\n")
+    print(
+        f"[carefl] n={len(obs)}  cf sanity: "
+        f"x3_cf(do x2=1.5)={gen.true_counterfactual(X_OBS, {'x2': 1.5})['x3']:.3f} "
+        f"(factual {X_OBS['x3']})"
+    )
+
+
+# %% public classes --------------------------------------------------------------------
 @dataclass
 class Carefl4(DatasetDraws):
     """SCM generator for the 4-variable CAREFL benchmark."""
@@ -179,39 +216,6 @@ class Carefl4(DatasetDraws):
         }
 
 
-# --------------------------------------------------------------------------- CLI
-def main(argv: list[str] | None = None) -> None:
-    """Regenerate the frozen CSV files of this data-generating process."""
-    p = argparse.ArgumentParser(description="Generate the CAREFL benchmark data.")
-    p.add_argument("--out", type=Path, default=Path("paper/data/carefl"))
-    p.add_argument("--seed", type=int, default=42)
-    p.add_argument("--n-obs", type=int, default=5000)
-    args = p.parse_args(argv)
-
-    gen = Carefl4(seed=args.seed)
-    args.out.mkdir(parents=True, exist_ok=True)
-    obs = gen.observational(args.n_obs)
-    obs.to_csv(args.out / "obs.csv", index=False)
-
-    truth = {
-        "source": "arXiv:2503.16206 App. C.2 (orig. Khemakhem 2021 Fig. 5)",
-        "seed": args.seed,
-        "n_obs": args.n_obs,
-        "scm": {
-            "x1": "Laplace(0, 1/sqrt(2))",
-            "x2": "Laplace(0, 1/sqrt(2))",
-            "x3": "x1 + 0.5*x2^3 + Laplace",
-            "x4": "-x2 + 0.5*x1^2 + Laplace",
-        },
-        **gen.true_cf_curves(),
-    }
-    (args.out / "truth.json").write_text(json.dumps(truth, indent=2) + "\n")
-    print(
-        f"[carefl] n={len(obs)}  cf sanity: "
-        f"x3_cf(do x2=1.5)={gen.true_counterfactual(X_OBS, {'x2': 1.5})['x3']:.3f} "
-        f"(factual {X_OBS['x3']})"
-    )
-
-
+# %% main ------------------------------------------------------------------------------
 if __name__ == "__main__":
     main()

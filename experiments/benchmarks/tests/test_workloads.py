@@ -6,6 +6,7 @@ bimodal DGP drifting away from the maintained generator, and a workload's
 frozen CSV disappearing from the area that owns it.
 """
 
+# %% imports ---------------------------------------------------------------------------
 import numpy as np
 from benchmarks.bench_training import all_ls_spec, stroke_data, vaca_data
 from benchmarks.perf_machine import vaca_dgp
@@ -17,6 +18,7 @@ from paper.simulations.vaca import VacaTriangle
 from tramdag import CausalFlowDAG
 
 
+# %% public functions ------------------------------------------------------------------
 def test_standalone_dgp_matches_the_generator():
     """perf_machine.py carries its own DGP so it can be downloaded alone.
 

@@ -8,6 +8,7 @@ node is a proportional-odds model by construction — which is what makes the
 classical comparisons exact.
 """
 
+# %% imports ---------------------------------------------------------------------------
 import numpy as np
 import pandas as pd
 import pytest
@@ -16,6 +17,7 @@ import torch
 from tramdag import CS, LS, CausalFlowDAG, ContinuousNode, I, OrdinalNode
 
 
+# %% private functions -----------------------------------------------------------------
 def _ls_spec() -> dict:
     """The in-class spec of the all-``ls`` chain: every edge a linear shift."""
     return {
@@ -26,6 +28,7 @@ def _ls_spec() -> dict:
     }
 
 
+# %% public functions ------------------------------------------------------------------
 # ------------------------------------------------------------------ fast
 def test_rejects_non_all_ls():
     spec = {"x1": ContinuousNode(), "x2": ContinuousNode([CS("x1")])}

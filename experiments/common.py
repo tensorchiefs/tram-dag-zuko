@@ -24,6 +24,7 @@ Run an experiment as a module, from ``experiments/``::
     uv run python -m check paper triangle-atan-cs
 """
 
+# %% imports ---------------------------------------------------------------------------
 from __future__ import annotations
 
 import json
@@ -34,6 +35,7 @@ import yaml
 from tramdag.utils import config_section
 
 
+# %% public functions ------------------------------------------------------------------
 def load_variant(
     script: str, variant: str, expected_keys: set[str] | None = None
 ) -> dict:

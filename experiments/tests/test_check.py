@@ -10,6 +10,7 @@ points the module's ``HERE`` at it, so nothing here reads or writes a committed
 file.
 """
 
+# %% imports ---------------------------------------------------------------------------
 from __future__ import annotations
 
 import json
@@ -18,6 +19,7 @@ import check as check_module
 import pytest
 
 
+# %% public functions ------------------------------------------------------------------
 @pytest.fixture
 def area(tmp_path, monkeypatch):
     """Give a writer for one throwaway area, with ``check`` pointed at it."""

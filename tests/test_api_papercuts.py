@@ -3,6 +3,7 @@ and machine-info persistence through save/load (the helper itself is
 tested in test_utils.py).
 """
 
+# %% imports ---------------------------------------------------------------------------
 import numpy as np
 import pandas as pd
 import pytest
@@ -12,6 +13,7 @@ import tramdag as td
 from tramdag import LS, CausalFlowDAG, ContinuousNode, OrdinalNode
 
 
+# %% private functions -----------------------------------------------------------------
 def _spec():
     return {
         "x1": ContinuousNode(),
@@ -20,6 +22,7 @@ def _spec():
     }
 
 
+# %% public functions ------------------------------------------------------------------
 # -------------------------------------------------- #1 constructor seeding
 def test_constructor_seed_makes_init_reproducible():
     a = CausalFlowDAG(_spec(), seed=42)

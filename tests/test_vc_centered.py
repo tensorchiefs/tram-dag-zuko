@@ -10,6 +10,7 @@ measured 5-10x on this protocol); the OOF plumbing is real fold bookkeeping
 t - e_hat under intervention (never cached).
 """
 
+# %% imports ---------------------------------------------------------------------------
 import numpy as np
 import pytest
 import torch
@@ -18,6 +19,7 @@ from tramdag import CS, LS, VC, CausalFlowDAG, ContinuousNode, I, OrdinalNode
 from tramdag.spec import spec_from_dict, spec_to_dict, validate_and_sort
 
 
+# %% private functions -----------------------------------------------------------------
 def _misspecified_spec(center) -> dict:
     return {
         "X": ContinuousNode([I(transform="affine")]),
@@ -42,6 +44,7 @@ def _fit(spec, df, epochs=250):
     return flow
 
 
+# %% public functions ------------------------------------------------------------------
 # ------------------------------------------------------- validation / spec
 def test_center_validation():
     with pytest.raises(ValueError, match="center_folds"):

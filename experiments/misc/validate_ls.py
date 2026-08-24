@@ -22,6 +22,7 @@ Usage (from experiments/)::
     uv run python -m misc.validate_ls classical
 """
 
+# %% imports ---------------------------------------------------------------------------
 from __future__ import annotations
 
 import argparse
@@ -40,6 +41,7 @@ from statsmodels.miscmodels.ordinal_model import OrderedModel
 
 from tramdag import LS, SI, CausalFlowDAG, ContinuousNode, OrdinalNode
 
+# %% global variables ------------------------------------------------------------------
 CONFIG_KEYS = {
     "cohort",
     "fitter",
@@ -57,6 +59,7 @@ CONFIG_KEYS = {
 }
 
 
+# %% public functions ------------------------------------------------------------------
 def build_spec(config: dict) -> dict:
     """Give the fully-connected all-``ls`` spec of the cohort.
 
@@ -275,6 +278,7 @@ def run(variant: str) -> dict:
     return metrics
 
 
+# %% main ------------------------------------------------------------------------------
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument(

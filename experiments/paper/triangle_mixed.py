@@ -18,6 +18,7 @@ Usage (from experiments/)::
     uv run python -m paper.triangle_mixed linear-ls
 """
 
+# %% imports ---------------------------------------------------------------------------
 from __future__ import annotations
 
 import argparse
@@ -45,6 +46,7 @@ from paper.helpers import (
 from paper.simulations.triangle import TriangleMixed
 from tramdag import CS, LS, SI, ContinuousNode, OrdinalNode
 
+# %% global variables ------------------------------------------------------------------
 CONFIG_KEYS = {
     "f",
     "shift",
@@ -77,6 +79,7 @@ CONFIG_KEYS = {
 MLP_KEYS = {"shift_units", "activation"}
 
 
+# %% public functions ------------------------------------------------------------------
 def build_spec(config: dict) -> dict:
     """Give the DAG spec with an ordinal x3.
 
@@ -369,6 +372,7 @@ def run(variant: str) -> dict:
     return metrics
 
 
+# %% main ------------------------------------------------------------------------------
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument(

@@ -32,6 +32,7 @@ CLI (regenerate the frozen CSVs for both families)::
     uv run python -m paper.simulations.triangle --out paper/data --seed 42
 """
 
+# %% imports ---------------------------------------------------------------------------
 from __future__ import annotations
 
 import argparse
@@ -44,6 +45,7 @@ import pandas as pd
 
 from ._common import DatasetDraws, logistic, resolve_latents, sigmoid
 
+# %% global variables ------------------------------------------------------------------
 F_VARIANTS = {
     "linear": (lambda x: -0.3 * x, "-0.3*x"),
     "cubic": (lambda x: 2.0 * x**3 + x, "2*x^3 + x"),
@@ -58,6 +60,7 @@ THETA_MIXED = np.array([-2.0, 0.42, 1.02])  # ordinal cutpoints (4 levels)
 PAPER_VARIANTS = {"continuous": ("linear", "atan", "sin"), "mixed": ("linear", "exp")}
 
 
+# %% private functions -----------------------------------------------------------------
 def _clamp(value, n: int) -> np.ndarray:
     """Broadcast a ``do`` value to shape ``(n,)``.
 
@@ -67,6 +70,61 @@ def _clamp(value, n: int) -> np.ndarray:
     return np.broadcast_to(np.asarray(value, dtype=float), (n,)).copy()
 
 
+def _write_variant(cls, out_dir: Path, f: str, seed: int, n_obs: int) -> None:
+    gen = cls(f=f, seed=seed)
+    vdir = out_dir / f
+    vdir.mkdir(parents=True, exist_ok=True)
+
+    obs = gen.observational(n_obs)
+    if gen.family == "mixed":
+        obs["x3"] = obs["x3"].astype(int)
+    obs.to_csv(vdir / "obs.csv", index=False)
+
+    truth = {
+        "source": "arXiv:2503.16206 Sec. 6 (Sick & Duerr, CLeaR 2025)",
+        "family": gen.family,
+        "f": f,
+        "f_formula": F_VARIANTS[f][1],
+        "seed": seed,
+        "n_obs": n_obs,
+        "paper": gen.paper_truth(),
+        "zuko": gen.zuko_expectations(),
+    }
+    (vdir / "truth.json").write_text(json.dumps(truth, indent=2) + "\n")
+    if gen.family == "mixed":
+        x3_range = f"levels {sorted(obs['x3'].unique())}"
+    else:
+        x3_range = f"in [{obs['x3'].min():.2f}, {obs['x3'].max():.2f}]"
+    print(
+        f"[{gen.family}/{f}] n={len(obs)}  "
+        f"x2 in [{obs['x2'].min():.2f}, {obs['x2'].max():.2f}]  "
+        f"x3 {x3_range}"
+    )
+
+
+# %% public functions ------------------------------------------------------------------
+def main(argv: list[str] | None = None) -> None:
+    """Regenerate the frozen CSV files of this data-generating process."""
+    p = argparse.ArgumentParser(
+        description="Generate the TRAM-DAG paper triangle data."
+    )
+    p.add_argument("--out", type=Path, default=Path("paper/data"))
+    p.add_argument("--seed", type=int, default=42)
+    p.add_argument("--n-obs", type=int, default=5000)
+    args = p.parse_args(argv)
+
+    for f in PAPER_VARIANTS["continuous"]:
+        _write_variant(
+            TriangleContinuous, args.out / "triangle", f, args.seed, args.n_obs
+        )
+    for f in PAPER_VARIANTS["mixed"]:
+        _write_variant(
+            TriangleMixed, args.out / "triangle-mixed", f, args.seed, args.n_obs
+        )
+    print(f"\nWrote triangle + triangle-mixed -> {args.out}")
+
+
+# %% private classes -------------------------------------------------------------------
 @dataclass
 class _TriangleBase(DatasetDraws):
     """Shared x1 (GMM source) and x2 (Colr-type TRAM) mechanisms.
@@ -196,6 +254,7 @@ class _TriangleBase(DatasetDraws):
         return exp
 
 
+# %% public classes --------------------------------------------------------------------
 class TriangleContinuous(_TriangleBase):
     """Paper Sec. 6.1: the all-continuous triangle.
 
@@ -382,59 +441,6 @@ class TriangleMixed(_TriangleBase):
         return exp
 
 
-# --------------------------------------------------------------------------- CLI
-def _write_variant(cls, out_dir: Path, f: str, seed: int, n_obs: int) -> None:
-    gen = cls(f=f, seed=seed)
-    vdir = out_dir / f
-    vdir.mkdir(parents=True, exist_ok=True)
-
-    obs = gen.observational(n_obs)
-    if gen.family == "mixed":
-        obs["x3"] = obs["x3"].astype(int)
-    obs.to_csv(vdir / "obs.csv", index=False)
-
-    truth = {
-        "source": "arXiv:2503.16206 Sec. 6 (Sick & Duerr, CLeaR 2025)",
-        "family": gen.family,
-        "f": f,
-        "f_formula": F_VARIANTS[f][1],
-        "seed": seed,
-        "n_obs": n_obs,
-        "paper": gen.paper_truth(),
-        "zuko": gen.zuko_expectations(),
-    }
-    (vdir / "truth.json").write_text(json.dumps(truth, indent=2) + "\n")
-    if gen.family == "mixed":
-        x3_range = f"levels {sorted(obs['x3'].unique())}"
-    else:
-        x3_range = f"in [{obs['x3'].min():.2f}, {obs['x3'].max():.2f}]"
-    print(
-        f"[{gen.family}/{f}] n={len(obs)}  "
-        f"x2 in [{obs['x2'].min():.2f}, {obs['x2'].max():.2f}]  "
-        f"x3 {x3_range}"
-    )
-
-
-def main(argv: list[str] | None = None) -> None:
-    """Regenerate the frozen CSV files of this data-generating process."""
-    p = argparse.ArgumentParser(
-        description="Generate the TRAM-DAG paper triangle data."
-    )
-    p.add_argument("--out", type=Path, default=Path("paper/data"))
-    p.add_argument("--seed", type=int, default=42)
-    p.add_argument("--n-obs", type=int, default=5000)
-    args = p.parse_args(argv)
-
-    for f in PAPER_VARIANTS["continuous"]:
-        _write_variant(
-            TriangleContinuous, args.out / "triangle", f, args.seed, args.n_obs
-        )
-    for f in PAPER_VARIANTS["mixed"]:
-        _write_variant(
-            TriangleMixed, args.out / "triangle-mixed", f, args.seed, args.n_obs
-        )
-    print(f"\nWrote triangle + triangle-mixed -> {args.out}")
-
-
+# %% main ------------------------------------------------------------------------------
 if __name__ == "__main__":
     main()

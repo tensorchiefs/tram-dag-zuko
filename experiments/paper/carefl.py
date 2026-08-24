@@ -16,6 +16,7 @@ Usage (from experiments/)::
     uv run python -m paper.carefl flexible
 """
 
+# %% imports ---------------------------------------------------------------------------
 from __future__ import annotations
 
 import argparse
@@ -39,6 +40,7 @@ from paper.helpers import (
 from paper.simulations.carefl import ALPHA_GRID, X_OBS, Carefl4
 from tramdag import CI, SI, ContinuousNode
 
+# %% global variables ------------------------------------------------------------------
 CONFIG_KEYS = {
     "n_train",
     "transform",
@@ -61,6 +63,7 @@ CONFIG_KEYS = {
 }
 
 
+# %% public functions ------------------------------------------------------------------
 def build_spec(config: dict) -> dict:
     """Give the all-complex-intercept spec of the 4-variable SCM.
 
@@ -201,6 +204,7 @@ def run(variant: str) -> dict:
     return metrics
 
 
+# %% main ------------------------------------------------------------------------------
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument(

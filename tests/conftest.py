@@ -17,17 +17,14 @@ Specs stay in the test modules: those pin the one syntax variant a
 property needs, and sharing them would couple unrelated acceptance bars.
 """
 
+# %% imports ---------------------------------------------------------------------------
 import numpy as np
 import pandas as pd
 import pytest
 
 from tramdag import CausalFlowDAG, ContinuousNode
 
-
-def _sigmoid(x):
-    return 1.0 / (1.0 + np.exp(-x))
-
-
+# %% global variables ------------------------------------------------------------------
 # --------------------------------------------------------------- DGP 1: all-ls
 # Every conditional is an exact linear-shift transformation model, so the
 # outcome node is a proportional-odds model and the flow's MLE must equal
@@ -43,6 +40,37 @@ LS_CHAIN_TRUTH = {
     "beta_y_t": -0.8,  # y  <- t  (w[1] - w[0] of the one-hot)
     "cutpoints_y": (-1.5, 0.0, 1.5),  # 4 ordinal levels
 }
+
+# ------------------------------------------------- DGP 2: heterogeneous effect
+# The outcome conditional is exactly a transformation model with a
+# treatment effect that varies with the covariates, so a VC term is
+# in-class and its read-out is scorable against beta(x). X2 is
+# deliberately both a confounder and an effect modifier — the case where
+# an unregularized CS reduced form fails hardest.
+VC_HETERO_TRUTH = {
+    "b0": -1.0,  # beta(x) = b0 + b2*X2 + b3*X3
+    "b2": 0.8,
+    "b3": -0.6,
+    "h_scale": 2.0,  # h(y) = 2 y
+    "g": "0.5*X1^2 + X2 - 0.5*X3",
+    "propensity": "sigmoid(0.4*X1 + 0.4*X2)",
+}
+
+# ------------------------------------------------ DGP 3: confounded + nonlinear
+# One covariate, strong confounding and a quadratic prognostic part. Fitted
+# with a linear prognostic term the misfit correlates with the propensity,
+# which is the configuration propensity centering exists for.
+CONFOUNDED_TRUTH = {
+    "tau": -1.0,  # constant effect on the latent scale
+    "propensity": "sigmoid(2*X)",
+    "g": "1.2*X^2",
+    "h_scale": 2.0,
+}
+
+
+# %% private functions -----------------------------------------------------------------
+def _sigmoid(x):
+    return 1.0 / (1.0 + np.exp(-x))
 
 
 def _draw_ls_chain(n: int, seed: int) -> pd.DataFrame:
@@ -63,28 +91,6 @@ def _draw_ls_chain(n: int, seed: int) -> pd.DataFrame:
     cdf = _sigmoid(np.asarray(tr["cutpoints_y"])[None, :] - shift_y[:, None])
     y = (rng.uniform(size=n)[:, None] > cdf).sum(axis=1)
     return pd.DataFrame({"x1": x1, "x2": x2, "t": t, "y": y})
-
-
-@pytest.fixture(scope="session")
-def ls_chain():
-    """The all-``ls`` DGP: exact-MLE and classical-agreement tests."""
-    return {"draw": _draw_ls_chain, "truth": LS_CHAIN_TRUTH}
-
-
-# ------------------------------------------------- DGP 2: heterogeneous effect
-# The outcome conditional is exactly a transformation model with a
-# treatment effect that varies with the covariates, so a VC term is
-# in-class and its read-out is scorable against beta(x). X2 is
-# deliberately both a confounder and an effect modifier — the case where
-# an unregularized CS reduced form fails hardest.
-VC_HETERO_TRUTH = {
-    "b0": -1.0,  # beta(x) = b0 + b2*X2 + b3*X3
-    "b2": 0.8,
-    "b3": -0.6,
-    "h_scale": 2.0,  # h(y) = 2 y
-    "g": "0.5*X1^2 + X2 - 0.5*X3",
-    "propensity": "sigmoid(0.4*X1 + 0.4*X2)",
-}
 
 
 def _draw_vc_hetero(n: int, seed: int) -> pd.DataFrame:
@@ -109,28 +115,6 @@ def _beta_vc_hetero(df) -> np.ndarray:
     )
 
 
-@pytest.fixture(scope="session")
-def vc_hetero():
-    """The heterogeneous-effect DGP: VC recovery, read-out and nesting."""
-    return {
-        "draw": _draw_vc_hetero,
-        "beta": _beta_vc_hetero,
-        "truth": VC_HETERO_TRUTH,
-    }
-
-
-# ------------------------------------------------ DGP 3: confounded + nonlinear
-# One covariate, strong confounding and a quadratic prognostic part. Fitted
-# with a linear prognostic term the misfit correlates with the propensity,
-# which is the configuration propensity centering exists for.
-CONFOUNDED_TRUTH = {
-    "tau": -1.0,  # constant effect on the latent scale
-    "propensity": "sigmoid(2*X)",
-    "g": "1.2*X^2",
-    "h_scale": 2.0,
-}
-
-
 def _draw_confounded(n: int, seed: int) -> pd.DataFrame:
     """Draw the strongly-confounded DGP with a quadratic prognostic part."""
     tr = CONFOUNDED_TRUTH
@@ -139,6 +123,23 @@ def _draw_confounded(n: int, seed: int) -> pd.DataFrame:
     t = (rng.logistic(size=n) > -2.0 * x).astype(float)
     y = (rng.logistic(size=n) - 1.2 * x**2 - tr["tau"] * t) / tr["h_scale"]
     return pd.DataFrame({"X": x, "T": t, "Y": y})
+
+
+# %% public functions ------------------------------------------------------------------
+@pytest.fixture(scope="session")
+def ls_chain():
+    """The all-``ls`` DGP: exact-MLE and classical-agreement tests."""
+    return {"draw": _draw_ls_chain, "truth": LS_CHAIN_TRUTH}
+
+
+@pytest.fixture(scope="session")
+def vc_hetero():
+    """The heterogeneous-effect DGP: VC recovery, read-out and nesting."""
+    return {
+        "draw": _draw_vc_hetero,
+        "beta": _beta_vc_hetero,
+        "truth": VC_HETERO_TRUTH,
+    }
 
 
 @pytest.fixture(scope="session")

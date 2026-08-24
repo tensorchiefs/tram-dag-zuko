@@ -13,11 +13,14 @@ all, and the environment snapshot pulls in ``torch`` and ``platform`` only
 when it is actually called.
 """
 
+# %% imports ---------------------------------------------------------------------------
 from __future__ import annotations
 
+# %% global variables ------------------------------------------------------------------
 __all__ = ["config_section", "machine_info"]
 
 
+# %% public functions ------------------------------------------------------------------
 def config_section(document: dict, *keys: str, require: set[str] | None = None) -> dict:
     """Pick a mapping out of a parsed configuration and check its keys.
 

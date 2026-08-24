@@ -9,6 +9,7 @@ reduced form measures ~0.5 on this task class (tramdag-simu PR #21), so the
 bar is what the term exists to clear.
 """
 
+# %% imports ---------------------------------------------------------------------------
 import numpy as np
 import pandas as pd
 import pytest
@@ -18,6 +19,7 @@ from tramdag import CS, LS, VC, CausalFlowDAG, ContinuousNode, I, OrdinalNode
 from tramdag.spec import spec_from_dict, spec_to_dict, validate_and_sort
 
 
+# %% private functions -----------------------------------------------------------------
 def _vc_spec(penalty: float = 1.0) -> dict:
     """The DGP's in-class spec (affine sources: their marginals are
     irrelevant to Y's conditional because the joint NLL decomposes per node).
@@ -31,6 +33,26 @@ def _vc_spec(penalty: float = 1.0) -> dict:
             [CS("X1", "X2", "X3"), VC("X2", "X3", penalty=penalty, t="T")]
         ),
     }
+
+
+# %% public functions ------------------------------------------------------------------
+@pytest.fixture(scope="module")
+def small_fitted(vc_hetero):
+    """A briefly-fitted VC flow (module-scoped: shared by the identity and
+    serialization tests; the accuracy bar has its own fit).
+    """
+    df = vc_hetero["draw"](1500, 100)
+    flow = CausalFlowDAG(_vc_spec(), seed=0)
+    flow.fit(
+        df.iloc[:1300],
+        df.iloc[1300:],
+        epochs=60,
+        learning_rate=1e-2,
+        batch_size=512,
+        verbose=0,
+        seed=0,
+    )
+    return flow, vc_hetero
 
 
 # ------------------------------------------------------------ spec / validation
@@ -115,25 +137,6 @@ def test_fit_classical_rejects_vc(vc_hetero):
 
 
 # --------------------------------------------------------------- read-out ident
-@pytest.fixture(scope="module")
-def small_fitted(vc_hetero):
-    """A briefly-fitted VC flow (module-scoped: shared by the identity and
-    serialization tests; the accuracy bar has its own fit).
-    """
-    df = vc_hetero["draw"](1500, 100)
-    flow = CausalFlowDAG(_vc_spec(), seed=0)
-    flow.fit(
-        df.iloc[:1300],
-        df.iloc[1300:],
-        epochs=60,
-        learning_rate=1e-2,
-        batch_size=512,
-        verbose=0,
-        seed=0,
-    )
-    return flow, vc_hetero
-
-
 def test_varying_coef_deterministic_and_y_free(small_fitted):
     flow, dgp = small_fitted
     new = dgp["draw"](300, 900)

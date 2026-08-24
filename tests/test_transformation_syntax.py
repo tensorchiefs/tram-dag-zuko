@@ -5,12 +5,20 @@ fixed seed, the bit-identical model. A node takes at most one intercept
 term with parents, and a VC term names its treatment by keyword.
 """
 
+# %% imports ---------------------------------------------------------------------------
 import pytest
 import torch
 
 from tramdag import CI, CS, LS, SI, VC, CausalFlowDAG, ContinuousNode, I, OrdinalNode
 from tramdag.spec import spec_from_dict, spec_to_dict, validate_and_sort
 
+
+# %% private functions -----------------------------------------------------------------
+def _state_dicts_equal(a, b):
+    return set(a) == set(b) and all(torch.equal(a[k], b[k]) for k in a)
+
+
+# %% public functions ------------------------------------------------------------------
 # ----------------------------------------------------------- normalization
 
 
@@ -119,10 +127,6 @@ def test_vc_treatment_is_keyword_only():
 
 
 # --------------------------------------------------- model-level identity
-
-
-def _state_dicts_equal(a, b):
-    return set(a) == set(b) and all(torch.equal(a[k], b[k]) for k in a)
 
 
 def test_list_and_sum_build_the_identical_model():

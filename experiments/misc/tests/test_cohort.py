@@ -6,6 +6,7 @@ committed R reference are therefore the only contract it has, and these tests
 are that contract.
 """
 
+# %% imports ---------------------------------------------------------------------------
 import json
 from pathlib import Path
 
@@ -13,11 +14,13 @@ import numpy as np
 import pandas as pd
 import pytest
 
+# %% global variables ------------------------------------------------------------------
 COHORT = Path(__file__).resolve().parents[1] / "data" / "magic-mrclean" / "ls"
 COLUMNS = ["Age", "mRS_pre", "NIHSSa", "T", "mRS_3m"]
 LEVELS = {"mRS_pre": 6, "T": 2, "mRS_3m": 7}
 
 
+# %% public functions ------------------------------------------------------------------
 @pytest.fixture(scope="module")
 def truth():
     return json.loads((COHORT / "truth.json").read_text())

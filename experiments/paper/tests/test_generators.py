@@ -10,6 +10,7 @@ What the flow *does* with these DGPs is measured by the experiment scripts and
 their committed ground truth (see ``paper/ground_truth/``), not here.
 """
 
+# %% imports ---------------------------------------------------------------------------
 import numpy as np
 import pytest
 from paper.check_data import ATOL, DATASETS, worst_deviation
@@ -19,6 +20,7 @@ from paper.simulations.vaca import VacaTriangle
 from scipy import stats
 
 
+# %% public functions ------------------------------------------------------------------
 @pytest.mark.parametrize(
     "factory",
     [

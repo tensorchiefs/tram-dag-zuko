@@ -6,12 +6,14 @@ the ``(n, rng, latents)`` triple, and the seed offsets of the named
 datasets.
 """
 
+# %% imports ---------------------------------------------------------------------------
 from __future__ import annotations
 
 import numpy as np
 import pandas as pd
 
 
+# %% public functions ------------------------------------------------------------------
 def logistic(rng: np.random.Generator, size: int) -> np.ndarray:
     """Draw the standard logistic latent, the TRAM base distribution."""
     return rng.logistic(loc=0.0, size=size)
@@ -40,6 +42,7 @@ def resolve_latents(gen, n, rng, latents) -> tuple[dict[str, np.ndarray], int]:
     return gen.draw_latents(n, rng or np.random.default_rng(gen.seed)), n
 
 
+# %% public classes --------------------------------------------------------------------
 class DatasetDraws:
     """The named dataset draws every generator shares.
 

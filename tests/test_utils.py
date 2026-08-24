@@ -5,6 +5,7 @@ hidden default, and an extra key must never look effective. Parsing is the
 caller's job, so these tests hand it plain dicts.
 """
 
+# %% imports ---------------------------------------------------------------------------
 import pathlib
 
 import pytest
@@ -12,6 +13,7 @@ import pytest
 import tramdag as td
 from tramdag.utils import config_section, machine_info
 
+# %% global variables ------------------------------------------------------------------
 DOCUMENT = {
     "variants": {
         "fast": {"epochs": 5, "learning_rate": 0.001},
@@ -21,6 +23,7 @@ DOCUMENT = {
 }
 
 
+# %% public functions ------------------------------------------------------------------
 def test_selects_a_nested_section():
     assert config_section(DOCUMENT, "variants", "fast") == {
         "epochs": 5,

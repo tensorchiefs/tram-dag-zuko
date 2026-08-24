@@ -1,5 +1,6 @@
 """Unit tests for the tramdag causal flow."""
 
+# %% imports ---------------------------------------------------------------------------
 import numpy as np
 import pandas as pd
 import pytest
@@ -16,7 +17,36 @@ from tramdag.transforms import (
     ordinal_pmf,
 )
 
+# %% global variables ------------------------------------------------------------------
 torch.manual_seed(0)
+
+
+# %% public functions ------------------------------------------------------------------
+@pytest.fixture(scope="module")
+def fitted_flow():
+    rng = np.random.default_rng(7)
+    n = 3000
+    x = rng.normal(0, 2, n)
+    y_lat = 0.8 * x + rng.logistic(size=n)
+    y = np.digitize(y_lat, [-1.0, 0.5, 2.0]).astype(float)
+    w = 0.5 * x - 0.3 * y + rng.logistic(size=n)
+    df = pd.DataFrame({"X": x, "Y": y, "W": w})
+    spec = {
+        "X": ContinuousNode(),
+        "Y": OrdinalNode(4, [LS("X")]),
+        "W": ContinuousNode([LS("X"), LS("Y")]),
+    }
+    flow = CausalFlowDAG(spec)
+    flow.fit(
+        df.iloc[:2400],
+        df.iloc[2400:],
+        epochs=300,
+        learning_rate=0.05,
+        batch_size=600,
+        verbose=0,
+        seed=0,
+    )
+    return flow, df
 
 
 # ---------------------------------------------------------------- transforms
@@ -87,33 +117,6 @@ def test_topological_order():
 
 
 # ---------------------------------------------------------------- flow logic
-@pytest.fixture(scope="module")
-def fitted_flow():
-    rng = np.random.default_rng(7)
-    n = 3000
-    x = rng.normal(0, 2, n)
-    y_lat = 0.8 * x + rng.logistic(size=n)
-    y = np.digitize(y_lat, [-1.0, 0.5, 2.0]).astype(float)
-    w = 0.5 * x - 0.3 * y + rng.logistic(size=n)
-    df = pd.DataFrame({"X": x, "Y": y, "W": w})
-    spec = {
-        "X": ContinuousNode(),
-        "Y": OrdinalNode(4, [LS("X")]),
-        "W": ContinuousNode([LS("X"), LS("Y")]),
-    }
-    flow = CausalFlowDAG(spec)
-    flow.fit(
-        df.iloc[:2400],
-        df.iloc[2400:],
-        epochs=300,
-        learning_rate=0.05,
-        batch_size=600,
-        verbose=0,
-        seed=0,
-    )
-    return flow, df
-
-
 def test_pmf_matches_do_sampling(fitted_flow):
     flow, _ = fitted_flow
     grid = pd.DataFrame({"X": [1.5]})

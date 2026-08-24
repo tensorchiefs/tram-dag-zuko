@@ -16,6 +16,7 @@ Conventions follow the original TRAM-DAG implementation
   ``transform_intercepts_ordinal`` in the original implementation.
 """
 
+# %% imports ---------------------------------------------------------------------------
 from __future__ import annotations
 
 import math
@@ -28,6 +29,7 @@ from zuko.transforms import (
     MonotonicRQSTransform,
 )
 
+# %% global variables ------------------------------------------------------------------
 __all__ = [
     "AffineUT",
     "BernsteinUT",
@@ -63,64 +65,7 @@ _CDF_EPS = 1e-3
 _U_EPS = 1e-7
 
 
-class StandardLogistic:
-    """Standard logistic base distribution (the TRAM latent)."""
-
-    @staticmethod
-    def log_prob(z: Tensor) -> Tensor:
-        """Give the log density at ``z``.
-
-        Parameters
-        ----------
-        z : Tensor
-            Evaluation points.
-
-        Returns
-        -------
-        Tensor
-            The log density, same shape as ``z``.
-        """
-        return -z - 2.0 * torch.nn.functional.softplus(-z)
-
-    @staticmethod
-    def sample(shape, device=None, generator=None) -> Tensor:
-        """Draw samples of the given ``shape``.
-
-        Parameters
-        ----------
-        shape : tuple[int, ...]
-            Shape of the sample tensor.
-        device : torch.device | str | None, optional
-            Target device, by default ``None``.
-        generator : torch.Generator | None, optional
-            Random source for a reproducible draw, by default ``None``.
-
-        Returns
-        -------
-        Tensor
-            The samples.
-        """
-        u = torch.rand(shape, device=device, generator=generator)
-        return StandardLogistic.icdf(u)
-
-    @staticmethod
-    def icdf(u: Tensor) -> Tensor:
-        """Give the quantile at probability ``u``.
-
-        Parameters
-        ----------
-        u : Tensor
-            Probabilities in (0, 1). Clamped off 0 and 1 by ``_U_EPS``.
-
-        Returns
-        -------
-        Tensor
-            The quantiles, same shape as ``u``.
-        """
-        u = u.clamp(_U_EPS, 1.0 - _U_EPS)
-        return torch.log(u) - torch.log1p(-u)
-
-
+# %% private functions -----------------------------------------------------------------
 def _expanding_bisection(
     f, z: Tensor, lo: Tensor, hi: Tensor, max_expand: int = 20, iters: int = 40
 ) -> Tensor:
@@ -170,210 +115,26 @@ def _expanding_bisection(
     return 0.5 * (lo + hi)
 
 
-class _ScaledUT(torch.nn.Module):
-    """Base class for the scaled univariate transforms.
-
-    An affine pre-map takes ``[xmin, xmax]`` to ``[-B, B]`` with
-    ``B = BOUND``, then a zuko transform maps to the latent scale.
-    Subclasses define ``n_params`` and ``_build(theta) -> zuko Transform``.
-    """
-
-    def __init__(self):
-        super().__init__()
-        self.bound = BOUND
-        self.register_buffer("xmin", torch.tensor(0.0))
-        self.register_buffer("xmax", torch.tensor(1.0))
-        self._fitted = False
-
-    @property
-    def n_params(self) -> int:  # pragma: no cover - abstract
-        raise NotImplementedError
-
-    def _build(self, theta: Tensor):  # pragma: no cover - abstract
-        raise NotImplementedError
-
-    def set_range(self, xmin: float, xmax: float) -> None:
-        """Set the data range that maps onto the pre-scaled domain.
-
-        ``fit`` calls this once with the train 5%/95% quantiles. The call
-        marks the transform as fitted.
-
-        Parameters
-        ----------
-        xmin, xmax : float
-            The range ends. They map to ``-B`` and ``+B``.
-        """
-        self.xmin.fill_(float(xmin))
-        self.xmax.fill_(float(xmax))
-        self._fitted = True
-
-    def _scale(self, x: Tensor) -> Tensor:
-        return (x - self.xmin) / (self.xmax - self.xmin) * (2 * self.bound) - self.bound
-
-    def _unscale(self, t: Tensor) -> Tensor:
-        return (t + self.bound) / (2 * self.bound) * (self.xmax - self.xmin) + self.xmin
-
-    @property
-    def _log_dt_dx(self) -> Tensor:
-        # derive dtype from the range buffers so float64 stays pure (no float32
-        # literal promotion) inside fit_classical
-        two_b = torch.as_tensor(
-            2.0 * self.bound, dtype=self.xmin.dtype, device=self.xmin.device
-        )
-        return torch.log(two_b) - torch.log(self.xmax - self.xmin)
-
-    def forward(self, theta: Tensor, x: Tensor) -> tuple[Tensor, Tensor]:
-        """Map observed values to the latent scale, before the shift.
-
-        Parameters
-        ----------
-        theta : Tensor
-            Transform parameters, shape ``(n, P)``.
-        x : Tensor
-            Observed values in original units, shape ``(n,)``.
-
-        Returns
-        -------
-        tuple[Tensor, Tensor]
-            The pre-shift latent ``z0`` and the log absolute Jacobian
-            ``log|dz0/dx|``, both shape ``(n,)``.
-        """
-        t = self._scale(x)
-        T = self._build(theta)
-        z0, ladj = T.call_and_ladj(t)
-        return z0, ladj + self._log_dt_dx
-
-    def inverse(self, theta: Tensor, z0: Tensor) -> Tensor:
-        """Map pre-shift latents back to original units.
-
-        The inverse uses expanding-bracket bisection, so it also covers
-        latents far outside the pre-scaled domain.
-
-        Parameters
-        ----------
-        theta : Tensor
-            Transform parameters, shape ``(n, P)``.
-        z0 : Tensor
-            Pre-shift latents, shape ``(n,)``.
-
-        Returns
-        -------
-        Tensor
-            The values in original units, shape ``(n,)``.
-        """
-        T = self._build(theta)
-        B = torch.tensor(self.bound, dtype=z0.dtype, device=z0.device)
-        with torch.no_grad():
-            t = _expanding_bisection(T, z0, -B.expand_as(z0), B.expand_as(z0))
-        return self._unscale(t)
+def _bounds(theta_tilde: Tensor, shift: Tensor, y: Tensor) -> tuple[Tensor, Tensor]:
+    """Give the shifted cutpoint interval of each observed level."""
+    cut = ordinal_cutpoints(theta_tilde) - shift.view(-1, 1)
+    idx = torch.arange(theta_tilde.shape[0], device=theta_tilde.device)
+    y = y.long()
+    return cut[idx, y], cut[idx, y + 1]
 
 
-class BernsteinUT(_ScaledUT):
-    """TRAM-style Bernstein polynomial transform (zuko ``BernsteinTransform``).
-
-    Parameters
-    ----------
-    n_coeffs : int, optional
-        Number of Bernstein coefficients, by default 20.
-    """
-
-    def __init__(self, n_coeffs: int = 20):
-        super().__init__()
-        self._n = n_coeffs
-
-    @property
-    def n_params(self) -> int:
-        """int: number of transform parameters this transform needs."""
-        return self._n
-
-    def _build(self, theta: Tensor):
-        return BernsteinTransform(theta, bound=self.bound)
-
-    def marginal_init_theta(self) -> Tensor:
-        """Give the unconstrained Bernstein coefficients of the calibrated map.
-
-        The coefficients describe the linear map from the pre-scaled domain
-        ``[-B, B]`` onto the standard-logistic quantiles
-        ``[logit(RANGE_Q), logit(1-RANGE_Q)]``.
-
-        Returns
-        -------
-        Tensor
-            The coefficients, shape ``(n_params,)``.
-
-        Notes
-        -----
-        After ``set_range``, each node's 5%/95% data quantiles already sit
-        at the domain bounds -+B. A single canonical theta therefore maps
-        every node's body onto the latent's 5%/95% quantiles — the right
-        *scale* from step 0. zuko's default (zero) theta instead maps -+B
-        onto about -6.93/+7.63, about 2.5x too steep, so early training is
-        spent on rescaling. This is a pure initialization: the converged
-        MLE is unchanged. See the inversion of
-        ``BernsteinTransform._constrain_theta`` (cumsum of softplus
-        diffs).
-        """
-        n = self._n
-        q = RANGE_Q
-        a = math.log(q) - math.log(1.0 - q)  # logit(q) = -2.9444 at q=.05
-        span = -2.0 * a  # logit(1-q) - logit(q)
-        order = n + 1  # constrained control points: n+2
-        b = span / order  # per-step increment (constant)
-        shift = math.log(2.0) * n / 2.0  # zuko's centering offset
-        theta = torch.full(
-            (n,),
-            math.log(math.expm1(b)),
-            dtype=self.xmin.dtype,
-            device=self.xmin.device,
-        )
-        theta[0] = a + shift
-        return theta
+def _log1mexp(x: Tensor) -> Tensor:
+    """log(1 - exp(x)) for x <= 0, numerically stable (Maechler 2012)."""
+    branch = x > -math.log(2.0)
+    # mask each branch's input so the unused branch cannot produce inf/NaN grads
+    x_hi = x.clamp(min=-math.log(2.0))
+    x_lo = x.clamp(max=-math.log(2.0))
+    return torch.where(
+        branch, torch.log(-torch.expm1(x_hi)), torch.log1p(-torch.exp(x_lo))
+    )
 
 
-class SplineUT(_ScaledUT):
-    """Monotone rational-quadratic spline (zuko ``MonotonicRQSTransform``).
-
-    Parameters
-    ----------
-    bins : int, optional
-        Number of spline bins, by default 8 — zuko's own NSF default, so a
-        spline node reproduces upstream unless asked otherwise.
-    """
-
-    def __init__(self, bins: int = 8):
-        super().__init__()
-        self.bins = bins
-
-    @property
-    def n_params(self) -> int:
-        """int: number of transform parameters this transform needs."""
-        return 3 * self.bins - 1
-
-    def _build(self, theta: Tensor):
-        K = self.bins
-        widths, heights, derivs = (
-            theta[..., :K],
-            theta[..., K : 2 * K],
-            theta[..., 2 * K :],
-        )
-        return MonotonicRQSTransform(widths, heights, derivs, bound=self.bound)
-
-
-class AffineUT(_ScaledUT):
-    """Monotone affine transform: the node-conditional is a logistic GLM."""
-
-    @property
-    def n_params(self) -> int:
-        """int: number of transform parameters this transform needs."""
-        return 2
-
-    def _build(self, theta: Tensor):
-        return MonotonicAffineTransform(theta[..., 0], theta[..., 1])
-
-
-_TRANSFORMS = {"bernstein": BernsteinUT, "spline": SplineUT, "affine": AffineUT}
-
-
+# %% public functions ------------------------------------------------------------------
 def make_univariate_transform(name: str, **kwargs) -> _ScaledUT:
     """Build a scaled univariate transform by name.
 
@@ -477,25 +238,6 @@ def ordinal_marginal_init_theta(counts) -> Tensor:
     tt[0] = c[0]
     tt[1:] = np.log(diffs)
     return torch.as_tensor(tt)
-
-
-def _bounds(theta_tilde: Tensor, shift: Tensor, y: Tensor) -> tuple[Tensor, Tensor]:
-    """Give the shifted cutpoint interval of each observed level."""
-    cut = ordinal_cutpoints(theta_tilde) - shift.view(-1, 1)
-    idx = torch.arange(theta_tilde.shape[0], device=theta_tilde.device)
-    y = y.long()
-    return cut[idx, y], cut[idx, y + 1]
-
-
-def _log1mexp(x: Tensor) -> Tensor:
-    """log(1 - exp(x)) for x <= 0, numerically stable (Maechler 2012)."""
-    branch = x > -math.log(2.0)
-    # mask each branch's input so the unused branch cannot produce inf/NaN grads
-    x_hi = x.clamp(min=-math.log(2.0))
-    x_lo = x.clamp(max=-math.log(2.0))
-    return torch.where(
-        branch, torch.log(-torch.expm1(x_hi)), torch.log1p(-torch.exp(x_lo))
-    )
 
 
 def ordinal_log_prob(theta_tilde: Tensor, shift: Tensor, y: Tensor) -> Tensor:
@@ -622,3 +364,268 @@ def ordinal_abduct(
         lower.shape, device=lower.device, generator=generator
     )
     return StandardLogistic.icdf(u)
+
+
+# %% private classes -------------------------------------------------------------------
+class _ScaledUT(torch.nn.Module):
+    """Base class for the scaled univariate transforms.
+
+    An affine pre-map takes ``[xmin, xmax]`` to ``[-B, B]`` with
+    ``B = BOUND``, then a zuko transform maps to the latent scale.
+    Subclasses define ``n_params`` and ``_build(theta) -> zuko Transform``.
+    """
+
+    def __init__(self):
+        super().__init__()
+        self.bound = BOUND
+        self.register_buffer("xmin", torch.tensor(0.0))
+        self.register_buffer("xmax", torch.tensor(1.0))
+        self._fitted = False
+
+    @property
+    def n_params(self) -> int:  # pragma: no cover - abstract
+        raise NotImplementedError
+
+    def _build(self, theta: Tensor):  # pragma: no cover - abstract
+        raise NotImplementedError
+
+    def set_range(self, xmin: float, xmax: float) -> None:
+        """Set the data range that maps onto the pre-scaled domain.
+
+        ``fit`` calls this once with the train 5%/95% quantiles. The call
+        marks the transform as fitted.
+
+        Parameters
+        ----------
+        xmin, xmax : float
+            The range ends. They map to ``-B`` and ``+B``.
+        """
+        self.xmin.fill_(float(xmin))
+        self.xmax.fill_(float(xmax))
+        self._fitted = True
+
+    def _scale(self, x: Tensor) -> Tensor:
+        return (x - self.xmin) / (self.xmax - self.xmin) * (2 * self.bound) - self.bound
+
+    def _unscale(self, t: Tensor) -> Tensor:
+        return (t + self.bound) / (2 * self.bound) * (self.xmax - self.xmin) + self.xmin
+
+    @property
+    def _log_dt_dx(self) -> Tensor:
+        # derive dtype from the range buffers so float64 stays pure (no float32
+        # literal promotion) inside fit_classical
+        two_b = torch.as_tensor(
+            2.0 * self.bound, dtype=self.xmin.dtype, device=self.xmin.device
+        )
+        return torch.log(two_b) - torch.log(self.xmax - self.xmin)
+
+    def forward(self, theta: Tensor, x: Tensor) -> tuple[Tensor, Tensor]:
+        """Map observed values to the latent scale, before the shift.
+
+        Parameters
+        ----------
+        theta : Tensor
+            Transform parameters, shape ``(n, P)``.
+        x : Tensor
+            Observed values in original units, shape ``(n,)``.
+
+        Returns
+        -------
+        tuple[Tensor, Tensor]
+            The pre-shift latent ``z0`` and the log absolute Jacobian
+            ``log|dz0/dx|``, both shape ``(n,)``.
+        """
+        t = self._scale(x)
+        T = self._build(theta)
+        z0, ladj = T.call_and_ladj(t)
+        return z0, ladj + self._log_dt_dx
+
+    def inverse(self, theta: Tensor, z0: Tensor) -> Tensor:
+        """Map pre-shift latents back to original units.
+
+        The inverse uses expanding-bracket bisection, so it also covers
+        latents far outside the pre-scaled domain.
+
+        Parameters
+        ----------
+        theta : Tensor
+            Transform parameters, shape ``(n, P)``.
+        z0 : Tensor
+            Pre-shift latents, shape ``(n,)``.
+
+        Returns
+        -------
+        Tensor
+            The values in original units, shape ``(n,)``.
+        """
+        T = self._build(theta)
+        B = torch.tensor(self.bound, dtype=z0.dtype, device=z0.device)
+        with torch.no_grad():
+            t = _expanding_bisection(T, z0, -B.expand_as(z0), B.expand_as(z0))
+        return self._unscale(t)
+
+
+# %% public classes --------------------------------------------------------------------
+class StandardLogistic:
+    """Standard logistic base distribution (the TRAM latent)."""
+
+    @staticmethod
+    def log_prob(z: Tensor) -> Tensor:
+        """Give the log density at ``z``.
+
+        Parameters
+        ----------
+        z : Tensor
+            Evaluation points.
+
+        Returns
+        -------
+        Tensor
+            The log density, same shape as ``z``.
+        """
+        return -z - 2.0 * torch.nn.functional.softplus(-z)
+
+    @staticmethod
+    def sample(shape, device=None, generator=None) -> Tensor:
+        """Draw samples of the given ``shape``.
+
+        Parameters
+        ----------
+        shape : tuple[int, ...]
+            Shape of the sample tensor.
+        device : torch.device | str | None, optional
+            Target device, by default ``None``.
+        generator : torch.Generator | None, optional
+            Random source for a reproducible draw, by default ``None``.
+
+        Returns
+        -------
+        Tensor
+            The samples.
+        """
+        u = torch.rand(shape, device=device, generator=generator)
+        return StandardLogistic.icdf(u)
+
+    @staticmethod
+    def icdf(u: Tensor) -> Tensor:
+        """Give the quantile at probability ``u``.
+
+        Parameters
+        ----------
+        u : Tensor
+            Probabilities in (0, 1). Clamped off 0 and 1 by ``_U_EPS``.
+
+        Returns
+        -------
+        Tensor
+            The quantiles, same shape as ``u``.
+        """
+        u = u.clamp(_U_EPS, 1.0 - _U_EPS)
+        return torch.log(u) - torch.log1p(-u)
+
+
+class BernsteinUT(_ScaledUT):
+    """TRAM-style Bernstein polynomial transform (zuko ``BernsteinTransform``).
+
+    Parameters
+    ----------
+    n_coeffs : int, optional
+        Number of Bernstein coefficients, by default 20.
+    """
+
+    def __init__(self, n_coeffs: int = 20):
+        super().__init__()
+        self._n = n_coeffs
+
+    @property
+    def n_params(self) -> int:
+        """int: number of transform parameters this transform needs."""
+        return self._n
+
+    def _build(self, theta: Tensor):
+        return BernsteinTransform(theta, bound=self.bound)
+
+    def marginal_init_theta(self) -> Tensor:
+        """Give the unconstrained Bernstein coefficients of the calibrated map.
+
+        The coefficients describe the linear map from the pre-scaled domain
+        ``[-B, B]`` onto the standard-logistic quantiles
+        ``[logit(RANGE_Q), logit(1-RANGE_Q)]``.
+
+        Returns
+        -------
+        Tensor
+            The coefficients, shape ``(n_params,)``.
+
+        Notes
+        -----
+        After ``set_range``, each node's 5%/95% data quantiles already sit
+        at the domain bounds -+B. A single canonical theta therefore maps
+        every node's body onto the latent's 5%/95% quantiles — the right
+        *scale* from step 0. zuko's default (zero) theta instead maps -+B
+        onto about -6.93/+7.63, about 2.5x too steep, so early training is
+        spent on rescaling. This is a pure initialization: the converged
+        MLE is unchanged. See the inversion of
+        ``BernsteinTransform._constrain_theta`` (cumsum of softplus
+        diffs).
+        """
+        n = self._n
+        q = RANGE_Q
+        a = math.log(q) - math.log(1.0 - q)  # logit(q) = -2.9444 at q=.05
+        span = -2.0 * a  # logit(1-q) - logit(q)
+        order = n + 1  # constrained control points: n+2
+        b = span / order  # per-step increment (constant)
+        shift = math.log(2.0) * n / 2.0  # zuko's centering offset
+        theta = torch.full(
+            (n,),
+            math.log(math.expm1(b)),
+            dtype=self.xmin.dtype,
+            device=self.xmin.device,
+        )
+        theta[0] = a + shift
+        return theta
+
+
+class SplineUT(_ScaledUT):
+    """Monotone rational-quadratic spline (zuko ``MonotonicRQSTransform``).
+
+    Parameters
+    ----------
+    bins : int, optional
+        Number of spline bins, by default 8 — zuko's own NSF default, so a
+        spline node reproduces upstream unless asked otherwise.
+    """
+
+    def __init__(self, bins: int = 8):
+        super().__init__()
+        self.bins = bins
+
+    @property
+    def n_params(self) -> int:
+        """int: number of transform parameters this transform needs."""
+        return 3 * self.bins - 1
+
+    def _build(self, theta: Tensor):
+        K = self.bins
+        widths, heights, derivs = (
+            theta[..., :K],
+            theta[..., K : 2 * K],
+            theta[..., 2 * K :],
+        )
+        return MonotonicRQSTransform(widths, heights, derivs, bound=self.bound)
+
+
+class AffineUT(_ScaledUT):
+    """Monotone affine transform: the node-conditional is a logistic GLM."""
+
+    @property
+    def n_params(self) -> int:
+        """int: number of transform parameters this transform needs."""
+        return 2
+
+    def _build(self, theta: Tensor):
+        return MonotonicAffineTransform(theta[..., 0], theta[..., 1])
+
+
+# kept after the classes it maps to: the dict values are evaluated at definition time
+_TRANSFORMS = {"bernstein": BernsteinUT, "spline": SplineUT, "affine": AffineUT}

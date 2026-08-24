@@ -20,6 +20,7 @@ Usage (from experiments/)::
     uv run python -m paper.check_data
 """
 
+# %% imports ---------------------------------------------------------------------------
 from __future__ import annotations
 
 import json
@@ -33,6 +34,7 @@ from paper.simulations.carefl import Carefl4
 from paper.simulations.triangle import TriangleContinuous, TriangleMixed
 from paper.simulations.vaca import VacaTriangle
 
+# %% global variables ------------------------------------------------------------------
 DATA = Path(__file__).resolve().parent / "data"
 ATOL = 1e-9
 
@@ -50,6 +52,7 @@ DATASETS = {
 }
 
 
+# %% public functions ------------------------------------------------------------------
 def worst_deviation(subdir: str) -> float:
     """Regenerate one frozen dataset and give its largest absolute deviation.
 
@@ -104,5 +107,6 @@ def main() -> int:
     return 0
 
 
+# %% main ------------------------------------------------------------------------------
 if __name__ == "__main__":
     sys.exit(main())

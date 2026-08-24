@@ -2,6 +2,7 @@
 serialization, and the meta-adjacency view.
 """
 
+# %% imports ---------------------------------------------------------------------------
 import numpy as np
 import pandas as pd
 import pytest
@@ -11,6 +12,7 @@ from tramdag import CS, LS, CausalFlowDAG, ContinuousNode, I, OrdinalNode
 from tramdag.spec import spec_from_dict, spec_to_dict
 
 
+# %% private functions -----------------------------------------------------------------
 def _toy_df(n=64, seed=0):
     rng = np.random.default_rng(seed)
     x1 = rng.normal(size=n)
@@ -29,6 +31,7 @@ def _terms_spec():
     }
 
 
+# %% public functions ------------------------------------------------------------------
 # --------------------------------------------------------------- construction
 def test_terms_spec_builds_and_scores():
     """A term spec builds a flow whose per-node log-likelihood is finite."""

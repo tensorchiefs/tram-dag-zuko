@@ -3,6 +3,7 @@
 .. include:: ../../README.md
 """
 
+# %% imports ---------------------------------------------------------------------------
 from importlib.metadata import version
 
 from .flow import CausalFlowDAG
@@ -25,6 +26,7 @@ from .spec import (
 )
 from .utils import machine_info
 
+# %% global variables ------------------------------------------------------------------
 __all__ = [
     "CI",
     "CS",
