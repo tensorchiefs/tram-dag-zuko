@@ -60,7 +60,7 @@ framework.
 ## Semantics
 
 - **Scale**: `beta(x)` lives on the node's latent (log-odds) scale. The flow
-  adds it for a continuous node (`z = h(y) + …`) and subtracts it from the
+  adds it for a continuous node (`u = h(y) + …`) and subtracts it from the
   cutpoints for an ordinal node, exactly like an `LS` weight. With no
   modifiers, `VC(t="T")` *is* `LS("T")` (identical model, testably
   bit-exact). Thus `VC` versus `LS` is a nested question.

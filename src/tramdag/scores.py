@@ -14,8 +14,8 @@ Because every shift coefficient enters the latent additively, the scores are
 **analytic and exact** (no autograd): ``d l_i / d beta = (d l_i / d s_i) * x_i``
 with the latent-scale derivative in closed form —
 
-- continuous node (``z = h(x) + s``, standard-logistic latent):
-  ``d l / d s = 1 - 2 sigmoid(z)``;
+- continuous node (``u = h(x) + s``, standard-logistic latent):
+  ``d l / d s = 1 - 2 sigmoid(u)``;
 - ordinal node (``P(Y<=k) = sigmoid(theta_k - s)``):
   ``d l / d s = (sig'(l) - sig'(u)) / (sig(u) - sig(l))`` with ``l``/``u`` the
   observed level's shifted cutpoint bounds.

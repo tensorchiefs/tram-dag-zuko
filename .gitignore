@@ -6,7 +6,8 @@ __pycache__/
 *.egg-info/
 
 # Experiment outputs — regenerable, and (for the clinical 'magic' source) derived
-# from patient data, so never committed. The synthetic data/ folder IS tracked.
+# from patient data, so never committed. The synthetic data lives per area
+# under experiments/<area>/data/ and IS tracked.
 # run outputs of any experiment area, at any depth
 results/
 

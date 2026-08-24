@@ -592,6 +592,10 @@ class ContinuousNode:
         # term lists already imply an equal basis
         return isinstance(other, ContinuousNode) and self.terms == other.terms
 
+    def __hash__(self):
+        """Hash what ``__eq__`` compares, so nodes work in sets and as keys."""
+        return hash((self.kind, tuple(self.terms)))
+
 
 class OrdinalNode:
     """Ordinal variable with ``levels`` ordered classes, stored 0 to levels-1.
@@ -625,6 +629,10 @@ class OrdinalNode:
             and self.levels == other.levels
             and self.terms == other.terms
         )
+
+    def __hash__(self):
+        """Hash what ``__eq__`` compares, so nodes work in sets and as keys."""
+        return hash((self.kind, self.levels, tuple(self.terms)))
 
 
 NodeSpec = ContinuousNode | OrdinalNode

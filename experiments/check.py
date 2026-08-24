@@ -61,7 +61,7 @@ AREAS = ("paper", "misc")
 # complexipy: ignore
 def compare(  # noqa: C901 - split planned in the complexity-reduction PR
     area: str, name: str
-) -> tuple[list[str], list[str], list[str]]:
+) -> tuple[list[str], list[str], list[str], list[str]]:
     """Compare one result directory against its ground truth.
 
     Parameters

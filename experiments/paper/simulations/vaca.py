@@ -142,7 +142,7 @@ class VacaTriangle(DatasetDraws):
 def main(argv: list[str] | None = None) -> None:
     """Regenerate the frozen CSV files of this data-generating process."""
     p = argparse.ArgumentParser(description="Generate the VACA benchmark data.")
-    p.add_argument("--out", type=Path, default=Path("data/vaca"))
+    p.add_argument("--out", type=Path, default=Path("paper/data/vaca"))
     p.add_argument("--seed", type=int, default=42)
     p.add_argument("--n-obs", type=int, default=5000)
     p.add_argument("--mc-n", type=int, default=1_000_000)

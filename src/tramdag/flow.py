@@ -353,7 +353,9 @@ class CausalFlowDAG(nn.Module):
         """
         dtype = self._np_dtype
         return {
-            c: torch.as_tensor(df[c].to_numpy(dtype=dtype), device=self.device)
+            c: torch.as_tensor(
+                df[c].to_numpy(dtype=dtype, copy=True), device=self.device
+            )
             for c in (self.order if cols is None else cols)
         }
 
@@ -460,9 +462,9 @@ class CausalFlowDAG(nn.Module):
             theta, shift = node.theta_shift(feats, n, vc_ehat=ehat)
             x = values[name]
             if node.kind == "continuous":
-                z0, ladj = node.ut.forward(theta, x)
-                z = z0 + shift
-                out[name] = StandardLogistic.log_prob(z) + ladj
+                u0, ladj = node.ut.forward(theta, x)
+                u = u0 + shift
+                out[name] = StandardLogistic.log_prob(u) + ladj
             else:
                 out[name] = ordinal_log_prob(theta, shift, x)
         return out
@@ -1553,11 +1555,11 @@ class CausalFlowDAG(nn.Module):
             theta, shift = node.theta_shift(
                 feats, n, vc_ehat=self._vc_ehat_live(node, values, n)
             )
-            z = u_vals[name]
+            u_val = u_vals[name]
             if node.kind == "continuous":
-                values[name] = node.ut.inverse(theta, z - shift)
+                values[name] = node.ut.inverse(theta, u_val - shift)
             else:
-                values[name] = ordinal_sample(theta, shift, z)
+                values[name] = ordinal_sample(theta, shift, u_val)
         return pd.DataFrame({k: v.cpu().numpy() for k, v in values.items()})
 
     @torch.no_grad()
@@ -1594,8 +1596,8 @@ class CausalFlowDAG(nn.Module):
             )
             x = values[name]
             if node.kind == "continuous":
-                z0, _ = node.ut.forward(theta, x)
-                u[name] = z0 + shift
+                u0, _ = node.ut.forward(theta, x)
+                u[name] = u0 + shift
             else:
                 u[name] = ordinal_abduct(theta, shift, x, generator=gen)
         return pd.DataFrame({k: v.cpu().numpy() for k, v in u.items()})

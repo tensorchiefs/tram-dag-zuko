@@ -23,7 +23,7 @@ are the same object, so `LS is linear_shift`.
 | `node_terms()` / `node_parents()` | Canonical term list / ordered de-duplicated parent names of a node. |
 | `validate_and_sort()` | Edge-ownership validation plus Kahn topological sort. The returned order makes the flow triangular. |
 | `spec_to_dict()` / `spec_from_dict()` | Checkpoint (de)serialization. A term serializes as `{effect, parents, options}` and nothing else, since `options` is already canonical. No compatibility shims, and `spec_from_dict` builds `Term` directly — so `validate_and_sort` is the only guard on that path. |
-| (`_normalize_terms`, `_as_term`, `_check_intercepts`, `_options`, `_OPTION_DEFAULTS`) | Formula flattening and per-entry validation (a `+` sum nested in a list is rejected), the one-parented-`I` rule plus basis hoisting in one pass, canonical option storage. |
+| (`_normalize_terms`, `_as_term`, `_intercept_basis`, `_options`, `_OPTION_DEFAULTS`) | Formula flattening and per-entry validation (a `+` sum nested in a list is rejected), the one-parented-`I` rule plus basis hoisting in one pass, canonical option storage. |
 
 ## `transforms.py` — the monotone map h and the ordinal transform
 

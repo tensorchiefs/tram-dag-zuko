@@ -243,8 +243,8 @@ plt.show()
 #
 # Graph mutilation: clamp $x_2$, cut its incoming edge, resample. Under the DGP,
 # $x_3\,|\,do(x_2{=}a) = x_1 + 0.25a + \mathcal N(0,1)$. Thus
-# $\mathbb E[x_3] = -0.25 + 0.25a$ **analytically**. This is a hard number to be
-# wrong about.
+# $\mathbb E[x_3] = -0.25 + 0.25a$ **analytically**. This exact target makes an
+# error easy to see.
 
 # %%
 fig, axes = plt.subplots(1, 3, figsize=(11, 3.2), sharey=True)
@@ -268,7 +268,7 @@ fig.tight_layout()
 plt.show()
 
 # %% [markdown]
-# ## 5. Rung 3 — the counterfactual magic trick
+# ## 5. Rung 3 — counterfactuals for held-out individuals
 #
 # Take 1,000 **held-out** individuals. Step 1 (*abduction*): invert the flow to
 # recover the latent noise $u$ of each individual. This noise is everything

@@ -29,7 +29,7 @@ and the ``cs`` module again learns ``-f(x2)``.
 
 CLI (regenerate the frozen CSVs for both families)::
 
-    uv run python -m paper.simulations.triangle --out data --seed 42
+    uv run python -m paper.simulations.triangle --out paper/data --seed 42
 """
 
 from __future__ import annotations
@@ -420,7 +420,7 @@ def main(argv: list[str] | None = None) -> None:
     p = argparse.ArgumentParser(
         description="Generate the TRAM-DAG paper triangle data."
     )
-    p.add_argument("--out", type=Path, default=Path("data"))
+    p.add_argument("--out", type=Path, default=Path("paper/data"))
     p.add_argument("--seed", type=int, default=42)
     p.add_argument("--n-obs", type=int, default=5000)
     args = p.parse_args(argv)

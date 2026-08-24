@@ -55,7 +55,7 @@
 #
 # This **observed → latent** map is the convention of the paper (Eq. 2,
 # $F_{X\mid\mathrm{pa}}(x)=F_U\!\big(h(x\mid\mathrm{pa})\big)$) and of the code
-# (in code: `z = h(x) + shift`). It is also the **training direction**: the model
+# (in code: `u = h(x) + shift`). It is also the **training direction**: the model
 # evaluates $h$ *directly* to score the likelihood, which is cheap. **Sampling**
 # runs the inverse $x_i = h^{-1}(u_i \mid \mathrm{pa})$. This inverse has no
 # closed form, so bracketed bisection solves it. That is the costlier direction.
@@ -684,11 +684,11 @@ plt.show()
 # ## 9. Where to go from here
 #
 # * **Complex intercepts (`I(...)`)** — this is the one component not exercised
-#   here. Declare `terms=[I("Age")]`, and the *parameters* of the
+#   here. Declare `ContinuousNode(I("Age"))`, and the *parameters* of the
 #   Bernstein transform become a function of the parent. Several `I(...)` parents
 #   feed one joint network, that is, they can interact. The paper replications in
 #   `experiments/` use `I(...)` heavily. Run
-#   `uv run python experiments/vaca.py flexible` for an all-intercept flow on a
+#   `uv run python -m paper.vaca flexible` (from `experiments/`) for an all-intercept flow on a
 #   bimodal benchmark with analytic interventional truth.
 # * **Early stopping vs. exact MLE** — this notebook's DGP has no unobserved
 #   confounding, so the MLE (`restore_best=False`, the default) is the right
@@ -697,7 +697,7 @@ plt.show()
 #   the causal effect. See `CHANGELOG.md`.
 # * **Validation against classical models** — an all-`LS` flow trained to
 #   convergence *is* the classical proportional-odds MLE
-#   (`experiments/validate_ls.py` pins flow ≡ `statsmodels` ≡ R `polr`, and the
+#   (`experiments/misc/validate_ls.py` pins flow ≡ `statsmodels` ≡ R `polr`, and the
 #   framework tests check the same identity on an inline DGP).
 # * **Joint terms** — write several parents inside one term to model an
 #   *interaction*. `CS("x1", "x2")` is a single shift network $g(x_1, x_2)$, and

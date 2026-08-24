@@ -9,9 +9,9 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import matplotlib
+import matplotlib as mpl
 
-matplotlib.use("Agg")  # headless: the scripts only write files
+mpl.use("Agg")  # headless: the scripts only write files
 
 import matplotlib.pyplot as plt
 import numpy as np

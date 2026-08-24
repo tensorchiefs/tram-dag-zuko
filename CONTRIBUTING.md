@@ -43,8 +43,10 @@ uvx ruff check .        # report
 uvx ruff format --diff  # what formatting would change
 ```
 
-Rules live in `pyproject.toml`: `I`/`E`/`F`/`D`/`UP` at 88 columns, numpy
-docstring convention. Docstrings are not required in `tests/`,
+Rules live in `pyproject.toml`: ruff's default set plus the extras listed
+under `extend-select`, at 88 columns with the numpy docstring convention.
+Cognitive complexity is gated by the complexipy hooks (`src/` at 15;
+`experiments/`, `notebooks/` and `tests/` at 10). Docstrings are not required in `tests/`,
 `experiments/` or `notebooks/`.
 
 The hooks in `.pre-commit-config.yaml` are enforced by

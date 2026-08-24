@@ -8,7 +8,7 @@ flow from the standard-logistic latent to the observed variables.
 Conventions follow the original TRAM-DAG implementation
 (Keras/TF, https://github.com/tensorchiefs/tram-dag):
 
-- continuous: ``z = h(x) + s(parents)`` with ``h`` Bernstein / RQ-spline / affine,
+- continuous: ``u = h(x) + s(parents)`` with ``h`` Bernstein / RQ-spline / affine,
   fitted on the value range scaled from the train 5%/95% quantiles to ``[-B, B]``
   and linearly extrapolated outside.
 - ordinal:    ``P(x <= k) = sigmoid(theta_k - s(parents))`` with increasing
@@ -391,10 +391,16 @@ def make_univariate_transform(name: str, **kwargs) -> _ScaledUT:
 
     Raises
     ------
-    KeyError
+    ValueError
         If ``name`` is not registered.
     """
-    return _TRANSFORMS[name](**kwargs)
+    try:
+        cls = _TRANSFORMS[name]
+    except KeyError:
+        raise ValueError(
+            f"unknown transform {name!r}; choose one of {sorted(_TRANSFORMS)}"
+        ) from None
+    return cls(**kwargs)
 
 
 # ---------------------------------------------------------------------------

@@ -60,11 +60,11 @@ and `log_prob` sums them. For a node, given `θ, shift` from `theta_shift`:
 - **continuous** — change of variables through the monotone transform:
 
   ```
-  z = h(x; θ) + shift
+  u = h(x; θ) + shift
   log p(x | pa) = log f_logistic(z) + log |dz/dx|
   ```
 
-  That is, the term is the standard-logistic density at the latent `z`
+  That is, the term is the standard-logistic density at the latent `u`
   ([`StandardLogistic.log_prob`](../src/tramdag/transforms.py)) plus the
   transform's log-derivative. `ut.forward` returns this log-derivative as `ladj`.
   This is the 1-D Jacobian term that makes the result a proper density, not only

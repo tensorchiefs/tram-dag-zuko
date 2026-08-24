@@ -183,7 +183,7 @@ class Carefl4(DatasetDraws):
 def main(argv: list[str] | None = None) -> None:
     """Regenerate the frozen CSV files of this data-generating process."""
     p = argparse.ArgumentParser(description="Generate the CAREFL benchmark data.")
-    p.add_argument("--out", type=Path, default=Path("data/carefl"))
+    p.add_argument("--out", type=Path, default=Path("paper/data/carefl"))
     p.add_argument("--seed", type=int, default=42)
     p.add_argument("--n-obs", type=int, default=5000)
     args = p.parse_args(argv)
