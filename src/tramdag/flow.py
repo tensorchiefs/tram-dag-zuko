@@ -949,8 +949,8 @@ class CausalFlowDAG(nn.Module):
         Raises
         ------
         ValueError
-            If ``epochs`` is not given, or if ``schedule`` is neither
-            ``None`` nor ``"plateau"``.
+            If ``epochs`` is not given, if ``schedule`` is neither ``None``
+            nor ``"plateau"``, or if ``batch_size`` is below 1.
 
         Notes
         -----
@@ -980,6 +980,8 @@ class CausalFlowDAG(nn.Module):
             )
         if schedule not in (None, "plateau"):
             raise ValueError(f"unknown schedule {schedule!r}")
+        if batch_size < 1:
+            raise ValueError(f"batch_size must be at least 1, got {batch_size}")
         if seed is not None:
             torch.manual_seed(seed)
         self._set_ranges(train_df, marginal_init=marginal_init)
@@ -1505,8 +1507,7 @@ class CausalFlowDAG(nn.Module):
         train_df: pd.DataFrame,
         *,
         max_iter: int = 400,
-        tol: float = 1e-6,
-        chunk: int = 25,
+        tol: float = 1e-9,
         history_size: int = 50,
         verbose: bool = True,
     ) -> dict:
@@ -1531,11 +1532,11 @@ class CausalFlowDAG(nn.Module):
         max_iter : int, optional
             Upper limit on L-BFGS iterations, by default 400.
         tol : float, optional
-            Relative NLL change between L-BFGS rounds that counts as
-            converged, by default 1e-6.
-        chunk : int, optional
-            Inner L-BFGS iterations per round, by default 25. Convergence
-            is checked between rounds.
+            torch's ``tolerance_change``: the NLL (or parameter) change below
+            which L-BFGS stops, by default 1e-9. Measured on the classical
+            anchor: 1e-6 stops on a plateau step and leaves a rare one-hot
+            level 0.24 off statsmodels; 1e-9 lands within 0.03, the same as
+            running to the iteration cap.
         history_size : int, optional
             L-BFGS memory, by default 50.
         verbose : bool, optional
@@ -1562,8 +1563,9 @@ class CausalFlowDAG(nn.Module):
         Double precision is what lets the line search resolve the optimum
         cleanly.
 
-        Convergence is judged by **NLL flatness**: a relative change below
-        ``tol`` between L-BFGS rounds. ``|grad|`` and individual
+        Convergence is torch's own: L-BFGS stops when the NLL or the
+        parameters move by less than ``tol``, or when the gradient is
+        below its ``tolerance_grad``. ``|grad|`` and individual
         coefficients do *not* settle to machine precision. A continuous
         node's Bernstein intercept, and weakly-identified directions such
         as rare one-hot levels or a flat treatment-effect ridge, keep
@@ -1582,17 +1584,16 @@ class CausalFlowDAG(nn.Module):
 
         self.double()  # parameters + buffers (xmin/xmax) -> float64, one call
         t0 = time.perf_counter()
-        # chunk: inner L-BFGS iterations per round; we stop on NLL change
         try:
             vals = self._tensorize(train_df)
             self.train()
             opt = torch.optim.LBFGS(
                 self.parameters(),
                 lr=1.0,
-                max_iter=chunk,
+                max_iter=max_iter,
                 history_size=history_size,
-                tolerance_grad=0.0,
-                tolerance_change=0.0,
+                tolerance_grad=0.0,  # |grad| never settles on the flat ridges
+                tolerance_change=tol,
                 line_search_fn="strong_wolfe",
             )
 
@@ -1604,19 +1605,15 @@ class CausalFlowDAG(nn.Module):
                 nll.backward()
                 return nll
 
-            prev_nll, final_nll, n_iter, converged = (
-                float("inf"),
-                float("nan"),
-                0,
-                False,
-            )
-            for _ in range(max(1, max_iter // chunk)):
-                final_nll = float(opt.step(closure).detach())
-                n_iter += chunk
-                if abs(prev_nll - final_nll) < tol * (1.0 + abs(final_nll)):
-                    converged = True
-                    break
-                prev_nll = final_nll
+            opt.step(closure)
+            n_iter = next(iter(opt.state.values()))["n_iter"]
+            converged = n_iter < max_iter  # torch stopped on a tolerance
+            with torch.no_grad():
+                final_nll = float(
+                    torch.stack(
+                        [-lp.mean() for lp in self.node_log_prob(vals).values()]
+                    ).sum()
+                )
             grad_norm = float(
                 torch.cat(
                     [

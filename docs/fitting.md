@@ -187,11 +187,11 @@ transformation model (ordered-logit / Colr). It raises on any `cs`/`ci` edge.
   minibatches, no schedule, and no early stopping. Therefore the fit is
   **deterministic** (same init → bit-identical) and lands on the **exact MLE**
   (matches `statsmodels`/R to ~1e-3 on well-identified coefficients).
-- **Solver budget** (`max_iter=400`, `tol=1e-6`, `chunk=25`,
-  `history_size=50`): the fit runs in rounds of `chunk` inner L-BFGS
-  iterations and checks NLL flatness between them, so `n_iter` in the
-  report counts in multiples of `chunk`. `history_size` is the L-BFGS
-  memory.
+- **Solver budget** (`max_iter=400`, `tol=1e-9`, `history_size=50`): one
+  L-BFGS run with torch's own stopping rule — it ends when the NLL or the
+  parameters move by less than `tol`, or at `max_iter`. The report's
+  `n_iter` is torch's count and `converged` says whether a tolerance, not
+  the cap, ended the run. `history_size` is the L-BFGS memory.
 - **float64 is a transient compute mode**: `self.double()` upcasts parameters
   *and* the transforms' range buffers in one call. The fit runs in double. A
   `finally: self.float()` restores float32. The stored model stays float32, and

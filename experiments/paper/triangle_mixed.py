@@ -46,38 +46,6 @@ from paper.helpers import (
 from paper.simulations.triangle import TriangleMixed
 from tramdag import CS, LS, SI, ContinuousNode, OrdinalNode
 
-# %% global variables ------------------------------------------------------------------
-CONFIG_KEYS = {
-    "f",
-    "shift",
-    "transform",
-    "n_coeffs",
-    "n_train",
-    "n_val",
-    "epochs",
-    "learning_rate",
-    "batch_size",
-    "chunk_epochs",
-    "dgp_seed",
-    "init_seed",
-    "shuffle_seed",
-    "sample_seed",
-    "n_compare",
-    "do_x1",
-    "grid_low",
-    "grid_high",
-    "grid_points",
-    "levels",
-    "odds_ratio_threshold",
-    "odds_ratio_n",
-    "odds_ratio_seed",
-    "cf_n",
-    "cf_draws",
-    "cf_seed",
-}
-# only a complex shift has a network to configure
-MLP_KEYS = {"shift_units", "activation"}
-
 
 # %% public functions ------------------------------------------------------------------
 def build_spec(config: dict) -> dict:
@@ -255,10 +223,7 @@ def plot_counterfactual_pmfs(flow_pmf, analytic, path, title):
 
 def run(variant: str) -> dict:
     """Run one variant end to end and give its metrics."""
-    # an ls variant has no network, so its key set is smaller: read, then check
     config = load_variant(__file__, variant)
-    keys = CONFIG_KEYS | (MLP_KEYS if config["shift"] == "cs" else set())
-    config = load_variant(__file__, variant, keys)
     out = make_output_dir(__file__, f"triangle-mixed-{variant}")
     figures = []
 

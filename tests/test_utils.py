@@ -35,28 +35,6 @@ def test_no_keys_gives_the_document():
     assert set(config_section(DOCUMENT)) == {"variants", "scalar"}
 
 
-def test_require_accepts_an_exact_match():
-    section = config_section(
-        DOCUMENT, "variants", "slow", require={"epochs", "learning_rate"}
-    )
-    assert set(section) == {"epochs", "learning_rate"}
-
-
-def test_missing_key_is_an_error_not_a_default():
-    with pytest.raises(ValueError, match=r"missing keys \['batch_size'\]"):
-        config_section(
-            DOCUMENT,
-            "variants",
-            "fast",
-            require={"epochs", "learning_rate", "batch_size"},
-        )
-
-
-def test_unknown_key_is_an_error_not_ignored():
-    with pytest.raises(ValueError, match=r"unknown keys \['learning_rate'\]"):
-        config_section(DOCUMENT, "variants", "fast", require={"epochs"})
-
-
 def test_unknown_section_names_what_is_available():
     with pytest.raises(KeyError, match="fast, slow"):
         config_section(DOCUMENT, "variants", "medium")

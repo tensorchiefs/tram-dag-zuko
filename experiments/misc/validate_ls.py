@@ -41,23 +41,6 @@ from statsmodels.miscmodels.ordinal_model import OrderedModel
 
 from tramdag import LS, SI, CausalFlowDAG, ContinuousNode, OrdinalNode
 
-# %% global variables ------------------------------------------------------------------
-CONFIG_KEYS = {
-    "cohort",
-    "fitter",
-    "phases",
-    "batch_size",
-    "init_seed",
-    "shuffle_seed",
-    "classical_max_iter",
-    "good_outcome_levels",
-    "transform",
-    "n_coeffs",
-    "levels_mrs_pre",
-    "levels_treatment",
-    "levels_outcome",
-}
-
 
 # %% public functions ------------------------------------------------------------------
 def build_spec(config: dict) -> dict:
@@ -222,7 +205,7 @@ def treatment_effect(flow, statsmodels_result, trial, good_levels: int) -> dict:
 
 def run(variant: str) -> dict:
     """Run one variant end to end and give its metrics."""
-    config = load_variant(__file__, variant, CONFIG_KEYS)
+    config = load_variant(__file__, variant)
     out = make_output_dir(__file__, f"validate-ls-{variant}")
 
     observed, trial, truth, reference = load_cohort(config["cohort"])

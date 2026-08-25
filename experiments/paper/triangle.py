@@ -35,7 +35,7 @@ from common import (
 
 from paper.helpers import (
     cs_curve,
-    fit_with_snapshots,
+    fit_in_chunks,
     ls_weight,
     plot_cs_curve,
     plot_hist_grid,
@@ -43,32 +43,7 @@ from paper.helpers import (
     split_train_val,
 )
 from paper.simulations.triangle import TriangleContinuous
-from tramdag import CS, LS, SI, ContinuousNode
-
-# %% global variables ------------------------------------------------------------------
-CONFIG_KEYS = {
-    "f",
-    "shift",
-    "transform",
-    "n_coeffs",
-    "n_train",
-    "n_val",
-    "epochs",
-    "learning_rate",
-    "batch_size",
-    "chunk_epochs",
-    "dgp_seed",
-    "init_seed",
-    "shuffle_seed",
-    "sample_seed",
-    "n_compare",
-    "do_x1",
-    "grid_low",
-    "grid_high",
-    "grid_points",
-}
-# only a complex shift has a network to configure
-MLP_KEYS = {"shift_units", "activation"}
+from tramdag import CS, LS, SI, CausalFlowDAG, ContinuousNode
 
 
 # %% public functions ------------------------------------------------------------------
@@ -126,11 +101,7 @@ def snapshot(flow, shift: str) -> dict:
 
 def run(variant: str) -> dict:
     """Run one variant end to end and give its metrics."""
-    # the key set depends on the model: an ls variant has no network, so
-    # demanding shift_units/activation there would be a lie. Read, then check.
     config = load_variant(__file__, variant)
-    keys = CONFIG_KEYS | (MLP_KEYS if config["shift"] == "cs" else set())
-    config = load_variant(__file__, variant, keys)
     out = make_output_dir(__file__, f"triangle-{variant}")
     figures = []
 
@@ -143,17 +114,9 @@ def run(variant: str) -> dict:
         f"n={len(train)} for {config['epochs']} epochs "
         f"at lr {config['learning_rate']:g} ..."
     )
-    flow, trajectory = fit_with_snapshots(
-        build_spec(config),
-        train,
-        val,
-        epochs=config["epochs"],
-        learning_rate=config["learning_rate"],
-        batch_size=config["batch_size"],
-        init_seed=config["init_seed"],
-        shuffle_seed=config["shuffle_seed"],
-        chunk_epochs=config["chunk_epochs"],
-        record=lambda flow: snapshot(flow, config["shift"]),
+    flow = CausalFlowDAG(build_spec(config), seed=config["init_seed"])
+    trajectory = fit_in_chunks(
+        flow, train, val, config, record=lambda flow: snapshot(flow, config["shift"])
     )
     flow.save(out / "flow.pt")
 

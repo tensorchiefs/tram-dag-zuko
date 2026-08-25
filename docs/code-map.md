@@ -101,7 +101,7 @@ dependency, and `machine_info` pulls in torch and platform only when called.
 
 | Name | Role |
 |---|---|
-| `config_section()` | Pick a mapping out of an **already-parsed** configuration (descending through any number of keys) and require an exact key set, so a missing key cannot become a hidden default and an extra one cannot look effective. Parsing stays with the caller, so the package depends on no config parser. |
+| `config_section()` | Pick a mapping out of an **already-parsed** configuration, descending through any number of keys. Parsing stays with the caller, so the package needs no config parser. |
 | `machine_info()` | Machine/software snapshot stored by `save()`, so timings stay comparable across machines. Never raises. Exported top-level as `tramdag.machine_info`. |
 
 ## What is *not* in the package

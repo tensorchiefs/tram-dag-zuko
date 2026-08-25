@@ -68,78 +68,36 @@ def split_train_val(df: pd.DataFrame, n_train: int, n_val: int) -> tuple:
     return df.iloc[:n_train], df.iloc[n_train : n_train + n_val]
 
 
-def fit_with_snapshots(
-    spec: dict,
-    train: pd.DataFrame,
-    val: pd.DataFrame,
-    *,
-    epochs: int,
-    learning_rate: float,
-    batch_size: int,
-    init_seed: int,
-    shuffle_seed: int,
-    chunk_epochs: int,
-    record=None,
-) -> tuple[CausalFlowDAG, list[dict]]:
-    """Fit in pieces and read out coefficients between them.
+def fit_in_chunks(flow: CausalFlowDAG, train, val, config: dict, record=None) -> list:
+    """Fit in rounds of ``config["chunk_epochs"]`` epochs; snapshot between them.
 
-    Fitting in pieces of ``chunk_epochs`` epochs is what produces the
-    coefficient-against-epoch trajectories of paper Fig. 14, 15 and 19.
-    Consecutive ``fit`` calls continue from the current **weights** but not
-    from the optimizer state, which is what makes the chunk size matter (see
-    ``chunk_epochs``).
+    Every ``fit`` call starts a fresh Adam, so the chunk size is a
+    **hyperparameter** (a warm-restart schedule), not a reporting detail:
+    on the VACA benchmark, 8 chunks of 50 reach an interventional mean 20x
+    closer to the analytic value than one call of 400. The rounds share one
+    shuffle stream (``config["shuffle_seed"]`` seeds the first).
 
-    Parameters
-    ----------
-    spec : dict
-        The node specification.
-    train, val : pd.DataFrame
-        Training and validation rows.
-    epochs : int
-        Total number of epochs.
-    learning_rate : float
-        Adam learning rate.
-    batch_size : int
-        Minibatch size.
-    init_seed : int
-        Seeds the weight initialization, which happens at construction.
-    shuffle_seed : int
-        Seeds the minibatch shuffling of the first round. Later rounds
-        continue the stream, so the whole trajectory is one training run.
-    chunk_epochs : int
-        Epochs per ``fit`` call. **This is a hyperparameter, not a reporting
-        detail**: every call starts a fresh Adam, so the chunk size acts like
-        a warm-restart schedule and changes where the fit lands. Measured on
-        the VACA benchmark, 8 chunks of 50 reach an interventional mean 20x
-        closer to the analytic value than one call of 400.
-    record : callable | None, optional
-        ``record(flow)`` gives a dict of numbers to store after each chunk.
-        With ``None`` no snapshots are taken; the chunking is unchanged.
-
-    Returns
-    -------
-    tuple[CausalFlowDAG, list[dict]]
-        The fitted flow, and one ``{"epoch": ..., **record(flow)}`` entry
-        per snapshot.
+    ``record(flow)``, when given, is stored after each round with the epoch
+    count; this is what draws the coefficient trajectories of paper Fig. 14,
+    15 and 19.
     """
-    flow = CausalFlowDAG(spec, seed=init_seed)
-    trajectory: list[dict] = []
+    trajectory = []
     done = 0
-    while done < epochs:
-        this_round = min(chunk_epochs, epochs - done)
+    while done < config["epochs"]:
+        this_round = min(config["chunk_epochs"], config["epochs"] - done)
         flow.fit(
             train,
             val,
             epochs=this_round,
-            learning_rate=learning_rate,
-            batch_size=batch_size,
+            learning_rate=config["learning_rate"],
+            batch_size=config["batch_size"],
             verbose=0,
-            seed=shuffle_seed if done == 0 else None,
+            seed=config["shuffle_seed"] if done == 0 else None,
         )
         done += this_round
         if record is not None:
             trajectory.append({"epoch": done, **record(flow)})
-    return flow, trajectory
+    return trajectory
 
 
 def ls_weight(flow: CausalFlowDAG, node: str, parent: str) -> float:

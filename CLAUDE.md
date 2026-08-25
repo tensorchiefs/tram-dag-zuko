@@ -33,8 +33,7 @@ uv run python -m paper.check_data            # frozen data still regenerates
 ```
 
 Every experiment reads its hyperparameters from its sibling `<script>.yaml` and
-has **no defaults in code**; `experiments/common.py::load_variant` parses it and
-`tramdag.utils.config_section` rejects a variant with a missing or unknown key. `experiments/` is split into `paper/`, `benchmarks/` and
+has **no defaults in code**; `experiments/common.py::load_variant` parses it. `experiments/` is split into `paper/`, `benchmarks/` and
 `misc/`, with `experiments/tests/` for the shared `check.py`. `paper` and `misc`
 each own their `data/`, `ground_truth/`, `tests/` and `results/`; `benchmarks/` measures speed on the other two's data and pins
 no ground truth, writing up its numbers in `docs/` instead. Only `common.py`
@@ -75,8 +74,7 @@ See `experiments/README.md`.
   `n_thetas=20`) — **not** the paper's R nets, which every `experiments/paper/`
   config sets explicitly instead.
 - `utils.py` — the non-modelling helpers, with no module-level imports:
-  `config_section` (pick a section out of an already-parsed config and require
-  an exact key set, so a missing key cannot become a hidden default — parsing
+  `config_section` (pick a section out of an already-parsed config — parsing
   stays with the caller, so the package needs no config parser) and
   `machine_info` (the environment snapshot `save` stores; was `env.py`).
 - `flow.py` — `CausalFlowDAG`: `fit`, `fit_classical` (float64 full-batch
@@ -105,9 +103,7 @@ See `experiments/README.md`.
   outside [-5,5] regardless of θ, so the ~10% of data beyond the 5%/95% pre-scaling
   range is misweighted whenever the true tail slope differs — the structural reason
   `spline` consistently trails `bernstein` (whose linear extrapolation follows the
-  boundary derivative). Demonstrated in `notebooks/demo_tram_dag_colab.py` section 6,
-  which also shows the consequence: the interventional *mean* survives a wrong
-  transform while tail probabilities do not.
+  boundary derivative). Demonstrated in `notebooks/demo_tram_dag_colab.py` section 6.
 - **`fit(restore_best=False)` is the default** (keeps final converged weights = exact
   MLE; an all-`ls` model then matches statsmodels/R-polr to ~1e-3). `restore_best=True`
   = per-node best-validation restoration (early stopping). Key empirical finding:
@@ -159,9 +155,10 @@ extra control points on, so `n_coeffs=20` is order 21 where the reference's
   flow SUBTRACTS → fitted weights −0.2 / +0.3; the C.4 odds-ratio check gives
   OR ≈ e² ≈ 7.4. `vaca`: E[x3|do(x2=a)] = −0.25 + 0.25a (do(x2=−3) is off-manifold
   extrapolation — looser tolerance). `carefl`: counterfactuals are analytic
-  (`Carefl4.true_counterfactual`); the paper's x_obs has a ~2.9σ abducted noise (4.07 in units of the Laplace
-  scale b = 1/√2), so
-  typical held-out rows are scored instead of that single point.
+  (`Carefl4.true_counterfactual`); the paper's x_obs is printed in CAREFL's
+  sd-standardized units (x3/x4 divided by 6.01/1.91) — in raw units it is
+  (2, 1.5, 5.0875, −0.5), noise (2, 1.5, 1.4, −1), a typical point. Held-out
+  rows are scored next to it because one point is a noisy yardstick.
 - **`validate_ls`** (`experiments/misc/data/magic-mrclean/ls`, seed 7, n=1275, full data,
   `restore_best=False`): flow = statsmodels = R polr at Age 0.0526, NIHSSa 0.1630,
   T −0.9424; ATE +0.1429 vs +0.1428, true ATE +0.132. The R reference

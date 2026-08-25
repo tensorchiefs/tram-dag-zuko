@@ -84,14 +84,14 @@ def test_continuous_only_all_ls_recovers_the_true_shift(ls_chain):
     assert beta == pytest.approx(ls_chain["truth"]["beta_x2_x1"], abs=0.15)
 
 
-def test_chunk_and_history_size_reach_the_solver(ls_chain):
-    """Chunk sets the L-BFGS round length that n_iter counts in."""
+def test_max_iter_and_history_size_reach_the_solver(ls_chain):
+    """max_iter caps the L-BFGS iterations the report counts."""
     obs = ls_chain["draw"](800, 3)
     rep = CausalFlowDAG(_ls_spec(), seed=0).fit_classical(
-        obs, max_iter=10, chunk=5, history_size=7, verbose=False
+        obs, max_iter=10, history_size=7, verbose=False
     )
-    assert rep["n_iter"] % 5 == 0
     assert 0 < rep["n_iter"] <= 10
+    assert rep["converged"] is False  # ten iterations cannot settle this fit
     with pytest.raises(TypeError):
         CausalFlowDAG(_ls_spec(), seed=0).fit_classical(obs, not_a_kwarg=1)
 

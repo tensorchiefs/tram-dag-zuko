@@ -40,29 +40,6 @@ from paper.helpers import (
 from paper.simulations.vaca import DO_X2_VALUES, VacaTriangle
 from tramdag import CI, SI, ContinuousNode
 
-# %% global variables ------------------------------------------------------------------
-CONFIG_KEYS = {
-    "n_train",
-    "transform",
-    "n_coeffs",
-    "intercept_units",
-    "activation",
-    "n_val",
-    "epochs",
-    "chunk_epochs",
-    "learning_rate",
-    "batch_size",
-    "polish_epochs",
-    "polish_learning_rate",
-    "dgp_seed",
-    "init_seed",
-    "shuffle_seed",
-    "sample_seed",
-    "n_compare",
-    "n_scatter",
-    "hist_bins",
-}
-
 
 # %% private functions -----------------------------------------------------------------
 def _marginal_panel(ax, observed, sampled, bins: int) -> None:
@@ -161,7 +138,7 @@ def plot_interventional(generator, flow, config, truth, path) -> dict:
 
 def run(variant: str) -> dict:
     """Run the benchmark end to end and give its metrics."""
-    config = load_variant(__file__, variant, CONFIG_KEYS)
+    config = load_variant(__file__, variant)
     out = make_output_dir(__file__, f"vaca-{variant}")
 
     generator = VacaTriangle(seed=config["dgp_seed"])

@@ -121,3 +121,10 @@ def test_ls_coefficients_omits_a_node_without_linear_shifts():
 
     spec = {"x1": ContinuousNode(), "x2": ContinuousNode([CS("x1")])}
     assert CausalFlowDAG(spec, seed=0).ls_coefficients() == {}
+
+
+def test_fit_rejects_a_batch_size_below_one():
+    """batch_size=0 used to reach range() and fail with a cryptic message."""
+    df = pd.DataFrame({"x1": np.zeros(8), "x2": np.zeros(8), "y": np.zeros(8)})
+    with pytest.raises(ValueError, match="batch_size must be at least 1"):
+        CausalFlowDAG(_spec(), seed=0).fit(df, epochs=1, batch_size=0)

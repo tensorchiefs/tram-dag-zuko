@@ -4,6 +4,9 @@
 
 ### Added
 
+- **`fit(batch_size=)` below 1 raises** with a plain message instead of
+  reaching `range()` with a cryptic one.
+
 - **A source node is canonical too.** `ContinuousNode()` and `OrdinalNode(k)`
   now hold `[SI()]` instead of `None`, so `node.terms[0]` really is always
   the intercept, `ContinuousNode() == ContinuousNode([SI()])`, and node
@@ -200,6 +203,18 @@
 
 ### Removed (breaking)
 
+- **`config_section(require=)` and the key-set check** — the loader picks
+  the section and nothing more; a script's YAML is the single source of its
+  numbers, and the check bought a second copy of every key list in code.
+- **`fit_classical(chunk=)`** — L-BFGS runs once with torch's own
+  `tolerance_change` (the `tol` argument, now 1e-9) instead of in
+  hand-rolled rounds with a relative NLL-flatness test; `n_iter` is torch's
+  count. Measured on the classical anchor: 1e-9 reproduces the old
+  convergence exactly (coefficients within 0.0027 of statsmodels), 1e-6
+  would stop on a plateau step.
+- **Two demo-notebook sections** — the misspecification excursion and the
+  GPU-vs-CPU race — so the demo stays the five-minute L1/L2/L3 walk.
+
 - **`tramdag.simulations` is no longer part of the package.** The SCM
   generators are research code and moved to `experiments/simulations/`,
   together with the frozen datasets (`data/` → `experiments/data/`). The
@@ -320,6 +335,9 @@
   entries.
 
 ### Changed (internal, no API surface)
+
+- `experiments/paper/helpers.py`: `fit_with_snapshots` became `fit_in_chunks`
+  — it takes the flow and the config instead of eight keyword arguments.
 
 - **Every complexity hotspot is dissolved into named stages** — `fit`
   (cognitive complexity 103 → 10), `validate_and_sort` (65 → 1),

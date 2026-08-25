@@ -1,7 +1,7 @@
 # Hyperparameters of the classical-MLE validation (validate_ls.py).
 #
 # Every value the script uses is in this file: it reads no defaults of its
-# own and rejects a variant whose keys do not match exactly.
+# own.
 
 cohort_and_model: &cohort_and_model
   cohort: magic-mrclean/ls   # frozen synthetic cohort with a known true effect

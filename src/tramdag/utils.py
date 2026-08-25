@@ -1,9 +1,8 @@
 """Helpers that are useful around a fit without being part of one.
 
 Two of them: :func:`config_section`, which picks a section out of an
-already-parsed configuration and refuses one whose keys are not exactly what
-the caller says it reads, and :func:`machine_info`, the environment snapshot
-``save`` stores with a model.
+already-parsed configuration, and :func:`machine_info`, the environment
+snapshot ``save`` stores with a model.
 
 Neither is about causal modelling, which is why they live together here
 rather than being spread through the modelling modules.
@@ -21,13 +20,12 @@ __all__ = ["config_section", "machine_info"]
 
 
 # %% public functions ------------------------------------------------------------------
-def config_section(document: dict, *keys: str, require: set[str] | None = None) -> dict:
-    """Pick a mapping out of a parsed configuration and check its keys.
+def config_section(document: dict, *keys: str) -> dict:
+    """Pick a mapping out of a parsed configuration.
 
     Parsing is the caller's job — pass whatever ``yaml.safe_load``,
-    ``json.load`` or ``tomllib.load`` returned. What this adds is the part
-    worth having in one place: a **missing** key can never become a hidden
-    default, and an **extra** key can never look effective.
+    ``json.load`` or ``tomllib.load`` returned. This descends through
+    ``keys`` and gives the mapping found there as a shallow copy.
 
     Parameters
     ----------
@@ -37,9 +35,6 @@ def config_section(document: dict, *keys: str, require: set[str] | None = None) 
         Keys to descend through before the mapping is returned, for example
         ``"variants", "atan-cs"`` for a document that groups several
         variants. Without any key the document itself is used.
-    require : set[str] | None, optional
-        The keys the caller reads. The mapping must carry exactly these.
-        Default ``None`` skips the check.
 
     Returns
     -------
@@ -52,18 +47,13 @@ def config_section(document: dict, *keys: str, require: set[str] | None = None) 
         If one of ``keys`` is not present. The message lists what is
         available at that level.
     ValueError
-        If a selected value is not a mapping, or if its keys do not match
-        ``require``.
+        If a selected value is not a mapping.
 
     Examples
     --------
     >>> document = {"variants": {"fast": {"epochs": 5, "lr": 0.01}}}
-    >>> config_section(document, "variants", "fast", require={"epochs", "lr"})
+    >>> config_section(document, "variants", "fast")
     {'epochs': 5, 'lr': 0.01}
-    >>> config_section(document, "variants", "fast", require={"epochs"})
-    Traceback (most recent call last):
-        ...
-    ValueError: variants -> fast: missing keys [], unknown keys ['lr']
     """
     node = document
     for depth, key in enumerate(keys):
@@ -85,13 +75,7 @@ def config_section(document: dict, *keys: str, require: set[str] | None = None) 
         # malformed config data, not a wrongly typed argument
         raise ValueError(f"{where} is {type(node).__name__}, not a mapping")  # noqa: TRY004
 
-    section = dict(node)
-    if require is not None:
-        missing = sorted(set(require) - set(section))
-        unknown = sorted(set(section) - set(require))
-        if missing or unknown:
-            raise ValueError(f"{where}: missing keys {missing}, unknown keys {unknown}")
-    return section
+    return dict(node)
 
 
 def machine_info() -> dict:
