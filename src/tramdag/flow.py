@@ -125,9 +125,11 @@ class _FitSchedule:
         plateau_factor: float,
         freeze_patience: int | None,
         min_delta: float,
+        min_lr: float | None = None,
     ):
         self.schedule = schedule
         self.lr = learning_rate
+        self.min_lr = learning_rate * 1e-3 if min_lr is None else min_lr
         self.patience = plateau_patience
         self.factor = plateau_factor
         self.freeze_patience = freeze_patience
@@ -152,7 +154,7 @@ class _FitSchedule:
                 and self.bad[name] > 0
                 and self.bad[name] % self.patience == 0
             ):
-                g["lr"] = max(g["lr"] * self.factor, self.lr * 1e-3)
+                g["lr"] = max(g["lr"] * self.factor, self.min_lr)
             # under "plateau", only freeze nodes whose lr has already been
             # decayed substantially — otherwise a node can freeze while a
             # smaller lr would still make progress toward the optimum
@@ -814,7 +816,9 @@ class CausalFlowDAG(nn.Module):
         marginal_init: bool = True,
         vc_warm_start: bool = True,
         plateau_factor: float = 0.3,
+        plateau_min_lr: float | None = None,
         vc_oof_fit: dict | None = None,
+        epoch_callback=None,
     ) -> CausalFlowDAG:
         """Fit all nodes jointly by maximum likelihood.
 
@@ -931,6 +935,11 @@ class CausalFlowDAG(nn.Module):
             validation curve: three 0.3 steps land near one 0.1 step, but a
             single spurious plateau costs a third of the rate instead of a
             tenth. Read only under ``schedule="plateau"``.
+        plateau_min_lr : float | None, optional
+            Absolute floor of the per-node learning rate under
+            ``schedule="plateau"``. ``None`` (default) keeps the floor at
+            ``1e-3 * learning_rate``; the paper's reference code uses an
+            absolute ``1e-7``.
         vc_oof_fit : dict | None, optional
             Keyword overrides for the stage-1 out-of-fold proxy fits of
             centered VC terms, merged over the default
@@ -941,6 +950,12 @@ class CausalFlowDAG(nn.Module):
             override them if stage 1 underfits.
             Ignored when the treatment node is all-``ls`` — the
             deterministic :meth:`fit_classical` runs instead.
+        epoch_callback : callable | None, optional
+            ``epoch_callback(flow, epoch)`` runs after every epoch, once the
+            validation pass, the schedules and the best-weight snapshot are
+            done. This is how an experiment reads out coefficient trajectories
+            from one continuous run, the way the reference's per-epoch Keras
+            loop does. ``epoch`` counts from 1.
 
         Returns
         -------
@@ -1007,6 +1022,7 @@ class CausalFlowDAG(nn.Module):
             plateau_factor,
             freeze_patience,
             min_delta,
+            plateau_min_lr,
         )
         t0 = time.perf_counter()
         t_offset = self.history["time"][-1] if self.history.get("time") else 0.0
@@ -1036,6 +1052,8 @@ class CausalFlowDAG(nn.Module):
                 t_start=(t0, t_offset),
             ):
                 break
+            if epoch_callback is not None:
+                epoch_callback(self, epoch + 1)
 
         if best is not None:  # restore per-node best-validation weights
             self._load_best_weights(best)

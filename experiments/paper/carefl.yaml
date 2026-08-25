@@ -1,46 +1,49 @@
 # Hyperparameters of the CAREFL counterfactual benchmark (carefl.py).
 #
-# Every value the script uses is in this file: it reads no defaults of its
-# own.
-
-# The paper says only "the same architecture and training procedure" as its
-# main experiments (App. C.2), with no numbers, so every value below is this
-# repository's choice, carried over unchanged from the pre-0.4 script.
-
-#   * the reference implementation's own CAREFL comparison
-#     (comparison/carefl_fig5.r) used M = 30, 7000 epochs and nTrain = 2500 —
-#     a different protocol from the one below, which comes from this
-#     repository's pre-0.4 script and is kept so the numbers stay comparable
-#     across the restructure.
-
-# The model architecture below IS the reference's: comparison/utils.R's
-# make_model, one net per node, dense(10, tanh) -> dense(100, tanh) ->
-# dense(len_theta). The training protocol is not, as noted above.
+# Every value the script uses is in this file; it reads no defaults of its own.
+#
+# Protocol = the reference implementation's own comparison run
+# (tensorchiefs/tram-dag, comparison/utils.R with carefl_fig5.r: EPOCHS = 7000), reproduced 1:1
+# where the framework allows:
+#   * nTrain = 2500, validation = a separate dgp(5000) draw;
+#   * one full-batch gradient step per epoch (train_step: one apply_gradients
+#     over all rows), 7000 epochs, Adam at lr 0.001;
+#   * update_learning_rate: ReduceLROnPlateau on the summed validation NLL,
+#     factor 0.1, patience 50, min_lr 1e-7, no min_delta (strict <);
+#   * make_model: one net per node, dense(10, tanh) -> dense(100, tanh) ->
+#     dense(len_theta), M = 30 so len_theta = 31; final weights, no early stop.
+# Known deviations, all framework-level and documented in CLAUDE.md: the
+# plateau rule decays each node on its own validation NLL (the reference
+# decays one optimizer on the sum); the transform is pre-scaled from the train
+# 5%/95% quantiles instead of min-max to [0, 1]; the intercept net's output
+# layer has no bias (Keras dense has one); torch init and Adam eps 1e-8 vs
+# Keras glorot and 1e-7; the reference seeded R's RNG, so every seed below is
+# a repo choice.
 #
 variants:
-  # all conditionals complex intercepts; the Laplace noise is additive, so
-  # the counterfactual truth is analytic and the errors below are exact
+  # all conditionals complex intercepts
   flexible:
-    n_train: 18000
-    n_val: 2000
-    epochs: 300
-    learning_rate: 0.01
-    batch_size: 512
-    transform: bernstein        # stated rather than inherited
-    # from the reference comparison script: M = 30, len_theta = M + 1 = 31
-    # unconstrained coefficients. zuko ties two extra control points onto
-    # those to smooth the extrapolation, so the polynomial is order 32 where
-    # the reference's is order 30; the free-parameter count is what matches.
+    n_train: 2500               # nTrain
+    n_val: 5000                 # val = dgp(5000)
+    epochs: 7000
+    learning_rate: 0.001
+    batch_size: 2500            # = n_train: one full-batch step per epoch
+    marginal_init: false        # the reference has no calibrated start
+    schedule: plateau           # update_learning_rate
+    plateau_patience: 50
+    plateau_factor: 0.1
+    plateau_min_lr: 1.0e-7
+    min_delta: 0.0
+    transform: bernstein
+    # M = 30, len_theta = M + 1 = 31 unconstrained coefficients; zuko ties two
+    # extra control points on (order 32 against the reference's 30); the
+    # free-parameter count is what matches
     n_coeffs: 31
     intercept_units: [10, 100]  # make_model's two dense layers
     activation: tanh            # make_model's activation
-    chunk_epochs: 50            # each fit call restarts Adam: a warm-restart
-                                # schedule, and it matters (see helpers.py)
-    polish_epochs: 100          # second phase at a lower rate
-    polish_learning_rate: 0.001
-    dgp_seed: 42                # repo choice: the reference read CAREFL's X.csv
-    init_seed: 7                # flow weight initialization
-    shuffle_seed: 0             # minibatch shuffling
+    dgp_seed: 42                # repo choice
+    init_seed: 7                # repo choice
+    shuffle_seed: 0             # repo choice (full batch: no shuffling effect)
     n_heldout: 300              # typical rows scored next to the single x_obs
     heldout_seed: 999           # seed offset of the held-out draw
     alphas_scored: [-1.5, 0.0, 1.5]

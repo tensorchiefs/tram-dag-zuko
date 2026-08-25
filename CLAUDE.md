@@ -127,9 +127,17 @@ Framework tests (inline DGPs, `tests/conftest.py`):
 
 Experiments (`experiments/`, seed 42 unless stated, arXiv:2503.16206). The
 paper states only four training numbers — n=40000, 500 epochs, Adam lr 1e-3,
-Bernstein order 20 — and the triangle configs match them; batch size, the
-90/10 split, the chunk size, the VACA/CAREFL protocols and every seed are
-repo choices, labelled as such in each YAML.
+Bernstein order 20. The configs follow the paper's own R code 1:1 where the
+framework allows: the triangle scripts train one continuous Adam run at Keras'
+default batch size 32 with a separate validation draw (40k / 10k mixed) and
+read the coefficients after every epoch (`fit(epoch_callback=)`); the
+VACA/CAREFL comparisons take one full-batch step per epoch on nTrain = 2500
+for 10000 / 7000 epochs with the reference's ReduceLROnPlateau (factor 0.1,
+patience 50, min_lr 1e-7) on a separate 5000-row validation draw. Every
+seed is a repo choice (the R scripts run unseeded or on R's RNG). Known,
+documented deviations: 5%/95% quantile pre-scaling instead of min-max,
+torch init instead of Keras glorot, per-node instead of global plateau, a
+bias-free intercept output layer, `marginal_init: false` in every config.
 
 **Each config takes its architecture from *its own* reference script**, and the
 reference uses two different ones. The triangle experiments

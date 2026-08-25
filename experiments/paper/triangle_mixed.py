@@ -36,15 +36,14 @@ from common import (
 from paper.helpers import (
     cs_curve,
     finish,
-    fit_with_snapshots,
+    fit_paper,
     ls_weight,
     plot_cs_curve,
     plot_hist_grid,
     plot_trajectories,
-    split_train_val,
 )
 from paper.simulations.triangle import TriangleMixed
-from tramdag import CS, LS, SI, ContinuousNode, OrdinalNode
+from tramdag import CS, LS, SI, CausalFlowDAG, ContinuousNode, OrdinalNode
 
 
 # %% public functions ------------------------------------------------------------------
@@ -228,24 +227,18 @@ def run(variant: str) -> dict:
     figures = []
 
     generator = TriangleMixed(f=config["f"], seed=config["dgp_seed"])
-    sample = generator.observational(config["n_train"] + config["n_val"])
-    train, val = split_train_val(sample, config["n_train"], config["n_val"])
+    train = generator.observational(config["n_train"])
+    val = generator.observational(
+        config["n_val"], seed_offset=1
+    )  # separate draw, as in R
 
     print(
         f"fitting triangle-mixed/{config['f']} with a {config['shift']} shift "
         f"on n={len(train)} for {config['epochs']} epochs ..."
     )
-    flow, trajectory = fit_with_snapshots(
-        build_spec(config),
-        train,
-        val,
-        epochs=config["epochs"],
-        learning_rate=config["learning_rate"],
-        batch_size=config["batch_size"],
-        init_seed=config["init_seed"],
-        shuffle_seed=config["shuffle_seed"],
-        chunk_epochs=config["chunk_epochs"],
-        record=lambda flow: snapshot(flow, config["shift"]),
+    flow = CausalFlowDAG(build_spec(config), seed=config["init_seed"])
+    trajectory = fit_paper(
+        flow, train, val, config, record=lambda flow: snapshot(flow, config["shift"])
     )
     flow.save(out / "flow.pt")
 

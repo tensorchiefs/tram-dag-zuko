@@ -16,7 +16,6 @@ mpl.use("Agg")  # headless: the scripts only write files
 
 import matplotlib.pyplot as plt
 import numpy as np
-import pandas as pd
 import torch
 
 from tramdag import CausalFlowDAG
@@ -51,52 +50,46 @@ def _continuous_hist(ax, dgp_values, flow_values) -> None:
 
 # %% public functions ------------------------------------------------------------------
 # ------------------------------------------------------------------ fitting
-def split_train_val(df: pd.DataFrame, n_train: int, n_val: int) -> tuple:
-    """Split positionally: the first rows train, the next ones validate.
+def fit_paper(flow: CausalFlowDAG, train, val, config: dict, record=None) -> list:
+    """Fit the way the paper's R code does: one run, one optimizer, per-epoch read-out.
 
-    The split is positional, not random: the generators draw i.i.d. rows,
-    so the first rows are already an unbiased sample, and a positional
-    split keeps a run reproducible from the seed alone.
+    ``summerof24/*.R`` calls Keras ``fit(epochs = 1)`` in a loop over one
+    compiled model and reads the ``beta`` layer after every epoch, so the
+    trajectory comes from a single continuous Adam run; ``comparison/utils.R``
+    takes one full-batch step per epoch with a ReduceLROnPlateau on the
+    validation NLL. Both are one ``fit`` call here: ``epoch_callback`` is the
+    per-epoch read-out, and ``schedule``/``plateau_*`` carry the plateau rule.
 
-    Raises
-    ------
-    ValueError
-        If the frame has fewer than ``n_train + n_val`` rows.
-    """
-    if len(df) < n_train + n_val:
-        raise ValueError(f"need {n_train} + {n_val} rows, the sample has {len(df)}")
-    return df.iloc[:n_train], df.iloc[n_train : n_train + n_val]
-
-
-def fit_in_chunks(flow: CausalFlowDAG, train, val, config: dict, record=None) -> list:
-    """Fit in rounds of ``config["chunk_epochs"]`` epochs; snapshot between them.
-
-    Every ``fit`` call starts a fresh Adam, so the chunk size is a
-    **hyperparameter** (a warm-restart schedule), not a reporting detail:
-    on the VACA benchmark, 8 chunks of 50 reach an interventional mean 20x
-    closer to the analytic value than one call of 400. The rounds share one
-    shuffle stream (``config["shuffle_seed"]`` seeds the first).
-
-    ``record(flow)``, when given, is stored after each round with the epoch
-    count; this is what draws the coefficient trajectories of paper Fig. 14,
-    15 and 19.
+    ``record(flow)``, when given, is stored after each epoch with the epoch
+    count — the coefficient trajectories of paper Fig. 14, 15 and 19.
     """
     trajectory = []
-    done = 0
-    while done < config["epochs"]:
-        this_round = min(config["chunk_epochs"], config["epochs"] - done)
-        flow.fit(
-            train,
-            val,
-            epochs=this_round,
-            learning_rate=config["learning_rate"],
-            batch_size=config["batch_size"],
-            verbose=0,
-            seed=config["shuffle_seed"] if done == 0 else None,
-        )
-        done += this_round
-        if record is not None:
-            trajectory.append({"epoch": done, **record(flow)})
+    flow.fit(
+        train,
+        val,
+        epochs=config["epochs"],
+        learning_rate=config["learning_rate"],
+        batch_size=config["batch_size"],
+        seed=config["shuffle_seed"],
+        marginal_init=config["marginal_init"],
+        schedule=config["schedule"],
+        **(
+            {
+                "plateau_patience": config["plateau_patience"],
+                "plateau_factor": config["plateau_factor"],
+                "plateau_min_lr": config["plateau_min_lr"],
+                "min_delta": config["min_delta"],
+            }
+            if config["schedule"] == "plateau"
+            else {}
+        ),
+        verbose=0,
+        epoch_callback=(
+            None
+            if record is None
+            else lambda f, e: trajectory.append({"epoch": e, **record(f)})
+        ),
+    )
     return trajectory
 
 

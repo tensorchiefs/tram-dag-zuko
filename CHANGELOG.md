@@ -4,6 +4,11 @@
 
 ### Added
 
+- **`fit(epoch_callback=)`** — `callback(flow, epoch)` after every epoch, so an
+  experiment reads coefficient trajectories out of one continuous run the way
+  the reference's per-epoch Keras loop does; **`fit(plateau_min_lr=)`** — an
+  absolute learning-rate floor for `schedule="plateau"` (the reference uses
+  1e-7; the default stays `1e-3 * learning_rate`).
 - **`density(df, node, grid, do=)`** — the analytic conditional density of a
   continuous node on a grid, the continuous counterpart of `pmf`; closed
   form from the transform, no sampling. Pinned against `exp(log_prob)` at
@@ -285,6 +290,15 @@
 
 ### Changed (breaking)
 
+- **The paper replications follow the paper's R code 1:1.** Triangle: one
+  Adam run at lr 0.001, Keras' default batch size 32, 500 epochs, a separate
+  validation draw, coefficients read every epoch. VACA/CAREFL: nTrain 2500,
+  one full-batch step per epoch, 10000 / 7000 epochs, ReduceLROnPlateau
+  (0.1 / 50 / 1e-7) on a separate 5000-row draw. Gone: the 90/10 split,
+  `chunk_epochs` (fresh Adam per chunk — a warm-restart schedule the
+  reference never had), the `polish_*` phase, `fit_in_chunks`. Every
+  ground-truth file is re-pinned from these runs; the deviations that
+  remain are framework-level and listed in each YAML and CLAUDE.md.
 - **`fit(marginal_init=)` defaults to `True`.** Every unconditional
   intercept starts at its marginal (Bernstein: the linear map onto the
   latent 5%/95% quantiles; ordinal: the empirical class log-odds) instead

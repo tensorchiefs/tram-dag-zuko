@@ -35,12 +35,11 @@ from common import (
 
 from paper.helpers import (
     cs_curve,
-    fit_in_chunks,
+    fit_paper,
     ls_weight,
     plot_cs_curve,
     plot_hist_grid,
     plot_trajectories,
-    split_train_val,
 )
 from paper.simulations.triangle import TriangleContinuous
 from tramdag import CS, LS, SI, CausalFlowDAG, ContinuousNode
@@ -106,8 +105,10 @@ def run(variant: str) -> dict:
     figures = []
 
     generator = TriangleContinuous(f=config["f"], seed=config["dgp_seed"])
-    sample = generator.observational(config["n_train"] + config["n_val"])
-    train, val = split_train_val(sample, config["n_train"], config["n_val"])
+    train = generator.observational(config["n_train"])
+    val = generator.observational(
+        config["n_val"], seed_offset=1
+    )  # separate draw, as in R
 
     print(
         f"fitting triangle/{config['f']} with a {config['shift']} shift on "
@@ -115,7 +116,7 @@ def run(variant: str) -> dict:
         f"at lr {config['learning_rate']:g} ..."
     )
     flow = CausalFlowDAG(build_spec(config), seed=config["init_seed"])
-    trajectory = fit_in_chunks(
+    trajectory = fit_paper(
         flow, train, val, config, record=lambda flow: snapshot(flow, config["shift"])
     )
     flow.save(out / "flow.pt")

@@ -1,44 +1,46 @@
 # Hyperparameters of the mixed-data triangle replication (triangle_mixed.py).
 #
-# Every value the script uses is in this file: it reads no defaults of its
-# own.
-
-# Provenance, from two sources:
-#   * the paper states 40000 samples, 500 epochs and Adam at lr 0.001 in its
-#     App. C.3 preamble (C.4 repeats the sample size and the 500-epoch
-#     figures but states no learning rate);
-#   * the paper's own implementation
-#     (tensorchiefs/tram-dag, summerof24/triangle_structured_mixed.R) adds
-#     hidden_features_CS = c(2, 2, 2, 2), sigmoid activations, len_theta = 20,
-#     and the ordinal cutpoints theta_k = c(-2, 0.42, 1.02) that this
-#     repository's generator reproduces exactly.
-# The batch size, the split, the chunk size and the seeds are this
-# repository's choices.
+# Every value the script uses is in this file; it reads no defaults of its own.
+#
+# Protocol = the paper's own code, summerof24/triangle_structured_mixed.R
+# (tensorchiefs/tram-dag), reproduced 1:1 where the framework allows:
+#   * train = dgp(40000), test = dgp(10000): two separate draws, no split;
+#   * 500 epochs, optimizer_adam() = Keras Adam at lr 0.001, Keras fit() with
+#     its default batch size 32, shuffled; one compiled model, so one
+#     continuous optimizer run — the coefficients are read after every epoch;
+#   * len_theta = 20, hidden_features_I = hidden_features_CS = c(2, 2, 2, 2), ordinal cutpoints
+#     theta_k = c(-2, 0.42, 1.02) that this repository's generator reproduces,
+#     sigmoid activations (create_param_net; its ReLU line is commented out);
+#   * no learning-rate schedule, no early stopping, final weights.
+# Known deviations, all framework-level and documented in CLAUDE.md: the
+# transform is pre-scaled from the train 5%/95% quantiles instead of the
+# reference's min-max scaling; weights start from torch's default init, not
+# Keras glorot (marginal_init is off, as the reference has no calibrated
+# start); the R script runs unseeded, so every seed below is a repo choice.
 
 paper_protocol: &paper_protocol
-  # from the paper: n = 40000 (split 90/10 below), 500 epochs, Adam at lr 1e-3
-  n_train: 36000
-  n_val: 4000
-  epochs: 500
-  learning_rate: 0.001
-  batch_size: 512
-  chunk_epochs: 10        # epochs per fit call; snapshots ride on the boundaries
-  # the continuous nodes' transform, stated rather than inherited
-  transform: bernstein    # from the paper: Bernstein polynomials
-  # from the reference: len_theta = 20 unconstrained coefficients. zuko ties
-  # two more control points on to smooth the extrapolation (order 21 here
-  # against the reference's 19); the free-parameter count is what matches.
+  n_train: 40000          # dgp(40000)
+  n_val: 10000            # test = dgp(10000), a separate draw
+  epochs: 500             # num_epochs
+  learning_rate: 0.001    # optimizer_adam() default
+  batch_size: 32          # Keras fit() default
+  marginal_init: false    # the reference has no calibrated start
+  schedule:               # the reference has no schedule
+  transform: bernstein
+  # len_theta = 20 unconstrained coefficients; zuko ties two more control
+  # points on (order 21 against the reference's 19); the free-parameter count
+  # is what matches
   n_coeffs: 20
-  dgp_seed: 42            # repo choice: a numpy seed cannot reproduce the R stream
-  init_seed: 7            # flow weight initialization
-  shuffle_seed: 0         # minibatch shuffling
+  dgp_seed: 42            # repo choice: the R script runs unseeded
+  init_seed: 7            # repo choice
+  shuffle_seed: 0         # repo choice
   sample_seed: 0          # sampling for the distribution comparisons
   n_compare: 10000        # rows per distribution panel (Fig. 9/20)
   do_x1: -1.0             # the paper's L2 query, do(x1 = -1)
-  levels: 4               # ordinal levels of x3, stored 0..3
   grid_low: -1.0          # x2 grid of the complex-shift overlay
   grid_high: 1.0
   grid_points: 81
+  levels: 4               # ordinal levels of x3, stored 0..3
   odds_ratio_threshold: -1.0   # the App. C.4 check looks at odds(x2 <= -1)
   odds_ratio_n: 40000          # rows of the shared-latent DGP comparison
   odds_ratio_seed: 99
@@ -46,11 +48,10 @@ paper_protocol: &paper_protocol
   cf_draws: 200                # abduction draws averaged into a per-row PMF
   cf_seed: 1000
 
-# the shift network, from the reference implementation; only a complex-shift
-# variant has one, so these keys appear only there
+# the shift network, from the reference; only a complex-shift variant has one
 reference_net: &reference_net
-  shift_units: [2, 2, 2, 2]     # hidden_features_CS in the reference
-  activation: sigmoid           # create_param_net's activation
+  shift_units: [2, 2, 2, 2]     # hidden_features_CS
+  activation: sigmoid           # create_param_net
 
 variants:
   # the paper's headline mixed case (Fig. 9/19 + the C.4 odds-ratio check);

@@ -34,8 +34,7 @@ from common import (
 
 from paper.helpers import (
     finish,
-    fit_in_chunks,
-    split_train_val,
+    fit_paper,
 )
 from paper.simulations.carefl import ALPHA_GRID, X_OBS, Carefl4
 from tramdag import CI, SI, CausalFlowDAG, ContinuousNode
@@ -128,24 +127,17 @@ def run(variant: str) -> dict:
     out = make_output_dir(__file__, f"carefl-{variant}")
 
     generator = Carefl4(seed=config["dgp_seed"])
-    sample = generator.observational(config["n_train"] + config["n_val"])
-    train, val = split_train_val(sample, config["n_train"], config["n_val"])
+    train = generator.observational(config["n_train"])
+    val = generator.observational(
+        config["n_val"], seed_offset=1
+    )  # separate draw, as in R
 
     print(
         f"fitting the flexible flow on the CAREFL SCM, n={len(train)}: "
-        f"{config['epochs']} epochs at lr {config['learning_rate']:g}, then "
-        f"{config['polish_epochs']} at lr {config['polish_learning_rate']:g} ..."
+        f"{config['epochs']} full-batch epochs at lr {config['learning_rate']:g} ..."
     )
     flow = CausalFlowDAG(build_spec(config), seed=config["init_seed"])
-    fit_in_chunks(flow, train, val, config)
-    flow.fit(
-        train,
-        val,
-        epochs=config["polish_epochs"],
-        learning_rate=config["polish_learning_rate"],
-        batch_size=config["batch_size"],
-        verbose=0,
-    )
+    fit_paper(flow, train, val, config)
     flow.save(out / "flow.pt")
 
     paper_latents = flow.abduct(pd.DataFrame([X_OBS]))

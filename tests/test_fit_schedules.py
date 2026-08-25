@@ -158,3 +158,34 @@ def test_plateau_factor_sets_the_decay_step(ls_chain):
             flow.history["lr"],
             expected,
         )
+
+
+def test_epoch_callback_runs_once_per_epoch_with_the_flow(ls_chain):
+    """The callback sees the live flow after each epoch, epochs counted from 1."""
+    df = ls_chain["draw"](200, 0)[["x1", "x2"]]
+    spec = {"x1": ContinuousNode(), "x2": ContinuousNode([LS("x1")])}
+    seen = []
+    flow = CausalFlowDAG(spec, seed=0)
+    flow.fit(
+        df, epochs=3, verbose=0, epoch_callback=lambda f, e: seen.append((f is flow, e))
+    )
+    assert seen == [(True, 1), (True, 2), (True, 3)]
+
+
+def test_plateau_min_lr_is_an_absolute_floor(ls_chain):
+    """With patience 1 and min_delta huge, every epoch decays; the floor holds."""
+    df = ls_chain["draw"](200, 0)[["x1", "x2"]]
+    spec = {"x1": ContinuousNode(), "x2": ContinuousNode([LS("x1")])}
+    flow = CausalFlowDAG(spec, seed=0)
+    flow.fit(
+        df,
+        epochs=6,
+        learning_rate=1e-2,
+        verbose=0,
+        schedule="plateau",
+        plateau_patience=1,
+        plateau_factor=0.1,
+        plateau_min_lr=1e-4,
+        min_delta=1e9,
+    )
+    assert min(flow.history["lr"]) == pytest.approx(1e-4)

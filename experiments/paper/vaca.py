@@ -33,12 +33,11 @@ from common import (
 
 from paper.helpers import (
     finish,
-    fit_with_snapshots,
+    fit_paper,
     hist_overlay,
-    split_train_val,
 )
 from paper.simulations.vaca import DO_X2_VALUES, VacaTriangle
-from tramdag import CI, SI, ContinuousNode
+from tramdag import CI, SI, CausalFlowDAG, ContinuousNode
 
 
 # %% private functions -----------------------------------------------------------------
@@ -142,40 +141,23 @@ def run(variant: str) -> dict:
     out = make_output_dir(__file__, f"vaca-{variant}")
 
     generator = VacaTriangle(seed=config["dgp_seed"])
-    sample = generator.observational(config["n_train"] + config["n_val"])
-    train, val = split_train_val(sample, config["n_train"], config["n_val"])
+    train = generator.observational(config["n_train"])
+    val = generator.observational(
+        config["n_val"], seed_offset=1
+    )  # separate draw, as in R
     truth = generator.true_moments(mc_n=config["n_compare"])
 
     print(
         f"fitting the flexible flow on the VACA triangle, n={len(train)}: "
-        f"{config['epochs']} epochs at lr {config['learning_rate']:g}, then "
-        f"{config['polish_epochs']} at lr {config['polish_learning_rate']:g} ..."
+        f"{config['epochs']} full-batch epochs at lr {config['learning_rate']:g} ..."
     )
-    flow, _ = fit_with_snapshots(
-        build_spec(config),
-        train,
-        val,
-        epochs=config["epochs"],
-        learning_rate=config["learning_rate"],
-        batch_size=config["batch_size"],
-        chunk_epochs=config["chunk_epochs"],
-        init_seed=config["init_seed"],
-        shuffle_seed=config["shuffle_seed"],
-    )
-    # a short low-rate phase settles the intercepts the bimodal source needs
-    flow.fit(
-        train,
-        val,
-        epochs=config["polish_epochs"],
-        learning_rate=config["polish_learning_rate"],
-        batch_size=config["batch_size"],
-        verbose=0,
-    )
+    flow = CausalFlowDAG(build_spec(config), seed=config["init_seed"])
+    fit_paper(flow, train, val, config)
     flow.save(out / "flow.pt")
 
-    sampled = flow.sample(len(sample), seed=config["sample_seed"])
+    sampled = flow.sample(len(train), seed=config["sample_seed"])
     plot_pairs(
-        sample,
+        train,
         sampled,
         ["x1", "x2", "x3"],
         config["hist_bins"],
@@ -190,7 +172,7 @@ def run(variant: str) -> dict:
         )
     )
     # L1: does the flow reproduce the bimodal source marginal?
-    metrics["std_x1_dgp"] = float(sample["x1"].std())
+    metrics["std_x1_dgp"] = float(train["x1"].std())
     metrics["std_x1_flow"] = float(sampled["x1"].std())
 
     save_metrics(out, metrics)

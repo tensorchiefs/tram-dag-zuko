@@ -1,38 +1,38 @@
 # Hyperparameters of the continuous-triangle replication (triangle.py).
 #
-# Every value the script uses is in this file. It reads no defaults of its own,
-# so nothing is silently inherited from the framework.
+# Every value the script uses is in this file; it reads no defaults of its own.
 #
-# Provenance, from two sources:
-#   * the paper (App. C.3 preamble) states 40000 samples, 500 epochs, Adam at
-#     lr 0.001 and Bernstein order M = 20;
-#   * the paper's own implementation
-#     (tensorchiefs/tram-dag, summerof24/triangle_structured_continous.R) adds
-#     hidden_features_CS = c(2, 25, 25, 2) and, in create_param_net, sigmoid
-#     activations — its ReLU line is commented out.
-# Everything else — the batch size, the 90/10 split, the chunk size and every
-# seed — is this repository's choice, carried over from the pre-0.4 scripts so
-# the numbers stay comparable.
+# Protocol = the paper's own code, summerof24/triangle_structured_continous.R
+# (tensorchiefs/tram-dag), reproduced 1:1 where the framework allows:
+#   * train = dgp(40000), test = dgp(40000): two separate draws, no split;
+#   * 500 epochs, optimizer_adam() = Keras Adam at lr 0.001, Keras fit() with
+#     its default batch size 32, shuffled; one compiled model, so one
+#     continuous optimizer run — the coefficients are read after every epoch;
+#   * len_theta = 20, hidden_features_I = hidden_features_CS = c(2, 25, 25, 2),
+#     sigmoid activations (create_param_net; its ReLU line is commented out);
+#   * no learning-rate schedule, no early stopping, final weights.
+# Known deviations, all framework-level and documented in CLAUDE.md: the
+# transform is pre-scaled from the train 5%/95% quantiles instead of the
+# reference's min-max scaling; weights start from torch's default init, not
+# Keras glorot (marginal_init is off, as the reference has no calibrated
+# start); the R script runs unseeded, so every seed below is a repo choice.
 
 paper_protocol: &paper_protocol
-  # from the paper: n = 40000 (split 90/10 below), 500 epochs, Adam at lr 1e-3
-  n_train: 36000
-  n_val: 4000
-  epochs: 500
-  learning_rate: 0.001
-  batch_size: 512
-  chunk_epochs: 10        # epochs per fit call; snapshots ride on the boundaries
-  # the monotone transform, stated rather than inherited
-  transform: bernstein    # from the paper: Bernstein polynomials
-  # from the reference: len_theta = 20 "Number of coefficients of the
-  # Bernstein polynomials". These are the unconstrained coefficients; zuko
-  # ties two more control points onto them to smooth the extrapolation, so
-  # this polynomial is order 21 where the reference's is order 19 and the
-  # paper's text says 20. The free-parameter count is what matches.
+  n_train: 40000          # dgp(40000)
+  n_val: 40000            # test = dgp(40000), a separate draw
+  epochs: 500             # num_epochs
+  learning_rate: 0.001    # optimizer_adam() default
+  batch_size: 32          # Keras fit() default
+  marginal_init: false    # the reference has no calibrated start
+  schedule:               # the reference has no schedule
+  transform: bernstein
+  # len_theta = 20 unconstrained coefficients; zuko ties two more control
+  # points on (order 21 against the reference's 19); the free-parameter count
+  # is what matches
   n_coeffs: 20
-  dgp_seed: 42            # repo choice: a numpy seed cannot reproduce the R stream
-  init_seed: 7            # flow weight initialization
-  shuffle_seed: 0         # minibatch shuffling
+  dgp_seed: 42            # repo choice: the R script runs unseeded
+  init_seed: 7            # repo choice
+  shuffle_seed: 0         # repo choice
   sample_seed: 0          # sampling for the distribution comparisons
   n_compare: 10000        # rows per distribution panel (Fig. 16/17)
   do_x1: -1.0             # the paper's L2 query, do(x1 = -1)
@@ -40,12 +40,10 @@ paper_protocol: &paper_protocol
   grid_high: 1.0
   grid_points: 81
 
-# the shift network, from the reference implementation. Only a complex-shift
-# variant has a network, so these keys appear only there — an ls variant that
-# carried them would be claiming a setting it never uses.
+# the shift network, from the reference; only a complex-shift variant has one
 reference_net: &reference_net
-  shift_units: [2, 25, 25, 2]   # hidden_features_CS in the reference
-  activation: sigmoid           # create_param_net's activation
+  shift_units: [2, 25, 25, 2]   # hidden_features_CS
+  activation: sigmoid           # create_param_net
 
 variants:
   # the linear DGP is the only one with a true beta23 (+0.3) to recover
