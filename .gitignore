@@ -45,3 +45,4 @@ REVIEW.md
 
 # emacs lock files
 .#*
+site/
