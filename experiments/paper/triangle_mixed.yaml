@@ -33,6 +33,7 @@ paper_protocol: &paper_protocol
   n_coeffs: 20
   dgp_seed: 42
   init_seed: 7
+  net_input_scaling:          # the triangle scripts feed the nets raw parents
   shuffle_seed: 0
   sample_seed: 0          # sampling for the distribution comparisons
   n_compare: 10000        # rows per distribution panel (Fig. 9/20)

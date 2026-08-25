@@ -76,7 +76,7 @@ See `experiments/README.md`.
 - `utils.py` — the non-modelling helpers, with no module-level imports:
   `config_section` (pick a section out of an already-parsed config — parsing
   stays with the caller, so the package needs no config parser) and
-  `machine_info` (the environment snapshot `save` stores; was `env.py`).
+  `machine_info` (the environment snapshot `save` stores).
 - `flow.py` — `CausalFlowDAG`: `fit`, `fit_classical` (float64 full-batch
   L-BFGS, exact MLE for all-`ls` specs), `sample(n, do=, u=)`, `abduct`, `pmf`,
   `density` (its continuous counterpart, on a grid),
@@ -90,7 +90,10 @@ See `experiments/README.md`.
 - **Latent scale**: continuous `z = h(x) + shift` (shifts ADDED); ordinal
   `P(Y<=k) = sigmoid(theta_k − shift)` (shift SUBTRACTED). Both follow the original TRAM-DAG
   conventions; tests pin them.
-- **Parent encoding**: continuous parents enter RAW (no standardization); ordinal
+- **Parent encoding**: continuous parents enter RAW (no standardization) unless
+  `CausalFlowDAG(spec, net_input_scaling="minmax")`, which feeds the *networks*
+  (CI/CS/VC modifiers) the train min-max scaled parent like the reference's
+  `scale_df` — LS and the VC treatment stay raw either way; ordinal
   parents one-hot (all levels). With cutpoints, only shift *differences* between
   one-hot levels are identified — compare `w[k] − w[0]` against classical references.
 - **Ordinal log-prob is computed in log-space** (`logsigmoid` + stable `log1mexp`,
@@ -137,7 +140,12 @@ patience 50, min_lr 1e-7) on a separate 5000-row validation draw. Every
 seed is a repo choice (the R scripts run unseeded or on R's RNG). Known,
 documented deviations: 5%/95% quantile pre-scaling instead of min-max,
 torch init instead of Keras glorot, per-node instead of global plateau, a
-bias-free intercept output layer, `marginal_init: false` in every config.
+bias-free intercept output layer, `marginal_init=False` hard-coded in
+`helpers.py::fit_paper` (`validate_ls` keeps the default).
+The reference's `scale_df` (everything min-max scaled to [0,1] in the
+comparison scripts) is matched where it matters: `net_input_scaling: minmax`
+feeds the VACA/CAREFL tanh nets scaled parents (raw parents saturate them —
+`do(x2=-3)` error 0.731 → 0.026); the triangle scripts fit `df_orig`, raw.
 
 **Each config takes its architecture from *its own* reference script**, and the
 reference uses two different ones. The triangle experiments

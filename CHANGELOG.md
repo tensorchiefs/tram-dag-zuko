@@ -4,6 +4,16 @@
 
 ### Added
 
+- **`CausalFlowDAG(spec, net_input_scaling="minmax")`** — feeds every network
+  (complex intercept, complex shift, VC modifiers) its continuous parents
+  scaled to `[0, 1]` by the training min and max, the way the paper's
+  comparison scripts do (`comparison/utils.R::scale_df`); linear shifts and
+  the VC treatment stay raw, so `ls_coefficients` keep their units. Raw
+  parents saturate a tanh net whenever `|x| > 2` — 40% of the VACA rows —
+  which is why the VACA/CAREFL replications under the exact reference
+  protocol were 2–20× off the paper: `do(x2=-3)` error 0.731 → 0.026 with
+  the option on. Default off; calibrated at the first `fit`, stored in the
+  checkpoint.
 - **`fit(epoch_callback=)`** — `callback(flow, epoch)` after every epoch, so an
   experiment reads coefficient trajectories out of one continuous run the way
   the reference's per-epoch Keras loop does; **`fit(plateau_min_lr=)`** — an
@@ -77,7 +87,7 @@
   `fit(vc_oof_fit={...})` (settings of the stage-1 out-of-fold proxy fits
   behind `VC(center=True)`, default
   `{"epochs": 300, "learning_rate": 1e-2, "batch_size": 512}`), plus
-  `fit_classical(chunk=25, history_size=50)` (L-BFGS round length and
+  `fit_classical(history_size=50)` (L-BFGS
   memory). The plateau lr floor (`1e-3 * learning_rate`) and the freeze
   guard (`1e-2 * learning_rate`) are documented in the `fit` docstring.
 
@@ -225,14 +235,14 @@
   GPU-vs-CPU race — so the demo stays the five-minute L1/L2/L3 walk.
 
 - **`tramdag.simulations` is no longer part of the package.** The SCM
-  generators are research code and moved to `experiments/simulations/`,
-  together with the frozen datasets (`data/` → `experiments/data/`). The
+  generators are research code and moved to `experiments/paper/simulations/`,
+  together with the frozen datasets (`data/` → `experiments/paper/data/`). The
   wheel now contains framework code only, and `import tramdag.simulations`
   fails. The stroke storyline left with them: the `magic_mrclean` generator,
   the `magic-mrclean/nl` cohort, `sim_flow.py`, the `vc_shift` DGP,
   `experiments/stale/` and `docs/stroke-case-study.md` are deleted, and the
   clinical case study lives in its own repository.
-  `experiments/data/magic-mrclean/ls` stays as the frozen input of
+  `experiments/misc/data/magic-mrclean/ls` stays as the frozen input of
   `validate_ls`. **Everything deleted is recoverable at the
   `pre-experiments-cut` tag**: `git checkout pre-experiments-cut -- <path>`.
 
@@ -255,8 +265,8 @@
   place.
 
 - **All backward compatibility.** Pre-1.0, one API and one checkpoint
-  format: `term()` takes the current labels only (`"I"`, `"LS"`, `"CS"`,
-  `"VC"` — the lowercase `"ls"`/`"cs"`/`"ci"` aliases are gone), the two
+  format: the lowercase `"ls"`/`"cs"`/`"ci"` effect aliases are gone (a
+  checkpoint carries `"I"`, `"LS"`, `"CS"`, `"VC"`), the two
   0.3-checkpoint shims in `spec_from_dict` (the multi-`I` merge and the
   node-level-basis carry) are gone with the redundant node-level
   `transform`/`transform_kwargs` keys that fed them, VC terms read
@@ -274,10 +284,10 @@
   checkpoint loader. The terms argument itself is unchanged and still
   accepts its name: `ContinuousNode(terms=[...])` and
   `ContinuousNode([...])` are the same call.
-- The unmaintained notebooks and experiment scripts moved to
-  `notebooks/stale/` and `experiments/stale/`; the maintained set is
-  the intro and Colab demo notebooks plus `sim_flow.py` and
-  `validate_ls.py`.
+- The unmaintained notebooks and experiment scripts were first moved to
+  `notebooks/stale/` and `experiments/stale/`, then deleted in this same
+  release (see Removed); the maintained set is the intro and Colab demo
+  notebooks plus the `experiments/` tree.
 
 - **`term(effect, *parents)`** — the string-label term factory. It was a
   second, weaker way to build a term, its `VC` branch and `penalty=`
@@ -363,8 +373,9 @@
 
 ### Changed (internal, no API surface)
 
-- `experiments/paper/helpers.py`: `fit_with_snapshots` became `fit_in_chunks`
-  — it takes the flow and the config instead of eight keyword arguments.
+- `experiments/paper/helpers.py`: the per-epoch coefficient read-out is
+  `fit(epoch_callback=)` inside one `fit_paper(generator, spec, config, out,
+  record)` call — there is no chunked or snapshotting fit helper any more.
 
 - **Every complexity hotspot is dissolved into named stages** — `fit`
   (cognitive complexity 103 → 10), `validate_and_sort` (65 → 1),
@@ -435,7 +446,8 @@
   a heterogeneous-effect SCM and not the inert prognostic X1. Docs:
   `docs/scores.md`.
 
-- **`VC(on, *modifiers, penalty=)` — varying-coefficient shift term** (issue #28):
+- **`VC(*modifiers, t=, penalty=)` — varying-coefficient shift term** (issue #28;
+  first staged as `VC(on, *modifiers, penalty=)`, see Changed (breaking)):
   a treatment-effect head `beta(x) = beta0 + b_theta(x)` with a small (16-unit),
   **penalized**, zero-initialised network that only multiplies `x_on`, plus the
   first-class read-out `flow.varying_coef(node, data)` (closed-form,
@@ -448,15 +460,16 @@
   is *expressive but unestimated* — corr ≈ 0.5 against the true effect function
   even in-class (tramdag-simu#18/PR #21) because nothing in the NLL rewards a
   smooth arm-difference; the regularized head reaches ≈ 0.99 on the same task
-  class. New validation DGP `simulations/vc_shift.py` (`VCLogisticShift`,
-  frozen `data/vc-shift/`, registry `"vc-shift"`) with known
-  `beta_true = −1 + 0.8·X2 − 0.6·X3`; acceptance tests in `tests/test_vc_term.py`
+  class. Validation DGP with known `beta_true = −1 + 0.8·X2 − 0.6·X3` — the
+  inline `vc_hetero` DGP in `tests/conftest.py` (the earlier
+  `simulations/vc_shift.py` + frozen `data/vc-shift/` left with the stroke
+  storyline, see Removed); acceptance tests in `tests/test_vc_term.py`
   (recovery bar corr ≥ 0.9 at n = 5000, measured min-over-seeds 0.986). Docs:
   `docs/varying-coefficients.md`.
 
 - **`flow.intercept_contributions(node, data)`** (issue #20, Option A) — post-hoc,
   mean-centered decomposition of an **additive complex intercept**
-  (`[I("x1"), I("x2")]`). The per-term networks are summed in unconstrained
+  (`CI("x1", "x2", allow_interaction=False)`). The per-term networks are summed in unconstrained
   parameter space, so the sum is identified but each term's contribution only up to
   a constant; this returns each term's **sum-to-zero** (GAM-style mean-centered over
   `data`) contribution to the transform parameters plus the absorbed `baseline`, for

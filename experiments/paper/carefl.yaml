@@ -42,6 +42,7 @@ variants:
     activation: tanh            # make_model's activation
     dgp_seed: 42                # repo choice
     init_seed: 7                # repo choice
+    net_input_scaling: minmax   # comparison/utils.R::scale_df: parents scaled to [0, 1]
     shuffle_seed: 0             # full batch: the shuffle seed has no effect
     n_heldout: 300              # typical rows scored next to the single x_obs
     heldout_seed_offset: 999    # seed offset of the held-out draw

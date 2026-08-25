@@ -22,7 +22,7 @@ are the same object, so `LS is linear_shift`.
 | `OrdinalNode` | Ordinal variable with `levels` classes: ordered logit (cutpoints) plus shifts. |
 | `node_terms()` / `node_parents()` | Canonical term list / ordered de-duplicated parent names of a node. |
 | `validate_and_sort()` | Edge-ownership validation plus Kahn topological sort. The returned order makes the flow triangular. |
-| `spec_to_dict()` / `spec_from_dict()` | Checkpoint (de)serialization. A term serializes as `{effect, parents, options}` and nothing else, since `options` is already canonical. No compatibility shims, and `spec_from_dict` builds `Term` directly — so `validate_and_sort` is the only guard on that path. |
+| `spec_to_dict()` / `spec_from_dict()` | Checkpoint (de)serialization. A term serializes as `{effect, parents, options}` and nothing else, since `options` is already canonical. No compatibility shims: `spec_from_dict` rejects a term without `options`, the node constructors normalize the formula, and `validate_and_sort` checks the DAG. |
 | (`_normalize_terms`, `_as_term`, `_intercept_basis`, `_options`, `_OPTION_DEFAULTS`) | Formula flattening and per-entry validation (a `+` sum nested in a list is rejected), the one-parented-`I` rule plus basis hoisting in one pass, canonical option storage. |
 | (`_check_term`, `_check_node`, `_check_vc_term`, `_kahn_sort`) | The stages behind `validate_and_sort`: per-term validation (effect, LS arity, unknown parents), per-node edge-ownership bookkeeping, the VC-specific checks, and the topological sort. |
 
@@ -57,14 +57,14 @@ config in `experiments/paper/` states `units=` and `activation=` itself.
 | `LinearShift` | `LS` | `Linear(n, 1, bias=False)`. `.weight` is the interpretable coefficient; no bias because the intercept slot owns the constant. |
 | `ComplexShift` | `CS` | 64-128-64 ReLU MLP to one shift value. |
 | `VaryingCoef` | `VC` | `beta0 + b_theta(mods)` with a zero-initialized output layer and the L2 hook `l2()`. `beta()` evaluates the effect, `recenter()` re-splits `beta0`/`b_theta` after training (function-preserving). |
-| (`_mlp`) | — | The one MLP builder: a ReLU stack of the given `units`, then a bias-free output layer. |
+| (`_mlp`) | — | The one MLP builder: a stack of the given `units` with the term's `activation` (relu by default), then a bias-free output layer. |
 
 ## `flow.py` — the model
 
 | Name | Role |
 |---|---|
 | `CausalFlowDAG` | The flow: one `_Node` per variable in topological order. Construction seeds the weights (`seed=` is the reproducibility knob). |
-| `fit()` | Joint maximum likelihood with Adam, one parameter group per node (exact, because the NLL decomposes per node). Options: `schedule="plateau"` (per-node decay), per-node freezing, `restore_best`, `marginal_init`, `vc_warm_start`, `plateau_factor`, `vc_oof_fit`. A second call continues training. Progress goes to the `tramdag.flow` logger. |
+| `fit()` | Joint maximum likelihood with Adam, one parameter group per node (exact, because the NLL decomposes per node). Options: `schedule="plateau"` (per-node decay), per-node freezing, `restore_best`, `marginal_init`, `vc_warm_start`, `plateau_factor`, `plateau_min_lr`, `vc_oof_fit`, `epoch_callback`. A second call continues training. Progress goes to the `tramdag.flow` logger. |
 | `fit_classical()` | Float64 full-batch L-BFGS for all-`ls` specs: deterministic, exact MLE, matches `statsmodels`/R `polr`. Refuses flexible specs. |
 | `sample()` | Observational, interventional (`do=`, graph mutilation) and counterfactual (`u=`) sampling. |
 | `abduct()` | Pearl step 1: recover the latents. Continuous exactly, ordinal by truncated draw. |
@@ -129,9 +129,10 @@ default you can read at the call site. Nothing numeric is buried.
 | VC warm start | `fit(vc_warm_start=)` | True (classical `beta0` start) |
 | VC stage-1 proxy fits | `fit(vc_oof_fit=)` | `{"epochs": 300, "learning_rate": 1e-2, "batch_size": 512}` |
 | VC penalty and centering | `VC(penalty=, center=, center_folds=)` | 1.0 / False / 5 |
-| L-BFGS budget | `fit_classical(max_iter=, tol=, chunk=, history_size=)` | 400 / 1e-6 / 25 / 50 |
+| L-BFGS budget | `fit_classical(max_iter=, tol=, history_size=)` | 400 / 1e-9 (torch `tolerance_change`; `tolerance_grad` is off) / 50 — one full-batch run, no chunks |
 | training budget | `fit(epochs=)` | **required** — a fixed default is wrong in both directions ([training-speed](training-speed.md)) |
 | network widths | `units=` on `I`/`CS`/`VC` | (8, 8) / (64, 128, 64) — parity with the PyTorch reference's default classes; VC's (16,) has no counterpart there and comes from the recovery measurement |
 | activation | `activation=` on `I`/`CS`/`VC` | `"relu"` (the reference default classes); `"sigmoid"` and `"tanh"` are the paper's |
 | transform basis | `I(transform=, **kwargs)` (extra kwargs go to the transform class) | `"bernstein"`, `n_coeffs=20` unconstrained coefficients (zuko ties two more control points on, so order 21); spline `bins=8` = zuko's NSF default (the domain is fixed at [-5, 5], `transforms.BOUND`) |
 | shuffling / weight init | `fit(seed=)` / `CausalFlowDAG(seed=)` | init happens at construction — the constructor seed is the reproducibility knob |
+| network inputs | `CausalFlowDAG(net_input_scaling=)` | `None` (raw parents); `"minmax"` scales the continuous parents of every net (CI/CS/VC modifiers) to [0, 1] by the training min–max, the reference's `scale_df` — LS and the VC treatment stay raw |

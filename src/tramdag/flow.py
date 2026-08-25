@@ -212,11 +212,26 @@ class _Node(nn.Module):
         The full DAG specification. Needed for the parent feature widths.
     """
 
-    def __init__(self, node: NodeSpec, spec: dict[str, NodeSpec]):
+    def __init__(
+        self,
+        node: NodeSpec,
+        spec: dict[str, NodeSpec],
+        net_input_scaling: str | None = None,
+    ):
         super().__init__()
         self.kind = node.kind
         terms = node_terms(node)
         self.parents = tuple(node_parents(node))  # ordered parent names
+        self.continuous_parents = tuple(
+            p for p in self.parents if isinstance(spec[p], ContinuousNode)
+        )
+        # min-max of every continuous parent on the training rows, for the
+        # network inputs (net_input_scaling="minmax"); identity until fit
+        k = len(self.continuous_parents)
+        self.register_buffer("net_lo", torch.zeros(k))
+        self.register_buffer("net_hi", torch.ones(k))
+        self.net_input_scaling = net_input_scaling
+        self._net_scaled = False  # min-max taken from the first fit's rows
         i_term = next((t for t in terms if t.effect == "I" and t.parents), None)
         if i_term is None:
             i_groups = []
@@ -331,17 +346,48 @@ class _Node(nn.Module):
             t = t - vc_ehat[g.on].view(-1, 1)
         return t
 
+    def set_net_range(self, train_df: pd.DataFrame) -> None:
+        """Take the network-input min-max from the first fit's training rows."""
+        if self.net_input_scaling is None or self._net_scaled:
+            return
+        for i, p in enumerate(self.continuous_parents):
+            lo, hi = float(train_df[p].min()), float(train_df[p].max())
+            if hi == lo:
+                raise ValueError(
+                    f"net_input_scaling='minmax': parent {p!r} is constant on the "
+                    "training rows"
+                )
+            self.net_lo[i], self.net_hi[i] = lo, hi
+        self._net_scaled = True
+
+    def net_input(self, feats: dict[str, Tensor], parents) -> Tensor:
+        """Concatenate parent features for a network, scaled when configured.
+
+        Every network input goes through here — training and the read-outs
+        (``varying_coef``, ``intercept_contributions``) alike — so the model
+        seen at inference is the model that was fitted. Linear shifts and the
+        VC treatment column are not network inputs and never pass through.
+        """
+        cols = []
+        for p in parents:
+            x = feats[p]
+            if self.net_input_scaling == "minmax" and p in self.continuous_parents:
+                i = self.continuous_parents.index(p)
+                x = (x - self.net_lo[i]) / (self.net_hi[i] - self.net_lo[i])
+            cols.append(x)
+        return torch.cat(cols, dim=1)
+
     def _theta(self, feats: dict[str, Tensor], n: int) -> Tensor:
         """Evaluate the intercept: the transform parameters, shape ``(n, P)``."""
         if self.intercept_nets is not None:  # additive complex intercept
             return sum(
-                net(torch.cat([feats[p] for p in grp], dim=1))
+                net(self.net_input(feats, grp))
                 for net, grp in zip(
                     self.intercept_nets, self._intercept_groups, strict=True
                 )
             )
         if self.ci_parents:  # single or joint complex intercept
-            return self.intercept(torch.cat([feats[p] for p in self.ci_parents], dim=1))
+            return self.intercept(self.net_input(feats, self.ci_parents))
         return self.intercept(n)  # simple (free) intercept
 
     def _vc_shift(self, g, feats: dict, vc_ehat: dict | None) -> Tensor:
@@ -353,7 +399,7 @@ class _Node(nn.Module):
                 "term without its propensity."
             )
         t = self.vc_column(g, feats, vc_ehat)
-        mod_feat = torch.cat([feats[p] for p in g.mods], dim=1) if g.mods else None
+        mod_feat = self.net_input(feats, g.mods) if g.mods else None
         return self.shifts[g.on](t, mod_feat)
 
     def theta_shift(
@@ -387,12 +433,13 @@ class _Node(nn.Module):
         theta = self._theta(feats, n)
         shift = torch.zeros(n, dtype=theta.dtype, device=theta.device)
         for key, ps in self._shift_groups:
-            feat = (
-                feats[ps[0]]
-                if len(ps) == 1
-                else torch.cat([feats[p] for p in ps], dim=1)
+            module = self.shifts[key]
+            feat = (  # a linear shift stays raw: its weight is the paper's beta
+                torch.cat([feats[p] for p in ps], dim=1)
+                if isinstance(module, LinearShift)
+                else self.net_input(feats, ps)
             )
-            shift = shift + self.shifts[key](feat)
+            shift = shift + module(feat)
         for g in self._vc_groups:
             shift = shift + self._vc_shift(g, feats, vc_ehat)
         return theta, shift
@@ -414,18 +461,35 @@ class CausalFlowDAG(nn.Module):
         initialization happens at construction, so this is the one knob
         for a reproducible model. ``fit(seed=...)`` only seeds the
         minibatch shuffling.
+    net_input_scaling : str | None, optional
+        ``"minmax"`` feeds every network (complex intercepts, complex shifts,
+        VC modifiers) its continuous parents scaled to ``[0, 1]`` by the
+        training min and max, the way the paper's reference implementation
+        does; raw parents (default ``None``) saturate a tanh net whenever
+        ``|x| > 2``. Linear shifts and the VC treatment stay raw, so their
+        coefficients keep their units. Set at the first ``fit``; stored in
+        the checkpoint.
     """
 
     def __init__(
-        self, spec: dict[str, NodeSpec], device: str = "cpu", seed: int | None = None
+        self,
+        spec: dict[str, NodeSpec],
+        device: str = "cpu",
+        seed: int | None = None,
+        net_input_scaling: str | None = None,
     ):
         super().__init__()
+        if net_input_scaling not in (None, "minmax"):
+            raise ValueError(
+                f"net_input_scaling must be None or 'minmax', got {net_input_scaling!r}"
+            )
         if seed is not None:
             torch.manual_seed(seed)
         self.spec = spec
         self.order = validate_and_sort(spec)
+        self.net_input_scaling = net_input_scaling
         self.nodes = nn.ModuleDict(
-            {name: _Node(spec[name], spec) for name in self.order}
+            {name: _Node(spec[name], spec, net_input_scaling) for name in self.order}
         )
         self.device = torch.device(device)
         self.history: dict = {"train": [], "val": [], "lr": [], "time": []}
@@ -624,6 +688,7 @@ class CausalFlowDAG(nn.Module):
         """
         for name in self.order:
             node = self.nodes[name]
+            node.set_net_range(train_df)
             if node.kind == "continuous" and not node.ut._fitted:
                 q = train_df[name].quantile([RANGE_Q, 1.0 - RANGE_Q])
                 node.ut.set_range(q.iloc[0], q.iloc[1])
@@ -1221,7 +1286,12 @@ class CausalFlowDAG(nn.Module):
         fold_id = np.random.default_rng(0).permutation(n) % k
         e = np.empty(n, dtype=np.float64)
         for j in range(k):
-            proxy = CausalFlowDAG(proxy_spec, device=str(self.device), seed=0)
+            proxy = CausalFlowDAG(
+                proxy_spec,
+                device=str(self.device),
+                seed=0,
+                net_input_scaling=self.net_input_scaling,
+            )
             held_in = train_df.iloc[fold_id != j][cols]
             if all_ls:
                 proxy.fit_classical(held_in, verbose=False)
@@ -1247,7 +1317,7 @@ class CausalFlowDAG(nn.Module):
                     continue
                 if feats is None:
                     feats = self._features(values)
-                nd.shifts[g.on].recenter(torch.cat([feats[p] for p in g.mods], dim=1))
+                nd.shifts[g.on].recenter(nd.net_input(feats, g.mods))
 
     @torch.no_grad()
     def varying_coef(
@@ -1315,7 +1385,7 @@ class CausalFlowDAG(nn.Module):
         mod_feat = None
         if mods:
             feats = self._features(self._tensorize(data, mods))
-            mod_feat = torch.cat([feats[p] for p in mods], dim=1)
+            mod_feat = nd.net_input(feats, mods)
         return nd.shifts[t].beta(mod_feat, len(data)).cpu().numpy()
 
     def _is_all_ls(self) -> bool:
@@ -1466,7 +1536,7 @@ class CausalFlowDAG(nn.Module):
         parents: dict[str, tuple] = {}
         baseline = None
         for net, grp in zip(nets, groups, strict=True):
-            raw = net(torch.cat([feats[p] for p in grp], dim=1))  # (n, P)
+            raw = net(nd.net_input(feats, grp))  # (n, P)
             mean = raw.mean(dim=0, keepdim=True)  # (1, P)
             label = "+".join(grp)
             contributions[label] = (raw - mean).cpu().numpy()
@@ -1559,7 +1629,8 @@ class CausalFlowDAG(nn.Module):
         history_size : int, optional
             L-BFGS memory, by default 50.
         verbose : bool, optional
-            Print a one-line summary, by default True.
+            Log a one-line INFO summary on the ``tramdag.flow`` logger, by
+            default True.
 
         Returns
         -------
@@ -1583,8 +1654,8 @@ class CausalFlowDAG(nn.Module):
         cleanly.
 
         Convergence is torch's own: L-BFGS stops when the NLL or the
-        parameters move by less than ``tol``, or when the gradient is
-        below its ``tolerance_grad``. ``|grad|`` and individual
+        parameters move by less than ``tol`` (``tolerance_grad`` is set to
+        0, so the gradient never ends the run). ``|grad|`` and individual
         coefficients do *not* settle to machine precision. A continuous
         node's Bernstein intercept, and weakly-identified directions such
         as rare one-hot levels or a flat treatment-effect ridge, keep
@@ -1967,6 +2038,7 @@ class CausalFlowDAG(nn.Module):
         torch.save(
             {
                 "spec": spec_to_dict(self.spec),
+                "net_input_scaling": self.net_input_scaling,
                 "state_dict": self.state_dict(),
                 "history": self.history,
                 "meta": meta,
@@ -1995,12 +2067,17 @@ class CausalFlowDAG(nn.Module):
             The restored model, in eval mode.
         """
         ckpt = torch.load(path, map_location=device, weights_only=False)
-        flow = cls(spec_from_dict(ckpt["spec"]), device=device)
+        flow = cls(
+            spec_from_dict(ckpt["spec"]),
+            device=device,
+            net_input_scaling=ckpt.get("net_input_scaling"),
+        )
         # A loaded model carries trained parameters, so both first-fit guards
         # must already be closed: re-fitting with marginal_init=True would
         # otherwise reset the intercept to the data marginal.
         for name in flow.order:
             node = flow.nodes[name]
+            node._net_scaled = True
             if node.kind == "continuous":
                 node.ut._fitted = True
             elif isinstance(node.intercept, SimpleIntercept):
