@@ -1,8 +1,9 @@
 """Helpers shared by the paper replications.
 
-The fitting loop with coefficient snapshots and the figure styles below are
-specific to these experiments; what every area shares (config loading,
-output directories, reports) lives in ``experiments/common.py``.
+One fit call with a per-epoch read-out, the triangle spec pieces and the
+figure styles below are specific to these experiments; what every area
+shares (config loading, output directories, reports) lives in
+``experiments/common.py``.
 """
 
 # %% imports ---------------------------------------------------------------------------
@@ -18,39 +19,15 @@ import matplotlib.pyplot as plt
 import numpy as np
 import torch
 
-from tramdag import CausalFlowDAG
+from tramdag import CS, LS, CausalFlowDAG
 
-
-# %% private functions -----------------------------------------------------------------
-def _level_bars(ax, dgp_values, flow_values, n_levels: int) -> None:
-    """Draw side-by-side level-frequency bars for one ordinal panel."""
-    levels = np.arange(n_levels)
-    dgp_freq = dgp_values.value_counts(normalize=True).reindex(levels, fill_value=0)
-    flow_freq = flow_values.value_counts(normalize=True).reindex(levels, fill_value=0)
-    ax.bar(levels - 0.18, dgp_freq, width=0.36, alpha=0.6, label="DGP")
-    ax.bar(
-        levels + 0.18,
-        flow_freq,
-        width=0.36,
-        alpha=0.8,
-        color="C3",
-        label="flow",
-    )
-    ax.set_xticks(levels)
-
-
-def _continuous_hist(ax, dgp_values, flow_values) -> None:
-    """Draw one continuous panel, with bins from the DGP quantiles."""
-    low, high = np.quantile(dgp_values, [0.001, 0.999])
-    if high - low < 1e-9:
-        # a do-clamped column is constant: give the panel a width
-        low, high = low - 1.0, high + 1.0
-    hist_overlay(ax, dgp_values, flow_values, np.linspace(low, high, 50))
+# %% global variables ------------------------------------------------------------------
+PLATEAU_KEYS = ("plateau_patience", "plateau_factor", "plateau_min_lr", "min_delta")
 
 
 # %% public functions ------------------------------------------------------------------
 # ------------------------------------------------------------------ fitting
-def fit_paper(flow: CausalFlowDAG, train, val, config: dict, record=None) -> list:
+def fit_paper(generator, spec: dict, config: dict, out: Path, record=None):
     """Fit the way the paper's R code does: one run, one optimizer, per-epoch read-out.
 
     ``summerof24/*.R`` calls Keras ``fit(epochs = 1)`` in a loop over one
@@ -60,9 +37,24 @@ def fit_paper(flow: CausalFlowDAG, train, val, config: dict, record=None) -> lis
     validation NLL. Both are one ``fit`` call here: ``epoch_callback`` is the
     per-epoch read-out, and ``schedule``/``plateau_*`` carry the plateau rule.
 
-    ``record(flow)``, when given, is stored after each epoch with the epoch
-    count — the coefficient trajectories of paper Fig. 14, 15 and 19.
+    Train and validation are two separate draws, as in R. The fitted flow is
+    saved to ``out / "flow.pt"``. ``record(flow)``, when given, is stored
+    after each epoch with the epoch count — the coefficient trajectories of
+    paper Fig. 14, 15 and 19.
+
+    Returns
+    -------
+    tuple
+        ``(flow, val, trajectory)``.
     """
+    train = generator.observational(config["n_train"])
+    val = generator.observational(config["n_val"], seed_offset=1)
+    flow = CausalFlowDAG(spec, seed=config["init_seed"])
+    plateau = (
+        {key: config[key] for key in PLATEAU_KEYS}
+        if config["schedule"] == "plateau"
+        else {}
+    )
     trajectory = []
     flow.fit(
         train,
@@ -71,18 +63,10 @@ def fit_paper(flow: CausalFlowDAG, train, val, config: dict, record=None) -> lis
         learning_rate=config["learning_rate"],
         batch_size=config["batch_size"],
         seed=config["shuffle_seed"],
-        marginal_init=config["marginal_init"],
+        # a framework switch the reference lacks: no calibrated start
+        marginal_init=False,
         schedule=config["schedule"],
-        **(
-            {
-                "plateau_patience": config["plateau_patience"],
-                "plateau_factor": config["plateau_factor"],
-                "plateau_min_lr": config["plateau_min_lr"],
-                "min_delta": config["min_delta"],
-            }
-            if config["schedule"] == "plateau"
-            else {}
-        ),
+        **plateau,
         verbose=0,
         epoch_callback=(
             None
@@ -90,7 +74,36 @@ def fit_paper(flow: CausalFlowDAG, train, val, config: dict, record=None) -> lis
             else lambda f, e: trajectory.append({"epoch": e, **record(f)})
         ),
     )
-    return trajectory
+    flow.save(out / "flow.pt")
+    return flow, val, trajectory
+
+
+# ----------------------------------------------------------------- triangle
+def shift_term(config: dict):
+    """Give the x2 -> x3 term of a triangle spec: a linear or complex shift.
+
+    Raises
+    ------
+    ValueError
+        If ``shift`` is neither ``"ls"`` nor ``"cs"``.
+    """
+    shift = config["shift"]
+    if shift == "ls":
+        return LS("x2")
+    if shift == "cs":
+        return CS("x2", units=config["shift_units"], activation=config["activation"])
+    raise ValueError(f"shift must be 'ls' or 'cs', got '{shift}'")
+
+
+def snapshot(flow: CausalFlowDAG, shift: str) -> dict:
+    """Read the triangle's linear-shift coefficients out of a flow mid-training."""
+    values = {
+        "beta12": ls_weight(flow, "x2", "x1"),
+        "beta13": ls_weight(flow, "x3", "x1"),
+    }
+    if shift == "ls":
+        values["beta23"] = ls_weight(flow, "x3", "x2")
+    return values
 
 
 def ls_weight(flow: CausalFlowDAG, node: str, parent: str) -> float:
@@ -102,7 +115,39 @@ def cs_curve(flow: CausalFlowDAG, node: str, parent: str, grid) -> np.ndarray:
     """Evaluate the node's complex-shift network on a grid of parent values."""
     x = torch.as_tensor(np.asarray(grid), dtype=torch.float32).view(-1, 1)
     with torch.no_grad():
-        return flow.nodes[node].shifts[parent](x).detach().numpy()
+        return flow.nodes[node].shifts[parent](x).detach().numpy().ravel()
+
+
+def compare_do_x1(
+    generator, flow: CausalFlowDAG, config: dict, out: Path, ordinal_levels, title
+) -> dict:
+    """Compare the observational and ``do(x1)`` distributions, DGP vs flow.
+
+    Writes ``plots/distributions.png`` (paper Fig. 9/16/17/20) and gives the
+    ``do(x1)`` mean of x3 under both.
+    """
+    do_query = f"do(x1={config['do_x1']:+.0f})"
+    n, seed = config["n_compare"], config["sample_seed"]
+    dgp_samples = {
+        "Obs": generator.observational(n, seed_offset=5),
+        do_query: generator.interventional(n, {"x1": config["do_x1"]}),
+    }
+    flow_samples = {
+        "Obs": flow.sample(n, seed=seed),
+        do_query: flow.sample(n, do={"x1": config["do_x1"]}, seed=seed),
+    }
+    plot_hist_grid(
+        dgp_samples,
+        flow_samples,
+        ["x1", "x2", "x3"],
+        out / "plots" / "distributions.png",
+        title,
+        ordinal_levels,
+    )
+    return {
+        "mean_x3_dgp_do_x1": float(dgp_samples[do_query]["x3"].mean()),
+        "mean_x3_flow_do_x1": float(flow_samples[do_query]["x3"].mean()),
+    }
 
 
 # ------------------------------------------------------------------- plots
@@ -125,6 +170,23 @@ def hist_overlay(ax, dgp_values, flow_values, bins) -> None:
         color="C3",
         label="flow",
     )
+
+
+def continuous_hist(ax, dgp, flow, bins: int = 50) -> None:
+    """Draw one continuous panel, with bins from the DGP's 0.1%/99.9% quantiles."""
+    low, high = np.quantile(dgp, [0.001, 0.999])
+    if high - low < 1e-9:
+        # a do-clamped column is constant: give the panel a width
+        low, high = low - 1.0, high + 1.0
+    hist_overlay(ax, dgp, flow, np.linspace(low, high, bins))
+
+
+def level_bars(ax, dgp_freq, flow_freq, labels=("DGP", "flow")) -> None:
+    """Draw side-by-side level-frequency bars, one array per side."""
+    levels = np.arange(len(dgp_freq))
+    ax.bar(levels - 0.18, dgp_freq, width=0.36, alpha=0.6, label=labels[0])
+    ax.bar(levels + 0.18, flow_freq, width=0.36, alpha=0.8, color="C3", label=labels[1])
+    ax.set_xticks(levels)
 
 
 def plot_trajectories(trajectory: list[dict], truths: dict, path: Path, title: str):
@@ -205,9 +267,18 @@ def plot_hist_grid(
             dgp_values = dgp_samples[scenario][column]
             flow_values = flow_samples[scenario][column]
             if column in ordinal_levels:
-                _level_bars(ax, dgp_values, flow_values, ordinal_levels[column])
+                levels = np.arange(ordinal_levels[column])
+                level_bars(
+                    ax,
+                    dgp_values.value_counts(normalize=True).reindex(
+                        levels, fill_value=0
+                    ),
+                    flow_values.value_counts(normalize=True).reindex(
+                        levels, fill_value=0
+                    ),
+                )
             else:
-                _continuous_hist(ax, dgp_values, flow_values)
+                continuous_hist(ax, dgp_values, flow_values)
     for ax, column in zip(axes[0], columns, strict=True):
         ax.set_title(column)
     for ax_row, scenario in zip(axes, scenarios, strict=True):

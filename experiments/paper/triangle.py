@@ -22,27 +22,20 @@ Usage (from experiments/)::
 # %% imports ---------------------------------------------------------------------------
 from __future__ import annotations
 
-import argparse
-
 import numpy as np
-from common import (
-    load_variant,
-    make_output_dir,
-    save_metrics,
-    variants_of,
-    write_report,
-)
+from common import cli, load_variant, make_output_dir, save_metrics, write_report
 
 from paper.helpers import (
+    compare_do_x1,
     cs_curve,
     fit_paper,
-    ls_weight,
     plot_cs_curve,
-    plot_hist_grid,
     plot_trajectories,
+    shift_term,
+    snapshot,
 )
 from paper.simulations.triangle import TriangleContinuous
-from tramdag import CS, LS, SI, CausalFlowDAG, ContinuousNode
+from tramdag import LS, SI, ContinuousNode
 
 
 # %% public functions ------------------------------------------------------------------
@@ -51,26 +44,12 @@ def build_spec(config: dict) -> dict:
 
     Every network and transform setting is taken from the config rather than
     from a framework default, so the architecture is visible in one file.
-
-    Raises
-    ------
-    ValueError
-        If ``shift`` is neither ``"ls"`` nor ``"cs"``.
     """
-    shift = config["shift"]
-    if shift == "ls":
-        x2_to_x3 = LS("x2")
-    elif shift == "cs":
-        x2_to_x3 = CS(
-            "x2", units=config["shift_units"], activation=config["activation"]
-        )
-    else:
-        raise ValueError(f"shift must be 'ls' or 'cs', got '{shift}'")
     basis = dict(transform=config["transform"], n_coeffs=config["n_coeffs"])
     return {
         "x1": ContinuousNode([SI(**basis)]),
         "x2": ContinuousNode([SI(**basis), LS("x1")]),
-        "x3": ContinuousNode([SI(**basis), LS("x1"), x2_to_x3]),
+        "x3": ContinuousNode([SI(**basis), LS("x1"), shift_term(config)]),
     }
 
 
@@ -87,39 +66,25 @@ def true_coefficients(f: str, shift: str) -> dict:
     return truths
 
 
-def snapshot(flow, shift: str) -> dict:
-    """Read the linear-shift coefficients out of a flow mid-training."""
-    values = {
-        "beta12": ls_weight(flow, "x2", "x1"),
-        "beta13": ls_weight(flow, "x3", "x1"),
-    }
-    if shift == "ls":
-        values["beta23"] = ls_weight(flow, "x3", "x2")
-    return values
-
-
 def run(variant: str) -> dict:
     """Run one variant end to end and give its metrics."""
     config = load_variant(__file__, variant)
     out = make_output_dir(__file__, f"triangle-{variant}")
-    figures = []
+    figures = ["coefficients.png"]
 
     generator = TriangleContinuous(f=config["f"], seed=config["dgp_seed"])
-    train = generator.observational(config["n_train"])
-    val = generator.observational(
-        config["n_val"], seed_offset=1
-    )  # separate draw, as in R
-
     print(
         f"fitting triangle/{config['f']} with a {config['shift']} shift on "
-        f"n={len(train)} for {config['epochs']} epochs "
+        f"n={config['n_train']} for {config['epochs']} epochs "
         f"at lr {config['learning_rate']:g} ..."
     )
-    flow = CausalFlowDAG(build_spec(config), seed=config["init_seed"])
-    trajectory = fit_paper(
-        flow, train, val, config, record=lambda flow: snapshot(flow, config["shift"])
+    flow, val, trajectory = fit_paper(
+        generator,
+        build_spec(config),
+        config,
+        out,
+        record=lambda flow: snapshot(flow, config["shift"]),
     )
-    flow.save(out / "flow.pt")
 
     truths = true_coefficients(config["f"], config["shift"])
     plot_trajectories(
@@ -129,7 +94,6 @@ def run(variant: str) -> dict:
         f"triangle/{config['f']}, {config['shift']} model — "
         "linear-shift coefficients (Fig. 14/15)",
     )
-    figures.append("coefficients.png")
 
     metrics = {key: value for key, value in trajectory[-1].items() if key != "epoch"}
     metrics["val_nll_x3"] = float(flow.nll(val)["x3"])
@@ -140,7 +104,7 @@ def run(variant: str) -> dict:
         )
         metrics["cs_curve_max_abs_err"] = plot_cs_curve(
             grid,
-            fitted=cs_curve(flow, "x3", "x2", grid).ravel(),
+            fitted=cs_curve(flow, "x3", "x2", grid),
             true=generator.true_shift_curve(grid),
             path=out / "plots" / "cs_curve.png",
             # which paper figure this is depends on f (7 right for atan,
@@ -151,33 +115,18 @@ def run(variant: str) -> dict:
         figures.append("cs_curve.png")
 
     # L1 (observational fit) and L2 (interventional) distributions
-    do_query = f"do(x1={config['do_x1']:+.0f})"
-    dgp_samples = {
-        "Obs": generator.observational(config["n_compare"], seed_offset=5),
-        do_query: generator.interventional(
-            config["n_compare"], {"x1": config["do_x1"]}
-        ),
-    }
-    flow_samples = {
-        "Obs": flow.sample(config["n_compare"], seed=config["sample_seed"]),
-        do_query: flow.sample(
-            config["n_compare"],
-            do={"x1": config["do_x1"]},
-            seed=config["sample_seed"],
-        ),
-    }
-    plot_hist_grid(
-        dgp_samples,
-        flow_samples,
-        ["x1", "x2", "x3"],
-        out / "plots" / "distributions.png",
-        f"triangle/{config['f']}, {config['shift']} model — L1/L2 (Fig. 16/17)",
-        ordinal_levels={},
+    metrics.update(
+        compare_do_x1(
+            generator,
+            flow,
+            config,
+            out,
+            ordinal_levels={},
+            title=f"triangle/{config['f']}, {config['shift']} model — "
+            "L1/L2 (Fig. 16/17)",
+        )
     )
     figures.append("distributions.png")
-
-    metrics["mean_x3_dgp_do_x1"] = float(dgp_samples[do_query]["x3"].mean())
-    metrics["mean_x3_flow_do_x1"] = float(flow_samples[do_query]["x3"].mean())
 
     save_metrics(out, metrics)
     write_report(
@@ -194,10 +143,4 @@ def run(variant: str) -> dict:
 
 # %% main ------------------------------------------------------------------------------
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument(
-        "variant",
-        choices=variants_of(__file__),
-        help="which DGP and model to run; hyperparameters live in triangle.yaml",
-    )
-    run(parser.parse_args().variant)
+    run(cli(__file__, __doc__))

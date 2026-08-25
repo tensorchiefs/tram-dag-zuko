@@ -53,7 +53,13 @@ def main(argv: list[str] | None = None) -> None:
     p.add_argument("--out", type=Path, default=Path("paper/data/carefl"))
     p.add_argument("--seed", type=int, default=42)
     p.add_argument("--n-obs", type=int, default=5000)
+    p.add_argument("--force", action="store_true", help="overwrite an existing folder")
     args = p.parse_args(argv)
+    if args.out.exists() and not args.force:
+        raise SystemExit(
+            f"{args.out} exists: the frozen data is a contract. A new seed or new "
+            "equations belong in a NEW folder (--out); pass --force to overwrite."
+        )
 
     gen = Carefl4(seed=args.seed)
     args.out.mkdir(parents=True, exist_ok=True)
@@ -194,17 +200,8 @@ class Carefl4(DatasetDraws):
         cf = self.simulate(do=do, latents=eps)
         return {k: float(cf[k].iloc[0]) for k in cf}
 
-    def true_cf_curves(
-        self, obs: dict[str, float] = X_OBS, alphas: np.ndarray = ALPHA_GRID
-    ) -> dict:
+    def true_cf_curves(self) -> dict:
         """Compute the two analytic counterfactual curves of paper Fig. 6.
-
-        Parameters
-        ----------
-        obs : dict[str, float], optional
-            The factual observation, by default the paper's ``X_OBS``.
-        alphas : np.ndarray, optional
-            Intervention grid, by default ``ALPHA_GRID``.
 
         Returns
         -------
@@ -212,11 +209,11 @@ class Carefl4(DatasetDraws):
             The observation, the intervention grid, and the counterfactual
             values of x3 under do(x2) and of x4 under do(x1).
         """
-        x3_cf = [self.true_counterfactual(obs, {"x2": a})["x3"] for a in alphas]
-        x4_cf = [self.true_counterfactual(obs, {"x1": a})["x4"] for a in alphas]
+        x3_cf = [self.true_counterfactual(X_OBS, {"x2": a})["x3"] for a in ALPHA_GRID]
+        x4_cf = [self.true_counterfactual(X_OBS, {"x1": a})["x4"] for a in ALPHA_GRID]
         return {
-            "x_obs": dict(obs),
-            "alphas": [float(a) for a in alphas],
+            "x_obs": dict(X_OBS),
+            "alphas": [float(a) for a in ALPHA_GRID],
             "x3_cf_do_x2": x3_cf,
             "x4_cf_do_x1": x4_cf,
         }

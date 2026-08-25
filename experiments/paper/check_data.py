@@ -25,6 +25,7 @@ from __future__ import annotations
 
 import json
 import sys
+from functools import partial
 from pathlib import Path
 
 import numpy as np
@@ -40,15 +41,13 @@ ATOL = 1e-9
 
 # dataset directory -> (generator factory taking the truth dict, ...)
 DATASETS = {
-    "carefl": lambda truth: Carefl4(seed=truth["seed"]),
-    "vaca": lambda truth: VacaTriangle(seed=truth["seed"]),
-    "triangle/linear": lambda truth: TriangleContinuous(f="linear", seed=truth["seed"]),
-    "triangle/atan": lambda truth: TriangleContinuous(f="atan", seed=truth["seed"]),
-    "triangle/sin": lambda truth: TriangleContinuous(f="sin", seed=truth["seed"]),
-    "triangle-mixed/linear": lambda truth: TriangleMixed(
-        f="linear", seed=truth["seed"]
-    ),
-    "triangle-mixed/exp": lambda truth: TriangleMixed(f="exp", seed=truth["seed"]),
+    "carefl": Carefl4,
+    "vaca": VacaTriangle,
+    "triangle/linear": partial(TriangleContinuous, f="linear"),
+    "triangle/atan": partial(TriangleContinuous, f="atan"),
+    "triangle/sin": partial(TriangleContinuous, f="sin"),
+    "triangle-mixed/linear": partial(TriangleMixed, f="linear"),
+    "triangle-mixed/exp": partial(TriangleMixed, f="exp"),
 }
 
 
@@ -68,25 +67,16 @@ def worst_deviation(subdir: str) -> float:
     directory = DATA / subdir
     truth = json.loads((directory / "truth.json").read_text())
     frozen = pd.read_csv(directory / "obs.csv")
-    regenerated = DATASETS[subdir](truth).observational(truth["n_obs"])
+    regenerated = DATASETS[subdir](seed=truth["seed"]).observational(truth["n_obs"])
     if list(frozen.columns) != list(regenerated.columns):
         raise ValueError(
             f"columns changed: {list(frozen.columns)} vs {list(regenerated.columns)}"
         )
-    if len(frozen) != truth["n_obs"] or len(regenerated) != truth["n_obs"]:
+    if len(frozen) != truth["n_obs"]:
         raise ValueError(
-            f"row count changed: {len(frozen)} / {len(regenerated)} "
-            f"against n_obs {truth['n_obs']}"
+            f"row count changed: {len(frozen)} against n_obs {truth['n_obs']}"
         )
-    return max(
-        float(
-            np.abs(
-                frozen[column].to_numpy(dtype=float)
-                - regenerated[column].to_numpy(dtype=float)
-            ).max()
-        )
-        for column in frozen.columns
-    )
+    return float(np.abs(frozen.to_numpy(float) - regenerated.to_numpy(float)).max())
 
 
 def main() -> int:

@@ -27,6 +27,7 @@ Run an experiment as a module, from ``experiments/``::
 # %% imports ---------------------------------------------------------------------------
 from __future__ import annotations
 
+import argparse
 import json
 from pathlib import Path
 
@@ -67,6 +68,22 @@ def load_variant(script: str, variant: str) -> dict:
         raise FileNotFoundError(f"no config next to {Path(script).name}: {path}")
     document = yaml.safe_load(path.read_text())
     return config_section(document, "variants", variant)
+
+
+def cli(script: str, doc: str) -> str:
+    """Parse an experiment script's command line and give the chosen variant.
+
+    The one positional argument is the variant; its choices come from the
+    script's YAML file and the description from the first line of its
+    module docstring.
+    """
+    parser = argparse.ArgumentParser(description=doc.splitlines()[0])
+    parser.add_argument(
+        "variant",
+        choices=variants_of(script),
+        help="which variant to run; hyperparameters live in the sibling YAML file",
+    )
+    return parser.parse_args().variant
 
 
 def variants_of(script: str) -> list[str]:

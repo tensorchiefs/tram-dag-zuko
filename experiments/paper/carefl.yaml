@@ -3,8 +3,8 @@
 # Every value the script uses is in this file; it reads no defaults of its own.
 #
 # Protocol = the reference implementation's own comparison run
-# (tensorchiefs/tram-dag, comparison/utils.R with carefl_fig5.r: EPOCHS = 7000), reproduced 1:1
-# where the framework allows:
+# (tensorchiefs/tram-dag, comparison/utils.R with carefl_fig5.r:
+# EPOCHS = 7000), reproduced 1:1 where the framework allows:
 #   * nTrain = 2500, validation = a separate dgp(5000) draw;
 #   * one full-batch gradient step per epoch (train_step: one apply_gradients
 #     over all rows), 7000 epochs, Adam at lr 0.001;
@@ -17,8 +17,8 @@
 # decays one optimizer on the sum); the transform is pre-scaled from the train
 # 5%/95% quantiles instead of min-max to [0, 1]; the intercept net's output
 # layer has no bias (Keras dense has one); torch init and Adam eps 1e-8 vs
-# Keras glorot and 1e-7; the reference seeded R's RNG, so every seed below is
-# a repo choice.
+# Keras glorot and 1e-7; torch cannot replay R's stream, so every seed below
+# is a repo choice.
 #
 variants:
   # all conditionals complex intercepts
@@ -28,7 +28,6 @@ variants:
     epochs: 7000
     learning_rate: 0.001
     batch_size: 2500            # = n_train: one full-batch step per epoch
-    marginal_init: false        # the reference has no calibrated start
     schedule: plateau           # update_learning_rate
     plateau_patience: 50
     plateau_factor: 0.1
@@ -43,7 +42,7 @@ variants:
     activation: tanh            # make_model's activation
     dgp_seed: 42                # repo choice
     init_seed: 7                # repo choice
-    shuffle_seed: 0             # repo choice (full batch: no shuffling effect)
+    shuffle_seed: 0             # full batch: the shuffle seed has no effect
     n_heldout: 300              # typical rows scored next to the single x_obs
-    heldout_seed: 999           # seed offset of the held-out draw
+    heldout_seed_offset: 999    # seed offset of the held-out draw
     alphas_scored: [-1.5, 0.0, 1.5]

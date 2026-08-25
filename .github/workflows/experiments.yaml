@@ -1,8 +1,10 @@
 name: experiments
 
-# The paper replications, one matrix job each. They run on every push, so a
-# commit's report is always current — note that this trains real models, so a
-# full run is minutes per job. A workflow_dispatch may narrow it to a single
+# Every experiment, one matrix job each. They run on every push, so a
+# commit's report is always current — note that this trains real models on
+# the paper's own protocol (batch size 32 over 40000 rows for 500 epochs on
+# the triangle scripts), which is 35-80 minutes per triangle job on a 32-core
+# box and longer on a runner. A workflow_dispatch may narrow it to a single
 # script+variant when that is all you need.
 #
 # Each job runs its experiment, compares the metrics against the committed
@@ -79,7 +81,7 @@ jobs:
   replicate:
     needs: plan
     runs-on: ubuntu-latest
-    timeout-minutes: 90
+    timeout-minutes: 300
     strategy:
       fail-fast: false           # one drifting experiment must not hide the rest
       matrix:
@@ -113,12 +115,14 @@ jobs:
         uv run --group experiments python -m check
         ${{ matrix.area }} ${{ steps.result.outputs.name }}
 
-    - if: always()               # a drifted run is when the figures matter most
+    # a drifted run is when the figures matter most — but only once the run got
+    # as far as writing its report; earlier failures are the job's own error
+    - if: always() && hashFiles(format('experiments/{0}/results/{1}/report.md', matrix.area, steps.result.outputs.name)) != ''
       name: post the report as a commit comment
       uses: iterative/setup-cml@e5f9f4673e0a8f275c45cc66dbbfd29c8469fb4e # v2.1.0
       with:
         vega: false
-    - if: always()               # a drifted run is when the figures matter most
+    - if: always() && hashFiles(format('experiments/{0}/results/{1}/report.md', matrix.area, steps.result.outputs.name)) != ''
       working-directory: >-
         experiments/${{ matrix.area }}/results/${{ steps.result.outputs.name }}
       env:

@@ -14,8 +14,8 @@
 # Known deviations, all framework-level and documented in CLAUDE.md: the
 # transform is pre-scaled from the train 5%/95% quantiles instead of the
 # reference's min-max scaling; weights start from torch's default init, not
-# Keras glorot (marginal_init is off, as the reference has no calibrated
-# start); the R script runs unseeded, so every seed below is a repo choice.
+# Keras glorot; the R script runs unseeded, so every seed below is a repo
+# choice.
 
 paper_protocol: &paper_protocol
   n_train: 40000          # dgp(40000)
@@ -23,16 +23,15 @@ paper_protocol: &paper_protocol
   epochs: 500             # num_epochs
   learning_rate: 0.001    # optimizer_adam() default
   batch_size: 32          # Keras fit() default
-  marginal_init: false    # the reference has no calibrated start
   schedule:               # the reference has no schedule
   transform: bernstein
   # len_theta = 20 unconstrained coefficients; zuko ties two more control
   # points on (order 21 against the reference's 19); the free-parameter count
   # is what matches
   n_coeffs: 20
-  dgp_seed: 42            # repo choice: the R script runs unseeded
-  init_seed: 7            # repo choice
-  shuffle_seed: 0         # repo choice
+  dgp_seed: 42
+  init_seed: 7
+  shuffle_seed: 0
   sample_seed: 0          # sampling for the distribution comparisons
   n_compare: 10000        # rows per distribution panel (Fig. 16/17)
   do_x1: -1.0             # the paper's L2 query, do(x1 = -1)

@@ -3,8 +3,9 @@
 # Every value the script uses is in this file; it reads no defaults of its own.
 #
 # Protocol = the reference implementation's own comparison run
-# (tensorchiefs/tram-dag, comparison/utils.R with Figure_Triangle_Linear_Bimodal.R: EPOCHS = 10000), reproduced 1:1
-# where the framework allows:
+# (tensorchiefs/tram-dag, comparison/utils.R with
+# Figure_Triangle_Linear_Bimodal.R: EPOCHS = 10000), reproduced 1:1 where the
+# framework allows:
 #   * nTrain = 2500, validation = a separate dgp(5000) draw;
 #   * one full-batch gradient step per epoch (train_step: one apply_gradients
 #     over all rows), 10000 epochs, Adam at lr 0.001;
@@ -17,8 +18,8 @@
 # decays one optimizer on the sum); the transform is pre-scaled from the train
 # 5%/95% quantiles instead of min-max to [0, 1]; the intercept net's output
 # layer has no bias (Keras dense has one); torch init and Adam eps 1e-8 vs
-# Keras glorot and 1e-7; the reference seeded R's RNG, so every seed below is
-# a repo choice.
+# Keras glorot and 1e-7; torch cannot replay R's stream, so every seed below
+# is a repo choice.
 #
 variants:
   # all conditionals complex intercepts
@@ -28,7 +29,6 @@ variants:
     epochs: 10000
     learning_rate: 0.001
     batch_size: 2500            # = n_train: one full-batch step per epoch
-    marginal_init: false        # the reference has no calibrated start
     schedule: plateau           # update_learning_rate
     plateau_patience: 50
     plateau_factor: 0.1
@@ -43,7 +43,7 @@ variants:
     activation: tanh            # make_model's activation
     dgp_seed: 42                # repo choice
     init_seed: 7                # repo choice
-    shuffle_seed: 0             # repo choice (full batch: no shuffling effect)
+    shuffle_seed: 0             # full batch: the shuffle seed has no effect
     sample_seed: 1
     n_compare: 50000            # rows per interventional panel (Fig. 5)
     n_scatter: 2000             # points per off-diagonal scatter (Fig. 4)

@@ -13,7 +13,7 @@ benchmark TRAM-DAG against Causal Normalizing Flows (Javaloy et al. 2024) on L1
 
 Gaussian noise, so this DGP is deliberately *outside* the flow's logistic-latent
 family — a flexible (all-``ci``) TRAM-DAG still has to fit it. Interventional
-queries in the paper: p(x3 | do(x2 = a)) for a in {-3, -1, 0}.
+queries in the paper: p(x3 | do(x2 = a)) for a in {-3, -2, 0}.
 
 CLI::
 
@@ -34,7 +34,7 @@ import pandas as pd
 from ._common import DatasetDraws, resolve_latents
 
 # %% global variables ------------------------------------------------------------------
-DO_X2_VALUES = (-3.0, -1.0, 0.0)  # the paper's Fig. 5 interventions
+DO_X2_VALUES = (-3.0, -2.0, 0.0)  # the paper's Fig. 5 interventions
 
 
 # %% public functions ------------------------------------------------------------------
@@ -45,7 +45,13 @@ def main(argv: list[str] | None = None) -> None:
     p.add_argument("--seed", type=int, default=42)
     p.add_argument("--n-obs", type=int, default=5000)
     p.add_argument("--mc-n", type=int, default=1_000_000)
+    p.add_argument("--force", action="store_true", help="overwrite an existing folder")
     args = p.parse_args(argv)
+    if args.out.exists() and not args.force:
+        raise SystemExit(
+            f"{args.out} exists: the frozen data is a contract. A new seed or new "
+            "equations belong in a NEW folder (--out); pass --force to overwrite."
+        )
 
     gen = VacaTriangle(seed=args.seed)
     args.out.mkdir(parents=True, exist_ok=True)
@@ -142,35 +148,40 @@ class VacaTriangle(DatasetDraws):
         """Give the observational and interventional ground-truth moments.
 
         Under ``do(x2=a)``: ``x3 = x1 + 0.25 a + N(0,1)``, so
-        ``E = E[x1] + 0.25 a`` and ``Var = Var[x1] + 1``. These are exact.
-        Monte Carlo values for the observational moments are stored too,
-        with the same estimator a test uses.
+        ``E = E[x1] + 0.25 a`` and ``Var = Var[x1] + 1``. These and the sd
+        of the bimodal source are exact. Monte Carlo values for the
+        observational moments are stored too, with the same estimator a
+        test uses — unless ``mc_n`` is 0, which skips the draw.
 
         Parameters
         ----------
         mc_n : int, optional
-            Monte Carlo sample size, by default 1_000_000.
+            Monte Carlo sample size, by default 1_000_000; 0 for analytic only.
 
         Returns
         -------
         dict
-            ``mc_n``, the observational ``obs_mean`` and ``obs_std`` per
-            column, and the analytic x3 moments per ``do(x2)`` value.
+            ``std_x1_analytic``, the analytic x3 moments per ``do(x2)`` value
+            and, for ``mc_n > 0``, ``mc_n`` with the observational
+            ``obs_mean`` and ``obs_std`` per column.
         """
         mu1 = 0.5 * (-2.0) + 0.5 * 1.5
         var1 = 0.5 * (1.5 + (-2.0 - mu1) ** 2) + 0.5 * (1.0 + (1.5 - mu1) ** 2)
-        obs = self.observational(mc_n, seed_offset=777)
         out = {
-            "mc_n": mc_n,
-            "obs_mean": {c: float(obs[c].mean()) for c in obs},
-            "obs_std": {c: float(obs[c].std()) for c in obs},
-            "do_x2": {},
+            "std_x1_analytic": float(np.sqrt(var1)),
+            "do_x2": {
+                str(a): {
+                    "mean_x3_analytic": mu1 + 0.25 * a,
+                    "std_x3_analytic": float(np.sqrt(var1 + 1.0)),
+                }
+                for a in DO_X2_VALUES
+            },
         }
-        for a in DO_X2_VALUES:
-            out["do_x2"][str(a)] = {
-                "mean_x3_analytic": mu1 + 0.25 * a,
-                "std_x3_analytic": float(np.sqrt(var1 + 1.0)),
-            }
+        if mc_n:
+            obs = self.observational(mc_n, seed_offset=777)
+            out["mc_n"] = mc_n
+            out["obs_mean"] = {c: float(obs[c].mean()) for c in obs}
+            out["obs_std"] = {c: float(obs[c].std()) for c in obs}
         return out
 
 

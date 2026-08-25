@@ -14,7 +14,6 @@ standard-logistic latents (paper Section 6; original code
 ``f`` selects the x2 -> x3 effect (paper / R-script variants)::
 
     linear  -0.3 x                  (=> +0.3 coefficient on x2 in h3)
-    cubic   2 x^3 + x
     exp     0.5 exp(x)
     atan    0.75 atan(5 (x + 0.12))  (complex-shift experiment, Fig. 7)
     sin     2 sin(3 x) + x           (non-monotone, App. C.3.4)
@@ -43,12 +42,11 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from ._common import DatasetDraws, logistic, resolve_latents, sigmoid
+from ._common import DatasetDraws, resolve_latents, sigmoid
 
 # %% global variables ------------------------------------------------------------------
 F_VARIANTS = {
     "linear": (lambda x: -0.3 * x, "-0.3*x"),
-    "cubic": (lambda x: 2.0 * x**3 + x, "2*x^3 + x"),
     "exp": (lambda x: 0.5 * np.exp(x), "0.5*exp(x)"),
     "atan": (lambda x: 0.75 * np.arctan(5.0 * (x + 0.12)), "0.75*atan(5*(x+0.12))"),
     "sin": (lambda x: 2.0 * np.sin(3.0 * x) + x, "2*sin(3*x) + x"),
@@ -111,7 +109,13 @@ def main(argv: list[str] | None = None) -> None:
     p.add_argument("--out", type=Path, default=Path("paper/data"))
     p.add_argument("--seed", type=int, default=42)
     p.add_argument("--n-obs", type=int, default=5000)
+    p.add_argument("--force", action="store_true", help="overwrite an existing folder")
     args = p.parse_args(argv)
+    if args.out.exists() and not args.force:
+        raise SystemExit(
+            f"{args.out} exists: the frozen data is a contract. A new seed or new "
+            "equations belong in a NEW folder (--out); pass --force to overwrite."
+        )
 
     for f in PAPER_VARIANTS["continuous"]:
         _write_variant(
@@ -157,8 +161,8 @@ class _TriangleBase(DatasetDraws):
             "x1_mix": rng.uniform(size=n),  # component indicator
             "x1_a": rng.normal(size=n),  # N(0.25, 0.1) branch
             "x1_b": rng.normal(size=n),  # N(0.73, 0.05) branch
-            "x2": logistic(rng, n),
-            "x3": logistic(rng, n),
+            "x2": rng.logistic(size=n),
+            "x3": rng.logistic(size=n),
         }
 
     # --------------------------------------------------------------------- SCM

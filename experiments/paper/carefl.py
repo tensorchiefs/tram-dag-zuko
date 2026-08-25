@@ -19,25 +19,14 @@ Usage (from experiments/)::
 # %% imports ---------------------------------------------------------------------------
 from __future__ import annotations
 
-import argparse
-
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-from common import (
-    load_variant,
-    make_output_dir,
-    save_metrics,
-    variants_of,
-    write_report,
-)
+from common import cli, load_variant, make_output_dir, save_metrics, write_report
 
-from paper.helpers import (
-    finish,
-    fit_paper,
-)
+from paper.helpers import finish, fit_paper
 from paper.simulations.carefl import ALPHA_GRID, X_OBS, Carefl4
-from tramdag import CI, SI, CausalFlowDAG, ContinuousNode
+from tramdag import CI, SI, ContinuousNode
 
 
 # %% public functions ------------------------------------------------------------------
@@ -78,9 +67,10 @@ def plot_curves(alphas, flow_x3, flow_x4, truth, path) -> dict:
         ax.set_xlabel(xlabel)
         ax.set_ylabel(ylabel)
         ax.legend()
+    x_obs = ", ".join(f"{value:.2f}" for value in X_OBS.values())
     fig.suptitle(
-        "CAREFL counterfactual queries at $x_{obs}$ = (2.00, 1.50, 0.81, -0.28) "
-        "(Fig. 6)"
+        f"CAREFL counterfactual queries at $x_{{obs}}$ = ({x_obs}), raw units\n"
+        "(Fig. 6; the paper prints x3/x4 standardized)"
     )
     finish(fig, path)
     return {
@@ -101,7 +91,7 @@ def heldout_errors(generator, flow, config) -> dict:
     each row — the flow's abduction is compared against that.
     """
     rows = generator.observational(
-        config["n_heldout"], seed_offset=config["heldout_seed"]
+        config["n_heldout"], seed_offset=config["heldout_seed_offset"]
     )
     flow_latents = flow.abduct(rows)
     dgp_noise = generator.abduct_noise(rows)
@@ -127,18 +117,11 @@ def run(variant: str) -> dict:
     out = make_output_dir(__file__, f"carefl-{variant}")
 
     generator = Carefl4(seed=config["dgp_seed"])
-    train = generator.observational(config["n_train"])
-    val = generator.observational(
-        config["n_val"], seed_offset=1
-    )  # separate draw, as in R
-
     print(
-        f"fitting the flexible flow on the CAREFL SCM, n={len(train)}: "
-        f"{config['epochs']} full-batch epochs at lr {config['learning_rate']:g} ..."
+        f"fitting the flexible flow on the CAREFL SCM, n={config['n_train']}: "
+        f"{config['epochs']} epochs at lr {config['learning_rate']:g} ..."
     )
-    flow = CausalFlowDAG(build_spec(config), seed=config["init_seed"])
-    fit_paper(flow, train, val, config)
-    flow.save(out / "flow.pt")
+    flow, val, _ = fit_paper(generator, build_spec(config), config, out)
 
     paper_latents = flow.abduct(pd.DataFrame([X_OBS]))
     truth = generator.true_cf_curves()
@@ -167,10 +150,4 @@ def run(variant: str) -> dict:
 
 # %% main ------------------------------------------------------------------------------
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument(
-        "variant",
-        choices=variants_of(__file__),
-        help="which model to run; hyperparameters live in carefl.yaml",
-    )
-    run(parser.parse_args().variant)
+    run(cli(__file__, __doc__))
