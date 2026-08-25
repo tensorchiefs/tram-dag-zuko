@@ -29,16 +29,15 @@ jobs:
       UV_NO_DEFAULT_GROUPS: '1'   # dev drags in editor tooling; name groups
       # the notebooks to execute and publish; add a name to add a notebook
       # (and mirror it in .github/pdoc-templates/module.html.jinja2)
-      NOTEBOOKS: demo_tram_dag_colab intro_tram_dag
+      NOTEBOOKS: demo_tram_dag_colab intro_tram_dag additive_vs_joint_ci varying_coefficients
     steps:
     - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1
-    - uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9   # v9.0.0
+    - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d   # v10.0.1
       with:
         enable-cache: true
 
-    # The kernel runs in the OUTPUT file's directory, and the notebooks
-    # resolve data/ relative to that -- so the executed copy must land in
-    # notebooks/ (gitignored).
+    # The executed copies land in notebooks/ (gitignored), next to their
+    # sources, so any repo-relative path in a notebook keeps resolving.
     - name: execute the notebooks and convert to markdown
       run: |
         set -euo pipefail
@@ -85,7 +84,8 @@ jobs:
         import pathlib
         import re
 
-        GH = "https://github.com/tensorchiefs/tramdag/blob/main"
+        # blob links point at the ref being built, so dev-* docs match dev-* code
+        GH = "https://github.com/tensorchiefs/tramdag/blob/${{ github.ref_name }}"
         site = pathlib.Path("site")
         guides = {
             p.stem: p.stem.replace("-", "_") for p in pathlib.Path("docs").glob("*.md")

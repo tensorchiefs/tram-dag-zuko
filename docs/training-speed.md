@@ -2,12 +2,15 @@
 
 This document benchmarks learning-rate schedules, per-node freezing, batch sizes, devices,
 and LBFGS. The benchmark ran in June 2026 on an Apple-silicon Mac mini with torch 2.12
-(CPU unless noted). To reproduce it, use `experiments/stale/bench_training.py` (parked).
-Migrate the script to the current API first. The grid takes ≈ 35 min. For a quick **cross-machine** comparison, use the
-self-contained `experiments/stale/perf_machine.py` (parked). It runs fixed 200-epoch
-workloads on all available devices and writes a machine fingerprint to JSON. After
-`pip install tramdag`, it runs on any machine. The raw CSV is a local artifact of
-the parked benchmark and is not committed.
+(CPU unless noted). To reproduce it, run
+[`experiments/benchmarks/bench_training.py`](../experiments/benchmarks/bench_training.py)
+(`cd experiments && uv run python -m benchmarks.bench_training`, or `--quick` for
+one seed on cpu); the full grid takes ≈ 35 min. For a quick **cross-machine**
+comparison, use the self-contained
+[`experiments/benchmarks/perf_machine.py`](../experiments/benchmarks/perf_machine.py).
+It runs fixed 200-epoch workloads on all available devices and writes a machine
+fingerprint to JSON, and it needs nothing but `pip install tramdag`. The raw CSV
+is a local run artifact and is not committed.
 
 ## The options, and how to use them
 
@@ -16,7 +19,7 @@ the parked benchmark and is not committed.
 | value | behavior |
 |---|---|
 | `None` (default) | constant lr — the classic behavior, exactly as before this PR |
-| `"plateau"` | **per-node**: a node whose own validation NLL hasn't improved by `min_delta` (default 1e-4) for `plateau_patience` epochs (default 15) gets its lr × 0.3, floored at 1e-3 × the initial lr. Each node decays independently — valid because the per-node losses have independent gradients. |
+| `"plateau"` | **per-node**: a node whose own validation NLL hasn't improved by `min_delta` (default 1e-4) for `plateau_patience` epochs (default 30) gets its lr × 0.3, floored at 1e-3 × the initial lr. Each node decays independently — valid because the per-node losses have independent gradients. |
 
 `"onecycle"` and `"cosine"` were part of this benchmark and lost to
 `"plateau"` on every workload; 0.4.0 removed both. The result tables below
@@ -39,7 +42,7 @@ flow.fit(train_df, epochs=4000, learning_rate=1e-2, batch_size=512)  # constant 
 flow.fit(train_df, epochs=2000, learning_rate=1e-3, batch_size=512)  # 2nd phase
 ```
 
-is still the exact-MLE path that `experiments/validate_ls.py` uses. Independent of all
+is still the exact-MLE path that `experiments/misc/validate_ls.py` uses. Independent of all
 this, `restore_best=False` remains the default (see CHANGELOG). The guard test
 `tests/test_fit_schedules.py::test_plateau_freeze_preserves_exact_mle` also shows that
 even *with* plateau+freezing the all-`ls` fit lands on the classical MLE within the usual
@@ -66,13 +69,20 @@ long-run reference (3 torch seeds, medians):
 
 | workload | model / data | reference NLL | tight tol | practical tol |
 |---|---|---|---|---|
-| **stroke-ls** | all-`ls` stroke DAG, frozen `magic-mrclean/ls` (n=1275, full-data MLE) | 10.3042 (train) | +1e-3 | +5e-3 |
-| **vaca-ci** | all-`ci` flow, frozen `vaca` (n=5000, 90/10 split) | 4.9632 (val) | +2e-3 | +1e-2 |
+| **stroke-ls** | all-`ls` 5-node DAG, frozen `experiments/misc/data/magic-mrclean/ls` (n=1275, full-data MLE) | 10.3042 (train) | +1e-3 | +5e-3 |
+| **vaca-ci** | all-`ci` flow, frozen `experiments/paper/data/vaca` (n=5000, 90/10 split) | 4.9632 (val) | +2e-3 | +1e-2 |
 
 *Tight* ≈ exact-MLE equivalence (statsmodels/R-polr match). *Practical* ≈
-coefficient-equivalent: a stroke fit with gap ≈ 3e-3 already matches the R reference
-coefficients within the test tolerances
-(`tests/test_fit_schedules.py::test_plateau_freeze_preserves_exact_mle`).
+coefficient-equivalent: a fit with gap ≈ 3e-3 already matches the R reference
+coefficients within the tolerances of
+[`experiments/misc/validate_ls.py`](../experiments/misc/validate_ls.py). The same
+exact-MLE-under-plateau-and-freezing property is pinned on an inline DGP by
+`tests/test_fit_schedules.py::test_plateau_freeze_preserves_exact_mle`.
+
+These numbers were measured before the experiment code moved into
+`experiments/benchmarks/`; the workloads are unchanged (same frozen data, same
+specs), so the timings still stand. Re-running the benchmark reproduces the
+machine-independent part exactly: the stroke-ls reference NLL 10.3042.
 
 ## Results
 
@@ -85,10 +95,10 @@ never reached the target within the budget.
 | config | stroke-ls practical | stroke-ls tight | vaca-ci practical | vaca-ci tight | self-stops |
 |---|---|---|---|---|---|
 | baseline two-phase (old default) | 9.0 | **21.4** | 2.1 | 2.8¹ | no (runs 40 s / 15 s) |
-| constant 1e-2 | 9.1 | 21.5² | 2.2 | 2.8¹ | no |
-| onecycle (1500 / 300 ep) | — | — | 3.5 | 4.5 | no |
-| onecycle (3000 ep) | 16.8 | — (gap 1–2e-3) | | | no |
-| cosine | — | — | 2.2 | 3.5¹ | no |
+| constant 1e-2 | 9.1 | 21.5³ | 2.2 | 2.8¹ | no |
+| onecycle (1500 / 300 ep)² | — | — | 3.5 | 4.5 | no |
+| onecycle (3000 ep)² | 16.8 | — (gap 1–2e-3) | | | no |
+| cosine² | — | — | 2.2 | 3.5¹ | no |
 | **plateau + freeze** | **8.9** | — (gap 2e-3) | **2.0** | 2.9 | **yes — 13 s / 4 s total** |
 | LBFGS (full-batch) | **1.6** (2/3 seeds) | — (gap 4–8e-3) | n/a | n/a | yes |
 
@@ -96,7 +106,9 @@ never reached the target within the budget.
 the 1e-3 phase to *stay*. Vaca shows mild overfitting. Final gap for the vaca baseline is
 0.037. The old 520-epoch budget **underfits** vaca by ~0.03 nats. Plateau+freeze *stays*
 at its target.
-² constant lr at batch 512 stalls at gap 3–7e-3. Only the lr-decay phase closes the last
+² `onecycle` and `cosine` were removed from `fit()` in 0.4 — they lost to
+plateau on every workload here — so these three rows cannot be re-measured.
+³ constant lr at batch 512 stalls at gap 3–7e-3. Only the lr-decay phase closes the last
 decade. This is why the two-phase recipe existed.
 
 ## Findings
@@ -149,7 +161,9 @@ The generous `epochs` value is only a ceiling. The fit stops itself. For exact c
 comparisons where the last 1e-3 matters, append a short constant-lr polish phase
 (`epochs=500, learning_rate=1e-3`) after the plateau fit. Or run the old two-phase recipe.
 
-The benchmark deliberately changed no `fit()`/`run_experiment` defaults. Default
-changes are their own reviewed decision (see the `restore_best` episode in
-CHANGELOG.md). `run_experiment` still uses the two-phase constant-lr recipe; the
-switch to the plateau recipe remains an open 3-line follow-up.
+The benchmark itself changed no defaults — that is its own reviewed decision (see
+the `restore_best` episode in CHANGELOG.md). Two of its findings have since been
+adopted: `plateau_patience` defaults to the 30 recommended here, and `epochs` has no
+default at all, because finding 6 is precisely that a fixed budget cannot be right for
+every workload. The experiment scripts still run the two-phase constant-lr recipe,
+which each states in its own YAML.

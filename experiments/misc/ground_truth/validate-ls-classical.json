@@ -1,0 +1,65 @@
+{
+  "_note": "Same comparison through float64 L-BFGS. It agrees on the well-identified coefficients and the ATE, but drifts on rare one-hot levels along near-zero-curvature directions, hence the looser tolerances. max_abs_diff_named_coefs is the precision claim (Age, NIHSSa, treatment contrast, ~1e-3). max_abs_diff_flow_vs_statsmodels also spans the mRS_pre level contrasts, and level 5 has 7 of 1275 rows -- where two optimizers stop on it differs by ~0.1 between machines (0.028 here, 0.113 on the CI runner), so its bound is a sanity check.",
+  "coef_Age_flow": {
+    "value": 0.053949128836393356,
+    "atol": 0.05
+  },
+  "coef_Age_statsmodels": {
+    "value": 0.05255252284332864,
+    "atol": 0.0001
+  },
+  "coef_Age_r": {
+    "value": 0.0525524746811871,
+    "atol": 0.0001
+  },
+  "coef_NIHSSa_flow": {
+    "value": 0.16382162272930145,
+    "atol": 0.05
+  },
+  "coef_NIHSSa_statsmodels": {
+    "value": 0.16298912417364875,
+    "atol": 0.0001
+  },
+  "coef_NIHSSa_r": {
+    "value": 0.162988956157133,
+    "atol": 0.0001
+  },
+  "coef_T_flow": {
+    "value": -0.9397529363632202,
+    "atol": 0.05
+  },
+  "coef_T_statsmodels": {
+    "value": -0.9424177297583866,
+    "atol": 0.0001
+  },
+  "coef_T_r": {
+    "value": -0.942416795232296,
+    "atol": 0.0001
+  },
+  "max_abs_diff_flow_vs_statsmodels": {
+    "max": 0.25,
+    "why": "the maximum is over the mRS_pre level contrasts, and level 5 has 7 of 1275 rows: two optimizers place it ~0.1 apart across machines (0.028 here, 0.113 on the CI runner). max_abs_diff_named_coefs is the precision claim"
+  },
+  "ate_flow": {
+    "value": 0.14158333837985992,
+    "atol": 0.01
+  },
+  "ate_statsmodels": {
+    "value": 0.14284264382211473,
+    "atol": 0.0001
+  },
+  "ate_true": {
+    "value": 0.13212599999999997,
+    "atol": 1e-09
+  },
+  "ate_naive_observational": {
+    "value": 0.254998719108005,
+    "atol": 1e-09
+  },
+  "ate_abs_diff_flow_vs_statsmodels": {
+    "max": 0.003148
+  },
+  "max_abs_diff_named_coefs": {
+    "max": 0.01
+  }
+}

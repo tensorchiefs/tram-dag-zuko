@@ -5,12 +5,22 @@ fixed seed, the bit-identical model. A node takes at most one intercept
 term with parents, and a VC term names its treatment by keyword.
 """
 
+# %% imports ---------------------------------------------------------------------------
+import json
+
 import pytest
 import torch
 
 from tramdag import CI, CS, LS, SI, VC, CausalFlowDAG, ContinuousNode, I, OrdinalNode
 from tramdag.spec import spec_from_dict, spec_to_dict, validate_and_sort
 
+
+# %% private functions -----------------------------------------------------------------
+def _state_dicts_equal(a, b):
+    return set(a) == set(b) and all(torch.equal(a[k], b[k]) for k in a)
+
+
+# %% public functions ------------------------------------------------------------------
 # ----------------------------------------------------------- normalization
 
 
@@ -28,7 +38,16 @@ def test_sum_chains_flatten_in_order():
 def test_bare_i_and_single_term():
     assert ContinuousNode([I]).terms == [I()]
     assert ContinuousNode(I).terms == [I()]
-    assert ContinuousNode(LS("x1")).terms == [LS("x1")]
+    # a shifts-only formula gets the implicit simple intercept, first
+    assert ContinuousNode(LS("x1")).terms == [SI(), LS("x1")]
+    assert ContinuousNode(LS("x1")) == ContinuousNode([SI(), LS("x1")])
+
+
+def test_exactly_one_intercept_and_first():
+    with pytest.raises(ValueError, match="exactly one intercept"):
+        ContinuousNode([SI(), CI("a")])
+    with pytest.raises(ValueError, match="comes first"):
+        ContinuousNode(LS("a") + CI("b"))
 
 
 def test_ordinal_takes_transformation_positionally():
@@ -91,8 +110,8 @@ def test_bare_i_can_carry_the_source_basis():
 
 
 def test_two_i_transforms_conflict():
-    # a bare carrier plus a parented I is legal -- two bases are not
-    with pytest.raises(ValueError, match="only one I term"):
+    # two intercepts is the error now, whatever they carry
+    with pytest.raises(ValueError, match="exactly one intercept"):
         ContinuousNode(I(transform="spline") + I("a", transform="affine"))
 
 
@@ -110,10 +129,6 @@ def test_vc_treatment_is_keyword_only():
 
 
 # --------------------------------------------------- model-level identity
-
-
-def _state_dicts_equal(a, b):
-    return set(a) == set(b) and all(torch.equal(a[k], b[k]) for k in a)
 
 
 def test_list_and_sum_build_the_identical_model():
@@ -243,12 +258,12 @@ def test_short_aliases_are_the_definitions():
     """LS is linear_shift, and both spellings build the same spec."""
     import tramdag as td
 
-    assert (I, LS, CS, VC) == (
+    assert (
         td.intercept,
         td.linear_shift,
         td.complex_shift,
         td.varying_coefficient,
-    )
+    ) == (I, LS, CS, VC)
     short = ContinuousNode(I("x") + LS("y") + CS("z") + VC("z", t="y"))
     long = ContinuousNode(
         td.intercept("x")
@@ -280,7 +295,7 @@ def test_units_survive_the_roundtrip():
         "b": ContinuousNode(CS("a", units=[16])),
     }
     back = spec_from_dict(spec_to_dict(spec))
-    assert back["b"].terms[0].units == (16,)
+    assert back["b"].terms[1].units == (16,)  # [0] is the canonical SI()
 
 
 def test_vc_modifiers_are_positional_t_is_keyword():
@@ -288,3 +303,56 @@ def test_vc_modifiers_are_positional_t_is_keyword():
     assert t.parents == ("T", "X2", "X3")  # internal layout: treatment first
     with pytest.raises(ValueError, match="cannot be both"):
         VC("T", t="T")
+
+
+def test_a_pre_0_4_spec_says_it_is_too_old():
+    """0.3 wrote a term's settings as sibling keys, not in "options".
+
+    Without this the loader raises a bare KeyError('options') from inside the
+    comprehension, which does not tell the reader their checkpoint is stale.
+    """
+    old_format = {
+        "x1": {"kind": "continuous", "terms": []},
+        "y": {
+            "kind": "continuous",
+            "terms": [{"effect": "VC", "parents": ["t", "x1"], "penalty": 2.5}],
+        },
+    }
+    with pytest.raises(ValueError, match=r"predates 0\.4"):
+        spec_from_dict(old_format)
+
+
+def test_basis_arguments_apply_without_naming_the_basis():
+    """SI(n_coeffs=40) must configure the default basis, not be ignored.
+
+    The effective transform used to be read only from a term that also set
+    `transform=`, so basis arguments on their own were silently dropped and
+    the reader got the default order with no indication.
+    """
+    node = ContinuousNode([SI(n_coeffs=40)])
+    assert node.transform == "bernstein"
+    assert node.transform_kwargs == {"n_coeffs": 40}
+    flow = CausalFlowDAG({"x": node}, seed=0)
+    assert flow.nodes["x"].ut.n_params == 40
+
+
+def test_a_source_node_is_canonical_too():
+    """None normalizes to [SI()]: equal, hashable, terms[0] is the intercept."""
+    assert ContinuousNode().terms == [SI()]
+    assert OrdinalNode(3).terms == [SI()]
+    assert ContinuousNode() == ContinuousNode([SI()])
+    assert hash(ContinuousNode()) == hash(ContinuousNode([SI()]))
+    assert len({ContinuousNode(), ContinuousNode([SI()]), OrdinalNode(3)}) == 2
+
+
+def test_spec_survives_a_json_roundtrip():
+    """Tuples come back as lists from json; spec_from_dict restores them."""
+    spec = {
+        "x": ContinuousNode([SI(transform="spline", bins=6)]),
+        "t": OrdinalNode(2, [LS("x")]),
+        "y": ContinuousNode([CI("x", units=[8, 8]), VC("x", t="t", units=[4])]),
+    }
+    back = spec_from_dict(json.loads(json.dumps(spec_to_dict(spec))))
+    assert back == spec
+    assert back["y"].terms[0].units == (8, 8)  # the CI intercept comes first
+    assert hash(back["y"].terms[1]) == hash(spec["y"].terms[1])

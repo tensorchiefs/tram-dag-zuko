@@ -1,0 +1,50 @@
+# Hyperparameters of the VACA/CNF benchmark (vaca.py).
+#
+# Every value the script uses is in this file: it reads no defaults of its
+# own and rejects a variant whose keys do not match exactly.
+
+# The paper does not state a training protocol for this benchmark (App. C.1
+# describes the DGP only), so every number below is this repository's choice,
+# carried over from the pre-0.4 script. One deliberate difference: that script
+# drew the observational sample at seed 0 and the interventional ones at seed 1;
+# here sample_seed covers both, which is why the interventional means moved
+# slightly when the restructure landed.
+
+#   * the reference implementation's own VACA comparison
+#     (comparison/Figure_Triangle_Linear_Bimodal.R) used M = 30, 10000 epochs
+#     and nTrain = 2500 — a different protocol from the one below, which comes
+#     from this repository's pre-0.4 script and is kept so the numbers stay
+#     comparable across the restructure.
+
+# The model architecture below IS the reference's: comparison/utils.R's
+# make_model, one net per node, dense(10, tanh) -> dense(100, tanh) ->
+# dense(len_theta). The training protocol is not, as noted above.
+#
+variants:
+  # all conditionals complex intercepts — the Gaussian, bimodal DGP is
+  # outside the logistic-latent family, so the transforms must do the work
+  flexible:
+    n_train: 18000
+    n_val: 2000
+    epochs: 400
+    learning_rate: 0.01
+    batch_size: 512
+    transform: bernstein        # stated rather than inherited
+    # from the reference comparison script: M = 30, len_theta = M + 1 = 31
+    # unconstrained coefficients. zuko ties two extra control points onto
+    # those to smooth the extrapolation, so the polynomial is order 32 where
+    # the reference's is order 30; the free-parameter count is what matches.
+    n_coeffs: 31
+    intercept_units: [10, 100]  # make_model's two dense layers
+    activation: tanh            # make_model's activation
+    chunk_epochs: 50            # each fit call restarts Adam: a warm-restart
+                                # schedule, and it matters (see helpers.py)
+    polish_epochs: 120          # second phase at a lower rate
+    polish_learning_rate: 0.001
+    dgp_seed: 42                # the paper's generator seed
+    init_seed: 7                # flow weight initialization
+    shuffle_seed: 0             # minibatch shuffling
+    sample_seed: 1
+    n_compare: 50000            # rows per interventional panel (Fig. 5)
+    n_scatter: 2000             # points per off-diagonal scatter (Fig. 4)
+    hist_bins: 60

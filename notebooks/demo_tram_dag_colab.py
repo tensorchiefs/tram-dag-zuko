@@ -49,11 +49,11 @@ if importlib.util.find_spec("tramdag") is None:  # Colab: install from PyPI
 
 import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd
 import scipy.stats as st  # for KDE plots only (preinstalled on Colab)
 import torch
 
 from tramdag import CausalFlowDAG, ContinuousNode, I
-from tramdag.simulations import VacaTriangle
 
 # tramdag reports fit() progress on its module logger
 logging.basicConfig(level=logging.INFO, format="%(message)s")
@@ -79,12 +79,60 @@ print(f"torch {torch.__version__}  device: {DEVICE}")
 # The DAG is $x_1 \to x_2$, $x_1 \to x_3$, $x_2 \to x_3$.
 
 # %%
-gen = VacaTriangle(seed=42)
-df = gen.observational(50_000)
+# The DGP, written out here so this notebook needs nothing but tramdag.
+# draw_latents/simulate are separate on purpose: keeping the noise lets us
+# intervene on the SAME individuals later, which is what makes the
+# counterfactual check in section 5 possible.
+
+
+def draw_latents(n, rng):
+    """Draw every noise variable of the SCM, n rows each."""
+    return {
+        "x1_mix": rng.uniform(size=n),  # which mixture component
+        "x1_a": rng.normal(size=n),  # N(-2, 1.5) branch
+        "x1_b": rng.normal(size=n),  # N(1.5, 1) branch
+        "x2": rng.normal(size=n),
+        "x3": rng.normal(size=n),
+    }
+
+
+def simulate(latents, do=None):
+    """Run the SCM forward; a variable named in `do` is clamped instead."""
+    do = do or {}
+    n = len(latents["x2"])
+
+    if "x1" in do:
+        x1 = np.full(n, float(do["x1"]))
+    else:
+        x1 = np.where(
+            latents["x1_mix"] < 0.5,
+            -2.0 + np.sqrt(1.5) * latents["x1_a"],
+            1.5 + latents["x1_b"],
+        )
+
+    if "x2" in do:
+        x2 = np.full(n, float(do["x2"]))
+    else:
+        x2 = -x1 + latents["x2"]
+
+    if "x3" in do:
+        x3 = np.full(n, float(do["x3"]))
+    else:
+        x3 = x1 + 0.25 * x2 + latents["x3"]
+
+    return pd.DataFrame({"x1": x1, "x2": x2, "x3": x3})
+
+
+def sample_dgp(n, seed, do=None):
+    """Draw n fresh rows from the SCM, optionally under an intervention."""
+    return simulate(draw_latents(n, np.random.default_rng(seed)), do)
+
+
+df = sample_dgp(50_000, seed=43)
 train, val = df.iloc[:45_000], df.iloc[45_000:]
 
 fig, axes = plt.subplots(1, 3, figsize=(11, 3))
-for ax, c in zip(axes, df.columns):
+for ax, c in zip(axes, df.columns, strict=True):
     ax.hist(df[c], bins=80, density=True, alpha=0.7)
     ax.set_title(f"observed ${c[0]}_{c[1]}$")
 fig.suptitle("50,000 observational samples — note the bimodal $x_1$")
@@ -142,7 +190,7 @@ tot_va = np.array([sum(d.values()) for d in hist["val"]])
 fig, ax = plt.subplots(figsize=(7.5, 3.6))
 ax.plot(ep, tot_tr, label="train NLL (total)")
 ax.plot(ep, tot_va, label="val NLL (total)")
-for i, (name, e) in enumerate(
+for _, (name, e) in enumerate(
     sorted(hist.get("frozen", {}).items(), key=lambda kv: kv[1])
 ):
     ax.axvline(e, ls="--", lw=1, color="gray")
@@ -195,14 +243,14 @@ plt.show()
 #
 # Graph mutilation: clamp $x_2$, cut its incoming edge, resample. Under the DGP,
 # $x_3\,|\,do(x_2{=}a) = x_1 + 0.25a + \mathcal N(0,1)$. Thus
-# $\mathbb E[x_3] = -0.25 + 0.25a$ **analytically**. This is a hard number to be
-# wrong about.
+# $\mathbb E[x_3] = -0.25 + 0.25a$ **analytically**. This exact target makes an
+# error easy to see.
 
 # %%
 fig, axes = plt.subplots(1, 3, figsize=(11, 3.2), sharey=True)
 print("E[x3 | do(x2=a)]:   analytic    TRAM-DAG")
-for ax, a in zip(axes, (-3.0, -1.0, 0.0)):
-    truth = gen.interventional(50_000, {"x2": a})
+for ax, a in zip(axes, (-3.0, -1.0, 0.0), strict=True):
+    truth = sample_dgp(50_000, seed=543, do={"x2": a})
     fl = flow.sample(50_000, do={"x2": a}, seed=2)
     bins = np.linspace(truth["x3"].quantile(0.001), truth["x3"].quantile(0.999), 70)
     # DGP histogram
@@ -220,7 +268,7 @@ fig.tight_layout()
 plt.show()
 
 # %% [markdown]
-# ## 5. Rung 3 — the counterfactual magic trick
+# ## 5. Rung 3 — counterfactuals for held-out individuals
 #
 # Take 1,000 **held-out** individuals. Step 1 (*abduction*): invert the flow to
 # recover the latent noise $u$ of each individual. This noise is everything
@@ -235,10 +283,9 @@ plt.show()
 # causal inference, and it is impossible with real data.
 
 # %%
-rng = np.random.default_rng(7)
-lat = gen.draw_latents(1_000, rng)
-factual = gen.simulate(latents=lat)
-cf_true = gen.simulate(latents=lat, do={"x1": 0.0})
+lat = draw_latents(1_000, np.random.default_rng(7))
+factual = simulate(lat)  # the same noise on both sides ...
+cf_true = simulate(lat, do={"x1": 0.0})  # ... so these are true counterfactuals
 
 u = flow.abduct(factual)
 recon = flow.sample(u=u)
@@ -247,7 +294,7 @@ print(f"abduction -> reconstruction: max |error| = {err:.2e}  (exact recovery)")
 
 cf_flow = flow.sample(do={"x1": 0.0}, u=u)
 fig, axes = plt.subplots(1, 2, figsize=(9, 3.6))
-for ax, c in zip(axes, ["x2", "x3"]):
+for ax, c in zip(axes, ["x2", "x3"], strict=True):
     ax.scatter(cf_true[c], cf_flow[c], s=4, alpha=0.4)
     lims = [cf_true[c].min(), cf_true[c].max()]
     ax.plot(lims, lims, "k--", lw=1)
@@ -329,6 +376,37 @@ plt.show()
 # why **Bernstein** is the TRAM-faithful default: its monotone softplus-cumsum
 # parametrization is easier to optimize. You can swap the transform per node at
 # any time with `I(..., transform="spline", bins=16)`.
+
+# %% [markdown]
+# ### Misspecification bends causal answers, not just the likelihood
+#
+# The transform choice propagates into the *interventional* distribution — and
+# the **mean** is forgiving. All three models get
+# $\mathbb{E}[x_3 \mid do(x_2)]$ right to a few hundredths, because the shifts
+# are right in each. What differs is the **shape**, so every query that reads the
+# shape — tail probabilities, quantiles, the spread of individual effects —
+# inherits the misfit. Compare a tail probability against the DGP:
+
+# %%
+truth_do = sample_dgp(50_000, seed=543, do={"x2": 0.0})["x3"]
+print("under do(x2=0):        E[x3]     P(x3 < -3)")
+print(
+    f"  DGP                  {truth_do.mean():+.3f}      "
+    f"{float((truth_do < -3).mean()):.4f}"
+)
+for tr in ("bernstein", "spline", "affine"):
+    drawn = fits[tr].sample(50_000, do={"x2": 0.0}, seed=4)["x3"]
+    print(
+        f"  {tr:9s}            {drawn.mean():+.3f}      "
+        f"{float((drawn < -3).mean()):.4f}"
+    )
+
+# %% [markdown]
+# The means agree while the tails do not, and the ranking changes: the
+# under-trained spline misses $P(x_3 < -3)$ by about two thirds and affine by
+# roughly a sixth, though both looked fine on the mean. A model can be "close
+# enough" on average and still be wrong about the question you actually asked —
+# which is why the transform is a modelling decision, not a default to inherit.
 
 # %% [markdown]
 # ## 7. GPU vs CPU

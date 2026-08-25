@@ -1,0 +1,76 @@
+# Hyperparameters of the continuous-triangle replication (triangle.py).
+#
+# Every value the script uses is in this file. It reads no defaults of its own,
+# and the loader rejects a variant whose keys do not match what the script
+# declares — so nothing can be silently inherited from the framework.
+#
+# Provenance, from two sources:
+#   * the paper (App. C.3 preamble) states 40000 samples, 500 epochs, Adam at
+#     lr 0.001 and Bernstein order M = 20;
+#   * the paper's own implementation
+#     (tensorchiefs/tram-dag, summerof24/triangle_structured_continous.R) adds
+#     hidden_features_CS = c(2, 25, 25, 2) and, in create_param_net, sigmoid
+#     activations — its ReLU line is commented out.
+# Everything else — the batch size, the 90/10 split, the chunk size and every
+# seed — is this repository's choice, carried over from the pre-0.4 scripts so
+# the numbers stay comparable.
+
+paper_protocol: &paper_protocol
+  # from the paper: n = 40000 (split 90/10 below), 500 epochs, Adam at lr 1e-3
+  n_train: 36000
+  n_val: 4000
+  epochs: 500
+  learning_rate: 0.001
+  batch_size: 512
+  chunk_epochs: 10        # epochs per fit call; snapshots ride on the boundaries
+  # the monotone transform, stated rather than inherited
+  transform: bernstein    # from the paper: Bernstein polynomials
+  # from the reference: len_theta = 20 "Number of coefficients of the
+  # Bernstein polynomials". These are the unconstrained coefficients; zuko
+  # ties two more control points onto them to smooth the extrapolation, so
+  # this polynomial is order 21 where the reference's is order 19 and the
+  # paper's text says 20. The free-parameter count is what matches.
+  n_coeffs: 20
+  dgp_seed: 42            # the paper's generator seed
+  init_seed: 7            # flow weight initialization
+  shuffle_seed: 0         # minibatch shuffling
+  sample_seed: 0          # sampling for the distribution comparisons
+  n_compare: 10000        # rows per distribution panel (Fig. 16/17)
+  do_x1: -1.0             # the paper's L2 query, do(x1 = -1)
+  grid_low: -1.0          # x2 grid of the complex-shift overlay (Fig. 7 right)
+  grid_high: 1.0
+  grid_points: 81
+
+# the shift network, from the reference implementation. Only a complex-shift
+# variant has a network, so these keys appear only there — an ls variant that
+# carried them would be claiming a setting it never uses.
+reference_net: &reference_net
+  shift_units: [2, 25, 25, 2]   # hidden_features_CS in the reference
+  activation: sigmoid           # create_param_net's activation
+
+variants:
+  # the linear DGP is the only one with a true beta23 (+0.3) to recover
+  linear-ls:
+    <<: *paper_protocol
+    f: linear
+    shift: ls
+
+  # the misspecified case (paper App. C.3.3, Fig. 17): the DGP's x2 -> x3
+  # effect is linear, but it is fitted with a complex shift, which must
+  # recover that straight line instead of bending to noise
+  linear-cs:
+    <<: [*paper_protocol, *reference_net]
+    f: linear
+    shift: cs
+
+  # the headline complex-shift experiment (Fig. 7/15/16)
+  atan-cs:
+    <<: [*paper_protocol, *reference_net]
+    f: atan
+    shift: cs
+
+  # a second nonlinear f, to show the shift recovery is not atan-specific
+  sin-cs:
+    <<: [*paper_protocol, *reference_net]
+    f: sin
+    shift: cs

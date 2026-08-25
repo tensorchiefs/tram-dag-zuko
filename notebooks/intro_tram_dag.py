@@ -55,7 +55,7 @@
 #
 # This **observed → latent** map is the convention of the paper (Eq. 2,
 # $F_{X\mid\mathrm{pa}}(x)=F_U\!\big(h(x\mid\mathrm{pa})\big)$) and of the code
-# (in code: `z = h(x) + shift`). It is also the **training direction**: the model
+# (in code: `u = h(x) + shift`). It is also the **training direction**: the model
 # evaluates $h$ *directly* to score the likelihood, which is cheap. **Sampling**
 # runs the inverse $x_i = h^{-1}(u_i \mid \mathrm{pa})$. This inverse has no
 # closed form, so bracketed bisection solves it. That is the costlier direction.
@@ -291,7 +291,7 @@ df.describe().round(2)
 
 # %%
 fig, axes = plt.subplots(1, 3, figsize=(11, 3.2))
-for ax, (a, b) in zip(axes, [("X1", "X2"), ("X1", "X3"), ("X2", "X3")]):
+for ax, (a, b) in zip(axes, [("X1", "X2"), ("X1", "X3"), ("X2", "X3")], strict=True):
     ax.scatter(df[a], df[b], s=3, alpha=0.25)
     ax.set_xlabel(a), ax.set_ylabel(b)
 axes[2].set_title("the U-shape of the complex shift", fontsize=9)
@@ -336,8 +336,17 @@ flow.nll(val_df)
 # %% [markdown]
 # ## 4. Anatomy: the spec *is* the additive decomposition
 #
-# Section 1 showed the decomposition on paper. Here we read it directly from the
-# **fitted** flow. Two small helpers do the job. `describe_node` reports which
+# Before the per-node detail, the whole model at a glance. `flow.to_matrix()`
+# labels every edge with the term that carries it — this is the paper's
+# **meta-adjacency matrix** (Fig. 3), and it is generated from the fitted
+# object rather than drawn by hand, so it cannot disagree with the model:
+
+# %%
+print(flow.to_matrix())
+
+# %% [markdown]
+# Rows are parents, columns children; an empty cell means no edge. Now read the
+# same structure node by node, directly from the **fitted** flow. Two small helpers do the job. `describe_node` reports which
 # network carries each parent (the structural view). `decompose_row` prints the
 # actual numbers for one observation and verifies that they rebuild the per-node
 # log-likelihood **exactly**. The equation $u = h_{\boldsymbol{\vartheta}}(x) + \sum \text{shifts}$ is an
@@ -421,7 +430,7 @@ for nm in ["X2", "X3", "Y"]:
 samp = flow.sample(len(df), seed=0)
 
 fig, axes = plt.subplots(1, 4, figsize=(13, 3))
-for ax, col in zip(axes[:3], ["X1", "X2", "X3"]):
+for ax, col in zip(axes[:3], ["X1", "X2", "X3"], strict=True):
     bins = np.linspace(df[col].min(), df[col].max(), 60)
     ax.hist(df[col], bins=bins, density=True, alpha=0.45, label="data")
     ax.hist(
@@ -572,7 +581,7 @@ print(
 # %%
 rng_iv = np.random.default_rng(123)
 fig, axes = plt.subplots(1, 2, figsize=(10, 3.4), sharey=True)
-for ax, a in zip(axes, [-1.0, 1.0]):
+for ax, a in zip(axes, [-1.0, 1.0], strict=True):
     truth, _ = simulate(20000, rng_iv, x1=a)
     fl = flow.sample(20000, do={"X1": a}, seed=5)
     fls = flow_ls.sample(20000, do={"X1": a}, seed=5)
@@ -658,7 +667,7 @@ u_val = {k: v[5000:] for k, v in u_obs.items()}
 cf_true, _ = simulate(len(val_df), rng, x1=0.0, u=u_val)
 
 fig, axes = plt.subplots(1, 2, figsize=(9, 3.4))
-for ax, col in zip(axes, ["X2", "X3"]):
+for ax, col in zip(axes, ["X2", "X3"], strict=True):
     ax.scatter(cf_true[col], cf_flow[col], s=5, alpha=0.4)
     lims = [cf_true[col].min(), cf_true[col].max()]
     ax.plot(lims, lims, "k--", lw=1)
@@ -675,20 +684,21 @@ plt.show()
 # ## 9. Where to go from here
 #
 # * **Complex intercepts (`I(...)`)** — this is the one component not exercised
-#   here. Declare `terms=[I("Age")]`, and the *parameters* of the
+#   here. Declare `ContinuousNode(I("Age"))`, and the *parameters* of the
 #   Bernstein transform become a function of the parent. Several `I(...)` parents
-#   feed one joint network, that is, they can interact. The stroke experiments in
+#   feed one joint network, that is, they can interact. The paper replications in
 #   `experiments/` use `I(...)` heavily. Run
-#   `uv run python experiments/sim_flow.py nl` for the full storyline on the
-#   synthetic cohort with known ground truth.
+#   `uv run python -m paper.vaca flexible` (from `experiments/`) for an all-intercept flow on a
+#   bimodal benchmark with analytic interventional truth.
 # * **Early stopping vs. exact MLE** — this notebook's DGP has no unobserved
 #   confounding, so the MLE (`restore_best=False`, the default) is the right
-#   target. On the synthetic stroke cohort, flexible (`I`/`CS`) models *overfit
-#   observational confounding* at the MLE and need `restore_best=True` to recover
-#   the causal effect. See `CHANGELOG.md` and the README's "Results" notes.
+#   target. Under observational confounding, flexible (`I`/`CS`) models can
+#   *overfit the confounding* at the MLE and need `restore_best=True` to recover
+#   the causal effect. See `CHANGELOG.md`.
 # * **Validation against classical models** — an all-`LS` flow trained to
 #   convergence *is* the classical proportional-odds MLE
-#   (`experiments/validate_ls.py` pins flow ≡ `statsmodels` ≡ R `polr`).
+#   (`experiments/misc/validate_ls.py` pins flow ≡ `statsmodels` ≡ R `polr`, and the
+#   framework tests check the same identity on an inline DGP).
 # * **Joint terms** — write several parents inside one term to model an
 #   *interaction*. `CS("x1", "x2")` is a single shift network $g(x_1, x_2)$, and
 #   `I("x1", "x2")` is a single intercept network over both parents. Separate

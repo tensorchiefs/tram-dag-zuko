@@ -14,8 +14,8 @@ Because every shift coefficient enters the latent additively, the scores are
 **analytic and exact** (no autograd): ``d l_i / d beta = (d l_i / d s_i) * x_i``
 with the latent-scale derivative in closed form —
 
-- continuous node (``z = h(x) + s``, standard-logistic latent):
-  ``d l / d s = 1 - 2 sigmoid(z)``;
+- continuous node (``u = h(x) + s``, standard-logistic latent):
+  ``d l / d s = 1 - 2 sigmoid(u)``;
 - ordinal node (``P(Y<=k) = sigmoid(theta_k - s)``):
   ``d l / d s = (sig'(l) - sig'(u)) / (sig(u) - sig(l))`` with ``l``/``u`` the
   observed level's shifted cutpoint bounds.
@@ -25,6 +25,7 @@ The public entry points are the ``CausalFlowDAG`` methods
 :meth:`~tramdag.CausalFlowDAG.effect_modifier_scan`. Both delegate here.
 """
 
+# %% imports ---------------------------------------------------------------------------
 from __future__ import annotations
 
 import math
@@ -37,12 +38,14 @@ from .conditioners import LinearShift
 from .spec import OrdinalNode
 from .transforms import _bounds
 
-__all__ = ["node_scores", "effect_modifier_scan", "sup_bb_pvalue"]
+# %% global variables ------------------------------------------------------------------
+__all__ = ["effect_modifier_scan", "node_scores", "sup_bb_pvalue"]
 
 # 5% critical value of sup |Brownian bridge| (Kolmogorov distribution)
 CRIT_5PCT = 1.3581
 
 
+# %% private functions -----------------------------------------------------------------
 def _dl_ds(
     nd, feats: dict, x: torch.Tensor, n: int, vc_ehat: dict | None = None
 ) -> torch.Tensor:
@@ -60,6 +63,42 @@ def _dl_ds(
     return (sl * (1 - sl) - su * (1 - su)) / (su - sl)
 
 
+def _ls_score_columns(
+    flow, ls_groups: list, feats: dict, dlds: torch.Tensor
+) -> dict[str, np.ndarray]:
+    """Give the score columns of the ``LS`` coefficients.
+
+    Parameters
+    ----------
+    flow : CausalFlowDAG
+        The fitted flow, to look up parent kinds.
+    ls_groups : list
+        The ``(key, parents)`` shift groups whose conditioner is a
+        :class:`~tramdag.conditioners.LinearShift`.
+    feats : dict
+        The encoded parent features.
+    dlds : torch.Tensor
+        ``d l_i / d s_i``, shape ``(n,)``.
+
+    Returns
+    -------
+    dict[str, np.ndarray]
+        One entry per coefficient: a continuous parent gives one column
+        named after the parent, an ordinal parent one column per one-hot
+        level, named ``"{parent}[{k}]"``.
+    """
+    cols: dict[str, np.ndarray] = {}
+    for key, (parent,) in ls_groups:  # an LS term has exactly one parent
+        psi = (dlds.unsqueeze(1) * feats[parent]).cpu().numpy()
+        if isinstance(flow.spec[parent], OrdinalNode):
+            for k in range(psi.shape[1]):  # one column per one-hot level
+                cols[f"{parent}[{k}]"] = psi[:, k]
+        else:
+            cols[key] = psi[:, 0]
+    return cols
+
+
+# %% public functions ------------------------------------------------------------------
 def node_scores(flow, df: pd.DataFrame, node: str) -> pd.DataFrame:
     """Compute the per-observation scores of the interpretable coefficients.
 
@@ -104,7 +143,7 @@ def node_scores(flow, df: pd.DataFrame, node: str) -> pd.DataFrame:
     ]
     if not ls_groups and not nd._vc_groups:
         raise ValueError(
-            f"node {node!r} has no LS or VC terms. params='shift' scores need "
+            f"node {node!r} has no LS or VC terms. Shift scores need "
             "at least one interpretable shift coefficient."
         )
 
@@ -118,34 +157,20 @@ def node_scores(flow, df: pd.DataFrame, node: str) -> pd.DataFrame:
     ehat = flow._vc_ehat_live(nd, values, len(df))
     dlds = _dl_ds(nd, feats, values[node], len(df), vc_ehat=ehat)
 
-    cols: dict[str, np.ndarray] = {}
-    for key, ps in ls_groups:
-        feat = (
-            feats[ps[0]] if len(ps) == 1 else torch.cat([feats[p] for p in ps], dim=1)
-        )
-        psi = (dlds.unsqueeze(1) * feat).cpu().numpy()
-        if len(ps) == 1 and isinstance(flow.spec[ps[0]], OrdinalNode):
-            for k in range(psi.shape[1]):
-                cols[f"{ps[0]}[{k}]"] = psi[:, k]
-        else:  # LS is single-parent, so a non-ordinal parent is one column
-            cols[key] = psi[:, 0]
-    for g in nd._vc_groups:
-        t = feats[g.on][:, -1:] if g.on_is_ord else feats[g.on]
-        if g.center:  # d s / d beta0 = t - e_hat(x)
-            t = t - ehat[g.on].view(-1, 1)
+    cols = _ls_score_columns(flow, ls_groups, feats, dlds)
+    for g in nd._vc_groups:  # d s / d beta0 is the term's own regressor
+        t = nd.vc_column(g, feats, ehat)
         cols[g.on] = (dlds * t.squeeze(-1)).cpu().numpy()
     return pd.DataFrame(cols, index=df.index)
 
 
-def sup_bb_pvalue(stat: float, terms: int = 100) -> float:
+def sup_bb_pvalue(stat: float) -> float:
     """Give ``P(sup |Brownian bridge| > stat)``, the Kolmogorov series.
 
     Parameters
     ----------
     stat : float
         Observed supremum statistic.
-    terms : int, optional
-        Number of series terms, by default 100.
 
     Returns
     -------
@@ -153,10 +178,10 @@ def sup_bb_pvalue(stat: float, terms: int = 100) -> float:
         The p-value, clipped to [0, 1].
     """
     if stat <= 0:
-        return 1.0
+        return 1.0  # the series alternates to 0.0 here, which is the wrong tail
+    # 100 terms: the k-th is exp(-2k^2 stat^2), so past k ~ 10 it underflows
     s = sum(
-        (-1) ** (k + 1) * math.exp(-2.0 * k * k * stat * stat)
-        for k in range(1, terms + 1)
+        (-1) ** (k + 1) * math.exp(-2.0 * k * k * stat * stat) for k in range(1, 101)
     )
     return min(1.0, max(0.0, 2.0 * s))
 

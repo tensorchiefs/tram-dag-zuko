@@ -7,6 +7,7 @@ zero column-mean over the centering data; and (c) purely post-hoc — it changes
 nothing about the model or its outputs.
 """
 
+# %% imports ---------------------------------------------------------------------------
 import numpy as np
 import pandas as pd
 import pytest
@@ -15,6 +16,7 @@ import torch
 from tramdag import LS, CausalFlowDAG, ContinuousNode, I, OrdinalNode
 
 
+# %% private functions -----------------------------------------------------------------
 def _data(n=400, seed=0):
     rng = np.random.default_rng(seed)
     x1 = rng.normal(size=n)
@@ -33,6 +35,7 @@ def _additive_ci_flow():
     return CausalFlowDAG(spec, seed=1)
 
 
+# %% public functions ------------------------------------------------------------------
 # ------------------------------------------------ exactness of the decomposition
 def test_baseline_plus_contributions_reproduces_theta():
     flow = _additive_ci_flow()
@@ -49,7 +52,7 @@ def test_baseline_plus_contributions_reproduces_theta():
     with torch.no_grad():
         theta = sum(
             net(torch.cat([feats[p] for p in grp], dim=1))
-            for net, grp in zip(nd.intercept_nets, nd._intercept_groups)
+            for net, grp in zip(nd.intercept_nets, nd._intercept_groups, strict=True)
         )
     np.testing.assert_allclose(recon, theta.numpy(), rtol=1e-5, atol=1e-5)
 
@@ -60,7 +63,7 @@ def test_contributions_are_mean_centered():
     df = _data()
     res = flow.intercept_contributions("x3", df)
     assert set(res["contributions"]) == {"x1", "x2"}
-    for label, contrib in res["contributions"].items():
+    for contrib in res["contributions"].values():
         # each column (transform parameter) averages to ~0 over the rows
         np.testing.assert_allclose(contrib.mean(axis=0), 0.0, atol=1e-6)
 
@@ -94,7 +97,7 @@ def test_ordinal_additive_ci():
 
 # --------------------------------------- transform-agnostic (spline / affine too)
 @pytest.mark.parametrize(
-    "transform,P", [("bernstein", None), ("spline", 3 * 8 - 1), ("affine", 2)]
+    ("transform", "P"), [("bernstein", None), ("spline", 3 * 8 - 1), ("affine", 2)]
 )
 def test_works_for_any_continuous_transform(transform, P):
     spec = {
@@ -116,7 +119,7 @@ def test_works_for_any_continuous_transform(transform, P):
     with torch.no_grad():
         theta = sum(
             net(torch.cat([feats[p] for p in grp], dim=1))
-            for net, grp in zip(nd.intercept_nets, nd._intercept_groups)
+            for net, grp in zip(nd.intercept_nets, nd._intercept_groups, strict=True)
         )
     np.testing.assert_allclose(recon, theta.numpy(), rtol=1e-5, atol=1e-5)
     for contrib in res["contributions"].values():
@@ -181,5 +184,5 @@ def test_does_not_mutate_model_outputs():
     flow.intercept_contributions("x3", df)
     after = flow.log_prob(df).detach().numpy()
     np.testing.assert_array_equal(before, after)
-    for a, b in zip(params_before, flow.parameters()):
+    for a, b in zip(params_before, flow.parameters(), strict=True):
         assert torch.equal(a, b)

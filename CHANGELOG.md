@@ -4,12 +4,54 @@
 
 ### Added
 
+- **A source node is canonical too.** `ContinuousNode()` and `OrdinalNode(k)`
+  now hold `[SI()]` instead of `None`, so `node.terms[0]` really is always
+  the intercept, `ContinuousNode() == ContinuousNode([SI()])`, and node
+  specs are hashable (a set of nodes used to raise `TypeError`).
+- **Specs round-trip through JSON.** `spec_to_dict` was already JSON-safe on
+  the way out; `spec_from_dict` now turns the lists JSON gives back into the
+  tuples `Term` stores, so a spec saved with `json` compares equal and
+  hashes the same as the one written.
+- **The inverse warns when a latent escapes its search bracket.** The
+  expanding bisection behind `sample` used to clip such an element to the
+  bracket edge silently; it now emits a `RuntimeWarning` naming how many
+  values were affected.
+
+- **Paper-aligned intercept constructors**: `simple_intercept`/`SI` (the
+  parentless baseline) and `complex_intercept`/`CI` (needs at least one
+  parent), matching the paper's SI/CI notation. `intercept`/`I` stays as
+  the fallback and dispatches on its arguments, so every existing spelling
+  keeps working, and both `I` and `SI` work as bare names in a term list.
+
+- **The experiments are self-contained and configuration-driven.** One
+  script per dataset (`triangle`, `triangle_mixed`, `vaca`, `carefl`,
+  `validate_ls`), each with the same shape — imports, function
+  definitions, a `run(variant)` function, a `__main__` block whose
+  argparse call selects the variant — and each reading **every**
+  hyperparameter from a sibling `<script>.yaml`. The loader rejects a
+  variant with a missing or unknown key, so a value cannot quietly become
+  a default. `experiments/paper/PAPER_COVERAGE.md` maps every figure of
+  arXiv:2503.16206 to the variant that reproduces it, including the
+  paper's misspecified case (Fig. 17, new variant `triangle linear-cs`)
+  and the two competing baselines that are deliberately not reimplemented.
+
+- **An experiments workflow** (`.github/workflows/experiments.yaml`) runs
+  all replication variants as a matrix on every push and on demand,
+  compares each run's `metrics.json` against the committed
+  `experiments/<area>/ground_truth/<name>.json` (a `{value, atol}` entry
+  per metric, or `{max}` for an error measure), and posts the run's report — metrics table plus figures — as a
+  commit comment through CML. `experiments/paper/check_data.py` additionally
+  verifies that every frozen dataset still regenerates from its stored
+  seed, at 1e-9 rather than bit equality.
+
 - **Transformation syntax**: a node's additive formula is now its first
   positional argument and can be written as a `+` sum — the formula reads
   like the math (`ContinuousNode(I("x1") + CS("x2"))`,
   `OrdinalNode(4, [I, LS("x1")])`). New on `I`:
-  `allow_interaction=False` (multi-parent intercept becomes additive,
-  `I("a","b", allow_interaction=False) == I("a") + I("b")`) and
+  `allow_interaction=False` (a multi-parent intercept becomes additive: one net
+  per parent, their coefficient vectors summed — written
+  `CI("a","b", allow_interaction=False)`, since a node takes at most one
+  intercept term with parents) and
   `transform=` (the monotone basis moves onto the intercept term,
   e.g. `I("x1", transform="spline")`; extra keyword arguments pass
   straight to the transform class, `I("x1", transform="spline", bins=6)`).
@@ -27,10 +69,6 @@
   memory). The plateau lr floor (`1e-3 * learning_rate`) and the freeze
   guard (`1e-2 * learning_rate`) are documented in the `fit` docstring.
 
-- **Paper-aligned intercept constructors**: `simple_intercept`/`SI`
-  (parentless baseline) and `complex_intercept`/`CI` (needs parents);
-  `intercept`/`I` stays as the fallback and dispatches on its arguments.
-
 - **Pythonic names for every term constructor**, with the short
   notation kept as an alias of the same object: `intercept`/`I`,
   `linear_shift`/`LS`, `complex_shift`/`CS` and
@@ -44,6 +82,114 @@
 
 ### Fixed
 
+- **`check.py` had no test, and the escape hatch it grew hid the thing it was
+  meant to expose.** A `"why"` on a `{max}` entry silenced *both* edges of the
+  band check, so three `validate_ls` bounds sat 12x, 141x and 566x above their
+  measurements — one of them the entry introduced as "the precision claim" —
+  and a fabricated 560x regression passed with an `ok`. A `"why"` now excuses
+  width only; no argument survives a bound below 1.5x its measurement. The
+  three bounds are re-derived from a stated floor (1e-3, the accuracy any
+  comparison here claims) rather than inherited from the classical variant,
+  whose scale they do not share.
+
+  The other decay mode had no check at all: a `{value, atol}` center keeps
+  passing while drifting through its tolerance, which is exactly how two
+  centers reached 62% and 75% before anyone noticed. A measurement past half
+  its `atol` is now reported the same way.
+
+  `experiments/tests/test_check.py` covers all of it — including that a better
+  fit never fails a `{max}`, that a `"why"` cannot silence a too-tight bound,
+  and that a truth entry whose metric disappeared is an error. It is the first
+  test the file has had, and the band logic had never run on a real input:
+  every committed bound was inside the band.
+
+- **vaca's ground truth pinned each flow mean *and* bounded its error against
+  the analytic truth.** Those are two windows on one number, offset by
+  `|center - analytic|`, and they disagreed: a run landing exactly on the
+  pinned `do(x2=-3)` mean would have failed its own paired bound (error 0.0605
+  against a bound of 0.0324). Setting the `atol` to the bound, as a first
+  attempt did, does not fix it unless the center *is* the analytic value. The
+  three centers are gone; the analytic value and the error bound determine the
+  flow mean between them, and the run report still prints it.
+
+- **The autoresearch write guard did not cover the numbers.** It denied edits
+  to `tests/`, `data/` and the benchmark harness — but the target values moved
+  to `experiments/*/ground_truth/` in this release, and that path was
+  unguarded.
+
+- **The ordinal counterfactual score had a reference point that was not a
+  bound.** `cf_prob_true_level_ceiling` was documented as "the best any model
+  could do". It is `E[p_true] = E[sum_i p_i^2]`: what a model that knew the
+  identifiable law exactly would score. The largest *expected* score is
+  `E[max_i p_i]`, from always naming the *modal* level — a strictly worse
+  distribution estimate. The metric is now `cf_prob_true_level_analytic`, with
+  `cf_prob_true_level_mode_bound` alongside it (0.921 and 0.954 on the mixed
+  DGP). This surfaced when the corrected architecture pushed the flow to 0.924,
+  i.e. *above* its own stated ceiling.
+
+  Both references are expectations while the metric is one finite draw, so
+  neither is a per-run ceiling either: on the `linear` DGP the mode predictor
+  scores **0.829** against its own 0.806 expectation, an overshoot larger than
+  the 0.003 gap the metric was introduced to explain. Measured, after a review
+  called the first wording ("the attainable maximum") false. Read the two as
+  reference points a run sits between, and `cf_pmf_tv_vs_analytic` as the
+  metric that cannot be gamed by sharpening a prediction.
+
+- **Ground-truth centers now follow the code.** The architecture change moved
+  every complex-shift variant, but only two files were re-pinned, so several
+  `{value}` centers described a net that no longer runs — `triangle-atan-cs`'s
+  interventional mean had consumed 62% of its tolerance, `triangle-sin-cs`'s
+  beta13 75%. All centers are re-measured. `{max}` bounds are now kept inside a
+  band instead of hand-tuned: useful between 1.5x and 4x the measurement, set
+  to 2.5x outside it. Below 1.5x is not hypothetical — one bound at 1.7x passed
+  locally at 0.028 and failed CI at 0.113, because its maximum is over a
+  coefficient with 7 of 1275 observations. That comparison is now split into
+  `max_abs_diff_named_coefs` (Age, NIHSSa, the treatment contrast: the
+  precision claim, ~1e-3) and the all-coefficient maximum (a sanity bound).
+
+- **Two of the four paper replications used the wrong reference
+  architecture.** The reference implementation has two: the triangle
+  scripts use `hidden_features_I = hidden_features_CS = c(2,25,25,2)` with
+  sigmoid, while its own CAREFL and VACA comparisons use
+  `comparison/utils.R::make_model` — one net per node,
+  `dense(10, tanh) -> dense(100, tanh) -> dense(len_theta)`, with `M = 30`.
+  `vaca.yaml` and `carefl.yaml` cited the first while replicating the
+  second. On the correct net CAREFL improves on every previously committed
+  number (counterfactual MAE 0.078/0.059/0.086 against bounds
+  0.216/0.174/0.219) and VACA's off-manifold `do(x2=-3)` mean lands 0.037
+  from the analytic truth instead of 0.21. Ground truth re-pinned, and the
+  `{max}` bounds re-pinned into a band — see the later entry on ground-truth
+  centers for the rule that replaced this pass's first attempt at one.
+
+- **The `conditioners` provenance claim was wrong.** The module, README,
+  CLAUDE.md and `docs/code-map.md` all said the default architectures come
+  from "the original Keras implementation (`tram_models.py` in
+  tensorchiefs/tram-dag)". That repository is pure R and has no Python in
+  it. The defaults come from the PyTorch reference this package grew out
+  of (buehlpa/TramDag, `tram_models.py`:
+  `ComplexShiftDefaultTabular` 64-128-64 ReLU,
+  `ComplexInterceptDefaultTabular` 8-8 ReLU, `n_thetas=20`) — which is
+  also why `DEFAULT_ACTIVATION` is relu. Corrected in all four places,
+  each of which now also says these are *not* the paper's nets, so a
+  replication states `units=` and `activation=` itself.
+
+- **The `n_coeffs` documentation was off by two control points.** zuko
+  constrains `n` unconstrained coefficients into `n + 2` monotone control
+  points, duplicating the end differences for a smooth extrapolation, so
+  `n_coeffs=20` is a degree-21 polynomial where the reference's
+  `len_theta=20` is degree 19. The configs claimed "order M = 20 from the
+  paper"; they now state the mapping and that the free-parameter count is
+  what matches.
+
+- **`ls_coefficients()` crashed on a node mixing `LS` and `CS` terms.** It
+  read `.weight` off every shift module, but a `CS` shift is a network and
+  a `VC` shift is an effect head — neither has one, so any such node raised
+  `AttributeError`. That broke the paper's headline complex-shift
+  replication (the old `paper_triangle.py`'s documented default was
+  `atan cs`). The method now returns the linear-shift weights it is named
+  for and skips network shifts; a node with no `LS` term is absent from the
+  result. The bug predates 0.4 (`tests/test_api_papercuts.py`).
+
 - **`marginal_init` no longer resets a loaded model.** The calibration is
   first-fit-only. A continuous node's guard is the transform's `_fitted`
   flag, which `load` restores; an ordinal node's guard lived on the
@@ -53,6 +199,23 @@
   (`tests/test_marginal_init.py`).
 
 ### Removed (breaking)
+
+- **`tramdag.simulations` is no longer part of the package.** The SCM
+  generators are research code and moved to `experiments/simulations/`,
+  together with the frozen datasets (`data/` → `experiments/data/`). The
+  wheel now contains framework code only, and `import tramdag.simulations`
+  fails. The stroke storyline left with them: the `magic_mrclean` generator,
+  the `magic-mrclean/nl` cohort, `sim_flow.py`, the `vc_shift` DGP,
+  `experiments/stale/` and `docs/stroke-case-study.md` are deleted, and the
+  clinical case study lives in its own repository.
+  `experiments/data/magic-mrclean/ls` stays as the frozen input of
+  `validate_ls`. **Everything deleted is recoverable at the
+  `pre-experiments-cut` tag**: `git checkout pre-experiments-cut -- <path>`.
+
+- **`transform_kwargs=`** on the intercept constructors. Extra keyword
+  arguments now pass straight to the transform class:
+  `I("x1", transform="spline", bins=6)`. The canonical storage inside
+  `Term.options` is unchanged, so serialized specs are unaffected.
 
 - **`fit(schedule=)` keeps `None` and `"plateau"` only.** `"onecycle"`
   and `"cosine"` had no caller outside one parametrized test, and the
@@ -81,11 +244,12 @@
 - **`Term.slot`** — derived from `effect`, and its only user in the repo
   was a test assertion.
 
-- The `terms=` keyword (use the first positional argument), node-level
-  `ContinuousNode(transform=/transform_kwargs=)` (choose the basis on the
-  intercept term, `I(..., transform="spline")`), the unused
-  `Intercept`/`LinShift`/`CShift` aliases, and the `parents={...}`
-  checkpoint loader.
+- Node-level `ContinuousNode(transform=/transform_kwargs=)` (choose the
+  basis on the intercept term instead, `I(..., transform="spline")`), the
+  unused `Intercept`/`LinShift`/`CShift` aliases, and the `parents={...}`
+  checkpoint loader. The terms argument itself is unchanged and still
+  accepts its name: `ContinuousNode(terms=[...])` and
+  `ContinuousNode([...])` are the same call.
 - The unmaintained notebooks and experiment scripts moved to
   `notebooks/stale/` and `experiments/stale/`; the maintained set is
   the intro and Colab demo notebooks plus `sim_flow.py` and
@@ -101,6 +265,36 @@
   `experiments/common.py::build_spec`).
 
 ### Changed (breaking)
+
+- **`fit(epochs=)` is required.** There is no default training budget any
+  more. `docs/training-speed.md` measures a fixed budget going wrong in both
+  directions on this repo's own workloads — the stroke fit converges after
+  ~1500 of 4000 budgeted epochs, the vaca fit is 0.03 nats short at 520 — so
+  a package-level number could only be arbitrary. `fit()` without `epochs`
+  now raises with that reason and names the alternative (a generous budget
+  with `schedule="plateau"` and `freeze_patience=`). 50 of the 51 `fit`
+  calls in this repo already passed it — the exception is an internal proxy
+  fit that supplies its own.
+
+- **`fit(plateau_patience=)` default 15 -> 30**, the value
+  `docs/training-speed.md` recommends after measuring the per-node plateau
+  trainer against the hand-tuned two-phase schedule. No caller in the repo
+  used the default.
+
+- **`make_univariate_transform` raises `KeyError`, not `ValueError`.** The
+  registry lookup speaks for itself; this package no longer re-words the
+  failure of the dict it owns. The docstring said `ValueError` even before,
+  so an `except ValueError` around a spec built from a hand-edited checkpoint
+  never caught anything.
+
+- **Single-value keyword arguments that no caller ever set became
+  constants**: `StandardLogistic.sample(eps=)`/`icdf(eps=)` (`_U_EPS`),
+  `BernsteinUT.marginal_init_theta(q=)` (`RANGE_Q`),
+  `ordinal_marginal_init_theta(eps=)` (`_CDF_EPS`) and
+  `scores.sup_bb_pvalue(terms=)`. `RANGE_Q` is now shared with
+  `_set_ranges`, which hard-coded the same 0.05: the two only calibrate
+  each other when they agree, so any other `q` was a silent
+  miscalibration rather than a setting.
 
 - **`VC(*modifiers, t=...)`**: the positional arguments are the
   covariates that enter `b_theta`; the treatment `t` is a required
@@ -127,6 +321,29 @@
 
 ### Changed (internal, no API surface)
 
+- **Every complexity hotspot is dissolved into named stages** — `fit`
+  (cognitive complexity 103 → 10), `validate_and_sort` (65 → 1),
+  `_Node.__init__`, `to_matrix`, `check.compare`, `bench_training.main` and
+  seven more — and every module follows one `# %% <section>` layout. Verified
+  behavior-identical: a fixed-seed harness compares state dicts, history and
+  samples bit-equal before and after, and all error messages moved verbatim.
+
+- **The framework tests carry their own data.** Three inline numpy DGPs in
+  `tests/conftest.py` (an all-`ls` chain, a heterogeneous-effect DGP and a
+  confounded DGP with a prognostic misfit) replace the generator package the
+  suite used to import. The external-software anchor is unchanged in
+  substance — an all-`ls` outcome node is an ordered-logit model, so the
+  flow's MLE must equal `statsmodels` on the same design matrix — but it is
+  now measured on inline data at test time instead of against a committed R
+  reference; the R comparison lives on in `experiments/misc/validate_ls.py`. The
+  generator-pinning and frozen-CSV tests moved to the experiments workflow.
+
+- **The stacked ternaries in the `vaca` and `carefl` generators' `simulate`
+  became one if/else per variable** (readability of experiment code).
+  Verified behaviour-neutral: `vaca` regenerates bit-identically and
+  `carefl` within 7e-15, the same machine-epsilon drift the untouched
+  `triangle` generator shows after the dependency bump.
+
 - **The serialized term is `{effect, parents, options}`.** `Term.options`
   is already canonical (sorted, defaults dropped), so `spec_to_dict` emits
   it whole and the per-key reader disappears. `spec_from_dict` now builds
@@ -134,13 +351,14 @@
   load path — a malformed checkpoint is rejected there
   (`tests/test_transformation_syntax.py`).
 
-- **The five SCM generators share one layer.** `simulations/_common.py`
-  holds `logistic`, `sigmoid`, `resolve_latents`, and the `DatasetDraws`
-  mixin (`observational`, `interventional`, `counterfactual_pair`) — with
-  it the seed offsets behind the frozen CSVs in `data/` (`+1`, `+501`,
-  `+2`) are defined once instead of five times. Every generator now
-  exposes the same three named draws. `simulations/` drops from 1663 to
-  1377 lines with the frozen-CSV contract unchanged.
+- **The SCM generators share one layer.** `simulations/_common.py` holds
+  `logistic`, `sigmoid`, `resolve_latents`, and the `DatasetDraws` mixin
+  (`observational`, `interventional`, `counterfactual_pair`) — with it the
+  seed offsets behind the frozen CSVs in `data/` (`+1`, `+501`, `+2`) are
+  defined once instead of once per generator. Every generator exposes the
+  same three named draws. What is left of the package after the stroke
+  storyline moved out is 916 lines for the four paper generators, with the
+  frozen-CSV contract unchanged.
 
 ### Added (staged earlier as an unreleased 0.3.1)
 

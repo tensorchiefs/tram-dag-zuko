@@ -10,31 +10,16 @@ measured 5-10x on this protocol); the OOF plumbing is real fold bookkeeping
 t - e_hat under intervention (never cached).
 """
 
+# %% imports ---------------------------------------------------------------------------
 import numpy as np
-import pandas as pd
 import pytest
 import torch
 
 from tramdag import CS, LS, VC, CausalFlowDAG, ContinuousNode, I, OrdinalNode
-from tramdag.simulations import VCLogisticShift
 from tramdag.spec import spec_from_dict, spec_to_dict, validate_and_sort
 
-TAU = -1.0
 
-
-def _confounded_df(n: int, seed: int) -> pd.DataFrame:
-    """Strongly confounded DGP with a nonlinear prognostic part:
-    e(x) = sigmoid(2x), Y = (u - 1.2 x^2 - TAU t) / 2, u standard logistic.
-    Fitted with a *linear* prognostic term, the x^2 misfit correlates with the
-    propensity — the configuration where in-arm effect estimates break.
-    """
-    rng = np.random.default_rng(seed)
-    x = rng.normal(size=n)
-    t = (rng.logistic(size=n) > -2.0 * x).astype(float)
-    y = (rng.logistic(size=n) - 1.2 * x**2 - TAU * t) / 2.0
-    return pd.DataFrame({"X": x, "T": t, "Y": y})
-
-
+# %% private functions -----------------------------------------------------------------
 def _misspecified_spec(center) -> dict:
     return {
         "X": ContinuousNode([I(transform="affine")]),
@@ -59,6 +44,7 @@ def _fit(spec, df, epochs=250):
     return flow
 
 
+# %% public functions ------------------------------------------------------------------
 # ------------------------------------------------------- validation / spec
 def test_center_validation():
     with pytest.raises(ValueError, match="center_folds"):
@@ -74,17 +60,17 @@ def test_center_serialization_roundtrip():
         "T": OrdinalNode(2, [LS("X")]),
         "Y": ContinuousNode([VC("X", center=True, center_folds=3, t="T")]),
     }
-    t = spec_from_dict(spec_to_dict(spec))["Y"].terms[0]
+    round_tripped = spec_from_dict(spec_to_dict(spec))
+    t = next(t for t in round_tripped["Y"].terms if t.effect == "VC")
     assert (t.center, t.center_folds) == (True, 3)
 
 
 # ---------------------------------------- acceptance: center=False regression
-def test_center_false_is_bit_identical_to_plain_vc():
+def test_center_false_is_bit_identical_to_plain_vc(vc_hetero):
     """The default must preserve #28's behavior exactly: a VC term written
     without the kwarg and one with center=False produce bit-identical fits.
     """
-    gen = VCLogisticShift(seed=42)
-    df = gen.observational(1200, seed_offset=100)
+    df = vc_hetero["draw"](1200, 100)
 
     def fit_with(term):
         spec = {
@@ -101,19 +87,21 @@ def test_center_false_is_bit_identical_to_plain_vc():
     a = fit_with(VC("X2", "X3", t="T"))
     b = fit_with(VC("X2", "X3", center=False, t="T"))
     assert VC("X2", t="T") == VC("X2", center=False, t="T")  # Term equality
-    for (ka, pa), (kb, pb) in zip(a.state_dict().items(), b.state_dict().items()):
+    for (ka, pa), (kb, pb) in zip(
+        a.state_dict().items(), b.state_dict().items(), strict=True
+    ):
         assert ka == kb
         assert torch.equal(pa, pb), ka
     assert a.vc_center_info == {}  # stage 1 never ran
 
 
 # ------------------------------------------------ acceptance: gradient isolation
-def test_gradient_isolation():
+def test_gradient_isolation(confounded):
     """With center=True the treatment node's parameters receive ZERO gradient
     from the outcome-node loss — on the live (inference) e_hat path and, a
     fortiori, on the frozen-OOF training path.
     """
-    df = _confounded_df(800, seed=1)
+    df = confounded["draw"](800, 1)
     flow = CausalFlowDAG(_misspecified_spec(True), seed=0)
     flow.fit(df, epochs=3, verbose=0, seed=0)  # stage 1 + a few steps
     flow.zero_grad()
@@ -129,19 +117,20 @@ def test_gradient_isolation():
 
 
 # ------------------------------------------------- acceptance: OOF plumbing
-def test_training_ehat_is_out_of_fold():
+def test_training_ehat_is_out_of_fold(confounded):
     """The training propensities are genuine OOF quantities: fold bookkeeping
     exists, each fold's values reproduce a proxy fitted WITHOUT that fold
     (recomputed independently here), and they differ from the in-sample
     full-data fit — a later 'simplification' to in-sample e_hat fails this.
     """
-    df = _confounded_df(1200, seed=2)
+    df = confounded["draw"](1200, 2)
     flow = CausalFlowDAG(_misspecified_spec(True), seed=0)
     flow.fit(df, epochs=2, verbose=0, seed=0)
     info = flow.vc_center_info[("Y", "T")]
     assert info["folds"] == 5
     fold_id, e_oof = info["fold_id"], info["e_oof"]
-    assert fold_id.shape == (len(df),) and set(fold_id) == set(range(5))
+    assert fold_id.shape == (len(df),)
+    assert set(fold_id) == set(range(5))
 
     # (a) fold-0 values equal an independent refit WITHOUT fold 0 (deterministic)
     proxy_spec = {
@@ -161,18 +150,63 @@ def test_training_ehat_is_out_of_fold():
     assert np.abs(e_oof - e_in).max() > 1e-4
 
 
+def test_treatment_with_a_bare_intercept_takes_the_classical_oof_path(confounded):
+    """A parentless ``I()`` on the treatment does not force the Adam proxy.
+
+    ``[I, LS("X")]`` is an all-``ls`` conditional with its simple intercept
+    written out (the spelling that carries ``transform=``), so stage 1 must use
+    the deterministic ``fit_classical``, exactly as ``[LS("X")]`` does. The
+    per-node test used to demand ``effect == "LS"`` for every term and sent this
+    spec down the 300-epoch Adam path instead.
+
+    Determinism is the observable: the classical fit is reproducible to the last
+    bits, the Adam proxy is not run twice from the same state.
+    """
+    df = confounded["draw"](600, 3)
+    spec = {
+        "X": ContinuousNode([I(transform="affine")]),
+        "T": OrdinalNode(2, [I, LS("X")]),
+        "Y": ContinuousNode([I("X"), VC(t="T", center=True, center_folds=3)]),
+    }
+    runs = []
+    for _ in range(2):
+        flow = CausalFlowDAG(spec, seed=0)
+        flow.fit(df, epochs=2, verbose=0, seed=0)
+        runs.append(np.array(flow.vc_center_info[("Y", "T")]["e_oof"]))
+    assert np.array_equal(runs[0], runs[1])
+
+    # and it agrees with the classical fit of the same conditional, out of fold
+    info = CausalFlowDAG(spec, seed=0)
+    info.fit(df, epochs=2, verbose=0, seed=0)
+    book = info.vc_center_info[("Y", "T")]
+    fold_id = book["fold_id"]
+    proxy = CausalFlowDAG(
+        {
+            "X": ContinuousNode([I(transform="affine")]),
+            "T": OrdinalNode(2, [I, LS("X")]),
+        },
+        seed=0,
+    )
+    proxy.fit_classical(df.iloc[fold_id != 0][["X", "T"]], verbose=False)
+    np.testing.assert_allclose(
+        book["e_oof"][fold_id == 0],
+        proxy._predict_p1("T", df.iloc[fold_id == 0]),
+        atol=1e-7,
+    )
+
+
 # ------------------------------------- acceptance: do() recomputes t - e_hat
-def test_do_recomputes_centered_regressor():
+def test_do_recomputes_centered_regressor(confounded):
     """On FRESH rows (nothing cacheable) the centered regressor is re-derived
     from the current values: abduct at T=1 minus T=0 equals beta(x) exactly
     (e_hat(x) cancels only if the same live e_hat enters both), the e_hat term
     verifiably enters the latent, and counterfactual sampling under do
     round-trips through it.
     """
-    df = _confounded_df(2000, seed=4)
+    df = confounded["draw"](2000, 4)
     flow = CausalFlowDAG(_misspecified_spec(True), seed=0)
     flow.fit(df, epochs=40, verbose=0, seed=0)
-    fresh = _confounded_df(300, seed=99)  # never seen in fit
+    fresh = confounded["draw"](300, 99)  # never seen in fit
 
     beta = flow.varying_coef("Y", fresh)
     u1 = flow.abduct(fresh.assign(T=1.0), seed=0)["Y"].values
@@ -207,7 +241,7 @@ def test_do_recomputes_centered_regressor():
 
 
 # ---------------------------------------------- acceptance: Dandl reproduction
-def test_dandl_centering_reduces_bias():
+def test_dandl_centering_reduces_bias(confounded):
     """THE reason the feature exists (issue #30, Dandl et al. 2024): under
     strong confounding + a deliberately under-specified prognostic part, the
     centered VC must show materially lower bias in beta_hat than the uncentered
@@ -215,19 +249,20 @@ def test_dandl_centering_reduces_bias():
     = 1.10-1.24 (the confounded misfit swallows the effect, mean beta_hat
     ~ -0.2 vs tau = -1), centered = 0.11-0.27 — a 5-10x reduction.
     """
-    df = _confounded_df(6000, seed=0)
-    test = _confounded_df(3000, seed=1000)
+    tau = confounded["truth"]["tau"]
+    df = confounded["draw"](6000, 0)
+    test = confounded["draw"](3000, 1000)
     flow_u = _fit(_misspecified_spec(False), df)
     flow_c = _fit(_misspecified_spec(True), df)
-    bias_u = float(np.mean(np.abs(flow_u.varying_coef("Y", test) - TAU)))
-    bias_c = float(np.mean(np.abs(flow_c.varying_coef("Y", test) - TAU)))
+    bias_u = float(np.mean(np.abs(flow_u.varying_coef("Y", test) - tau)))
+    bias_c = float(np.mean(np.abs(flow_c.varying_coef("Y", test) - tau)))
     assert bias_u > 0.5, f"trap not armed (uncentered bias {bias_u:.3f})"
     assert bias_c < 0.5 * bias_u, (bias_u, bias_c)
 
 
 # --------------------------------------------------------------- integration
-def test_centered_save_load_and_queries():
-    df = _confounded_df(1000, seed=6)
+def test_centered_save_load_and_queries(confounded):
+    df = confounded["draw"](1000, 6)
     flow = CausalFlowDAG(_misspecified_spec(True), seed=0)
     flow.fit(df, epochs=10, verbose=0, seed=0)
     assert torch.isfinite(flow.log_prob(df)).all()
@@ -236,14 +271,14 @@ def test_centered_save_load_and_queries():
     assert {"X", "T"} <= set(psi.columns)
 
 
-def test_centered_roundtrip_after_load(tmp_path):
-    df = _confounded_df(1000, seed=6)
+def test_centered_roundtrip_after_load(tmp_path, confounded):
+    df = confounded["draw"](1000, 6)
     flow = CausalFlowDAG(_misspecified_spec(True), seed=0)
     flow.fit(df, epochs=10, verbose=0, seed=0)
     p = tmp_path / "c.pt"
     flow.save(p)
     flow2 = CausalFlowDAG.load(p)
-    t = flow2.spec["Y"].terms[1]
+    t = next(t for t in flow2.spec["Y"].terms if t.effect == "VC")
     assert t.center is True
     with torch.no_grad():
         np.testing.assert_allclose(
@@ -253,7 +288,7 @@ def test_centered_roundtrip_after_load(tmp_path):
         )
 
 
-def test_vc_oof_fit_reaches_the_stage_one_proxy():
+def test_vc_oof_fit_reaches_the_stage_one_proxy(confounded):
     """vc_oof_fit is forwarded to the stage-1 out-of-fold proxy fits.
 
     The proxy uses Adam only when the treatment node is not all-``ls``
@@ -262,7 +297,7 @@ def test_vc_oof_fit_reaches_the_stage_one_proxy():
     surface as a TypeError from that fit, which is what proves the
     forwarding rather than a silently ignored argument.
     """
-    df = _confounded_df(200, seed=0)
+    df = confounded["draw"](200, 0)
     spec = {
         "X": ContinuousNode(),
         "T": OrdinalNode(2, [CS("X")]),  # not all-ls -> the Adam proxy path

@@ -3,10 +3,9 @@
 .. include:: ../../README.md
 """
 
+# %% imports ---------------------------------------------------------------------------
 from importlib.metadata import version
 
-from . import simulations
-from .env import machine_info
 from .flow import CausalFlowDAG
 from .spec import (
     CI,
@@ -25,26 +24,26 @@ from .spec import (
     simple_intercept,
     varying_coefficient,
 )
+from .utils import machine_info
 
+# %% global variables ------------------------------------------------------------------
 __all__ = [
+    "CI",
+    "CS",
+    "LS",
+    "SI",
+    "VC",
     "CausalFlowDAG",
     "ContinuousNode",
-    "OrdinalNode",
-    "machine_info",
-    "simulations",
-    # term-formula notation: short aliases and their definitions
-    "Term",
     "I",
-    "intercept",
-    "SI",
-    "simple_intercept",
-    "CI",
+    "OrdinalNode",
+    "Term",
     "complex_intercept",
-    "LS",
-    "linear_shift",
-    "CS",
     "complex_shift",
-    "VC",
+    "intercept",
+    "linear_shift",
+    "machine_info",
+    "simple_intercept",
     "varying_coefficient",
 ]
 __version__ = version("tramdag")

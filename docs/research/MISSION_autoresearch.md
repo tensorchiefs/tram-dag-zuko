@@ -14,13 +14,14 @@ You are running a self-directed research loop. Goal: find changes that make
 better optima). You have the full repository and this machine (check its GPU). No
 human is in the loop — work autonomously, with rigor.
 
-Read first: CLAUDE.md, docs/training-speed.md, experiments/stale/bench_training.py,
+Read first: CLAUDE.md, docs/training-speed.md, experiments/benchmarks/bench_training.py,
 src/tramdag/flow.py. The June 2026 benchmark defines your methodology.
 
-> **Parked scripts.** `bench_training.py`, `perf_machine.py` and
-> `transforms_tram_dag.py` moved to their `stale/` directories in the 0.4
-> cleanup and use the removed 0.3 API. Migrate them before the next run —
-> Experiment #0 fails as written until then.
+> **Script status.** `bench_training.py` and `perf_machine.py` are migrated to
+> the current API and live in `experiments/benchmarks/`; both run. Note that
+> `fit()` no longer has the `onecycle` and `cosine` schedules, so those rows of
+> the June 2026 grid cannot be re-measured. The transform comparison lives in
+> `notebooks/demo_tram_dag_colab.py` §6.
 
 ## Hard limits
 
@@ -84,8 +85,8 @@ baseline until a check-in has demonstrably landed on the remote.
 ## Experiment #0 (the baseline)
 
 Before changing anything: run the existing benchmark suite unchanged on THIS
-machine — `experiments/stale/bench_training.py` (full grid, 3 seeds) and
-`experiments/stale/perf_machine.py` (hardware fingerprint). All published numbers are
+machine — `experiments/benchmarks/bench_training.py` (full grid, 3 seeds) and
+`experiments/benchmarks/perf_machine.py` (hardware fingerprint). All published numbers are
 from an Apple-silicon Mac mini; nothing transfers — your baseline is the only
 valid comparison point. Commit the results (bench `results.csv`/`ranking.csv`
 into `docs/research/baseline/`, the perf JSON into `docs/perf/`) and push.
@@ -94,7 +95,7 @@ hypothesis. You may delete `docs/research/HEARTBEAT.md` in this commit.
 
 ## The metric (non-negotiable)
 
-- **Time-to-target** as defined in `experiments/stale/bench_training.py`: wall-clock
+- **Time-to-target** as defined in `experiments/benchmarks/bench_training.py`: wall-clock
   seconds until val-NLL is within tolerance of the cached long-run reference
   (W1 stroke-ls: tight 1e-3 / practical 5e-3; W2 vaca-ci: 2e-3 / 1e-2).
 - Add **W3**: vaca-ci at n=50,000, batch 4096, on this machine's GPU — the
@@ -152,7 +153,7 @@ TRAM-DAG training **in general**. Optimize for that, not for the harness:
   that evaporates off the measured setup is overfitting to the harness — reject it.
 - **Never touch what measures you.** You may **not** edit the tests, the frozen
   data in `data/`, the benchmark targets/tolerances in
-  `experiments/stale/bench_training.py`, or the cached reference values, in order to make
+  `experiments/benchmarks/bench_training.py`, or the cached reference values, in order to make
   a result look better. *Changing the measurement is not a result.* If a test
   fails, your change is wrong — not the test. Reference values are computed once
   (Experiment #0) and then fixed. **Do not read the target values** either — the
@@ -191,8 +192,9 @@ GPU · **warm-start init**: initialize Bernstein θ from the node's marginal
 quantiles instead of zeros — could delete most of early training · per-node Adam
 betas/eps · LBFGS polish phase after plateau-freeze · evaluate val less often
 (per-epoch val eval is overhead) · vectorize/fuse the Python loop over nodes ·
-one-hot caching in `_tensorize` · the RQS tail-slope fix from
-`notebooks/stale/transforms_tram_dag.py` (accuracy lever, may also help optimization) ·
+one-hot caching in `_tensorize` · the RQS tail-slope fix (its
+symptom is documented in CLAUDE.md and shown in the demo notebook's §6; an
+accuracy lever that may also help optimization) ·
 gradient accumulation vs huge batches.
 
 ## Cadence and end state

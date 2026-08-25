@@ -45,6 +45,17 @@ spec["Y"] = td.ContinuousNode(
 )  # scan-informed
 ```
 
+**Read it as screening, not as a test of effect modification.** The statistic
+measures how unstable the *cheap* model is along a covariate, and instability
+has two sources: a coefficient that genuinely varies, and a **prognostic part
+the cheap model gets wrong**. In the example above `X1` is unflagged because
+its prognostic effect is linear; make it quadratic and `X1` flags as strongly
+as the true modifiers (0.56 → 4.14 on the DGP of
+[`notebooks/varying_coefficients.py`](../notebooks/varying_coefficients.py),
+which demonstrates both cases side by side). A flag therefore means "look
+here", and what you find may be a modifier or a misspecification — both worth
+knowing.
+
 Notes: For a binary ordinal `LS` treatment, `t` resolves to the identified
 level-1-vs-0 contrast. For a `VC` treatment, `t` resolves to `beta0`.
 Candidates default to every column of `df` except the node and `t`.

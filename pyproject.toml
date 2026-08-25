@@ -11,6 +11,9 @@ dev = [
   {include-group = "test"},
   "pre-commit",
   "pylsp-rope",
+  # actionlint lints a workflow's shell scripts only when shellcheck is on
+  # PATH. Without it, a local hook run silently checks less than CI does.
+  "shellcheck-py",
   "python-lsp-ruff",
   "python-lsp-server[all]"
 ]
@@ -20,8 +23,9 @@ docs = [
 ]
 experiments = [
   "matplotlib",
-  "scikit-learn",  # train/val/test split in experiments/common.py
-  "statsmodels"  # classical references (OrderedModel, proportion CIs)
+  "pyyaml",  # the per-experiment hyperparameter files
+  "scipy",  # KS tests in the generator checks
+  "statsmodels"  # classical reference (OrderedModel in validate_ls.py)
 ]
 notebooks = [
   "jupytext",
@@ -31,8 +35,13 @@ notebooks = [
 ]
 test = [
   "pytest",
+  "pytest-cov",  # the CI coverage gate ([tool.coverage] + `pytest --cov`)
   "pytest-xdist",
-  "scipy",  # scipy.stats in the generator tests
+  # testpaths covers experiments/ too, so this group must be able to import
+  # what those tests import: the generators (scipy) and, through the benchmark
+  # modules, matplotlib. No collected test reads a config file.
+  "matplotlib",
+  "scipy",
   "statsmodels"  # exact-MLE agreement tests
 ]
 
@@ -80,6 +89,19 @@ Homepage = "https://github.com/tensorchiefs/tramdag"
 "Method paper (CLeaR 2025)" = "https://arxiv.org/abs/2503.16206"
 "Stroke case study" = "https://arxiv.org/abs/2606.12623"
 
+[tool.coverage.report]
+# the fast suite alone measures 97% (2026-08-24); 95 leaves room for noise
+# while still failing on an untested new code path
+fail_under = 95
+
+[tool.coverage.run]
+source = ["src/tramdag"]
+
+[tool.hatch.build.targets.sdist]
+# without this, the sdist ships experiments/ (~2 MB frozen CSVs) and tests/;
+# README, LICENSE and pyproject.toml ride along automatically
+only-include = ["src"]
+
 [tool.hatch.build.targets.wheel]
 packages = ["src/tramdag"]
 
@@ -91,7 +113,13 @@ addopts = ["-v", "--tb=short"]
 markers = [
   "slow: long fit/training tests — excluded from PR CI, run in the nightly full suite"
 ]
-testpaths = ["tests"]
+# so `paper.simulations` and `common` import the same way as when a script is
+# run with `python -m paper.triangle` from experiments/
+pythonpath = ["experiments"]
+# The framework suite and the per-area experiment checks both run on a bare
+# `pytest`. The experiment tests are cheap (numpy-only generator properties);
+# the training runs live in the experiments workflow, not here.
+testpaths = ["tests", "experiments"]
 
 [tool.ruff]
 # .claude/ is agent tooling, not package code
@@ -101,7 +129,48 @@ line-length = 88
 target-version = "py310"
 
 [tool.ruff.lint]
-select = ["I", "E", "F", "D", "UP"]
+# ruff's default set stays active (in 0.16 that is more than the historical
+# E4/E7/E9/F: it includes e.g. S110, BLE001, TRY004); these add to it
+extend-select = [
+  "I",  # import order
+  "E",  # the full pycodestyle errors, beyond the default E4/E7/E9
+  "D",  # docstrings (numpy convention below)
+  "UP",  # modern syntax
+  "B",  # bugbear: real bug patterns (B905: zip truncates silently)
+  "C4",  # comprehension misuse
+  "C90",  # cyclomatic complexity (cognitive complexity: complexipy hook)
+  "NPY",  # numpy pitfalls (legacy random API)
+  "PERF",  # accidental quadratic/copy patterns
+  "PT",  # pytest style: composite asserts hide which clause failed
+  "RUF",  # ruff-native checks (unused noqa, __all__ order)
+  "SIM",  # simplifiable constructs
+  # the following are clean today (measured 2026-08-24) and bind new code only
+  "A",  # builtin shadowing
+  "DTZ",  # naive datetimes
+  "FURB",  # modernization (refurb)
+  "G",  # logging format strings
+  "ICN",  # import-alias conventions (np, pd, plt, mpl)
+  "ISC",  # implicit string concatenation hides missing commas
+  "LOG",  # logging misuse
+  "PIE",  # misc correctness/duplication
+  "PLW1641",  # __eq__ without __hash__ makes a class silently unhashable
+  "PTH",  # pathlib over os.path
+  "RET"  # return-statement hygiene
+]
+ignore = [
+  # em-dashes and Greek letters in prose are deliberate (docs/notation.md)
+  "RUF001",
+  "RUF002",
+  "RUF003",
+  # dict(arrowstyle=...) as kwargs-style collection literals is deliberate
+  # matplotlib idiom in the experiments' plotting code
+  "C408",
+  # a ternary is not automatically clearer than if/else; keep it a choice
+  "SIM108"
+]
+
+[tool.ruff.lint.mccabe]
+max-complexity = 12
 
 [tool.ruff.lint.per-file-ignores]
 # D1xx: scripts, notebooks and tests document themselves in prose and in

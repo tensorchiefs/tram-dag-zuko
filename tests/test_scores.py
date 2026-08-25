@@ -6,6 +6,7 @@ use case — on an SCM with a (X2, X3)-modified treatment effect and an inert X1
 the CUSUM of the treatment-coefficient scores flags X2 and X3 and not X1.
 """
 
+# %% imports ---------------------------------------------------------------------------
 import numpy as np
 import pandas as pd
 import pytest
@@ -14,6 +15,7 @@ import torch
 from tramdag import CS, LS, VC, CausalFlowDAG, ContinuousNode, I, OrdinalNode
 
 
+# %% private functions -----------------------------------------------------------------
 def _hetero_df(n: int, seed: int = 11) -> pd.DataFrame:
     """Randomized-treatment SCM with an (X2, X3)-modified effect, inert X1:
     Y = (u - (0.8 X1 + X2 - 0.5 X3) - (-1 + 0.8 X2 - 0.6 X3) T) / 2, u logistic.
@@ -38,6 +40,7 @@ def _ls_spec() -> dict:
     }
 
 
+# %% public functions ------------------------------------------------------------------
 @pytest.fixture(scope="module")
 def mle_flow():
     df = _hetero_df(4000)
@@ -104,7 +107,7 @@ def test_scores_match_finite_differences():
             ("T", {"X1": flow.nodes["T"].shifts["X1"].fc.weight}),
         ]:
             psi = flow.scores(df, node=node)
-            needed = list(flow.nodes[node].parents) + [node]
+            needed = [*list(flow.nodes[node].parents), node]
             np_vals = {
                 c: torch.as_tensor(df[c].to_numpy(dtype=np.float64)) for c in needed
             }
@@ -134,9 +137,8 @@ def test_effect_modifier_scan_flags_true_modifiers(mle_flow):
     flow, df = mle_flow
     scan = flow.effect_modifier_scan(df, node="Y", t="T")
     assert set(scan.index) == {"X1", "X2", "X3"}, scan.to_string()  # default cands
-    assert bool(scan.loc["X2", "flag"]) and bool(scan.loc["X3", "flag"]), (
-        scan.to_string()
-    )
+    assert bool(scan.loc["X2", "flag"]), scan.to_string()
+    assert bool(scan.loc["X3", "flag"]), scan.to_string()
     assert not bool(scan.loc["X1", "flag"]), scan.to_string()
     # the modifiers clearly dominate the ranking
     assert scan.loc[["X2", "X3"], "stat"].min() > 2 * scan.loc["X1", "stat"]
@@ -184,8 +186,6 @@ def test_scores_error_paths(mle_flow):
     flow, df = mle_flow
     with pytest.raises(KeyError, match="unknown node"):
         flow.scores(df, node="nope")
-    with pytest.raises(ValueError, match="only option"):
-        flow.scores(df, node="Y", params="all")
     with pytest.raises(KeyError, match="missing column"):
         flow.scores(df.drop(columns=["Y"]), node="Y")
     with pytest.raises(ValueError, match="no LS or VC"):

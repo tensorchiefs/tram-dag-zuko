@@ -7,11 +7,16 @@ truth**.
 
 | notebook | what it is |
 |---|---|
-| `intro_tram_dag.py` | didactic walkthrough of the TRAM-DAG model (SI/CI/LS/CS, L1–L3, all claims checked against a hand-built SCM) |
+| `intro_tram_dag.py` | didactic walkthrough of the TRAM-DAG model (SI/LS/CS, L1–L3, all claims checked against a hand-built SCM; complex intercepts are the one component it does not exercise — see `additive_vs_joint_ci.py`) |
 | `demo_tram_dag_colab.py` | 5-minute showcase on the paper's bimodal VACA benchmark, GPU-ready ([open in Colab](https://colab.research.google.com/github/tensorchiefs/tramdag/blob/main/notebooks/demo_tram_dag_colab.ipynb)) |
+| `additive_vs_joint_ci.py` | joint vs additive complex intercept, and reading per-parent effects out of the additive one with `intercept_contributions` |
+| `varying_coefficients.py` | heterogeneous treatment effects: the `VC` head, `varying_coef`, the modifier scan and propensity centering, all scored against a known `beta(x)` |
 
-Further notebooks are parked in [`stale/`](stale/README.md) until they are
-migrated to the current API.
+Every notebook here is executed by the docs workflow — on pushes to `main` and
+`dev-*` branches — which is what keeps them working against the current API. A
+notebook that is not in that workflow's `NOTEBOOKS` list does not belong in this
+directory. On a feature branch, run one by hand:
+`MPLBACKEND=Agg uv run python notebooks/<name>.py`.
 
 ## Rules
 

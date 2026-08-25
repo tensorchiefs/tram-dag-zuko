@@ -1,30 +1,27 @@
 """Tests for the varying-coefficient shift term VC(on, *modifiers, penalty=)
 (issue #28) — construction/validation, the LS nesting (exact and fitted), the
-recovery acceptance bar on the vc-shift DGP, the read-out identities, warm
-start, and serialization.
+recovery acceptance bar on the heterogeneous-effect DGP, the read-out
+identities, warm start, and serialization.
 
-The recovery bar (corr(beta_hat, beta_true) >= 0.9 at n = 5000) is the
-regression guard against "expressive but unestimated": the unregularized
-``CS(on, x...)`` reduced form measures ~0.5 on this task class (tramdag-simu
-PR #21), so the bar is what the term exists to clear.
+The recovery bar (corr(beta_hat, beta_true) >= 0.9) is the regression guard
+against "expressive but unestimated": the unregularized ``CS(on, x...)``
+reduced form measures ~0.5 on this task class (tramdag-simu PR #21), so the
+bar is what the term exists to clear.
 """
 
-from pathlib import Path
-
+# %% imports ---------------------------------------------------------------------------
 import numpy as np
 import pandas as pd
 import pytest
 import torch
 
 from tramdag import CS, LS, VC, CausalFlowDAG, ContinuousNode, I, OrdinalNode
-from tramdag.simulations import VCLogisticShift
 from tramdag.spec import spec_from_dict, spec_to_dict, validate_and_sort
 
-DATA = Path(__file__).resolve().parents[1] / "data"
 
-
+# %% private functions -----------------------------------------------------------------
 def _vc_spec(penalty: float = 1.0) -> dict:
-    """The vc-shift DGP's in-class spec (affine sources: their marginals are
+    """The DGP's in-class spec (affine sources: their marginals are
     irrelevant to Y's conditional because the joint NLL decomposes per node).
     """
     return {
@@ -38,14 +35,36 @@ def _vc_spec(penalty: float = 1.0) -> dict:
     }
 
 
+# %% public functions ------------------------------------------------------------------
+@pytest.fixture(scope="module")
+def small_fitted(vc_hetero):
+    """A briefly-fitted VC flow (module-scoped: shared by the identity and
+    serialization tests; the accuracy bar has its own fit).
+    """
+    df = vc_hetero["draw"](1500, 100)
+    flow = CausalFlowDAG(_vc_spec(), seed=0)
+    flow.fit(
+        df.iloc[:1300],
+        df.iloc[1300:],
+        epochs=60,
+        learning_rate=1e-2,
+        batch_size=512,
+        verbose=0,
+        seed=0,
+    )
+    return flow, vc_hetero
+
+
 # ------------------------------------------------------------ spec / validation
 def test_vc_constructor():
     t = VC("X2", "X3", penalty=2.5, t="T")
     assert (t.effect, t.parents, t.penalty) == ("VC", ("T", "X2", "X3"), 2.5)
     assert VC(t="T").penalty == 1.0  # the documented default
-    with pytest.raises(ValueError):
+    with pytest.raises(
+        ValueError, match=r"cannot be both the treatment \(t\) and a modifier"
+    ):
         VC("T", t="T")  # on cannot be a modifier
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="penalty must be >= 0"):
         VC(penalty=-1.0, t="T")  # negative penalty
 
 
@@ -111,48 +130,29 @@ def test_vc_without_modifiers_equals_ls_exactly():
     assert torch.equal(fv.log_prob(df), fl.log_prob(df))
 
 
-def test_fit_classical_rejects_vc():
+def test_fit_classical_rejects_vc(vc_hetero):
     flow = CausalFlowDAG(_vc_spec())
     with pytest.raises(ValueError, match="all-`ls`"):
-        flow.fit_classical(VCLogisticShift().observational(100))
+        flow.fit_classical(vc_hetero["draw"](100, 1))
 
 
 # --------------------------------------------------------------- read-out ident
-@pytest.fixture(scope="module")
-def small_fitted():
-    """A briefly-fitted VC flow on the vc-shift DGP (module-scoped: shared by
-    the identity/serialization tests; the accuracy bar has its own fit).
-    """
-    gen = VCLogisticShift(seed=42)
-    df = gen.observational(1500, seed_offset=100)
-    flow = CausalFlowDAG(_vc_spec(), seed=0)
-    flow.fit(
-        df.iloc[:1300],
-        df.iloc[1300:],
-        epochs=60,
-        learning_rate=1e-2,
-        batch_size=512,
-        verbose=0,
-        seed=0,
-    )
-    return flow, gen
-
-
 def test_varying_coef_deterministic_and_y_free(small_fitted):
-    flow, gen = small_fitted
-    new = gen.observational(300, seed_offset=900)
+    flow, dgp = small_fitted
+    new = dgp["draw"](300, 900)
     b1 = flow.varying_coef("Y", new)
     b2 = flow.varying_coef("Y", new.drop(columns=["Y", "T", "X1"]))  # modifiers only
     np.testing.assert_array_equal(b1, b2)
-    assert b1.shape == (300,) and b1.std() > 0
+    assert b1.shape == (300,)
+    assert b1.std() > 0
 
 
 def test_varying_coef_equals_abduct_difference(small_fitted):
     """For a binary treatment, beta(x) must equal the abduct-difference
     u(x, T=1, y) - u(x, T=0, y) identically (issue #28 identity check).
     """
-    flow, gen = small_fitted
-    new = gen.observational(300, seed_offset=901)
+    flow, dgp = small_fitted
+    new = dgp["draw"](300, 901)
     u1 = flow.abduct(new.assign(T=1.0), seed=0)["Y"].values
     u0 = flow.abduct(new.assign(T=0.0), seed=0)["Y"].values
     np.testing.assert_allclose(flow.varying_coef("Y", new), u1 - u0, rtol=0, atol=1e-5)
@@ -162,19 +162,20 @@ def test_beta_recentered_over_training_data(small_fitted):
     """After fit, b_theta is sum-to-zero over the training rows: the mean of
     varying_coef on the training data equals beta0.
     """
-    flow, gen = small_fitted
-    train = gen.observational(1500, seed_offset=100).iloc[:1300]
+    flow, dgp = small_fitted
+    train = dgp["draw"](1500, 100).iloc[:1300]
     beta0 = float(flow.nodes["Y"].shifts["T"].beta0)
     assert np.mean(flow.varying_coef("Y", train)) == pytest.approx(beta0, abs=1e-5)
 
 
 def test_save_load_roundtrip_vc(tmp_path, small_fitted):
-    flow, gen = small_fitted
-    new = gen.observational(200, seed_offset=902)
+    flow, dgp = small_fitted
+    new = dgp["draw"](200, 902)
     p = tmp_path / "vc.pt"
     flow.save(p)
     flow2 = CausalFlowDAG.load(p)
-    assert flow2.spec["Y"].terms[1].penalty == 1.0
+    vc = next(t for t in flow2.spec["Y"].terms if t.effect == "VC")
+    assert vc.penalty == 1.0
     assert bool(flow2.nodes["Y"].shifts["T"].warm_started)  # buffer survives
     np.testing.assert_allclose(
         flow2.varying_coef("Y", new), flow.varying_coef("Y", new), atol=1e-7
@@ -184,17 +185,16 @@ def test_save_load_roundtrip_vc(tmp_path, small_fitted):
 
 def test_serialization_roundtrip_spec():
     spec2 = spec_from_dict(spec_to_dict(_vc_spec(penalty=3.0)))
-    t = spec2["Y"].terms[1]
+    t = next(t for t in spec2["Y"].terms if t.effect == "VC")
     assert t == VC("X2", "X3", penalty=3.0, t="T")
 
 
 # ------------------------------------------------------------------- warm start
-def test_warm_start_matches_classical_ls():
+def test_warm_start_matches_classical_ls(vc_hetero):
     """beta0 after warm start equals the classical (L-BFGS) all-`ls` coefficient
     of the node's conditional; b_theta stays the zero function.
     """
-    gen = VCLogisticShift(seed=42)
-    df = gen.observational(2000, seed_offset=100)
+    df = vc_hetero["draw"](2000, 100)
     flow = CausalFlowDAG(_vc_spec(), seed=0)
     flow._vc_warm_start(df)
     beta0 = float(flow.nodes["Y"].shifts["T"].beta0)
@@ -218,13 +218,12 @@ def test_warm_start_matches_classical_ls():
 
 
 # ----------------------------------------------- acceptance: fitted LS nesting
-def test_nesting_large_penalty_matches_classical_ls():
+def test_nesting_large_penalty_matches_classical_ls(vc_hetero):
     """Acceptance (issue #28): with `penalty` large the head is shrunk to the
     zero function and the fitted beta0 matches the fit_classical LS coefficient.
     Warm start is disabled so the test is not trivially satisfied by it.
     """
-    gen = VCLogisticShift(seed=42)
-    df = gen.observational(4000, seed_offset=100)
+    df = vc_hetero["draw"](4000, 100)
     spec = {
         **{k: ContinuousNode([I(transform="affine")]) for k in ("X1", "X2", "X3")},
         "T": OrdinalNode(2, [LS("X1"), LS("X2")]),
@@ -259,17 +258,15 @@ def test_nesting_large_penalty_matches_classical_ls():
 
 
 # --------------------------------------------------- acceptance: recovery >= 0.9
-def test_recovery_bar_on_vc_shift_dgp():
+def test_recovery_bar_on_hetero_dgp(vc_hetero):
     """THE acceptance bar (issue #28): corr(beta_hat, beta_true) >= 0.9 at
-    n = 5000 on the vc-shift DGP, default penalty. The unregularized
-    CS(on, x...) workaround measures ~0.5 on this task class — this test is the
-    regression guard against 'expressive but unestimated'. Measured on this
-    protocol: corr ~ 0.99 (min over seeds 0/1/2: 0.986).
+    n = 5000 on the heterogeneous-effect DGP, default penalty. The
+    unregularized CS(on, x...) workaround measures ~0.5 on this task class —
+    this test is the regression guard against 'expressive but unestimated'.
     """
-    gen = VCLogisticShift(seed=42)
-    df = gen.observational(5000, seed_offset=100)
+    df = vc_hetero["draw"](5000, 100)
     train, val = df.iloc[:4500], df.iloc[4500:]
-    test = gen.observational(2000, seed_offset=500)
+    test = vc_hetero["draw"](2000, 500)
 
     flow = CausalFlowDAG(_vc_spec(), seed=0)
     flow.fit(
@@ -283,10 +280,11 @@ def test_recovery_bar_on_vc_shift_dgp():
         restore_best=True,
     )
     beta_hat = flow.varying_coef("Y", test)
-    corr = float(np.corrcoef(beta_hat, gen.true_beta(test))[0, 1])
+    corr = float(np.corrcoef(beta_hat, vc_hetero["beta"](test))[0, 1])
     assert corr >= 0.9, f"recovery corr {corr:.3f} < 0.9"
-    # beta0 is the interpretable main effect: close to the true b0 = -1.0
-    assert float(flow.nodes["Y"].shifts["T"].beta0) == pytest.approx(-1.0, abs=0.15)
+    # beta0 is the interpretable main effect: close to the true b0
+    b0 = vc_hetero["truth"]["b0"]
+    assert float(flow.nodes["Y"].shifts["T"].beta0) == pytest.approx(b0, abs=0.15)
 
 
 # ------------------------------------------------------- continuous treatment
@@ -313,21 +311,3 @@ def test_vc_continuous_treatment():
     u0 = flow.abduct(df.assign(D=0.0), seed=0)["Y"].values
     np.testing.assert_allclose(2.0 * beta, u2 - u0, rtol=0, atol=1e-4)
     assert flow.sample(50, do={"D": 1.0}, seed=0).shape == (50, 3)
-
-
-# ------------------------------------------------------------- frozen contract
-def test_frozen_vc_shift_csv_contract():
-    """data/vc-shift/obs.csv regenerates bit-identically from the stored seed
-    (the same contract as the paper DGPs).
-    """
-    import json
-
-    vdir = DATA / "vc-shift"
-    truth = json.loads((vdir / "truth.json").read_text())
-    frozen = pd.read_csv(vdir / "obs.csv")
-    regen = VCLogisticShift(seed=truth["seed"]).observational(truth["n_obs"])
-    assert len(frozen) == truth["n_obs"]
-    for c in frozen.columns:
-        np.testing.assert_allclose(
-            frozen[c].to_numpy(dtype=float), regen[c].to_numpy(dtype=float), atol=1e-9
-        )

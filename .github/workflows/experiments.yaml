@@ -1,0 +1,129 @@
+name: experiments
+
+# The paper replications, one matrix job each. They run on every push, so a
+# commit's report is always current — note that this trains real models, so a
+# full run is minutes per job. A workflow_dispatch may narrow it to a single
+# script+variant when that is all you need.
+#
+# Each job runs its experiment, compares the metrics against the committed
+# ground truth in <area>/ground_truth/, and posts the run's report — table
+# plus figures — as a commit comment. CML uploads the figures to its asset
+# server, so no branch in this repository holds generated images.
+on:
+  push:            # every push runs them; concurrency cancels superseded runs
+  workflow_dispatch:
+    inputs:
+      script:
+        description: run only this script (empty = all)
+        required: false
+        default: ''
+      variant:
+        description: run only this variant (needs script)
+        required: false
+        default: ''
+
+concurrency:                     # one run per ref; a new push supersedes
+  group: experiments-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write                # commit comments
+
+jobs:
+  # The matrix comes from the YAML configs, not from a list in this file: a
+  # variant added to <script>.yaml is picked up here automatically, and the two
+  # can never disagree. A dispatch may narrow it to one script+variant.
+  plan:
+    runs-on: ubuntu-latest
+    outputs:
+      include: ${{ steps.pick.outputs.include }}
+    steps:
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1
+    - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d   # v10.0.1
+      with:
+        enable-cache: true
+    - id: pick
+      working-directory: experiments
+      env:
+        UV_NO_DEFAULT_GROUPS: '1'
+        ONLY_SCRIPT: ${{ inputs.script }}
+        ONLY_VARIANT: ${{ inputs.variant }}
+      run: |
+        set -euo pipefail
+        uv run --group experiments python - >> "$GITHUB_OUTPUT" <<'EOF'
+        import json, os, pathlib, yaml
+
+        only_script = os.environ.get("ONLY_SCRIPT", "")
+        only_variant = os.environ.get("ONLY_VARIANT", "")
+        if bool(only_script) != bool(only_variant):
+            raise SystemExit(
+                "narrowing the run needs both inputs: "
+                f"script={only_script!r} variant={only_variant!r}"
+            )
+        include = []
+        for path in sorted(pathlib.Path(".").glob("*/*.yaml")):
+            area, script = path.parent.name, path.stem
+            for variant in sorted(yaml.safe_load(path.read_text())["variants"]):
+                if only_script and (script, variant) != (only_script, only_variant):
+                    continue
+                include.append(
+                    {"area": area, "script": script, "variant": variant}
+                )
+        if not include:
+            raise SystemExit(
+                f"no experiment matches script={only_script!r} variant={only_variant!r}"
+            )
+        print("include=" + json.dumps(include))
+        EOF
+
+  replicate:
+    needs: plan
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false           # one drifting experiment must not hide the rest
+      matrix:
+        include: ${{ fromJSON(needs.plan.outputs.include) }}
+    env:
+      UV_NO_DEFAULT_GROUPS: '1'  # dev drags in editor tooling; name the group
+      OMP_NUM_THREADS: '2'       # the runners have 2 cores; avoid thread thrash
+    steps:
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1
+    - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d   # v10.0.1
+      with:
+        enable-cache: true
+
+    - name: run the experiment
+      working-directory: experiments
+      run: >-
+        uv run --group experiments python -m
+        ${{ matrix.area }}.${{ matrix.script }} ${{ matrix.variant }}
+
+    # the results directory of a run: <script-with-dashes>-<variant>
+    - name: name the result directory
+      id: result
+      run: |
+        set -euo pipefail
+        name="${{ matrix.script }}-${{ matrix.variant }}"
+        echo "name=${name//_/-}" >> "$GITHUB_OUTPUT"
+
+    - name: check the metrics against the committed ground truth
+      working-directory: experiments
+      run: >-
+        uv run --group experiments python -m check
+        ${{ matrix.area }} ${{ steps.result.outputs.name }}
+
+    - if: always()               # a drifted run is when the figures matter most
+      name: post the report as a commit comment
+      uses: iterative/setup-cml@e5f9f4673e0a8f275c45cc66dbbfd29c8469fb4e # v2.1.0
+      with:
+        vega: false
+    - if: always()               # a drifted run is when the figures matter most
+      working-directory: >-
+        experiments/${{ matrix.area }}/results/${{ steps.result.outputs.name }}
+      env:
+        REPO_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        set -euo pipefail
+        # cml uploads the figures the report links to and rewrites the links
+        cml comment create --target=commit report.md

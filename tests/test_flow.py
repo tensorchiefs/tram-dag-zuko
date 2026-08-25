@@ -1,5 +1,6 @@
 """Unit tests for the tramdag causal flow."""
 
+# %% imports ---------------------------------------------------------------------------
 import numpy as np
 import pandas as pd
 import pytest
@@ -11,12 +12,42 @@ from tramdag.transforms import (
     AffineUT,
     BernsteinUT,
     SplineUT,
+    _expanding_bisection,
     ordinal_cutpoints,
     ordinal_log_prob,
     ordinal_pmf,
 )
 
+# %% global variables ------------------------------------------------------------------
 torch.manual_seed(0)
+
+
+# %% public functions ------------------------------------------------------------------
+@pytest.fixture(scope="module")
+def fitted_flow():
+    rng = np.random.default_rng(7)
+    n = 3000
+    x = rng.normal(0, 2, n)
+    y_lat = 0.8 * x + rng.logistic(size=n)
+    y = np.digitize(y_lat, [-1.0, 0.5, 2.0]).astype(float)
+    w = 0.5 * x - 0.3 * y + rng.logistic(size=n)
+    df = pd.DataFrame({"X": x, "Y": y, "W": w})
+    spec = {
+        "X": ContinuousNode(),
+        "Y": OrdinalNode(4, [LS("X")]),
+        "W": ContinuousNode([LS("X"), LS("Y")]),
+    }
+    flow = CausalFlowDAG(spec)
+    flow.fit(
+        df.iloc[:2400],
+        df.iloc[2400:],
+        epochs=300,
+        learning_rate=0.05,
+        batch_size=600,
+        verbose=0,
+        seed=0,
+    )
+    return flow, df
 
 
 # ---------------------------------------------------------------- transforms
@@ -27,7 +58,8 @@ def test_univariate_roundtrip(ut):
     theta = torch.randn(n, ut.n_params)
     x = torch.linspace(-6.0, 10.0, n)  # includes values outside the fitted range
     z0, ladj = ut.forward(theta, x)
-    assert torch.isfinite(z0).all() and torch.isfinite(ladj).all()
+    assert torch.isfinite(z0).all()
+    assert torch.isfinite(ladj).all()
     x_rec = ut.inverse(theta, z0)
     assert torch.allclose(x_rec, x, atol=1e-3), (x_rec - x).abs().max()
 
@@ -56,7 +88,8 @@ def test_ordinal_log_prob_gradient_survives_saturation():
     lp = ordinal_log_prob(theta, shift, y)
     assert torch.isfinite(lp).all()
     lp.sum().backward()
-    assert torch.isfinite(theta.grad).all() and torch.isfinite(shift.grad).all()
+    assert torch.isfinite(theta.grad).all()
+    assert torch.isfinite(shift.grad).all()
     assert theta.grad.abs().max() > 1e-3
     assert shift.grad.abs().max() > 1e-3
 
@@ -85,33 +118,6 @@ def test_topological_order():
 
 
 # ---------------------------------------------------------------- flow logic
-@pytest.fixture(scope="module")
-def fitted_flow():
-    rng = np.random.default_rng(7)
-    n = 3000
-    x = rng.normal(0, 2, n)
-    y_lat = 0.8 * x + rng.logistic(size=n)
-    y = np.digitize(y_lat, [-1.0, 0.5, 2.0]).astype(float)
-    w = 0.5 * x - 0.3 * y + rng.logistic(size=n)
-    df = pd.DataFrame({"X": x, "Y": y, "W": w})
-    spec = {
-        "X": ContinuousNode(),
-        "Y": OrdinalNode(4, [LS("X")]),
-        "W": ContinuousNode([LS("X"), LS("Y")]),
-    }
-    flow = CausalFlowDAG(spec)
-    flow.fit(
-        df.iloc[:2400],
-        df.iloc[2400:],
-        epochs=300,
-        learning_rate=0.05,
-        batch_size=600,
-        verbose=0,
-        seed=0,
-    )
-    return flow, df
-
-
 def test_pmf_matches_do_sampling(fitted_flow):
     flow, _ = fitted_flow
     grid = pd.DataFrame({"X": [1.5]})
@@ -207,3 +213,13 @@ def test_ls_node_equals_proportional_odds():
         res.params, exog=df[["X1", "X2"]].values[:500], which="prob"
     )
     assert np.abs(pmf_flow - pmf_sm).max() < 0.01
+
+
+def test_bisection_warns_when_a_root_escapes_the_bracket():
+    """A root beyond max_expand doublings is clipped and reported, not silent."""
+    z = torch.tensor([0.5, 1e12])  # the second target is out of any reach
+    lo, hi = torch.tensor([-1.0, -1.0]), torch.tensor([1.0, 1.0])
+    with pytest.warns(RuntimeWarning, match="1 latent value"):
+        root = _expanding_bisection(lambda t: t, z, lo, hi, max_expand=5, iters=30)
+    assert torch.isclose(root[0], torch.tensor(0.5), atol=1e-6)
+    assert root[1] < 1e12  # clipped to the (expanded) bracket edge

@@ -1,6 +1,6 @@
 # tramdag cross-machine benchmark
 
-Fixed 200-epoch workloads (see `experiments/stale/perf_machine.py`); `final_val_nll` must agree across machines (same seed & data).
+Fixed 200-epoch workloads (see `experiments/benchmarks/perf_machine.py`); `final_val_nll` must agree across machines (same seed & data).
 
 | host | chip | gpu | code | workload | device | fit_s | epochs_per_s | sample_100k_s | final_val_nll |
 |---|---|---|---|---|---|---|---|---|---|
@@ -18,7 +18,7 @@ Fixed 200-epoch workloads (see `experiments/stale/perf_machine.py`); `final_val_
 ```bash
 # on the new machine (no repo clone needed; GPU optional)
 pip install tramdag
-curl -O https://raw.githubusercontent.com/tensorchiefs/tramdag/main/experiments/stale/perf_machine.py
+curl -O https://raw.githubusercontent.com/tensorchiefs/tramdag/main/experiments/benchmarks/perf_machine.py
 python perf_machine.py            # ~2-5 min -> <YYYY-MM-DD-HHMM>_<host>.json
 ```
 
@@ -26,7 +26,7 @@ Then copy the JSON into `docs/perf/` in the repo, commit it, and
 regenerate this file (or ask Claude to do it):
 
 ```bash
-python experiments/stale/perf_machine.py --report docs/perf
+python experiments/benchmarks/perf_machine.py --report docs/perf
 ```
 
 Sanity check before committing: the new row's `final_val_nll` should

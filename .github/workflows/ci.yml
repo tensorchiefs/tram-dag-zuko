@@ -32,11 +32,14 @@ jobs:
         - '3.14'
 
     runs-on: ${{ matrix.platform }}
+    # a torch hang would otherwise burn the 6-hour default per matrix job;
+    # the nightly slow suite needs the headroom, the fast run needs minutes
+    timeout-minutes: 120
 
     steps:
     - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1
 
-    - uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9   # v9.0.0
+    - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d   # v10.0.1
       with:
         python-version: ${{ matrix.python-version }}
         enable-cache: true
@@ -47,8 +50,17 @@ jobs:
         uv sync --no-default-groups --group test
         --python ${{ matrix.python-version }}
 
+    # no path argument: testpaths in pyproject covers tests/ and the
+    # per-area experiment checks, and both are meant to run here
     - name: Tests
       shell: bash
+      # torch opens as many intra-op threads as the box reports, and -n auto
+      # already runs one worker per vCPU: uncapped, a single worker was
+      # measured at 41 min CPU after 9 min wall without finishing, while the
+      # capped run does the whole not-slow suite in under a minute
+      env:
+        OMP_NUM_THREADS: '1'
+      # --cov gate: [tool.coverage] in pyproject sets source and fail_under
       run: >-
-        uv run pytest tests/ -q -n auto
+        uv run pytest -q -n auto --cov
         ${{ (github.event_name != 'schedule' && github.event_name != 'workflow_dispatch') && '-m "not slow"' || '' }}

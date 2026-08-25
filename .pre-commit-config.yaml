@@ -16,7 +16,6 @@ repos:
   - id: check-executables-have-shebangs
   - id: check-merge-conflict
   - id: check-shebang-scripts-are-executable
-    exclude: ^data/   # frozen test contract; not ours to chmod
   - id: check-toml
   - id: check-yaml
   - id: end-of-file-fixer
@@ -40,7 +39,7 @@ repos:
   - id: codespell
     name: codespell (tracked files)
     args: [-L, 'nd,continous']
-    exclude: ^(data/|uv\.lock|.*\.ipynb$|.*texfrag/|notebooks/stale/|experiments/stale/)
+    exclude: ^(experiments/.*/data/|uv\.lock|.*\.ipynb$|.*texfrag/)
   # a commit-msg-stage hook is handed ONLY the message file, so the message is
   # spell-checked without the file excludes above applying to it
   - id: codespell
@@ -48,6 +47,23 @@ repos:
     name: codespell (commit message)
     args: [-L, 'nd,continous']
     stages: [commit-msg]
+
+- repo: https://github.com/rohaquinlop/complexipy-pre-commit
+  rev: v7.0.1
+  hooks:
+  # cognitive complexity, tiered: framework code may be intricate where the
+  # maths is; examples and tests must stay simple enough to read as prose
+  - id: complexipy
+    alias: complexipy-src
+    name: complexipy (src, max 15)
+    args: [--max-complexity-allowed, '15']
+    files: ^src/
+  - id: complexipy
+    alias: complexipy-examples
+    name: complexipy (experiments/notebooks/tests, max 10)
+    args: [--max-complexity-allowed, '10']
+    files: ^(experiments|notebooks|tests)/
+    exclude: \.ipynb$   # generated from the .py sources
 
 - repo: https://github.com/rhysd/actionlint
   rev: v1.7.12

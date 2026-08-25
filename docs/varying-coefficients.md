@@ -48,7 +48,7 @@ of `s(x,t)`, and nothing rewards a smooth difference between the arms. The
 read-out is thus the difference of two jointly fitted, unregularized
 networks, which amplifies noise.
 
-On the `vc-shift` validation DGP task class, the `CS` reduced form reaches
+On the heterogeneous-effect validation DGP (see below), the `CS` reduced form reaches
 corr ≈ 0.5 against the true effect function (tramdag-simu#18 / PR #21). This
 holds **even when the model is exactly in-class**. The `VC` term reaches
 corr ≈ 0.99 on the same protocol (`tests/test_vc_term.py`, acceptance bar
@@ -60,7 +60,7 @@ framework.
 ## Semantics
 
 - **Scale**: `beta(x)` lives on the node's latent (log-odds) scale. The flow
-  adds it for a continuous node (`z = h(y) + …`) and subtracts it from the
+  adds it for a continuous node (`u = h(y) + …`) and subtracts it from the
   cutpoints for an ordinal node, exactly like an `LS` weight. With no
   modifiers, `VC(t="T")` *is* `LS("T")` (identical model, testably
   bit-exact). Thus `VC` versus `LS` is a nested question.
@@ -135,12 +135,15 @@ design:
 
 ## Validation
 
-`tramdag.simulations.VCLogisticShift` (`data/vc-shift/`, frozen contract) is
-a logistic-shift SCM with known `beta_true(x) = −1 + 0.8·X2 − 0.6·X3`. It
-has a nonlinear prognostic part and confounded assignment (X2 is confounder
-*and* modifier). Acceptance (`tests/test_vc_term.py`) requires three
-results: recovery corr ≥ 0.9 at n = 5000 (measured ≈ 0.99, min over 3 seeds
-0.986), a fitted `beta0` that matches `fit_classical` under a large penalty,
-and the read-out identities. Candidate follow-ups are separate issues:
-propensity-centered `beta(x)·(t − ê(x))` (#30), and per-observation scores
-for effect-modifier scans (#29).
+The `vc_hetero` DGP in [`tests/conftest.py`](../tests/conftest.py) is a
+logistic-shift SCM with known `beta_true(x) = −1 + 0.8·X2 − 0.6·X3`. It has a
+nonlinear prognostic part and confounded assignment (X2 is confounder *and*
+modifier), which is the configuration where the `CS` reduced form fails
+hardest. Acceptance (`tests/test_vc_term.py`) requires three results:
+recovery corr ≥ 0.9 at n = 5000 (measured ≈ 0.99, min over 3 seeds 0.986), a
+fitted `beta0` that matches `fit_classical` under a large penalty, and the
+read-out identities. The centering claims are measured against the
+`confounded` DGP in the same file. Both former follow-ups have since
+shipped: propensity centering (#30) is `center=True`, documented above, and the
+per-observation scores for effect-modifier scans (#29) are `flow.scores` and
+`flow.effect_modifier_scan` — see [scores.md](scores.md).

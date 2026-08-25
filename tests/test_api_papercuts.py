@@ -1,7 +1,9 @@
 """Tests for the API papercuts in issue #12: constructor seeding, history +
-machine-info persistence through save/load, and the machine_info() helper.
+and machine-info persistence through save/load (the helper itself is
+tested in test_utils.py).
 """
 
+# %% imports ---------------------------------------------------------------------------
 import numpy as np
 import pandas as pd
 import pytest
@@ -11,6 +13,7 @@ import tramdag as td
 from tramdag import LS, CausalFlowDAG, ContinuousNode, OrdinalNode
 
 
+# %% private functions -----------------------------------------------------------------
 def _spec():
     return {
         "x1": ContinuousNode(),
@@ -19,11 +22,12 @@ def _spec():
     }
 
 
+# %% public functions ------------------------------------------------------------------
 # -------------------------------------------------- #1 constructor seeding
 def test_constructor_seed_makes_init_reproducible():
     a = CausalFlowDAG(_spec(), seed=42)
     b = CausalFlowDAG(_spec(), seed=42)
-    for pa, pb in zip(a.parameters(), b.parameters()):
+    for pa, pb in zip(a.parameters(), b.parameters(), strict=True):
         assert torch.equal(pa, pb)
 
 
@@ -31,23 +35,29 @@ def test_constructor_seed_differs_across_seeds():
     a = CausalFlowDAG(_spec(), seed=42)
     c = CausalFlowDAG(_spec(), seed=7)
     assert any(
-        not torch.equal(pa, pc) for pa, pc in zip(a.parameters(), c.parameters())
+        not torch.equal(pa, pc)
+        for pa, pc in zip(a.parameters(), c.parameters(), strict=True)
     )
 
 
 def test_no_seed_still_works():
-    # default (no seed) constructs fine; just not pinned across processes
-    flow = CausalFlowDAG(_spec())
-    assert flow.order  # built
+    # default (no seed) constructs fine, and is deliberately not pinned:
+    # two unseeded models differ, which is what makes seed= the only knob
+    a, b = CausalFlowDAG(_spec()), CausalFlowDAG(_spec())
+    assert any(
+        not torch.equal(pa, pb)
+        for pa, pb in zip(a.parameters(), b.parameters(), strict=True)
+    )
 
 
 # ------------------------------------------- #2 history persists through io
 def test_save_load_round_trips_history(tmp_path):
+    rng = np.random.default_rng(0)
     df = pd.DataFrame(
         {
-            "x1": np.random.randn(200),
-            "x2": np.random.randn(200),
-            "y": np.random.randint(0, 3, 200).astype(float),
+            "x1": rng.standard_normal(200),
+            "x2": rng.standard_normal(200),
+            "y": rng.integers(0, 3, 200).astype(float),
         }
     )
     flow = CausalFlowDAG(_spec(), seed=0)
@@ -62,25 +72,6 @@ def test_save_load_round_trips_history(tmp_path):
 
 
 # ----------------------------------------- #4 machine/env info in metadata
-def test_machine_info_has_expected_fields():
-    info = td.machine_info()
-    for k in [
-        "hostname",
-        "os",
-        "cpu_count",
-        "python",
-        "torch",
-        "zuko",
-        "tramdag",
-        "cuda",
-        "mps",
-        "ram_gb",
-    ]:
-        assert k in info
-    assert info["torch"] == torch.__version__
-    assert info["tramdag"] == td.__version__
-
-
 def test_save_carries_machine_and_version_metadata(tmp_path):
     flow = CausalFlowDAG(_spec(), seed=0)
     p = tmp_path / "flow.pt"
@@ -102,3 +93,31 @@ def test_load_requires_a_complete_checkpoint(tmp_path):
     torch.save({"spec": spec_to_dict(flow.spec), "state_dict": flow.state_dict()}, p)
     with pytest.raises(KeyError):
         CausalFlowDAG.load(p)
+
+
+def test_ls_coefficients_skips_network_shifts():
+    """A node mixing LS and CS terms gives only its linear-shift weights.
+
+    Reading `.weight` off every shift module used to raise an
+    AttributeError on a ComplexShift, which broke the paper's headline
+    complex-shift replication (`experiments/paper/triangle.py atan-cs`).
+    """
+    from tramdag import CS, LS, VC, CausalFlowDAG, ContinuousNode, OrdinalNode
+
+    spec = {
+        "x1": ContinuousNode(),
+        "x2": ContinuousNode([LS("x1")]),
+        "t": OrdinalNode(2, [LS("x1")]),
+        "x3": ContinuousNode([LS("x1"), CS("x2"), VC("x2", t="t")]),
+    }
+    coefficients = CausalFlowDAG(spec, seed=0).ls_coefficients()
+    assert set(coefficients["x3"]) == {"x1"}  # CS and VC carry no weight
+    assert set(coefficients["x2"]) == {"x1"}
+    assert coefficients["x3"]["x1"].shape == (1,)
+
+
+def test_ls_coefficients_omits_a_node_without_linear_shifts():
+    from tramdag import CS, CausalFlowDAG, ContinuousNode
+
+    spec = {"x1": ContinuousNode(), "x2": ContinuousNode([CS("x1")])}
+    assert CausalFlowDAG(spec, seed=0).ls_coefficients() == {}

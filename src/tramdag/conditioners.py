@@ -1,15 +1,27 @@
 """Conditioner networks, one per edge term type.
 
-Each architecture copies the default of the original Keras implementation
-(``tram_models.py`` in https://github.com/tensorchiefs/tram-dag). A fitted
-model is therefore directly comparable with that implementation.
+Each architecture copies a default of the PyTorch reference this package grew
+out of: ``tramdag/models/tram_models.py`` in
+https://github.com/buehlpa/TramDag, whose ``ComplexShiftDefaultTabular`` is
+64-128-64 ReLU into a bias-free ``Linear(64, 1)`` and whose
+``ComplexInterceptDefaultTabular`` is 8-8 ReLU into a bias-free
+``Linear(8, n_thetas)`` with ``n_thetas=20``. A fitted model is therefore
+directly comparable with that implementation.
+
+Those defaults are **not** the TRAM-DAG paper's own nets. The paper's R
+implementation (https://github.com/tensorchiefs/tram-dag) uses
+``hidden_features_I = hidden_features_CS = c(2, 25, 25, 2)`` with sigmoid
+activations for the triangle experiments, and a 10-100 tanh net for the
+CAREFL/VACA comparisons. Every replication in ``experiments/paper/`` therefore
+sets ``units=`` and ``activation=`` explicitly from its own reference script,
+and none of them relies on the defaults here.
 
 ===================== ============================================ ======
 Conditioner           Architecture                                 Term
 ===================== ============================================ ======
 ``LinearShift``       ``Linear(n, 1, bias=False)``                 ``LS``
 ``ComplexShift``      64-128-64 ReLU MLP to 1, no bias             ``CS``
-``ComplexIntercept``  8-8 ReLU MLP to ``n_params``, no bias        ``I``
+``ComplexIntercept``  8-8 ReLU MLP to ``n_params``, bias-free out  ``I``
 ``SimpleIntercept``   free parameter vector, no parent             none
 ``VaryingCoef``       ``beta0`` + penalized 16-unit MLP            ``VC``
 ===================== ============================================ ======
@@ -23,19 +35,35 @@ parent enters raw, in one column. An ordinal parent is one-hot encoded, in
 ``levels`` columns.
 """
 
+# %% imports ---------------------------------------------------------------------------
 from __future__ import annotations
 
 import torch
 from torch import Tensor, nn
 
+# %% global variables ------------------------------------------------------------------
+# the activations the reference implementations use: relu in the PyTorch
+# reference's default classes, sigmoid in the paper's create_param_net, tanh in
+# the paper's make_model for the CAREFL/VACA comparisons.
+ACTIVATIONS = {"relu": nn.ReLU, "sigmoid": nn.Sigmoid, "tanh": nn.Tanh}
+# relu, because the architectures these conditioners copy use relu -- the
+# default net and the default activation come from the same source.
+DEFAULT_ACTIVATION = "relu"
 
+
+# %% private functions -----------------------------------------------------------------
 def _mlp(
-    n_in: int, units: tuple[int, ...], n_out: int, *, zero_init_last: bool = False
+    n_in: int,
+    units: tuple[int, ...],
+    n_out: int,
+    *,
+    activation: str | None = None,
+    zero_init_last: bool = False,
 ) -> nn.Sequential:
     """Build the one MLP shape every conditioner uses.
 
-    Hidden layers of the given ``units`` with ReLU, then a bias-free output
-    layer.
+    Hidden layers of the given ``units``, each followed by ``activation``,
+    then a bias-free output layer.
 
     Parameters
     ----------
@@ -45,6 +73,12 @@ def _mlp(
         Hidden layer widths.
     n_out : int
         Output width.
+    activation : str | None, optional
+        Key of :data:`ACTIVATIONS`: ``"relu"`` (the default, and what the
+        PyTorch reference's default classes use), ``"sigmoid"`` (the paper's
+        ``create_param_net``) or ``"tanh"`` (the paper's ``make_model``, used
+        for its CAREFL/VACA comparisons). ``None`` takes
+        :data:`DEFAULT_ACTIVATION`.
     zero_init_last : bool, optional
         Zero the output layer, by default ``False``.
 
@@ -52,11 +86,17 @@ def _mlp(
     -------
     nn.Sequential
         The network.
+
+    Raises
+    ------
+    KeyError
+        From :data:`ACTIVATIONS` if the name is not one of its keys.
     """
+    make_activation = ACTIVATIONS[activation or DEFAULT_ACTIVATION]
     layers: list[nn.Module] = []
     width = n_in
     for u in units:
-        layers += [nn.Linear(width, u), nn.ReLU()]
+        layers += [nn.Linear(width, u), make_activation()]
         width = u
     out = nn.Linear(width, n_out, bias=False)
     if zero_init_last:
@@ -64,6 +104,7 @@ def _mlp(
     return nn.Sequential(*layers, out)
 
 
+# %% public classes --------------------------------------------------------------------
 class SimpleIntercept(nn.Module):
     """Free transform parameters that do not depend on the data.
 
@@ -105,14 +146,23 @@ class ComplexIntercept(nn.Module):
     n_params : int
         Number of transform parameters to produce.
     units : tuple[int, ...] | None, optional
-        Hidden layers of the network, by default ``(8, 8)``.
+        Hidden layers of the network, by default ``(8, 8)`` — the two hidden
+        layers of ``ComplexInterceptDefaultTabular`` (see the module
+        docstring). The paper's own nets are wider; a replication should set
+        this explicitly.
+    activation : str | None, optional
+        Key of :data:`ACTIVATIONS`, by default :data:`DEFAULT_ACTIVATION`.
     """
 
     def __init__(
-        self, n_features: int, n_params: int, units: tuple[int, ...] | None = None
+        self,
+        n_features: int,
+        n_params: int,
+        units: tuple[int, ...] | None = None,
+        activation: str | None = None,
     ):
         super().__init__()
-        self.net = _mlp(n_features, units or (8, 8), n_params)
+        self.net = _mlp(n_features, units or (8, 8), n_params, activation=activation)
 
     def forward(self, x: Tensor) -> Tensor:
         """Map parent features to transform parameters.
@@ -174,12 +224,22 @@ class ComplexShift(nn.Module):
     n_features : int
         Width of the encoded parent features.
     units : tuple[int, ...] | None, optional
-        Hidden layers of the network, by default ``(64, 128, 64)``.
+        Hidden layers of the network, by default ``(64, 128, 64)`` — the three
+        hidden layers of ``ComplexShiftDefaultTabular`` (see the module
+        docstring). The paper's own nets are narrower; a replication should
+        set this explicitly.
+    activation : str | None, optional
+        Key of :data:`ACTIVATIONS`, by default :data:`DEFAULT_ACTIVATION`.
     """
 
-    def __init__(self, n_features: int, units: tuple[int, ...] | None = None):
+    def __init__(
+        self,
+        n_features: int,
+        units: tuple[int, ...] | None = None,
+        activation: str | None = None,
+    ):
         super().__init__()
-        self.net = _mlp(n_features, units or (64, 128, 64), 1)
+        self.net = _mlp(n_features, units or (64, 128, 64), 1, activation=activation)
 
     def forward(self, x: Tensor) -> Tensor:
         """Compute the shift contribution.
@@ -222,7 +282,12 @@ class VaryingCoef(nn.Module):
     penalty : float, optional
         L2 weight on ``b_theta``, by default ``1.0``.
     units : tuple[int, ...] | None, optional
-        Hidden layers of ``b_theta``, by default ``(16,)``.
+        Hidden layers of ``b_theta``, by default ``(16,)``. One layer of 16 is
+        the head ``tests/test_vc_term.py`` recovers a known ``beta(x)`` with
+        at corr ~ 0.99; this term has no counterpart in the reference
+        implementations, so the size comes from that measurement.
+    activation : str | None, optional
+        Key of :data:`ACTIVATIONS`, by default :data:`DEFAULT_ACTIVATION`.
 
     Notes
     -----
@@ -240,6 +305,7 @@ class VaryingCoef(nn.Module):
         n_features: int,
         penalty: float = 1.0,
         units: tuple[int, ...] | None = None,
+        activation: str | None = None,
     ):
         super().__init__()
         self.penalty = float(penalty)
@@ -248,7 +314,13 @@ class VaryingCoef(nn.Module):
         self.register_buffer("warm_started", torch.tensor(False))
         if n_features > 0:
             # zero-initialised output: beta(x) == beta0 at init
-            self.net = _mlp(n_features, units or (16,), 1, zero_init_last=True)
+            self.net = _mlp(
+                n_features,
+                units or (16,),
+                1,
+                activation=activation,
+                zero_init_last=True,
+            )
         else:
             self.net = None
 

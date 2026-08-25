@@ -1,0 +1,46 @@
+# Hyperparameters of the CAREFL counterfactual benchmark (carefl.py).
+#
+# Every value the script uses is in this file: it reads no defaults of its
+# own and rejects a variant whose keys do not match exactly.
+
+# The paper says only "the same architecture and training procedure" as its
+# main experiments (App. C.2), with no numbers, so every value below is this
+# repository's choice, carried over unchanged from the pre-0.4 script.
+
+#   * the reference implementation's own CAREFL comparison
+#     (comparison/carefl_fig5.r) used M = 30, 7000 epochs and nTrain = 2500 —
+#     a different protocol from the one below, which comes from this
+#     repository's pre-0.4 script and is kept so the numbers stay comparable
+#     across the restructure.
+
+# The model architecture below IS the reference's: comparison/utils.R's
+# make_model, one net per node, dense(10, tanh) -> dense(100, tanh) ->
+# dense(len_theta). The training protocol is not, as noted above.
+#
+variants:
+  # all conditionals complex intercepts; the Laplace noise is additive, so
+  # the counterfactual truth is analytic and the errors below are exact
+  flexible:
+    n_train: 18000
+    n_val: 2000
+    epochs: 300
+    learning_rate: 0.01
+    batch_size: 512
+    transform: bernstein        # stated rather than inherited
+    # from the reference comparison script: M = 30, len_theta = M + 1 = 31
+    # unconstrained coefficients. zuko ties two extra control points onto
+    # those to smooth the extrapolation, so the polynomial is order 32 where
+    # the reference's is order 30; the free-parameter count is what matches.
+    n_coeffs: 31
+    intercept_units: [10, 100]  # make_model's two dense layers
+    activation: tanh            # make_model's activation
+    chunk_epochs: 50            # each fit call restarts Adam: a warm-restart
+                                # schedule, and it matters (see helpers.py)
+    polish_epochs: 100          # second phase at a lower rate
+    polish_learning_rate: 0.001
+    dgp_seed: 42                # the paper's generator seed
+    init_seed: 7                # flow weight initialization
+    shuffle_seed: 0             # minibatch shuffling
+    n_heldout: 300              # typical rows scored instead of the 4-sigma x_obs
+    heldout_seed: 999           # seed offset of the held-out draw
+    alphas_scored: [-1.5, 0.0, 1.5]
