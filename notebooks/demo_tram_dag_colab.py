@@ -56,7 +56,7 @@ import torch
 from tramdag import CausalFlowDAG, ContinuousNode, I
 
 # tramdag reports fit() progress on its module logger
-logging.basicConfig(level=logging.INFO, format="%(message)s")
+logging.basicConfig(level=logging.INFO, format="%(message)s")  # TODO: check
 
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 plt.rcParams["figure.dpi"] = 110
@@ -376,73 +376,6 @@ plt.show()
 # why **Bernstein** is the TRAM-faithful default: its monotone softplus-cumsum
 # parametrization is easier to optimize. You can swap the transform per node at
 # any time with `I(..., transform="spline", bins=16)`.
-
-# %% [markdown]
-# ### Misspecification bends causal answers, not just the likelihood
-#
-# The transform choice propagates into the *interventional* distribution — and
-# the **mean** is forgiving. All three models get
-# $\mathbb{E}[x_3 \mid do(x_2)]$ right to a few hundredths, because the shifts
-# are right in each. What differs is the **shape**, so every query that reads the
-# shape — tail probabilities, quantiles, the spread of individual effects —
-# inherits the misfit. Compare a tail probability against the DGP:
-
-# %%
-truth_do = sample_dgp(50_000, seed=543, do={"x2": 0.0})["x3"]
-print("under do(x2=0):        E[x3]     P(x3 < -3)")
-print(
-    f"  DGP                  {truth_do.mean():+.3f}      "
-    f"{float((truth_do < -3).mean()):.4f}"
-)
-for tr in ("bernstein", "spline", "affine"):
-    drawn = fits[tr].sample(50_000, do={"x2": 0.0}, seed=4)["x3"]
-    print(
-        f"  {tr:9s}            {drawn.mean():+.3f}      "
-        f"{float((drawn < -3).mean()):.4f}"
-    )
-
-# %% [markdown]
-# The means agree while the tails do not, and the ranking changes: the
-# under-trained spline misses $P(x_3 < -3)$ by about two thirds and affine by
-# roughly a sixth, though both looked fine on the mean. A model can be "close
-# enough" on average and still be wrong about the question you actually asked —
-# which is why the transform is a modelling decision, not a default to inherit.
-
-# %% [markdown]
-# ## 7. GPU vs CPU
-#
-# The whole flow is plain PyTorch, so it runs anywhere. Same 60-epoch fit, both
-# devices (a CPU-only runtime reports only CPU):
-
-
-# %%
-def timed_fit(device, epochs=60):
-    torch.manual_seed(0)
-    f = CausalFlowDAG(
-        {
-            "x1": ContinuousNode(),
-            "x2": ContinuousNode(I("x1")),
-            "x3": ContinuousNode(I("x1", "x2")),
-        },
-        device=device,
-    )
-    t0 = time.perf_counter()
-    f.fit(train, val, epochs=epochs, learning_rate=1e-2, batch_size=4096, verbose=0)
-    return time.perf_counter() - t0
-
-
-timings = {"cpu": timed_fit("cpu")}
-if torch.cuda.is_available():
-    timed_fit("cuda", epochs=5)  # warm-up (cuda kernel compilation)
-    timings["cuda"] = timed_fit("cuda")
-for dev, t in timings.items():
-    print(f"{dev:5s}: {t:6.1f}s for 60 epochs @ n=45,000")
-if len(timings) > 1:
-    fig, ax = plt.subplots(figsize=(4, 2.8))
-    ax.barh(list(timings), list(timings.values()), color=["C0", "C2"])
-    ax.set_xlabel("seconds (60 epochs)"), ax.set_title("same model, same data")
-    fig.tight_layout()
-    plt.show()
 
 # %% [markdown]
 # ## What you just saw

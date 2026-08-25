@@ -28,7 +28,7 @@ exactly as in classical proportional-odds models.
 > replicated here with pinned tests.
 
 **5-minute showcase**: the [Colab badge above](https://colab.research.google.com/github/tensorchiefs/tramdag/blob/main/notebooks/demo_tram_dag_colab.ipynb) fits the paper's bimodal benchmark
-live (GPU-ready) and walks L1 → L2 → L3, every answer checked against analytic
+live and walks L1 → L2 → L3, every answer checked against analytic
 ground truth. Further notebooks are available at [`notebooks/`](notebooks/) like the didactic walkthrough of the model:
 [`notebooks/intro_tram_dag.py`](notebooks/intro_tram_dag.py).
 

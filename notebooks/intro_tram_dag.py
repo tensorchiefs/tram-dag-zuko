@@ -123,12 +123,12 @@
 # in **exactly one** term: the intercept (the *shape*) or one shift. The
 # table shows the resulting decomposition for a single continuous target $X_3$:
 #
-# | `transformation` | $u_3 = h(x_3 \mid \mathrm{pa})$ | what carries each parent |
+# | formula (`terms`) | $u_3 = h(x_3 \mid \mathrm{pa})$ | what carries each parent |
 # |---|---|---|
-# | `None` / `[I]` (source) | $h_{\boldsymbol{\vartheta}}(x_3)$ | `SimpleIntercept` — $\boldsymbol{\vartheta}$ a free vector |
+# | `None` / `[SI()]` (source) | $h_{\boldsymbol{\vartheta}}(x_3)$ | `SimpleIntercept` — $\boldsymbol{\vartheta}$ a free vector |
+# | `[CI("X1")]` | $h_{\boldsymbol{\vartheta}(x_1)}(x_3)$ | `ComplexIntercept` — **no shift term**; $\boldsymbol{\vartheta}$ (the whole shape) bends with $x_1$ |
 # | `[LS("X1")]` | $h_{\boldsymbol{\vartheta}}(x_3) + \beta\,x_1$ | `LinearShift` — **one number** $\beta$ |
 # | `[CS("X1")]` | $h_{\boldsymbol{\vartheta}}(x_3) + g_1(x_1)$ | `ComplexShift` — additive MLP $g_1$ |
-# | `[I("X1")]` | $h_{\boldsymbol{\vartheta}(x_1)}(x_3)$ | `ComplexIntercept` — **no shift term**; $\boldsymbol{\vartheta}$ (the whole shape) bends with $x_1$ |
 # | `LS("X1") + CS("X2")` | $h_{\boldsymbol{\vartheta}}(x_3) + \beta x_1 + g_2(x_2)$ | one `LinearShift` + one `ComplexShift` (the model fitted below) |
 # | `[CS("X1", "X2")]` | $h_{\boldsymbol{\vartheta}}(x_3) + g_{1,2}(x_1, x_2)$ | **one joint** `ComplexShift` — an interaction in the shift |
 # | `CS("X1") + CS("X2")` | $h_{\boldsymbol{\vartheta}}(x_3) + g_1(x_1) + g_2(x_2)$ | two **additive** `ComplexShift`s |

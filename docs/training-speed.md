@@ -134,7 +134,7 @@ decade. This is why the two-phase recipe existed.
 5. **MPS (Apple GPU) is 3–4× slower than the M-series CPU** at these model sizes
    (verified correct: identical reconstruction). Kernel-launch overhead dominates
    sub-millisecond ops. Stay on CPU locally. CUDA on Colab-class GPUs is a different
-   regime (see the GPU-vs-CPU race in the demo notebook).
+   regime.
 6. **The old defaults waste or under-spend.** Stroke: 4000 epochs budgeted, converged
    work done after ~1500 (freezing recovers the difference automatically). Vaca: 520
    epochs budgeted, ~0.03 nats short of converged. Fixed budgets are wrong in both

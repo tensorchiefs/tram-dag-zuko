@@ -8,7 +8,7 @@ truth**.
 | notebook | what it is |
 |---|---|
 | `intro_tram_dag.py` | didactic walkthrough of the TRAM-DAG model (SI/LS/CS, L1–L3, all claims checked against a hand-built SCM; complex intercepts are the one component it does not exercise — see `additive_vs_joint_ci.py`) |
-| `demo_tram_dag_colab.py` | 5-minute showcase on the paper's bimodal VACA benchmark, GPU-ready ([open in Colab](https://colab.research.google.com/github/tensorchiefs/tramdag/blob/main/notebooks/demo_tram_dag_colab.ipynb)) |
+| `demo_tram_dag_colab.py` | 5-minute showcase on the paper's bimodal VACA benchmark ([open in Colab](https://colab.research.google.com/github/tensorchiefs/tramdag/blob/main/notebooks/demo_tram_dag_colab.ipynb)) |
 | `additive_vs_joint_ci.py` | joint vs additive complex intercept, and reading per-parent effects out of the additive one with `intercept_contributions` |
 | `varying_coefficients.py` | heterogeneous treatment effects: the `VC` head, `varying_coef`, the modifier scan and propensity centering, all scored against a known `beta(x)` |
 
