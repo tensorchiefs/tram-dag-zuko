@@ -71,20 +71,20 @@ flow.fit(
 
 # all-`ls` model? fit it classically instead: deterministic float64 L-BFGS,
 # exact MLE matching statsmodels/R (see docs/fitting.md)
-flow.fit_classical(train_df)  # raises on cs/ci specs
+flow.fit_classical(train_df)  # raises on cs/ci/vc specs
 
 flow.log_prob(df)  # L1: joint log-likelihood per row
 flow.sample(1000)  # L1: observational sampling
 flow.sample(1000, do={"T": 1})  # L2: interventional (graph mutilation)
 flow.pmf(df, node="Y", do={"T": 1})  # L2: analytic interventional PMF
-flow.density(df, node="X3", grid=grid, do={"T": 1})  # ... and density, continuous nodes
+flow.density(df, node="X2", grid=grid, do={"X1": 0.5})  # ... and density, continuous nodes
 
 u = flow.abduct(df)  # L3 step 1: latents from observations
 cf = flow.sample(do={"T": 1}, u=u)  # L3 steps 2+3: counterfactuals
 
 flow.ls_coefficients()  # interpret: per-edge log-odds-ratios (LS terms)
-flow.intercept_contributions("Y", df)  # interpret: per-parent partial effects
-# of an additive complex intercept (centered)
+# per-parent partial effects of an additive complex intercept (centered):
+# flow.intercept_contributions("Y", df) on a CI("A", "B", allow_interaction=False)
 
 # heterogeneous treatment effects: a small, penalized effect head beta(x)*T
 # (VC term) with a first-class read-out — see docs/varying-coefficients.md
@@ -113,7 +113,7 @@ intercept term `I` plus any number of shifts (notation:
 | `I("A")` | `h_ϑ(a)(x)` — ϑ bends with the parent | `ComplexIntercept`: MLP `[8, 8] → n_params` | the parent reshapes the whole distribution; no single coefficient |
 | `I("A","B")` (default `allow_interaction=True`) | `h_ϑ(a,b)(x)` | **one joint** MLP over both parents — they interact in ϑ | maximal flexibility |
 | `I("A","B", allow_interaction=False)` | `h_ϑ(a)+ϑ(b)(x)` | one MLP **per parent**, parameter vectors summed in coefficient space | per-parent partial effects via `flow.intercept_contributions` |
-| `LS("A")` | `β·a` | `Linear(width, 1)`, no bias — **one parameter** | `exp(β)` is an odds ratio |
+| `LS("A")` | `β·a` | `Linear(width, 1)`, no bias — **one parameter per feature column** (one for a continuous parent, `levels` for a one-hot ordinal) | `exp(β)` is an odds ratio |
 | `CS("A")` | `g(a)`, additive | `ComplexShift`: MLP `[64, 128, 64] → 1` | plot `g` |
 | `CS("A","B")` | `g(a,b)` — joint | one MLP over the concatenated features | interaction *in the shift* |
 | `CS("A") + CS("B")` | `g₁(a) + g₂(b)` | two MLPs, scalars added | GAM-style, each effect plottable |

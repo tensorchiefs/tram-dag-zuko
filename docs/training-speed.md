@@ -42,7 +42,8 @@ flow.fit(train_df, epochs=4000, learning_rate=1e-2, batch_size=512)  # constant 
 flow.fit(train_df, epochs=2000, learning_rate=1e-3, batch_size=512)  # 2nd phase
 ```
 
-is still the exact-MLE path that `experiments/misc/validate_ls.py` uses. Independent of all
+is still the exact-MLE path (`experiments/misc/validate_ls.py` runs a three-phase variant
+of it, 4000/2000/1000 epochs at 1e-2/1e-3/1e-4, batch 256). Independent of all
 this, `restore_best=False` remains the default (see CHANGELOG). The guard test
 `tests/test_fit_schedules.py::test_plateau_freeze_preserves_exact_mle` also shows that
 even *with* plateau+freezing the all-`ls` fit lands on the classical MLE within the usual
@@ -165,5 +166,6 @@ The benchmark itself changed no defaults — that is its own reviewed decision (
 the `restore_best` episode in CHANGELOG.md). Two of its findings have since been
 adopted: `plateau_patience` defaults to the 30 recommended here, and `epochs` has no
 default at all, because finding 6 is precisely that a fixed budget cannot be right for
-every workload. The experiment scripts still run the two-phase constant-lr recipe,
-which each states in its own YAML.
+every workload. The paper scripts follow the paper's own protocol (one constant-lr
+run, or the reference's ReduceLROnPlateau for VACA/CAREFL); `validate_ls` runs a
+three-phase constant-lr descent. Each states its recipe in its own YAML.

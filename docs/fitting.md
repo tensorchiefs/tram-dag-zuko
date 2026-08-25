@@ -197,7 +197,8 @@ transformation model (ordered-logit / Colr). It raises on any `cs`/`ci` edge.
   `finally: self.float()` restores float32. The stored model stays float32, and
   so do `save`/`load`. The data path (`_tensorize`, `sample`, `pmf`) reads the
   model dtype, so it follows along.
-- **Convergence**: the flag comes from NLL flatness and is *advisory*. A
+- **Convergence**: the flag is true when torch's `tolerance_change` ended the
+  run before `max_iter` did, and it is *advisory*. A
   Bernstein intercept and weakly-identified directions (rare one-hot levels, a
   flat treatment-effect ridge) continue to drift along zero-curvature valleys
   after the likelihood is at the optimum. Correctness comes from a comparison
