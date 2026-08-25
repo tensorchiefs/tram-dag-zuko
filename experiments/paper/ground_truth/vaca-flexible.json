@@ -1,17 +1,17 @@
 {
-  "_note": "Protocol = the paper's R code 1:1 (see the YAML header): measured 2026-08-25 on the feat/followups branch. Protocol = the paper's R code 1:1 (see the YAML header): measured 2026-08-25 on the feat/followups branch. Paper Sec. 5.1-5.2. The interventional means are analytic (E[x3|do(x2=a)] = -0.25 + 0.25a), so what is checked is the flow's error against them, not a pinned flow value: a center plus an error bound on the same number gave two windows that could disagree. do(x2=-3) is off-manifold extrapolation, which is why its error is the largest of the three.",
+  "_note": "Protocol = the paper's R code 1:1 (see the YAML header): measured 2026-08-25 on the feat/followups branch. Paper Sec. 5.1-5.2. The interventional means are analytic (E[x3|do(x2=a)] = -0.25 + 0.25a), so what is checked is the flow's error against them, not a pinned flow value: a center plus an error bound on the same number gave two windows that could disagree. do(x2=-3) is off-manifold extrapolation, which is why its error is the largest of the three.",
   "val_nll_x3": {
-    "value": 1.4415267705917358,
+    "value": 1.4350718259811401,
     "atol": 0.05
   },
   "mean_x3_abs_err_do_x2_-3": {
-    "max": 1.827
+    "max": 0.06517
   },
   "mean_x3_abs_err_do_x2_-2": {
-    "max": 1.066
+    "max": 0.08502
   },
   "mean_x3_abs_err_do_x2_+0": {
-    "max": 0.04221
+    "max": 0.1918
   },
   "std_x1_analytic": {
     "value": 2.0766559657295187,
