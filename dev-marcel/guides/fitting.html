@@ -30,12 +30,14 @@
   <li><a href="../guides/training_speed.html">Training speed</a></li>
   <li><a href="../guides/scores.html">Scores &amp; modifier scan</a></li>
   <li><a href="../guides/varying_coefficients.html">Varying coefficients</a></li>
-  <li><a href="../guides/stroke_case_study.html">Stroke case study</a></li>
+  <li><a href="../guides/code_map.html">Code map</a></li>
 </ul>
 <h2>Notebooks</h2>
 <ul class="memberlist">
   <li><a href="../examples/demo_tram_dag_colab.html">5-minute demo</a></li>
   <li><a href="../examples/intro_tram_dag.html">Didactic intro</a></li>
+  <li><a href="../examples/additive_vs_joint_ci.html">Additive vs joint CI</a></li>
+  <li><a href="../examples/varying_coefficients.html">Heterogeneous effects (VC)</a></li>
 </ul>
 <h2>Download</h2>
 <ul class="memberlist">
@@ -76,35 +78,39 @@
 
                         <div class="docstring"><h1 id="fitting-a-tram-dag-how-training-works">Fitting a TRAM-DAG: how training works</h1>
 
-<p>This page is the technical reference for <a href="https://github.com/tensorchiefs/tramdag/blob/main/docs/../src/tramdag/flow.py"><code>CausalFlowDAG</code></a>.
+<p>This page is the technical reference for <a href="https://github.com/tensorchiefs/tramdag/blob/dev-marcel/docs/../src/tramdag/flow.py"><code>CausalFlowDAG</code></a>.
 It explains how the module builds the flow and how it computes the likelihood. It
 describes the two fitting paths: the stochastic optimizer
-(<a href="https://github.com/tensorchiefs/tramdag/blob/main/docs/../src/tramdag/flow.py"><code>fit</code></a>) and the classical optimizer
-(<a href="https://github.com/tensorchiefs/tramdag/blob/main/docs/../src/tramdag/flow.py"><code>fit_classical</code></a>). It also covers per-node freezing, the
+(<a href="https://github.com/tensorchiefs/tramdag/blob/dev-marcel/docs/../src/tramdag/flow.py"><code>fit</code></a>) and the classical optimizer
+(<a href="https://github.com/tensorchiefs/tramdag/blob/dev-marcel/docs/../src/tramdag/flow.py"><code>fit_classical</code></a>). It also covers per-node freezing, the
 memory model, and future directions for optimizer choice.</p>
 
 <h2 id="how-the-flow-is-built-one-module-one-sub-model-per-node">How the flow is built: one module, one sub-model per node</h2>
 
 <p>A <code>CausalFlowDAG</code> is a single <code>torch.nn.Module</code>, but it is <strong>not one monolithic
-network</strong>. At construction (<a href="https://github.com/tensorchiefs/tramdag/blob/main/docs/../src/tramdag/flow.py"><code>CausalFlowDAG.__init__</code></a>), it
+network</strong>. At construction (<a href="https://github.com/tensorchiefs/tramdag/blob/dev-marcel/docs/../src/tramdag/flow.py"><code>CausalFlowDAG.__init__</code></a>), it
 topologically sorts the DAG. It then builds an <code>nn.ModuleDict</code> with <strong>one
-<a href="https://github.com/tensorchiefs/tramdag/blob/main/docs/../src/tramdag/flow.py"><code>_Node</code></a> sub-module per variable</strong>. The nodes share <em>no
+<a href="https://github.com/tensorchiefs/tramdag/blob/dev-marcel/docs/../src/tramdag/flow.py"><code>_Node</code></a> sub-module per variable</strong>. The nodes share <em>no
 parameters</em>. Each node owns the pieces for its own conditional <code>p(x_i | pa(x_i))</code>:</p>
 
 <ul>
 <li>an <strong>intercept</strong> that produces the transform parameters <code>θ</code>. This is
-<a href="https://github.com/tensorchiefs/tramdag/blob/main/docs/../src/tramdag/conditioners.py"><code>SimpleIntercept</code></a>, a free parameter vector that
+<a href="https://github.com/tensorchiefs/tramdag/blob/dev-marcel/docs/../src/tramdag/conditioners.py"><code>SimpleIntercept</code></a>, a free parameter vector that
 is data-independent. If the node has <code>ci</code> parents, it is
-<a href="https://github.com/tensorchiefs/tramdag/blob/main/docs/../src/tramdag/conditioners.py"><code>ComplexIntercept</code></a> instead, a small MLP whose
+<a href="https://github.com/tensorchiefs/tramdag/blob/dev-marcel/docs/../src/tramdag/conditioners.py"><code>ComplexIntercept</code></a> instead, a small MLP whose
 output <code>θ</code> depends on those parents.</li>
 <li>a <strong>monotone 1-D transform</strong> <code>h</code>
-(<a href="https://github.com/tensorchiefs/tramdag/blob/main/docs/../src/tramdag/transforms.py"><code>BernsteinUT</code> / <code>SplineUT</code> / <code>AffineUT</code></a>).
+(<a href="https://github.com/tensorchiefs/tramdag/blob/dev-marcel/docs/../src/tramdag/transforms.py"><code>BernsteinUT</code> / <code>SplineUT</code> / <code>AffineUT</code></a>).
 The transform itself carries <strong>no learnable weights</strong>, only the fitted
 range buffers <code>xmin</code>/<code>xmax</code>. The <code>θ</code> from the intercept sets its shape
 entirely.</li>
-<li>a <code>ModuleDict</code> of <strong>shift modules</strong>, one per parent edge:
-<a href="https://github.com/tensorchiefs/tramdag/blob/main/docs/../src/tramdag/conditioners.py"><code>LinearShift</code></a> (<code>ls</code>, a single weight) or
-<a href="https://github.com/tensorchiefs/tramdag/blob/main/docs/../src/tramdag/conditioners.py"><code>ComplexShift</code></a> (<code>cs</code>, an MLP).</li>
+<li>a <code>ModuleDict</code> of <strong>shift modules</strong>, one per shift <em>term</em> — which is one per
+parent edge except for a joint <code>CS("a","b")</code>, a single module keyed <code>"a+b"</code>
+that owns both edges:
+<a href="https://github.com/tensorchiefs/tramdag/blob/dev-marcel/docs/../src/tramdag/conditioners.py"><code>LinearShift</code></a> (<code>LS</code>, a single weight),
+<a href="https://github.com/tensorchiefs/tramdag/blob/dev-marcel/docs/../src/tramdag/conditioners.py"><code>ComplexShift</code></a> (<code>CS</code>, an MLP) or
+<a href="https://github.com/tensorchiefs/tramdag/blob/dev-marcel/docs/../src/tramdag/conditioners.py"><code>VaryingCoef</code></a> (<code>VC</code>, <code>beta0</code> plus a
+penalized head).</li>
 </ul>
 
 <p>So is this one network or several? It is <strong>one module, several independent per-node
@@ -127,23 +133,23 @@ the per-node 1-D terms. The joint log-likelihood therefore <strong>decomposes pe
 <pre><code>log p(x) = Σ_i log p(x_i | pa(x_i))
 </code></pre>
 
-<p><a href="https://github.com/tensorchiefs/tramdag/blob/main/docs/../src/tramdag/flow.py"><code>CausalFlowDAG.node_log_prob</code></a> computes one term per node
+<p><a href="https://github.com/tensorchiefs/tramdag/blob/dev-marcel/docs/../src/tramdag/flow.py"><code>CausalFlowDAG.node_log_prob</code></a> computes one term per node
 and <code>log_prob</code> sums them. For a node, given <code>θ, shift</code> from <code>theta_shift</code>:</p>
 
 <ul>
 <li><p><strong>continuous</strong> — change of variables through the monotone transform:</p>
 
-<pre><code>z = h(x; θ) + shift
+<pre><code>u = h(x; θ) + shift
 log p(x | pa) = log f_logistic(z) + log |dz/dx|
 </code></pre>
 
-<p>That is, the term is the standard-logistic density at the latent <code>z</code>
-(<a href="https://github.com/tensorchiefs/tramdag/blob/main/docs/../src/tramdag/transforms.py"><code>StandardLogistic.log_prob</code></a>) plus the
+<p>That is, the term is the standard-logistic density at the latent <code>u</code>
+(<a href="https://github.com/tensorchiefs/tramdag/blob/dev-marcel/docs/../src/tramdag/transforms.py"><code>StandardLogistic.log_prob</code></a>) plus the
 transform's log-derivative. <code>ut.forward</code> returns this log-derivative as <code>ladj</code>.
 This is the 1-D Jacobian term that makes the result a proper density, not only
 a score.</p></li>
 <li><strong>ordinal</strong> — an ordered-logit / proportional-odds head,
-<code>P(x ≤ k) = σ(θ_k − shift)</code>. <a href="https://github.com/tensorchiefs/tramdag/blob/main/docs/../src/tramdag/transforms.py"><code>ordinal_log_prob</code></a>
+<code>P(x ≤ k) = σ(θ_k − shift)</code>. <a href="https://github.com/tensorchiefs/tramdag/blob/dev-marcel/docs/../src/tramdag/transforms.py"><code>ordinal_log_prob</code></a>
 evaluates it as the log of the cutpoint-interval probability. The computation
 runs in log-space via <code>logsigmoid</code>/<code>log1mexp</code>, because the naive sigmoid
 difference underflows to exactly-zero gradients in float32.</li>
@@ -160,7 +166,7 @@ learning rates, per-node freezing (below), and the all-<code>ls</code> classical
 
 <h2 id="path-a-stochastic-optimization-fit">Path A — stochastic optimization (<code>fit</code>)</h2>
 
-<p><a href="https://github.com/tensorchiefs/tramdag/blob/main/docs/../src/tramdag/flow.py"><code>CausalFlowDAG.fit</code></a> is the general-purpose trainer. Any
+<p><a href="https://github.com/tensorchiefs/tramdag/blob/dev-marcel/docs/../src/tramdag/flow.py"><code>CausalFlowDAG.fit</code></a> is the general-purpose trainer. Any
 <code>cs</code>/<code>ci</code> edge requires it. Mechanics:</p>
 
 <ul>
@@ -253,11 +259,11 @@ conditional win in that regime, distinct from the unconditional win of freezing.
 
 <p>Benchmarks, schedule trade-offs, and the recommended self-stopping recipe are in
 <a href="../guides/training_speed.html">training-speed.md</a>. The worked walkthrough is
-<a href="https://github.com/tensorchiefs/tramdag/blob/main/docs/../notebooks/intro_tram_dag.py"><code>notebooks/intro_tram_dag.py</code></a>.</p>
+<a href="https://github.com/tensorchiefs/tramdag/blob/dev-marcel/docs/../notebooks/intro_tram_dag.py"><code>notebooks/intro_tram_dag.py</code></a>.</p>
 
 <h2 id="path-b-classical-optimization-fit_classical">Path B — classical optimization (<code>fit_classical</code>)</h2>
 
-<p><a href="https://github.com/tensorchiefs/tramdag/blob/main/docs/../src/tramdag/flow.py"><code>CausalFlowDAG.fit_classical</code></a> is the dedicated optimizer
+<p><a href="https://github.com/tensorchiefs/tramdag/blob/dev-marcel/docs/../src/tramdag/flow.py"><code>CausalFlowDAG.fit_classical</code></a> is the dedicated optimizer
 for <strong>all-<code>ls</code></strong> models, where every node-conditional is a classical
 transformation model (ordered-logit / Colr). It raises on any <code>cs</code>/<code>ci</code> edge.</p>
 
@@ -280,12 +286,30 @@ model dtype, so it follows along.</li>
 Bernstein intercept and weakly-identified directions (rare one-hot levels, a
 flat treatment-effect ridge) continue to drift along zero-curvature valleys
 after the likelihood is at the optimum. Correctness comes from a comparison
-with classical software (<code>experiments/validate_ls.py --classical</code>), not from
+with classical software (<code>python -m misc.validate_ls classical</code>), not from
 the flag.</li>
 <li>Read the fitted coefficients with <code>ls_coefficients()</code>.</li>
 </ul>
 
-<p>Walkthrough: <a href="https://github.com/tensorchiefs/tramdag/blob/main/docs/../notebooks/stale/classical_fit_tram_dag.py"><code>notebooks/stale/classical_fit_tram_dag.py</code></a> (parked).</p>
+<h3 id="warm-start-handoff-classical-fit-then-keep-training">Warm-start handoff: classical fit, then keep training</h3>
+
+<p><code>fit_classical</code> leaves the model at the MLE in float32, ready for any normal
+operation — and continuing with <code>fit()</code> from there <strong>stays put</strong>, which is both
+a check that the classical solution really is the optimum and a way to use it as
+a fast, principled initialization:</p>
+
+<div class="pdoc-code codehilite">
+<pre><span></span><code><span class="n">flow</span><span class="o">.</span><span class="n">fit_classical</span><span class="p">(</span><span class="n">train_df</span><span class="p">)</span>                       <span class="c1"># exact MLE, seconds</span>
+<span class="n">before</span> <span class="o">=</span> <span class="n">flow</span><span class="o">.</span><span class="n">ls_coefficients</span><span class="p">()[</span><span class="s2">"y"</span><span class="p">]</span>
+<span class="n">flow</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">train_df</span><span class="p">,</span> <span class="n">epochs</span><span class="o">=</span><span class="mi">300</span><span class="p">,</span> <span class="n">learning_rate</span><span class="o">=</span><span class="mf">1e-3</span><span class="p">,</span>  <span class="c1"># a gentle Adam phase ...</span>
+         <span class="n">restore_best</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">verbose</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+<span class="n">after</span> <span class="o">=</span> <span class="n">flow</span><span class="o">.</span><span class="n">ls_coefficients</span><span class="p">()[</span><span class="s2">"y"</span><span class="p">]</span>                 <span class="c1"># ... barely moves</span>
+</code></pre>
+</div>
+
+<p>A small drift means the classical fit was already at the optimum. The same
+handoff is what <code>fit(vc_warm_start=True)</code> uses internally to start a
+varying-coefficient term from the classical linear-shift coefficient.</p>
 
 <h2 id="memory-and-disk-during-fitting">Memory and disk during fitting</h2>
 
@@ -301,7 +325,7 @@ in-memory attribute and not a file</li>
 </ul>
 
 <p>The <strong>only</strong> disk I/O in the module is the explicit, user-called
-<a href="https://github.com/tensorchiefs/tramdag/blob/main/docs/../src/tramdag/flow.py"><code>save</code></a> (<code>torch.save</code> of spec + state_dict + history) and
+<a href="https://github.com/tensorchiefs/tramdag/blob/dev-marcel/docs/../src/tramdag/flow.py"><code>save</code></a> (<code>torch.save</code> of spec + state_dict + history) and
 its counterpart <code>load</code>. So a fit produces no temp files, no checkpoints, and no
 scratch directory. Persistence is opt-in via <code>flow.save(path)</code>. (The <em>experiment
 scripts</em> write the <code>results/</code> and <code>docs/perf/</code> artifacts in this repo, not the
@@ -327,8 +351,8 @@ quasi-Newton is a poor fit for them (minibatch noise also regularizes, which is
 why <code>fit_classical</code> refuses them).</li>
 <li><strong>Modern first-order variants.</strong> AdamW (decoupled weight decay), RAdam (warmup-
 free), or Lion/Sophia are drop-in alternatives to Adam. The benchmark harness
-(<a href="https://github.com/tensorchiefs/tramdag/blob/main/docs/../experiments/stale/bench_training.py"><code>experiments/stale/bench_training.py</code></a>,
-parked — needs an API migration) exists to evaluate exactly such swaps on
+(<a href="https://github.com/tensorchiefs/tramdag/blob/dev-marcel/docs/../experiments/benchmarks/bench_training.py"><code>experiments/benchmarks/bench_training.py</code></a>,
+in <code>experiments/benchmarks/</code>) exists to evaluate exactly such swaps on
 time-to-target.</li>
 <li><strong>Per-node optimizer selection.</strong> The loss decomposes, and the optimizer
 already holds one group per node. Therefore different nodes can in principle
@@ -340,7 +364,7 @@ polish) is a natural pattern to formalize.</li>
 </ul>
 
 <p>These are <em>directions</em>, not commitments. The autoresearch loop
-(<a href="https://github.com/tensorchiefs/tramdag/blob/main/docs/research/MISSION_autoresearch.md"><code>docs/research/MISSION_autoresearch.md</code></a>) is a
+(<a href="https://github.com/tensorchiefs/tramdag/blob/dev-marcel/docs/research/MISSION_autoresearch.md"><code>docs/research/MISSION_autoresearch.md</code></a>) is a
 good venue to test the speed-oriented ones empirically before any adoption.</p>
 </div>
 

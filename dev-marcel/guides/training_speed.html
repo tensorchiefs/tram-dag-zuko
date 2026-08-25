@@ -30,12 +30,14 @@
   <li><a href="../guides/training_speed.html">Training speed</a></li>
   <li><a href="../guides/scores.html">Scores &amp; modifier scan</a></li>
   <li><a href="../guides/varying_coefficients.html">Varying coefficients</a></li>
-  <li><a href="../guides/stroke_case_study.html">Stroke case study</a></li>
+  <li><a href="../guides/code_map.html">Code map</a></li>
 </ul>
 <h2>Notebooks</h2>
 <ul class="memberlist">
   <li><a href="../examples/demo_tram_dag_colab.html">5-minute demo</a></li>
   <li><a href="../examples/intro_tram_dag.html">Didactic intro</a></li>
+  <li><a href="../examples/additive_vs_joint_ci.html">Additive vs joint CI</a></li>
+  <li><a href="../examples/varying_coefficients.html">Heterogeneous effects (VC)</a></li>
 </ul>
 <h2>Download</h2>
 <ul class="memberlist">
@@ -77,12 +79,15 @@
 
 <p>This document benchmarks learning-rate schedules, per-node freezing, batch sizes, devices,
 and LBFGS. The benchmark ran in June 2026 on an Apple-silicon Mac mini with torch 2.12
-(CPU unless noted). To reproduce it, use <code>experiments/stale/bench_training.py</code> (parked).
-Migrate the script to the current API first. The grid takes ≈ 35 min. For a quick <strong>cross-machine</strong> comparison, use the
-self-contained <code>experiments/stale/perf_machine.py</code> (parked). It runs fixed 200-epoch
-workloads on all available devices and writes a machine fingerprint to JSON. After
-<code>pip install tramdag</code>, it runs on any machine. The raw CSV is a local artifact of
-the parked benchmark and is not committed.</p>
+(CPU unless noted). To reproduce it, run
+<a href="https://github.com/tensorchiefs/tramdag/blob/dev-marcel/docs/../experiments/benchmarks/bench_training.py"><code>experiments/benchmarks/bench_training.py</code></a>
+(<code>cd experiments &amp;&amp; uv run python -m benchmarks.bench_training</code>, or <code>--quick</code> for
+one seed on cpu); the full grid takes ≈ 35 min. For a quick <strong>cross-machine</strong>
+comparison, use the self-contained
+<a href="https://github.com/tensorchiefs/tramdag/blob/dev-marcel/docs/../experiments/benchmarks/perf_machine.py"><code>experiments/benchmarks/perf_machine.py</code></a>.
+It runs fixed 200-epoch workloads on all available devices and writes a machine
+fingerprint to JSON, and it needs nothing but <code>pip install tramdag</code>. The raw CSV
+is a local run artifact and is not committed.</p>
 
 <h2 id="the-options-and-how-to-use-them">The options, and how to use them</h2>
 
@@ -102,7 +107,7 @@ the parked benchmark and is not committed.</p>
 </tr>
 <tr>
   <td><code>"plateau"</code></td>
-  <td><strong>per-node</strong>: a node whose own validation NLL hasn't improved by <code>min_delta</code> (default 1e-4) for <code>plateau_patience</code> epochs (default 15) gets its lr × 0.3, floored at 1e-3 × the initial lr. Each node decays independently — valid because the per-node losses have independent gradients.</td>
+  <td><strong>per-node</strong>: a node whose own validation NLL hasn't improved by <code>min_delta</code> (default 1e-4) for <code>plateau_patience</code> epochs (default 30) gets its lr × 0.3, floored at 1e-3 × the initial lr. Each node decays independently — valid because the per-node losses have independent gradients.</td>
 </tr>
 </tbody>
 </table>
@@ -129,7 +134,7 @@ R <code>polr</code>/<code>tram</code>), omit both arguments. The benchmark chang
 </code></pre>
 </div>
 
-<p>is still the exact-MLE path that <code>experiments/validate_ls.py</code> uses. Independent of all
+<p>is still the exact-MLE path that <code>experiments/misc/validate_ls.py</code> uses. Independent of all
 this, <code>restore_best=False</code> remains the default (see CHANGELOG). The guard test
 <code>tests/test_fit_schedules.py::test_plateau_freeze_preserves_exact_mle</code> also shows that
 even <em>with</em> plateau+freezing the all-<code>ls</code> fit lands on the classical MLE within the usual
@@ -168,14 +173,14 @@ long-run reference (3 torch seeds, medians):</p>
 <tbody>
 <tr>
   <td><strong>stroke-ls</strong></td>
-  <td>all-<code>ls</code> stroke DAG, frozen <code>magic-mrclean/ls</code> (n=1275, full-data MLE)</td>
+  <td>all-<code>ls</code> 5-node DAG, frozen <code>experiments/misc/data/magic-mrclean/ls</code> (n=1275, full-data MLE)</td>
   <td>10.3042 (train)</td>
   <td>+1e-3</td>
   <td>+5e-3</td>
 </tr>
 <tr>
   <td><strong>vaca-ci</strong></td>
-  <td>all-<code>ci</code> flow, frozen <code>vaca</code> (n=5000, 90/10 split)</td>
+  <td>all-<code>ci</code> flow, frozen <code>experiments/paper/data/vaca</code> (n=5000, 90/10 split)</td>
   <td>4.9632 (val)</td>
   <td>+2e-3</td>
   <td>+1e-2</td>
@@ -184,9 +189,16 @@ long-run reference (3 torch seeds, medians):</p>
 </table>
 
 <p><em>Tight</em> ≈ exact-MLE equivalence (statsmodels/R-polr match). <em>Practical</em> ≈
-coefficient-equivalent: a stroke fit with gap ≈ 3e-3 already matches the R reference
-coefficients within the test tolerances
-(<code>tests/test_fit_schedules.py::test_plateau_freeze_preserves_exact_mle</code>).</p>
+coefficient-equivalent: a fit with gap ≈ 3e-3 already matches the R reference
+coefficients within the tolerances of
+<a href="https://github.com/tensorchiefs/tramdag/blob/dev-marcel/docs/../experiments/misc/validate_ls.py"><code>experiments/misc/validate_ls.py</code></a>. The same
+exact-MLE-under-plateau-and-freezing property is pinned on an inline DGP by
+<code>tests/test_fit_schedules.py::test_plateau_freeze_preserves_exact_mle</code>.</p>
+
+<p>These numbers were measured before the experiment code moved into
+<code>experiments/benchmarks/</code>; the workloads are unchanged (same frozen data, same
+specs), so the timings still stand. Re-running the benchmark reproduces the
+machine-independent part exactly: the stroke-ls reference NLL 10.3042.</p>
 
 <h2 id="results">Results</h2>
 
@@ -219,13 +231,13 @@ never reached the target within the budget.</p>
 <tr>
   <td>constant 1e-2</td>
   <td>9.1</td>
-  <td>21.5²</td>
+  <td>21.5³</td>
   <td>2.2</td>
   <td>2.8¹</td>
   <td>no</td>
 </tr>
 <tr>
-  <td>onecycle (1500 / 300 ep)</td>
+  <td>onecycle (1500 / 300 ep)²</td>
   <td>—</td>
   <td>—</td>
   <td>3.5</td>
@@ -233,7 +245,7 @@ never reached the target within the budget.</p>
   <td>no</td>
 </tr>
 <tr>
-  <td>onecycle (3000 ep)</td>
+  <td>onecycle (3000 ep)²</td>
   <td>16.8</td>
   <td>— (gap 1–2e-3)</td>
   <td></td>
@@ -241,7 +253,7 @@ never reached the target within the budget.</p>
   <td>no</td>
 </tr>
 <tr>
-  <td>cosine</td>
+  <td>cosine²</td>
   <td>—</td>
   <td>—</td>
   <td>2.2</td>
@@ -271,7 +283,9 @@ never reached the target within the budget.</p>
 the 1e-3 phase to <em>stay</em>. Vaca shows mild overfitting. Final gap for the vaca baseline is
 0.037. The old 520-epoch budget <strong>underfits</strong> vaca by ~0.03 nats. Plateau+freeze <em>stays</em>
 at its target.
-² constant lr at batch 512 stalls at gap 3–7e-3. Only the lr-decay phase closes the last
+² <code>onecycle</code> and <code>cosine</code> were removed from <code>fit()</code> in 0.4 — they lost to
+plateau on every workload here — so these three rows cannot be re-measured.
+³ constant lr at batch 512 stalls at gap 3–7e-3. Only the lr-decay phase closes the last
 decade. This is why the two-phase recipe existed.</p>
 
 <h2 id="findings">Findings</h2>
@@ -327,10 +341,12 @@ directions. Adaptive stopping fixes both.</li>
 comparisons where the last 1e-3 matters, append a short constant-lr polish phase
 (<code>epochs=500, learning_rate=1e-3</code>) after the plateau fit. Or run the old two-phase recipe.</p>
 
-<p>The benchmark deliberately changed no <code>fit()</code>/<code>run_experiment</code> defaults. Default
-changes are their own reviewed decision (see the <code>restore_best</code> episode in
-CHANGELOG.md). <code>run_experiment</code> still uses the two-phase constant-lr recipe; the
-switch to the plateau recipe remains an open 3-line follow-up.</p>
+<p>The benchmark itself changed no defaults — that is its own reviewed decision (see
+the <code>restore_best</code> episode in CHANGELOG.md). Two of its findings have since been
+adopted: <code>plateau_patience</code> defaults to the 30 recommended here, and <code>epochs</code> has no
+default at all, because finding 6 is precisely that a fixed budget cannot be right for
+every workload. The experiment scripts still run the two-phase constant-lr recipe,
+which each states in its own YAML.</p>
 </div>
 
                         <input id="mod-training_speed-view-source" class="view-source-toggle-state" type="checkbox" aria-hidden="true" tabindex="-1">

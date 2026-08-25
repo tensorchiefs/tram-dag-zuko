@@ -30,12 +30,14 @@
   <li><a href="../guides/training_speed.html">Training speed</a></li>
   <li><a href="../guides/scores.html">Scores &amp; modifier scan</a></li>
   <li><a href="../guides/varying_coefficients.html">Varying coefficients</a></li>
-  <li><a href="../guides/stroke_case_study.html">Stroke case study</a></li>
+  <li><a href="../guides/code_map.html">Code map</a></li>
 </ul>
 <h2>Notebooks</h2>
 <ul class="memberlist">
   <li><a href="../examples/demo_tram_dag_colab.html">5-minute demo</a></li>
   <li><a href="../examples/intro_tram_dag.html">Didactic intro</a></li>
+  <li><a href="../examples/additive_vs_joint_ci.html">Additive vs joint CI</a></li>
+  <li><a href="../examples/varying_coefficients.html">Heterogeneous effects (VC)</a></li>
 </ul>
 <h2>Download</h2>
 <ul class="memberlist">
@@ -117,6 +119,17 @@ covariates are the measured shortlist of <code>VC</code> modifiers
 <span class="p">)</span>  <span class="c1"># scan-informed</span>
 </code></pre>
 </div>
+
+<p><strong>Read it as screening, not as a test of effect modification.</strong> The statistic
+measures how unstable the <em>cheap</em> model is along a covariate, and instability
+has two sources: a coefficient that genuinely varies, and a <strong>prognostic part
+the cheap model gets wrong</strong>. In the example above <code>X1</code> is unflagged because
+its prognostic effect is linear; make it quadratic and <code>X1</code> flags as strongly
+as the true modifiers (0.56 → 4.14 on the DGP of
+<a href="https://github.com/tensorchiefs/tramdag/blob/dev-marcel/docs/../notebooks/varying_coefficients.py"><code>notebooks/varying_coefficients.py</code></a>,
+which demonstrates both cases side by side). A flag therefore means "look
+here", and what you find may be a modifier or a misspecification — both worth
+knowing.</p>
 
 <p>Notes: For a binary ordinal <code>LS</code> treatment, <code>t</code> resolves to the identified
 level-1-vs-0 contrast. For a <code>VC</code> treatment, <code>t</code> resolves to <code>beta0</code>.

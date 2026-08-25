@@ -30,12 +30,14 @@
   <li><a href="../guides/training_speed.html">Training speed</a></li>
   <li><a href="../guides/scores.html">Scores &amp; modifier scan</a></li>
   <li><a href="../guides/varying_coefficients.html">Varying coefficients</a></li>
-  <li><a href="../guides/stroke_case_study.html">Stroke case study</a></li>
+  <li><a href="../guides/code_map.html">Code map</a></li>
 </ul>
 <h2>Notebooks</h2>
 <ul class="memberlist">
   <li><a href="../examples/demo_tram_dag_colab.html">5-minute demo</a></li>
   <li><a href="../examples/intro_tram_dag.html">Didactic intro</a></li>
+  <li><a href="../examples/additive_vs_joint_ci.html">Additive vs joint CI</a></li>
+  <li><a href="../examples/varying_coefficients.html">Heterogeneous effects (VC)</a></li>
 </ul>
 <h2>Download</h2>
 <ul class="memberlist">
@@ -122,7 +124,7 @@ of <code>s(x,t)</code>, and nothing rewards a smooth difference between the arms
 read-out is thus the difference of two jointly fitted, unregularized
 networks, which amplifies noise.</p>
 
-<p>On the <code>vc-shift</code> validation DGP task class, the <code>CS</code> reduced form reaches
+<p>On the heterogeneous-effect validation DGP (see below), the <code>CS</code> reduced form reaches
 corr ≈ 0.5 against the true effect function (tramdag-simu#18 / PR #21). This
 holds <strong>even when the model is exactly in-class</strong>. The <code>VC</code> term reaches
 corr ≈ 0.99 on the same protocol (<code>tests/test_vc_term.py</code>, acceptance bar
@@ -135,7 +137,7 @@ framework.</p>
 
 <ul>
 <li><strong>Scale</strong>: <code>beta(x)</code> lives on the node's latent (log-odds) scale. The flow
-adds it for a continuous node (<code>z = h(y) + …</code>) and subtracts it from the
+adds it for a continuous node (<code>u = h(y) + …</code>) and subtracts it from the
 cutpoints for an ordinal node, exactly like an <code>LS</code> weight. With no
 modifiers, <code>VC(t="T")</code> <em>is</em> <code>LS("T")</code> (identical model, testably
 bit-exact). Thus <code>VC</code> versus <code>LS</code> is a nested question.</li>
@@ -214,15 +216,18 @@ Continuous-treatment centering with E[T|x] is a follow-up. <code>center=False</c
 
 <h2 id="validation">Validation</h2>
 
-<p><code><a href="../tramdag/simulations.html#VCLogisticShift">tramdag.simulations.VCLogisticShift</a></code> (<code>data/vc-shift/</code>, frozen contract) is
-a logistic-shift SCM with known <code>beta_true(x) = −1 + 0.8·X2 − 0.6·X3</code>. It
-has a nonlinear prognostic part and confounded assignment (X2 is confounder
-<em>and</em> modifier). Acceptance (<code>tests/test_vc_term.py</code>) requires three
-results: recovery corr ≥ 0.9 at n = 5000 (measured ≈ 0.99, min over 3 seeds
-0.986), a fitted <code>beta0</code> that matches <code>fit_classical</code> under a large penalty,
-and the read-out identities. Candidate follow-ups are separate issues:
-propensity-centered <code>beta(x)·(t − ê(x))</code> (#30), and per-observation scores
-for effect-modifier scans (#29).</p>
+<p>The <code>vc_hetero</code> DGP in <a href="https://github.com/tensorchiefs/tramdag/blob/dev-marcel/docs/../tests/conftest.py"><code>tests/conftest.py</code></a> is a
+logistic-shift SCM with known <code>beta_true(x) = −1 + 0.8·X2 − 0.6·X3</code>. It has a
+nonlinear prognostic part and confounded assignment (X2 is confounder <em>and</em>
+modifier), which is the configuration where the <code>CS</code> reduced form fails
+hardest. Acceptance (<code>tests/test_vc_term.py</code>) requires three results:
+recovery corr ≥ 0.9 at n = 5000 (measured ≈ 0.99, min over 3 seeds 0.986), a
+fitted <code>beta0</code> that matches <code>fit_classical</code> under a large penalty, and the
+read-out identities. The centering claims are measured against the
+<code>confounded</code> DGP in the same file. Both former follow-ups have since
+shipped: propensity centering (#30) is <code>center=True</code>, documented above, and the
+per-observation scores for effect-modifier scans (#29) are <code>flow.scores</code> and
+<code>flow.effect_modifier_scan</code> — see <a href="../guides/scores.html">scores.md</a>.</p>
 </div>
 
                         <input id="mod-varying_coefficients-view-source" class="view-source-toggle-state" type="checkbox" aria-hidden="true" tabindex="-1">

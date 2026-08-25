@@ -30,12 +30,14 @@
   <li><a href="../guides/training_speed.html">Training speed</a></li>
   <li><a href="../guides/scores.html">Scores &amp; modifier scan</a></li>
   <li><a href="../guides/varying_coefficients.html">Varying coefficients</a></li>
-  <li><a href="../guides/stroke_case_study.html">Stroke case study</a></li>
+  <li><a href="../guides/code_map.html">Code map</a></li>
 </ul>
 <h2>Notebooks</h2>
 <ul class="memberlist">
   <li><a href="../examples/demo_tram_dag_colab.html">5-minute demo</a></li>
   <li><a href="../examples/intro_tram_dag.html">Didactic intro</a></li>
+  <li><a href="../examples/additive_vs_joint_ci.html">Additive vs joint CI</a></li>
+  <li><a href="../examples/varying_coefficients.html">Heterogeneous effects (VC)</a></li>
 </ul>
 <h2>Download</h2>
 <ul class="memberlist">
@@ -54,8 +56,8 @@
     <li><a href="#conditionerspy-the-networks-behind-the-terms"><code>conditioners.py</code> — the networks behind the terms</a></li>
     <li><a href="#flowpy-the-model"><code>flow.py</code> — the model</a></li>
     <li><a href="#scorespy-effect-modifier-detection-issue-29"><code>scores.py</code> — effect-modifier detection (issue #29)</a></li>
-    <li><a href="#envpy"><code>env.py</code></a></li>
-    <li><a href="#simulations-numpy-only-ground-truth"><code>simulations/</code> — numpy-only ground truth</a></li>
+    <li><a href="#utilspy-helpers-that-are-not-about-modelling"><code>utils.py</code> — helpers that are not about modelling</a></li>
+    <li><a href="#what-is-not-in-the-package">What is <em>not</em> in the package</a></li>
     <li><a href="#where-every-training-hyperparameter-lives">Where every training hyperparameter lives</a></li>
   </ul></li>
 </ul>
@@ -100,8 +102,16 @@ are the same object, so <code>LS is linear_shift</code>.</p>
   <td>One additive term of a node's transformation: the frozen triple <code>(effect, parents, options)</code>. <code>+</code> on terms builds plain lists. Effect-specific settings live in <code>options</code> and read as attributes (<code>term.penalty</code>, <code>term.units</code>, ...).</td>
 </tr>
 <tr>
+  <td><code>simple_intercept()</code> / <code>SI</code></td>
+  <td>The parentless intercept — the paper's SI. Free transform parameters, the same for every row. Carries the basis choice (<code>transform=</code>, default <code>"bernstein"</code>); extra keyword arguments pass straight to the transform class.</td>
+</tr>
+<tr>
+  <td><code>complex_intercept()</code> / <code>CI</code></td>
+  <td>The parent-conditioned intercept — the paper's CI: the parents reshape the monotone transform. Needs at least one parent. Also carries <code>units=</code> and <code>allow_interaction=</code> (joint vs. additive multi-parent intercept).</td>
+</tr>
+<tr>
   <td><code>intercept()</code> / <code>I</code></td>
-  <td>Intercept term: the parents reshape the monotone transform. <code>I()</code> or the bare name <code>I</code> is the simple-intercept baseline. Carries the basis choice (<code>transform=</code>, default <code>"bernstein"</code>) and <code>allow_interaction=</code> (joint vs. additive multi-parent intercept).</td>
+  <td>The fallback: dispatches on its arguments to <code>SI</code> (no parents) or <code>CI</code> (parents). The bare names <code>I</code> and <code>SI</code> in a term list both mean the simple intercept.</td>
 </tr>
 <tr>
   <td><code>linear_shift()</code> / <code>LS</code></td>
@@ -136,8 +146,12 @@ are the same object, so <code>LS is linear_shift</code>.</p>
   <td>Checkpoint (de)serialization. A term serializes as <code>{effect, parents, options}</code> and nothing else, since <code>options</code> is already canonical. No compatibility shims, and <code>spec_from_dict</code> builds <code>Term</code> directly — so <code>validate_and_sort</code> is the only guard on that path.</td>
 </tr>
 <tr>
-  <td>(<code>_normalize_terms</code>, <code>_as_term</code>, <code>_check_intercepts</code>, <code>_options</code>, <code>_OPTION_DEFAULTS</code>)</td>
+  <td>(<code>_normalize_terms</code>, <code>_as_term</code>, <code>_intercept_basis</code>, <code>_options</code>, <code>_OPTION_DEFAULTS</code>)</td>
   <td>Formula flattening and per-entry validation (a <code>+</code> sum nested in a list is rejected), the one-parented-<code>I</code> rule plus basis hoisting in one pass, canonical option storage.</td>
+</tr>
+<tr>
+  <td>(<code>_check_term</code>, <code>_check_node</code>, <code>_check_vc_term</code>, <code>_kahn_sort</code>)</td>
+  <td>The stages behind <code>validate_and_sort</code>: per-term validation (effect, LS arity, unknown parents), per-node edge-ownership bookkeeping, the VC-specific checks, and the topological sort.</td>
 </tr>
 </tbody>
 </table>
@@ -197,8 +211,12 @@ are the same object, so <code>LS is linear_shift</code>.</p>
 
 <h2 id="conditionerspy-the-networks-behind-the-terms"><code>conditioners.py</code> — the networks behind the terms</h2>
 
-<p>Architectures replicate the original Keras implementation, so fitted models
-stay comparable to it.</p>
+<p>Default architectures replicate the PyTorch reference this package grew out of
+(<a href="https://github.com/buehlpa/TramDag">buehlpa/TramDag</a>, <code>tram_models.py</code>), so a
+fitted model stays comparable to it. They are <strong>not</strong> the TRAM-DAG paper's nets:
+the paper's R code uses <code>c(2, 25, 25, 2)</code> with sigmoid for the triangle
+experiments and a 10-100 tanh net for its CAREFL/VACA comparisons, so each
+config in <code>experiments/paper/</code> states <code>units=</code> and <code>activation=</code> itself.</p>
 
 <table>
 <thead>
@@ -301,6 +319,10 @@ stay comparable to it.</p>
   <td>The per-node linear-shift weights — the interpretable coefficients.</td>
 </tr>
 <tr>
+  <td><code>design_matrix()</code></td>
+  <td>Parent encoding as a DataFrame (<code>drop_first=</code> gives the classical statsmodels/<code>polr</code> design).</td>
+</tr>
+<tr>
   <td><code>to_matrix()</code></td>
   <td>The labeled meta-adjacency matrix of term effects.</td>
 </tr>
@@ -310,23 +332,27 @@ stay comparable to it.</p>
 </tr>
 <tr>
   <td>(<code>_Node</code>, <code>_VCGroup</code>)</td>
-  <td>Per-node module (intercept + shift <code>ModuleDict</code> + VC bookkeeping); <code>theta_shift()</code> computes <code>(theta, shift)</code>.</td>
+  <td>Per-node module (intercept + shift <code>ModuleDict</code> + VC bookkeeping); construction is <code>_build_intercept</code>/<code>_build_shifts</code>, and <code>theta_shift()</code> computes <code>(theta, shift)</code> through <code>_theta</code>/<code>_vc_shift</code>/<code>vc_column</code>.</td>
 </tr>
 <tr>
-  <td>(<code>_node</code>, <code>_encode_parent</code>, <code>_features</code>, <code>_tensorize</code>, <code>_dtype</code>, <code>_np_dtype</code>)</td>
-  <td>Node lookup with one shared error; parent encoding (continuous raw, ordinal one-hot); <code>_tensorize(df, cols=None)</code> for any column subset; dtype plumbing.</td>
+  <td>(<code>_FitSchedule</code>, <code>_fit_epoch</code>, <code>_end_epoch</code>, <code>_make_optimizer</code>, <code>_val_nll</code>, <code>_vc_penalized</code>, <code>_log_epoch</code>, <code>_snapshot_best</code>, <code>_load_best_weights</code>, <code>_best_store</code>)</td>
+  <td>The fit loop, decomposed: per-node plateau/freeze bookkeeping, one minibatch epoch (with the frozen carry-forward), the per-epoch record/schedule/snapshot/log step, and the restore-best store that persists across <code>fit</code> calls.</td>
+</tr>
+<tr>
+  <td>(<code>_node</code>, <code>_encode_parent</code>, <code>_features</code>, <code>_tensorize</code>, <code>_generator</code>, <code>_dtype</code>, <code>_np_dtype</code>, <code>_feat_width</code>, <code>_slice_ehat</code>, <code>_term_cells</code>)</td>
+  <td>Node lookup with one shared error; parent encoding (continuous raw, ordinal one-hot); <code>_tensorize(df, cols=None)</code> for any column subset; seeded-generator, dtype, feature-width and adjacency-cell plumbing.</td>
 </tr>
 <tr>
   <td>(<code>_set_ranges</code>)</td>
   <td>Train 5%/95% quantiles onto the transform domain, plus the optional marginal initialization. First fit only.</td>
 </tr>
 <tr>
-  <td>(<code>_vc_warm_start</code>, <code>_vc_oof_stage</code>, <code>_vc_oof_propensity</code>, <code>_predict_p1</code>, <code>_vc_ehat_live</code>, <code>_vc_ehat_columns</code>, <code>_recenter_vc</code>, <code>_source_proxies</code>)</td>
+  <td>(<code>_vc_warm_start</code>, <code>_ls_proxy_spec</code>, <code>_vc_oof_stage</code>, <code>_vc_oof_propensity</code>, <code>_predict_p1</code>, <code>_binary_p1</code>, <code>_vc_ehat_live</code>, <code>_vc_ehat_columns</code>, <code>_recenter_vc</code>, <code>_source_proxies</code>)</td>
   <td>The VC machinery: classical <code>beta0</code> warm start; frozen out-of-fold propensities for training (DML); live full-fit propensities for inference (recomputed under <code>do</code>, never cached); post-fit re-centering.</td>
 </tr>
 <tr>
-  <td>(<code>_is_all_ls</code>)</td>
-  <td>Guard for <code>fit_classical</code>.</td>
+  <td>(<code>_is_all_ls</code>, <code>_covered_by_classical</code>)</td>
+  <td>Guard for <code>fit_classical</code>: every term an <code>LS</code>, or a parentless <code>I()</code> basis carrier.</td>
 </tr>
 </tbody>
 </table>
@@ -358,13 +384,16 @@ stay comparable to it.</p>
   <td>&gt; stat)`, the Kolmogorov series.</td>
 </tr>
 <tr>
-  <td>(<code>_dl_ds</code>, <code>CRIT_5PCT</code>)</td>
-  <td>Closed-form latent-scale derivative; the 5% critical value 1.3581.</td>
+  <td>(<code>_dl_ds</code>, <code>_ls_score_columns</code>, <code>CRIT_5PCT</code>)</td>
+  <td>Closed-form latent-scale derivative; the LS/one-hot score-column builder; the 5% critical value 1.3581.</td>
 </tr>
 </tbody>
 </table>
 
-<h2 id="envpy"><code>env.py</code></h2>
+<h2 id="utilspy-helpers-that-are-not-about-modelling"><code>utils.py</code> — helpers that are not about modelling</h2>
+
+<p>Nothing is imported at module level here: <code>config_section</code> needs no
+dependency, and <code>machine_info</code> pulls in torch and platform only when called.</p>
 
 <table>
 <thead>
@@ -375,65 +404,24 @@ stay comparable to it.</p>
 </thead>
 <tbody>
 <tr>
+  <td><code>config_section()</code></td>
+  <td>Pick a mapping out of an <strong>already-parsed</strong> configuration (descending through any number of keys) and require an exact key set, so a missing key cannot become a hidden default and an extra one cannot look effective. Parsing stays with the caller, so the package depends on no config parser.</td>
+</tr>
+<tr>
   <td><code>machine_info()</code></td>
-  <td>Machine/software snapshot stored by <code>save()</code>, so timings stay comparable across machines. Never raises.</td>
+  <td>Machine/software snapshot stored by <code>save()</code>, so timings stay comparable across machines. Never raises. Exported top-level as <code><a href="../tramdag.html#machine_info">tramdag.machine_info</a></code>.</td>
 </tr>
 </tbody>
 </table>
 
-<h2 id="simulations-numpy-only-ground-truth"><code>simulations/</code> — numpy-only ground truth</h2>
+<h2 id="what-is-not-in-the-package">What is <em>not</em> in the package</h2>
 
-<p>Each generator is independent of the flow implementation and has a CLI that
-regenerates its frozen <code>data/&lt;name&gt;/</code> CSVs (a test contract — never
-regenerate silently). <code>REGISTRY</code> maps name → class.</p>
-
-<p><strong>Scheduled to move</strong> to the simulation-study companion repo
-(<code>tensorchiefs/tramdag-simu</code>) with <code>experiments/</code> and the data-contract
-tests; frozen until then.</p>
-
-<p><code>_common.py</code> holds what the generators share: <code>logistic</code>, <code>sigmoid</code>,
-<code>resolve_latents</code> (the <code>n</code>/<code>rng</code>/<code>latents</code> triple), and the <code>DatasetDraws</code>
-mixin — <code>observational</code>, <code>interventional</code>, <code>counterfactual_pair</code>. Those
-three carry the seed offsets (<code>+1</code>, <code>+501</code>, <code>+2</code>) that the frozen CSVs in
-<code>data/</code> depend on, so they are defined once. Each generator module then
-holds only its own structural equations and ground truth.</p>
-
-<table>
-<thead>
-<tr>
-  <th>Class (module)</th>
-  <th>DGP</th>
-  <th>Ground-truth read-outs</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-  <td><code>MagicMrClean</code> (<code>magic_mrclean</code>)</td>
-  <td>Synthetic stroke cohort, <code>ls</code>/<code>nl</code> variants</td>
-  <td><code>true_ate()</code>, <code>counterfactual_pair()</code>, <code>observational()</code>, <code>rct()</code></td>
-</tr>
-<tr>
-  <td><code>TriangleContinuous</code> / <code>TriangleMixed</code> (<code>triangle</code>)</td>
-  <td>Paper §6 triangles, f variants linear/cubic/exp/atan/sin</td>
-  <td><code>paper_truth()</code>, <code>zuko_expectations()</code>, <code>true_shift_curve()</code>, <code>true_pmf()</code> (mixed), <code>interventional()</code>, <code>counterfactual_pair()</code></td>
-</tr>
-<tr>
-  <td><code>VacaTriangle</code> (<code>vaca</code>)</td>
-  <td>App. C.1 bimodal Gaussian benchmark</td>
-  <td><code>true_moments()</code> (analytic do-moments), <code>interventional()</code></td>
-</tr>
-<tr>
-  <td><code>Carefl4</code> (<code>carefl</code>)</td>
-  <td>App. C.2 Laplace SCM</td>
-  <td><code>abduct_noise()</code>, <code>true_counterfactual()</code>, <code>true_cf_curves()</code> — all analytic</td>
-</tr>
-<tr>
-  <td><code>VCLogisticShift</code> (<code>vc_shift</code>)</td>
-  <td>Issue #28 heterogeneous-effect DGP</td>
-  <td><code>true_beta()</code> (known effect function), <code>counterfactual_pair()</code></td>
-</tr>
-</tbody>
-</table>
+<p>The SCM generators, the frozen datasets and the replication scripts are
+research code and live in <a href="../experiments/"><code>experiments/</code></a>, outside the
+installed package — see
+<a href="https://github.com/tensorchiefs/tramdag/blob/dev-marcel/docs/../experiments/README.md"><code>experiments/README.md</code></a>. The framework's own
+tests do not depend on them: they measure against three inline DGPs in
+<a href="https://github.com/tensorchiefs/tramdag/blob/dev-marcel/docs/../tests/conftest.py"><code>tests/conftest.py</code></a>.</p>
 
 <h2 id="where-every-training-hyperparameter-lives">Where every training hyperparameter lives</h2>
 
@@ -450,14 +438,14 @@ default you can read at the call site. Nothing numeric is buried.</p>
 </thead>
 <tbody>
 <tr>
-  <td>epochs, learning rate, batch size</td>
+  <td>learning rate, batch size</td>
   <td><code>fit()</code></td>
-  <td>500 / 1e-2 / 512 (in-repo examples always state them explicitly)</td>
+  <td>1e-2 / 512 (in-repo callers state them explicitly anyway)</td>
 </tr>
 <tr>
   <td>schedule, plateau patience, plateau decay factor</td>
   <td><code>fit(schedule=, plateau_patience=, plateau_factor=)</code></td>
-  <td>None / 15 / 0.3 (lr floor <code>1e-3 * learning_rate</code>, stated in the docstring)</td>
+  <td>None / 30 / 0.3 (lr floor <code>1e-3 * learning_rate</code>, stated in the docstring)</td>
 </tr>
 <tr>
   <td>per-node freezing</td>
@@ -495,14 +483,24 @@ default you can read at the call site. Nothing numeric is buried.</p>
   <td>400 / 1e-6 / 25 / 50</td>
 </tr>
 <tr>
+  <td>training budget</td>
+  <td><code>fit(epochs=)</code></td>
+  <td><strong>required</strong> — a fixed default is wrong in both directions (<a href="../guides/training_speed.html">training-speed</a>)</td>
+</tr>
+<tr>
   <td>network widths</td>
   <td><code>units=</code> on <code>I</code>/<code>CS</code>/<code>VC</code></td>
-  <td>(8, 8) / (64, 128, 64) / (16,) — Keras-parity architecture defaults</td>
+  <td>(8, 8) / (64, 128, 64) — parity with the PyTorch reference's default classes; VC's (16,) has no counterpart there and comes from the recovery measurement</td>
+</tr>
+<tr>
+  <td>activation</td>
+  <td><code>activation=</code> on <code>I</code>/<code>CS</code>/<code>VC</code></td>
+  <td><code>"relu"</code> (the reference default classes); <code>"sigmoid"</code> and <code>"tanh"</code> are the paper's</td>
 </tr>
 <tr>
   <td>transform basis</td>
   <td><code>I(transform=, **kwargs)</code> (extra kwargs go to the transform class)</td>
-  <td><code>"bernstein"</code>, <code>n_coeffs=20</code>; spline <code>bins=8</code> (the domain is fixed at [-5, 5], <code>transforms.BOUND</code>)</td>
+  <td><code>"bernstein"</code>, <code>n_coeffs=20</code> unconstrained coefficients (zuko ties two more control points on, so order 21); spline <code>bins=8</code> = zuko's NSF default (the domain is fixed at [-5, 5], <code>transforms.BOUND</code>)</td>
 </tr>
 <tr>
   <td>shuffling / weight init</td>
