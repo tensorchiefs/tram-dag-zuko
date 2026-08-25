@@ -6,6 +6,8 @@ term with parents, and a VC term names its treatment by keyword.
 """
 
 # %% imports ---------------------------------------------------------------------------
+import json
+
 import pytest
 import torch
 
@@ -332,3 +334,25 @@ def test_basis_arguments_apply_without_naming_the_basis():
     assert node.transform_kwargs == {"n_coeffs": 40}
     flow = CausalFlowDAG({"x": node}, seed=0)
     assert flow.nodes["x"].ut.n_params == 40
+
+
+def test_a_source_node_is_canonical_too():
+    """None normalizes to [SI()]: equal, hashable, terms[0] is the intercept."""
+    assert ContinuousNode().terms == [SI()]
+    assert OrdinalNode(3).terms == [SI()]
+    assert ContinuousNode() == ContinuousNode([SI()])
+    assert hash(ContinuousNode()) == hash(ContinuousNode([SI()]))
+    assert len({ContinuousNode(), ContinuousNode([SI()]), OrdinalNode(3)}) == 2
+
+
+def test_spec_survives_a_json_roundtrip():
+    """Tuples come back as lists from json; spec_from_dict restores them."""
+    spec = {
+        "x": ContinuousNode([SI(transform="spline", bins=6)]),
+        "t": OrdinalNode(2, [LS("x")]),
+        "y": ContinuousNode([CI("x", units=[8, 8]), VC("x", t="t", units=[4])]),
+    }
+    back = spec_from_dict(json.loads(json.dumps(spec_to_dict(spec))))
+    assert back == spec
+    assert back["y"].terms[0].units == (8, 8)  # the CI intercept comes first
+    assert hash(back["y"].terms[1]) == hash(spec["y"].terms[1])

@@ -20,6 +20,7 @@ Conventions follow the original TRAM-DAG implementation
 from __future__ import annotations
 
 import math
+import warnings
 
 import torch
 from torch import Tensor
@@ -94,6 +95,13 @@ def _expanding_bisection(
     -------
     Tensor
         The roots, same shape as ``z``.
+
+    Warns
+    -----
+    RuntimeWarning
+        If a root is still outside the bracket after ``max_expand``
+        doublings. That element then ends at the bracket edge, not at the
+        root. A near-zero boundary slope with a large shift can cause it.
     """
     width = hi - lo
     for _ in range(max_expand):
@@ -104,6 +112,16 @@ def _expanding_bisection(
         lo = torch.where(too_high, lo - width, lo)
         hi = torch.where(too_low, hi + width, hi)
         width = hi - lo
+    else:  # only reached when the doublings ran out
+        stuck = (f(lo) > z) | (f(hi) < z)
+        if stuck.any():
+            warnings.warn(
+                f"{int(stuck.sum())} latent value(s) lie outside the search "
+                f"bracket after {max_expand} doublings; their inverse is "
+                "clipped to the bracket edge",
+                RuntimeWarning,
+                stacklevel=2,
+            )
     for _ in range(iters):
         mid = 0.5 * (lo + hi)
         below = f(mid) < z

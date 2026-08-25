@@ -4,6 +4,19 @@
 
 ### Added
 
+- **A source node is canonical too.** `ContinuousNode()` and `OrdinalNode(k)`
+  now hold `[SI()]` instead of `None`, so `node.terms[0]` really is always
+  the intercept, `ContinuousNode() == ContinuousNode([SI()])`, and node
+  specs are hashable (a set of nodes used to raise `TypeError`).
+- **Specs round-trip through JSON.** `spec_to_dict` was already JSON-safe on
+  the way out; `spec_from_dict` now turns the lists JSON gives back into the
+  tuples `Term` stores, so a spec saved with `json` compares equal and
+  hashes the same as the one written.
+- **The inverse warns when a latent escapes its search bracket.** The
+  expanding bisection behind `sample` used to clip such an element to the
+  bracket edge silently; it now emits a `RuntimeWarning` naming how many
+  values were affected.
+
 - **Paper-aligned intercept constructors**: `simple_intercept`/`SI` (the
   parentless baseline) and `complex_intercept`/`CI` (needs at least one
   parent), matching the paper's SI/CI notation. `intercept`/`I` stays as

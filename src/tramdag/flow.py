@@ -1191,9 +1191,9 @@ class CausalFlowDAG(nn.Module):
             )
         node_spec = self.spec[on]
         proxy_spec = self._source_proxies(on_nd.parents)
-        terms = node_terms(node_spec) or None
+        terms = node_terms(node_spec)
         proxy_spec[on] = OrdinalNode(2, terms)
-        all_ls = all(map(_covered_by_classical, terms or []))
+        all_ls = all(map(_covered_by_classical, terms))
         cols = [*on_nd.parents, on]
 
         n = len(train_df)

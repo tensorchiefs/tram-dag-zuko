@@ -98,6 +98,11 @@ def _options(**kwargs) -> tuple:
     return tuple(sorted((k, v) for k, v in kwargs.items() if v != _OPTION_DEFAULTS[k]))
 
 
+def _tupled(value):
+    """Turn lists (what JSON gives back for tuples) into tuples, recursively."""
+    return tuple(_tupled(v) for v in value) if isinstance(value, list) else value
+
+
 def _as_term(value) -> Term:
     """Take one entry of a formula to a :class:`Term`.
 
@@ -138,11 +143,11 @@ def _normalize_terms(value):
 
     Returns
     -------
-    list[Term] | None
-        The canonical term list, or ``None`` for a source node.
+    list[Term]
+        The canonical term list; a source node gives ``[SI()]``.
     """
     if value is None:
-        return None
+        return [simple_intercept()]  # a source node: the free intercept alone
     written = value if isinstance(value, (list, tuple)) else [value]
     items = [_as_term(e) for e in written]
     intercepts = [i for i, t in enumerate(items) if t.effect == "I"]
@@ -679,10 +684,8 @@ def node_terms(node: NodeSpec) -> list[Term]:
     Returns
     -------
     list[Term]
-        The terms. Empty for a source node.
+        The terms; ``[SI()]`` for a source node.
     """
-    if node.terms is None:
-        return []
     return list(node.terms)
 
 
@@ -744,6 +747,9 @@ def spec_to_dict(spec: dict[str, NodeSpec]) -> dict:
 
     ``Term.options`` is already canonical — sorted by key, defaults
     dropped — so a term serializes as its three fields and nothing else.
+    The result is JSON-safe: tuples become lists, and :func:`spec_from_dict`
+    turns them back, so a spec round-trips through ``json`` as well as
+    through ``torch.save``.
 
     Parameters
     ----------
@@ -802,7 +808,7 @@ def spec_from_dict(d: dict) -> dict[str, NodeSpec]:
             Term(
                 t["effect"],
                 tuple(t["parents"]),
-                tuple(sorted(t["options"].items())),
+                tuple(sorted((k, _tupled(v)) for k, v in t["options"].items())),
             )
             for t in nd["terms"]
         ] or None

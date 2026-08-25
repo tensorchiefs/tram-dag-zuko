@@ -12,6 +12,7 @@ from tramdag.transforms import (
     AffineUT,
     BernsteinUT,
     SplineUT,
+    _expanding_bisection,
     ordinal_cutpoints,
     ordinal_log_prob,
     ordinal_pmf,
@@ -212,3 +213,13 @@ def test_ls_node_equals_proportional_odds():
         res.params, exog=df[["X1", "X2"]].values[:500], which="prob"
     )
     assert np.abs(pmf_flow - pmf_sm).max() < 0.01
+
+
+def test_bisection_warns_when_a_root_escapes_the_bracket():
+    """A root beyond max_expand doublings is clipped and reported, not silent."""
+    z = torch.tensor([0.5, 1e12])  # the second target is out of any reach
+    lo, hi = torch.tensor([-1.0, -1.0]), torch.tensor([1.0, 1.0])
+    with pytest.warns(RuntimeWarning, match="1 latent value"):
+        root = _expanding_bisection(lambda t: t, z, lo, hi, max_expand=5, iters=30)
+    assert torch.isclose(root[0], torch.tensor(0.5), atol=1e-6)
+    assert root[1] < 1e12  # clipped to the (expanded) bracket edge
