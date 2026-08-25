@@ -55,7 +55,6 @@ def small_fitted(vc_hetero):
     return flow, vc_hetero
 
 
-# %% spec / validation -----------------------------------------------------------------
 def test_vc_constructor():
     t = VC("X2", "X3", penalty=2.5, t="T")
     assert (t.effect, t.parents, t.penalty) == ("VC", ("T", "X2", "X3"), 2.5)
@@ -110,7 +109,6 @@ def test_to_matrix_vc_labels():
     assert m.loc["X3", "Y"] == "CS['X1', 'X2', 'X3']+VCm"
 
 
-# %% exact LS nesting ------------------------------------------------------------------
 def test_vc_without_modifiers_equals_ls_exactly():
     """VC(on) has no net — with beta0 set to the LS weight the two models give
     bit-identical log-probs (the nesting is exact, not approximate).
@@ -136,7 +134,6 @@ def test_fit_classical_rejects_vc(vc_hetero):
         flow.fit_classical(vc_hetero["draw"](100, 1))
 
 
-# %% read-out ident --------------------------------------------------------------------
 def test_varying_coef_deterministic_and_y_free(small_fitted):
     flow, dgp = small_fitted
     new = dgp["draw"](300, 900)
@@ -189,7 +186,6 @@ def test_serialization_roundtrip_spec():
     assert t == VC("X2", "X3", penalty=3.0, t="T")
 
 
-# %% warm start ------------------------------------------------------------------------
 def test_warm_start_matches_classical_ls(vc_hetero):
     """beta0 after warm start equals the classical (L-BFGS) all-`ls` coefficient
     of the node's conditional; b_theta stays the zero function.
@@ -217,7 +213,6 @@ def test_warm_start_matches_classical_ls(vc_hetero):
     assert float(flow.nodes["Y"].shifts["T"].beta0) == 123.0
 
 
-# %% acceptance: fitted LS nesting -----------------------------------------------------
 def test_nesting_large_penalty_matches_classical_ls(vc_hetero):
     """Acceptance (issue #28): with `penalty` large the head is shrunk to the
     zero function and the fitted beta0 matches the fit_classical LS coefficient.
@@ -257,7 +252,6 @@ def test_nesting_large_penalty_matches_classical_ls(vc_hetero):
     assert beta0 == pytest.approx(w[1] - w[0], abs=0.03)
 
 
-# %% acceptance: recovery >= 0.9 -------------------------------------------------------
 def test_recovery_bar_on_hetero_dgp(vc_hetero):
     """THE acceptance bar (issue #28): corr(beta_hat, beta_true) >= 0.9 at
     n = 5000 on the heterogeneous-effect DGP, default penalty. The
@@ -287,7 +281,6 @@ def test_recovery_bar_on_hetero_dgp(vc_hetero):
     assert float(flow.nodes["Y"].shifts["T"].beta0) == pytest.approx(b0, abs=0.15)
 
 
-# %% continuous treatment --------------------------------------------------------------
 def test_vc_continuous_treatment():
     """VC is linear in a continuous x_on: shift = beta(m) * d, so
     u(d=2) - u(d=0) = 2 * beta(m) (evaluated via abduct, y fixed).

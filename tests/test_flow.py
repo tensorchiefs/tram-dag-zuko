@@ -50,7 +50,6 @@ def fitted_flow():
     return flow, df
 
 
-# %% transforms ------------------------------------------------------------------------
 @pytest.mark.parametrize("ut", [BernsteinUT(n_coeffs=12), SplineUT(bins=6), AffineUT()])
 def test_univariate_roundtrip(ut):
     ut.set_range(-3.0, 7.0)
@@ -104,9 +103,6 @@ def test_ordinal_cutpoints_increasing_and_pmf_sums_to_one():
     assert torch.allclose(pmf.sum(dim=1), torch.ones(64), atol=1e-5)
 
 
-# %% dag -------------------------------------------------------------------------------
-
-
 def test_topological_order():
     spec = {
         "C": OrdinalNode(3, [LS("A"), LS("B")]),
@@ -117,7 +113,6 @@ def test_topological_order():
     assert order.index("A") < order.index("B") < order.index("C")
 
 
-# %% flow logic ------------------------------------------------------------------------
 def test_pmf_matches_do_sampling(fitted_flow):
     flow, _ = fitted_flow
     grid = pd.DataFrame({"X": [1.5]})
@@ -174,7 +169,6 @@ def test_save_load_roundtrip(tmp_path, fitted_flow):
     assert torch.allclose(lp1, lp2, atol=1e-6)
 
 
-# %% ls == ordered logit (MLE) ---------------------------------------------------------
 def test_ls_node_equals_proportional_odds():
     """An all-ls ordinal node is exactly a proportional-odds model: the SGD fit
     must agree with the statsmodels MLE (same data) in coefficients and PMFs.

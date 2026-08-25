@@ -49,7 +49,6 @@ def mle_flow():
     return flow, df
 
 
-# %% acceptance 1: sums ----------------------------------------------------------------
 def test_score_sums_vanish_at_mle(mle_flow):
     """At the MLE the score sums are ~0 per column (the defining property)."""
     flow, df = mle_flow
@@ -78,7 +77,6 @@ def test_score_sums_vanish_at_mle_ordinal_outcome():
     assert (psi.sum(axis=0).abs() / n < 1e-4).all()
 
 
-# %% acceptance 2: exact FD check ------------------------------------------------------
 def test_scores_match_finite_differences():
     """Analytic scores equal float64 central differences at an arbitrary
     (non-MLE) parameter point, for LS on continuous and ordinal parents, on
@@ -129,7 +127,6 @@ def test_scores_match_finite_differences():
         flow.float()
 
 
-# %% acceptance 3: end-to-end CUSUM ----------------------------------------------------
 def test_effect_modifier_scan_flags_true_modifiers(mle_flow):
     """The point of the feature: on the heterogeneous SCM the scan must flag
     the true modifiers X2 and X3 and NOT the inert X1 (issue #29).
@@ -181,7 +178,6 @@ def test_scores_on_vc_model_and_scan_column_resolution():
     assert list(scan.index) == ["X2"]
 
 
-# %% error paths -----------------------------------------------------------------------
 def test_scores_error_paths(mle_flow):
     flow, df = mle_flow
     with pytest.raises(KeyError, match="unknown node"):

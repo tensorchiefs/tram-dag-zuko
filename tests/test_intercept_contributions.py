@@ -36,7 +36,6 @@ def _additive_ci_flow():
 
 
 # %% public functions ------------------------------------------------------------------
-# %% exactness of the decomposition ----------------------------------------------------
 def test_baseline_plus_contributions_reproduces_theta():
     flow = _additive_ci_flow()
     df = _data()
@@ -57,7 +56,6 @@ def test_baseline_plus_contributions_reproduces_theta():
     np.testing.assert_allclose(recon, theta.numpy(), rtol=1e-5, atol=1e-5)
 
 
-# %% sum-to-zero per parameter ---------------------------------------------------------
 def test_contributions_are_mean_centered():
     flow = _additive_ci_flow()
     df = _data()
@@ -79,7 +77,6 @@ def test_shapes_and_parents():
     assert res["parents"] == {"x1": ("x1",), "x2": ("x2",)}
 
 
-# %% ordinal node ----------------------------------------------------------------------
 def test_ordinal_additive_ci():
     spec = {
         "x1": ContinuousNode(),
@@ -95,7 +92,6 @@ def test_ordinal_additive_ci():
         np.testing.assert_allclose(contrib.mean(axis=0), 0.0, atol=1e-6)
 
 
-# %% transform-agnostic (spline / affine too) ------------------------------------------
 @pytest.mark.parametrize(
     ("transform", "P"), [("bernstein", None), ("spline", 3 * 8 - 1), ("affine", 2)]
 )
@@ -126,7 +122,6 @@ def test_works_for_any_continuous_transform(transform, P):
         np.testing.assert_allclose(contrib.mean(axis=0), 0.0, atol=1e-6)
 
 
-# %% guard rails -----------------------------------------------------------------------
 def test_raises_on_node_without_complex_intercept():
     spec = {
         "x1": ContinuousNode(),
@@ -154,7 +149,6 @@ def test_raises_on_missing_parent_column():
         flow.intercept_contributions("x3", df)
 
 
-# %% single joint complex CI -----------------------------------------------------------
 def test_joint_complex_intercept_single_component():
     # I("x1","x2") is one pooled network -> one centered component over both
     spec = {
@@ -175,7 +169,6 @@ def test_joint_complex_intercept_single_component():
     np.testing.assert_allclose(recon, theta.numpy(), rtol=1e-5, atol=1e-5)
 
 
-# %% purely post-hoc / pure ------------------------------------------------------------
 def test_does_not_mutate_model_outputs():
     flow = _additive_ci_flow()
     df = _data()

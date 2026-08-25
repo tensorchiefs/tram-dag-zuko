@@ -182,9 +182,6 @@ def make_univariate_transform(name: str, **kwargs) -> _ScaledUT:
     return cls(**kwargs)
 
 
-# %% ordinal transform (ordered logit, the original parametrization) -------------------
-
-
 def ordinal_cutpoints(theta_tilde: Tensor) -> Tensor:
     """Constrain unconstrained parameters to increasing cutpoints.
 

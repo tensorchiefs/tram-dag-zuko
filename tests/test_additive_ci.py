@@ -31,7 +31,6 @@ def _scale_df(n, seed=0):
 
 
 # %% public functions ------------------------------------------------------------------
-# %% structure -------------------------------------------------------------------------
 def test_additive_ci_runs_and_finite():
     rng = np.random.default_rng(0)
     df = pd.DataFrame({c: rng.normal(size=64) for c in ["x1", "x2", "x3"]})
@@ -48,7 +47,6 @@ def test_additive_ci_runs_and_finite():
     assert torch.isfinite(lp).all()
 
 
-# %% validation ------------------------------------------------------------------------
 @pytest.mark.slow
 def test_additive_ci_beats_additive_shift_on_heteroscedastic(fit_x3_nll):
     df = _scale_df(4000)
