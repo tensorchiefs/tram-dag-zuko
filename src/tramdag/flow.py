@@ -1799,6 +1799,63 @@ class CausalFlowDAG(nn.Module):
         return ordinal_pmf(theta, shift).cpu().numpy()
 
     @torch.no_grad()
+    def density(
+        self,
+        df: pd.DataFrame,
+        node: str,
+        grid,
+        do: dict[str, float] | None = None,
+    ) -> np.ndarray:
+        """Give the analytic conditional density of a continuous node on a grid.
+
+        The continuous counterpart of :meth:`pmf`: for every row of ``df``
+        the density ``p(node = g | parents)`` at each grid value ``g``, in
+        closed form from the transform — no sampling.
+
+        Parameters
+        ----------
+        df : pd.DataFrame
+            Rows that supply the parent values of the node.
+        node : str
+            Name of the continuous node.
+        grid : array-like
+            Values of ``node`` at which to evaluate the density, shape ``(m,)``.
+        do : dict[str, float] | None, optional
+            Column overrides, applied to ``df`` before the evaluation.
+
+        Returns
+        -------
+        np.ndarray
+            The densities, shape ``(n, m)``.
+
+        Raises
+        ------
+        ValueError
+            If ``node`` is ordinal; use :meth:`pmf` for it.
+        """
+        if not isinstance(self.spec[node], ContinuousNode):
+            # a domain error (wrong node kind), not a Python type error
+            raise ValueError(  # noqa: TRY004
+                f"density() requires a continuous node, '{node}' is ordinal; use pmf()."
+            )
+        df_local = df.copy()
+        for col, val in (do or {}).items():
+            df_local[col] = val
+        nd = self.nodes[node]
+        n = len(df_local)
+        values = self._tensorize(df_local, list(nd.parents) + self._vc_ehat_columns(nd))
+        feats = self._features({p: values[p] for p in nd.parents})
+        theta, shift = nd.theta_shift(
+            feats, n, vc_ehat=self._vc_ehat_live(nd, values, n)
+        )
+        y = torch.as_tensor(np.asarray(grid, dtype=self._np_dtype), device=self.device)
+        m = y.numel()
+        # one (row, grid value) pair per evaluation: rows repeat, the grid tiles
+        u0, ladj = nd.ut.forward(theta.repeat_interleave(m, 0), y.repeat(n))
+        log_p = StandardLogistic.log_prob(u0 + shift.repeat_interleave(m)) + ladj
+        return log_p.exp().view(n, m).cpu().numpy()
+
+    @torch.no_grad()
     def scores(self, df: pd.DataFrame, node: str) -> pd.DataFrame:
         """Give the per-observation scores ``psi_i = d l_i / d theta``.
 

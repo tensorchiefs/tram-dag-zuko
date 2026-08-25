@@ -77,6 +77,7 @@ flow.log_prob(df)  # L1: joint log-likelihood per row
 flow.sample(1000)  # L1: observational sampling
 flow.sample(1000, do={"T": 1})  # L2: interventional (graph mutilation)
 flow.pmf(df, node="Y", do={"T": 1})  # L2: analytic interventional PMF
+flow.density(df, node="X3", grid=grid, do={"T": 1})  # ... and density, continuous nodes
 
 u = flow.abduct(df)  # L3 step 1: latents from observations
 cf = flow.sample(do={"T": 1}, u=u)  # L3 steps 2+3: counterfactuals

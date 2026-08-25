@@ -4,6 +4,10 @@
 
 ### Added
 
+- **`density(df, node, grid, do=)`** — the analytic conditional density of a
+  continuous node on a grid, the continuous counterpart of `pmf`; closed
+  form from the transform, no sampling. Pinned against `exp(log_prob)` at
+  the observed value, unit mass, and `do=` ≡ column substitution.
 - **`fit(batch_size=)` below 1 raises** with a plain message instead of
   reaching `range()` with a cryptic one.
 

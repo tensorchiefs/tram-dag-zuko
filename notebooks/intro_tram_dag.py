@@ -630,6 +630,29 @@ print("P(Y = k | do(X3 = 1)):")
 print("  true:", pmf_true.round(4), "\n  flow:", pmf_flow.round(4))
 
 # %% [markdown]
+# For a **continuous** node the same closed form exists: `flow.density` gives
+# $p(x_3 \mid do(X_1 = a), x_2)$ on a grid from the fitted transform, no sampling.
+# The DGP tells us the truth: $u_3 = \sinh(x_3) + 0.8\,x_1 + \tfrac12 x_2^2$, so
+# $p(x_3) = f_U\!\big(u_3\big)\cosh(x_3)$ with $f_U$ the standard-logistic density.
+
+# %%
+grid = np.linspace(-3.5, 3.5, 301)
+row = pd.DataFrame({"X2": [0.0]})  # the parent we keep; X1 is set by do=
+fig, ax = plt.subplots(figsize=(7, 3.2))
+for a, color in ((-1.0, "C0"), (1.0, "C3")):
+    dens = flow.density(row, "X3", grid, do={"X1": a})[0]
+    u3 = np.sinh(grid) + 0.8 * a + 0.5 * 0.0**2
+    truth_pdf = np.exp(-u3) / (1 + np.exp(-u3)) ** 2 * np.cosh(grid)
+    ax.plot(
+        grid, truth_pdf, color=color, lw=2.5, alpha=0.4, label=f"truth, $a={a:+.0f}$"
+    )
+    ax.plot(grid, dens, color=color, lw=1.2, label=f"flow.density, $a={a:+.0f}$")
+ax.set_xlabel("$x_3$"), ax.set_ylabel("$p(x_3 \\mid do(X_1=a), x_2=0)$")
+ax.legend()
+fig.tight_layout()
+plt.show()
+
+# %% [markdown]
 # ## 8. Rung 3 — counterfactuals: abduction → action → prediction
 #
 # Because the flow is **bijective in the continuous variables**, Pearl's three

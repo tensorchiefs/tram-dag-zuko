@@ -69,6 +69,7 @@ config in `experiments/paper/` states `units=` and `activation=` itself.
 | `sample()` | Observational, interventional (`do=`, graph mutilation) and counterfactual (`u=`) sampling. |
 | `abduct()` | Pearl step 1: recover the latents. Continuous exactly, ordinal by truncated draw. |
 | `pmf()` | Analytic class probabilities of an ordinal node, with `do=` overrides. |
+| `density()` | Analytic conditional density of a continuous node on a grid, with `do=` overrides — the continuous counterpart of `pmf`. |
 | `log_prob()` / `nll()` | Joint per-row log-likelihood / mean per-node NLL diagnostic. |
 | `node_log_prob()` | The per-node decomposition everything trains and evaluates through. |
 | `varying_coef()` | Closed-form read-out `beta(x)` of a fitted VC term. Deterministic, y-free. |

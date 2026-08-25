@@ -79,6 +79,7 @@ See `experiments/README.md`.
   `machine_info` (the environment snapshot `save` stores; was `env.py`).
 - `flow.py` — `CausalFlowDAG`: `fit`, `fit_classical` (float64 full-batch
   L-BFGS, exact MLE for all-`ls` specs), `sample(n, do=, u=)`, `abduct`, `pmf`,
+  `density` (its continuous counterpart, on a grid),
   `log_prob`, `save/load`, `ls_coefficients` (LS weights only — network shifts
   are skipped), `varying_coef` (VC read-out), `scores` /
   `effect_modifier_scan` (analytic per-row ∂ℓᵢ/∂θ + CUSUM modifier scan,
