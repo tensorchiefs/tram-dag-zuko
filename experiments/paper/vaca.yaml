@@ -1,7 +1,7 @@
 # Hyperparameters of the VACA/CNF benchmark (vaca.py).
 #
 # Every value the script uses is in this file: it reads no defaults of its
-# own and rejects a variant whose keys do not match exactly.
+# own.
 
 # The paper does not state a training protocol for this benchmark (App. C.1
 # describes the DGP only), so every number below is this repository's choice,
@@ -41,7 +41,7 @@ variants:
                                 # schedule, and it matters (see helpers.py)
     polish_epochs: 120          # second phase at a lower rate
     polish_learning_rate: 0.001
-    dgp_seed: 42                # the paper's generator seed
+    dgp_seed: 42                # repo choice: a numpy seed cannot reproduce the R stream
     init_seed: 7                # flow weight initialization
     shuffle_seed: 0             # minibatch shuffling
     sample_seed: 1

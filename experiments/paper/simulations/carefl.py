@@ -10,8 +10,12 @@ benchmark TRAM-DAG's L3 (counterfactual) queries (Fig. 6)::
 All-continuous additive-noise SCM, so individual counterfactuals are **analytic**
 via noise abduction (no Monte Carlo): eps3 = x3 - x1 - 0.5 x2^3 and
 eps4 = x4 + x2 - 0.5 x1^2 are recovered exactly, then the mutilated SCM is
-re-evaluated. The paper picks the observation ``X_OBS = (2.00, 1.50, 0.81, -0.28)``
-and sweeps two queries for alpha in [-3, 3]:
+re-evaluated. The paper's observation is the point with noise
+``(2, 1.5, 1.4, -1)``; CAREFL's runner divides x3 and x4 by their sample
+standard deviations (6.01, 1.91), which is where the paper's printed
+``(2.00, 1.50, 0.81, -0.28)`` comes from. In the SCM's own units the same
+point is ``X_OBS = (2.00, 1.50, 5.0875, -0.5)``. Two queries are swept for
+alpha in [-3, 3]:
 
     (i)  x3^cf  given do(x2 = alpha):  x1 + 0.5 alpha^3 + eps3
     (ii) x4^cf  given do(x1 = alpha): -x2 + 0.5 alpha^2 + eps4
@@ -35,7 +39,9 @@ import pandas as pd
 from ._common import DatasetDraws, resolve_latents
 
 # %% global variables ------------------------------------------------------------------
-X_OBS = {"x1": 2.00, "x2": 1.50, "x3": 0.81, "x4": -0.28}  # the paper's observation
+# the paper's observation in raw units: noise (2, 1.5, 1.4, -1) pushed through the
+# SCM; the paper prints x3/x4 divided by CAREFL's sample sds (6.01, 1.91)
+X_OBS = {"x1": 2.00, "x2": 1.50, "x3": 5.0875, "x4": -0.5}
 ALPHA_GRID = np.round(np.linspace(-3.0, 3.0, 61), 4)
 _SCALE = 1.0 / np.sqrt(2.0)
 

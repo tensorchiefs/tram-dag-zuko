@@ -1,7 +1,7 @@
 # Hyperparameters of the mixed-data triangle replication (triangle_mixed.py).
 #
 # Every value the script uses is in this file: it reads no defaults of its
-# own and rejects a variant whose keys do not match exactly.
+# own.
 
 # Provenance, from two sources:
 #   * the paper states 40000 samples, 500 epochs and Adam at lr 0.001 in its
@@ -29,7 +29,7 @@ paper_protocol: &paper_protocol
   # two more control points on to smooth the extrapolation (order 21 here
   # against the reference's 19); the free-parameter count is what matches.
   n_coeffs: 20
-  dgp_seed: 42            # the paper's generator seed
+  dgp_seed: 42            # repo choice: a numpy seed cannot reproduce the R stream
   init_seed: 7            # flow weight initialization
   shuffle_seed: 0         # minibatch shuffling
   sample_seed: 0          # sampling for the distribution comparisons

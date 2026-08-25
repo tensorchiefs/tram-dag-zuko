@@ -6,9 +6,9 @@ is the one benchmark where a flow's abduction can be scored against exact
 values instead of a second sample.
 
 Two things are measured. The paper's Fig. 6 curves at its single observation
-``x_obs``, and — because that observation sits at a roughly 2.9-sigma abducted
-noise value and is therefore a hard extrapolation — the mean absolute
-counterfactual error over a sample of typical held-out rows, which is the
+``x_obs`` (in the SCM's raw units; the paper prints x3/x4 divided by
+CAREFL's sample sds), and — because one point is a noisy yardstick — the
+mean absolute counterfactual error over a sample of held-out rows, which is the
 number to watch for regressions.
 
 Usage (from experiments/)::
@@ -34,33 +34,11 @@ from common import (
 
 from paper.helpers import (
     finish,
-    fit_with_snapshots,
+    fit_in_chunks,
     split_train_val,
 )
 from paper.simulations.carefl import ALPHA_GRID, X_OBS, Carefl4
-from tramdag import CI, SI, ContinuousNode
-
-# %% global variables ------------------------------------------------------------------
-CONFIG_KEYS = {
-    "n_train",
-    "transform",
-    "n_coeffs",
-    "intercept_units",
-    "activation",
-    "n_val",
-    "epochs",
-    "chunk_epochs",
-    "learning_rate",
-    "batch_size",
-    "polish_epochs",
-    "polish_learning_rate",
-    "dgp_seed",
-    "init_seed",
-    "shuffle_seed",
-    "n_heldout",
-    "heldout_seed",
-    "alphas_scored",
-}
+from tramdag import CI, SI, CausalFlowDAG, ContinuousNode
 
 
 # %% public functions ------------------------------------------------------------------
@@ -146,7 +124,7 @@ def heldout_errors(generator, flow, config) -> dict:
 
 def run(variant: str) -> dict:
     """Run the benchmark end to end and give its metrics."""
-    config = load_variant(__file__, variant, CONFIG_KEYS)
+    config = load_variant(__file__, variant)
     out = make_output_dir(__file__, f"carefl-{variant}")
 
     generator = Carefl4(seed=config["dgp_seed"])
@@ -158,17 +136,8 @@ def run(variant: str) -> dict:
         f"{config['epochs']} epochs at lr {config['learning_rate']:g}, then "
         f"{config['polish_epochs']} at lr {config['polish_learning_rate']:g} ..."
     )
-    flow, _ = fit_with_snapshots(
-        build_spec(config),
-        train,
-        val,
-        epochs=config["epochs"],
-        learning_rate=config["learning_rate"],
-        batch_size=config["batch_size"],
-        chunk_epochs=config["chunk_epochs"],
-        init_seed=config["init_seed"],
-        shuffle_seed=config["shuffle_seed"],
-    )
+    flow = CausalFlowDAG(build_spec(config), seed=config["init_seed"])
+    fit_in_chunks(flow, train, val, config)
     flow.fit(
         train,
         val,

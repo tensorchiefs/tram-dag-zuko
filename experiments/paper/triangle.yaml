@@ -1,8 +1,7 @@
 # Hyperparameters of the continuous-triangle replication (triangle.py).
 #
 # Every value the script uses is in this file. It reads no defaults of its own,
-# and the loader rejects a variant whose keys do not match what the script
-# declares — so nothing can be silently inherited from the framework.
+# so nothing is silently inherited from the framework.
 #
 # Provenance, from two sources:
 #   * the paper (App. C.3 preamble) states 40000 samples, 500 epochs, Adam at
@@ -31,7 +30,7 @@ paper_protocol: &paper_protocol
   # this polynomial is order 21 where the reference's is order 19 and the
   # paper's text says 20. The free-parameter count is what matches.
   n_coeffs: 20
-  dgp_seed: 42            # the paper's generator seed
+  dgp_seed: 42            # repo choice: a numpy seed cannot reproduce the R stream
   init_seed: 7            # flow weight initialization
   shuffle_seed: 0         # minibatch shuffling
   sample_seed: 0          # sampling for the distribution comparisons
