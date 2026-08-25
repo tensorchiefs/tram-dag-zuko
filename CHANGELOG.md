@@ -13,7 +13,8 @@
   which is why the VACA/CAREFL replications under the exact reference
   protocol were 2–20× off the paper: `do(x2=-3)` error 0.731 → 0.026 with
   the option on. Default off; calibrated at the first `fit`, stored in the
-  checkpoint.
+  checkpoint (the buffers are part of every node's state, so checkpoints
+  saved before this change do not load — refit).
 - **`fit(epoch_callback=)`** — `callback(flow, epoch)` after every epoch, so an
   experiment reads coefficient trajectories out of one continuous run the way
   the reference's per-epoch Keras loop does; **`fit(plateau_min_lr=)`** — an
@@ -50,9 +51,9 @@
   `validate_ls`), each with the same shape — imports, function
   definitions, a `run(variant)` function, a `__main__` block whose
   argparse call selects the variant — and each reading **every**
-  hyperparameter from a sibling `<script>.yaml`. The loader rejects a
-  variant with a missing or unknown key, so a value cannot quietly become
-  a default. `experiments/paper/PAPER_COVERAGE.md` maps every figure of
+  hyperparameter from a sibling `<script>.yaml`;
+  `experiments/paper/tests/test_configs.py` checks that every key in a
+  variant is read, so a leftover key cannot quietly become a default. `experiments/paper/PAPER_COVERAGE.md` maps every figure of
   arXiv:2503.16206 to the variant that reproduces it, including the
   paper's misspecified case (Fig. 17, new variant `triangle linear-cs`)
   and the two competing baselines that are deliberately not reimplemented.

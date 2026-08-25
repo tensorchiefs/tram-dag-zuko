@@ -181,7 +181,7 @@ Benchmarks, schedule trade-offs, and the recommended self-stopping recipe are in
 
 [`CausalFlowDAG.fit_classical`](../src/tramdag/flow.py) is the dedicated optimizer
 for **all-`ls`** models, where every node-conditional is a classical
-transformation model (ordered-logit / Colr). It raises on any `cs`/`ci` edge.
+transformation model (ordered-logit / Colr). It raises on any `cs`/`ci`/`vc` term.
 
 - **Full-batch, float64, L-BFGS** (strong-Wolfe line search). There are no
   minibatches, no schedule, and no early stopping. Therefore the fit is
