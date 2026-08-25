@@ -57,6 +57,26 @@ them locally so a push cannot fail on formatting:
 pre-commit install --install-hooks -t pre-commit -t commit-msg -t pre-push
 ```
 
+## Module layout
+
+Every Python module reads in the same order, separated by `# %%` markers
+padded with dashes to column 88:
+
+```python
+# %% imports ---------------------------------------------------------------------------
+# %% global variables ------------------------------------------------------------------
+# %% private functions -----------------------------------------------------------------
+# %% public functions ------------------------------------------------------------------
+# %% private classes -------------------------------------------------------------------
+# %% public classes --------------------------------------------------------------------
+# %% alias -----------------------------------------------------------------------------
+# %% main ------------------------------------------------------------------------------
+```
+
+A module carries only the sections it has. These eight are the only section
+names; there are no sub-section banners of any other kind. Notebooks are
+jupytext `py:percent` files and keep their narrative cell structure instead.
+
 ## Notebooks
 
 `notebooks/*.py` are [jupytext](https://github.com/mwouts/jupytext)
