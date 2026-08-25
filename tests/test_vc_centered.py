@@ -45,7 +45,7 @@ def _fit(spec, df, epochs=250):
 
 
 # %% public functions ------------------------------------------------------------------
-# ------------------------------------------------------- validation / spec
+# %% validation / spec -----------------------------------------------------------------
 def test_center_validation():
     with pytest.raises(ValueError, match="center_folds"):
         VC("X", center=True, center_folds=1, t="T")
@@ -65,7 +65,7 @@ def test_center_serialization_roundtrip():
     assert (t.center, t.center_folds) == (True, 3)
 
 
-# ---------------------------------------- acceptance: center=False regression
+# %% acceptance: center=False regression -----------------------------------------------
 def test_center_false_is_bit_identical_to_plain_vc(vc_hetero):
     """The default must preserve #28's behavior exactly: a VC term written
     without the kwarg and one with center=False produce bit-identical fits.
@@ -95,7 +95,7 @@ def test_center_false_is_bit_identical_to_plain_vc(vc_hetero):
     assert a.vc_center_info == {}  # stage 1 never ran
 
 
-# ------------------------------------------------ acceptance: gradient isolation
+# %% acceptance: gradient isolation ----------------------------------------------------
 def test_gradient_isolation(confounded):
     """With center=True the treatment node's parameters receive ZERO gradient
     from the outcome-node loss — on the live (inference) e_hat path and, a
@@ -116,7 +116,7 @@ def test_gradient_isolation(confounded):
     )
 
 
-# ------------------------------------------------- acceptance: OOF plumbing
+# %% acceptance: OOF plumbing ----------------------------------------------------------
 def test_training_ehat_is_out_of_fold(confounded):
     """The training propensities are genuine OOF quantities: fold bookkeeping
     exists, each fold's values reproduce a proxy fitted WITHOUT that fold
@@ -195,7 +195,7 @@ def test_treatment_with_a_bare_intercept_takes_the_classical_oof_path(confounded
     )
 
 
-# ------------------------------------- acceptance: do() recomputes t - e_hat
+# %% acceptance: do() recomputes t - e_hat ---------------------------------------------
 def test_do_recomputes_centered_regressor(confounded):
     """On FRESH rows (nothing cacheable) the centered regressor is re-derived
     from the current values: abduct at T=1 minus T=0 equals beta(x) exactly
@@ -240,7 +240,7 @@ def test_do_recomputes_centered_regressor(confounded):
         nd.theta_shift(feats, len(fresh), vc_ehat=None)
 
 
-# ---------------------------------------------- acceptance: Dandl reproduction
+# %% acceptance: Dandl reproduction ----------------------------------------------------
 def test_dandl_centering_reduces_bias(confounded):
     """THE reason the feature exists (issue #30, Dandl et al. 2024): under
     strong confounding + a deliberately under-specified prognostic part, the
@@ -260,7 +260,7 @@ def test_dandl_centering_reduces_bias(confounded):
     assert bias_c < 0.5 * bias_u, (bias_u, bias_c)
 
 
-# --------------------------------------------------------------- integration
+# %% integration -----------------------------------------------------------------------
 def test_centered_save_load_and_queries(confounded):
     df = confounded["draw"](1000, 6)
     flow = CausalFlowDAG(_misspecified_spec(True), seed=0)

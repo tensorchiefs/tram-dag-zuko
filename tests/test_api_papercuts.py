@@ -23,7 +23,7 @@ def _spec():
 
 
 # %% public functions ------------------------------------------------------------------
-# -------------------------------------------------- #1 constructor seeding
+# %% #1 constructor seeding ------------------------------------------------------------
 def test_constructor_seed_makes_init_reproducible():
     a = CausalFlowDAG(_spec(), seed=42)
     b = CausalFlowDAG(_spec(), seed=42)
@@ -50,7 +50,7 @@ def test_no_seed_still_works():
     )
 
 
-# ------------------------------------------- #2 history persists through io
+# %% #2 history persists through io ----------------------------------------------------
 def test_save_load_round_trips_history(tmp_path):
     rng = np.random.default_rng(0)
     df = pd.DataFrame(
@@ -71,7 +71,7 @@ def test_save_load_round_trips_history(tmp_path):
     assert len(loaded.history["time"]) == 12  # wall-clock curve survives too
 
 
-# ----------------------------------------- #4 machine/env info in metadata
+# %% #4 machine/env info in metadata ---------------------------------------------------
 def test_save_carries_machine_and_version_metadata(tmp_path):
     flow = CausalFlowDAG(_spec(), seed=0)
     p = tmp_path / "flow.pt"

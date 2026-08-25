@@ -182,9 +182,7 @@ def make_univariate_transform(name: str, **kwargs) -> _ScaledUT:
     return cls(**kwargs)
 
 
-# ---------------------------------------------------------------------------
-# Ordinal ("ordered logit") transform — exact port of the original parametrization
-# ---------------------------------------------------------------------------
+# %% ordinal transform (ordered logit, the original parametrization) -------------------
 
 
 def ordinal_cutpoints(theta_tilde: Tensor) -> Tensor:

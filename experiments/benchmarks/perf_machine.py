@@ -168,7 +168,7 @@ def vaca_dgp(n: int, seed: int = 42) -> pd.DataFrame:
     return pd.DataFrame({"x1": x1, "x2": x2, "x3": x3})
 
 
-# ----------------------------------------------------------- intro-NB workload
+# %% intro-NB workload -----------------------------------------------------------------
 def intro_dgp(n: int, seed: int = 1) -> pd.DataFrame:
     """Sample the SCM of notebooks/intro_tram_dag.py, with known truth."""
     rng = np.random.default_rng(seed)
@@ -181,7 +181,7 @@ def intro_dgp(n: int, seed: int = 1) -> pd.DataFrame:
     return pd.DataFrame({"X1": x1, "X2": x2, "X3": x3, "Y": y.astype(float)})
 
 
-# ------------------------------------------------------------------- machine
+# %% machine ---------------------------------------------------------------------------
 def code_version() -> dict:
     """Give the tramdag version, plus the git commit inside a repo clone."""
     v = {"tramdag": td.__version__, "git_commit": None, "git_dirty": None}
@@ -215,7 +215,7 @@ def available_devices() -> list[str]:
     return devices
 
 
-# ----------------------------------------------------------------- benchmark
+# %% benchmark -------------------------------------------------------------------------
 def run_workload(name: str, device: str) -> dict:
     w = WORKLOADS[name]
     df = w["data"]()
@@ -255,7 +255,7 @@ def run_workload(name: str, device: str) -> dict:
     }
 
 
-# -------------------------------------------------------------------- report
+# %% report ----------------------------------------------------------------------------
 def report(directory: str) -> None:
     rows = _collect_rows(directory)
     if not rows:

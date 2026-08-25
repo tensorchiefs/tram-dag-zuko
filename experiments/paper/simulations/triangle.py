@@ -150,7 +150,7 @@ class _TriangleBase(DatasetDraws):
             raise ValueError(f"f must be one of {sorted(F_VARIANTS)}, got {self.f!r}")
         self.f_callable = F_VARIANTS[self.f][0]
 
-    # ------------------------------------------------------------------ latents
+    # latents
     def draw_latents(self, n: int, rng: np.random.Generator) -> dict[str, np.ndarray]:
         """Draw all noise of the SCM, ``n`` rows each.
 
@@ -165,7 +165,7 @@ class _TriangleBase(DatasetDraws):
             "x3": rng.logistic(size=n),
         }
 
-    # --------------------------------------------------------------------- SCM
+    # SCM
     def _x1_x2(self, do: dict, latents: dict) -> tuple[np.ndarray, np.ndarray]:
         n = len(latents["x2"])
         if "x1" in do:
@@ -225,7 +225,7 @@ class _TriangleBase(DatasetDraws):
     def _x3(self, x1, x2, do, latents):  # pragma: no cover - abstract
         raise NotImplementedError
 
-    # -------------------------------------------------------------- ground truth
+    # ground truth
     def true_shift_curve(self, x2_grid: np.ndarray) -> np.ndarray:
         """Give the limit of a fitted ``cs`` module on the x2 to x3 edge.
 

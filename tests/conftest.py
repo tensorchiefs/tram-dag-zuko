@@ -25,7 +25,7 @@ import pytest
 from tramdag import CausalFlowDAG, ContinuousNode
 
 # %% global variables ------------------------------------------------------------------
-# --------------------------------------------------------------- DGP 1: all-ls
+# %% DGP 1: all-ls ---------------------------------------------------------------------
 # Every conditional is an exact linear-shift transformation model, so the
 # outcome node is a proportional-odds model and the flow's MLE must equal
 # the classical one (statsmodels / R polr).
@@ -41,7 +41,7 @@ LS_CHAIN_TRUTH = {
     "cutpoints_y": (-1.5, 0.0, 1.5),  # 4 ordinal levels
 }
 
-# ------------------------------------------------- DGP 2: heterogeneous effect
+# %% DGP 2: heterogeneous effect -------------------------------------------------------
 # The outcome conditional is exactly a transformation model with a
 # treatment effect that varies with the covariates, so a VC term is
 # in-class and its read-out is scorable against beta(x). X2 is
@@ -56,7 +56,7 @@ VC_HETERO_TRUTH = {
     "propensity": "sigmoid(0.4*X1 + 0.4*X2)",
 }
 
-# ------------------------------------------------ DGP 3: confounded + nonlinear
+# %% DGP 3: confounded + nonlinear -----------------------------------------------------
 # One covariate, strong confounding and a quadratic prognostic part. Fitted
 # with a linear prognostic term the misfit correlates with the propensity,
 # which is the configuration propensity centering exists for.
@@ -148,7 +148,7 @@ def confounded():
     return {"draw": _draw_confounded, "truth": CONFOUNDED_TRUTH}
 
 
-# ------------------------------------------------------------------- helpers
+# %% helpers ---------------------------------------------------------------------------
 @pytest.fixture
 def fit_x3_nll():
     """Fit ``x1 -> x3 <- x2`` with the given terms; give x3's validation NLL.

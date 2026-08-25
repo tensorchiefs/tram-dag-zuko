@@ -26,7 +26,7 @@ PLATEAU_KEYS = ("plateau_patience", "plateau_factor", "plateau_min_lr", "min_del
 
 
 # %% public functions ------------------------------------------------------------------
-# ------------------------------------------------------------------ fitting
+# %% fitting ---------------------------------------------------------------------------
 def fit_paper(generator, spec: dict, config: dict, out: Path, record=None):
     """Fit the way the paper's R code does: one run, one optimizer, per-epoch read-out.
 
@@ -78,7 +78,7 @@ def fit_paper(generator, spec: dict, config: dict, out: Path, record=None):
     return flow, val, trajectory
 
 
-# ----------------------------------------------------------------- triangle
+# %% triangle --------------------------------------------------------------------------
 def shift_term(config: dict):
     """Give the x2 -> x3 term of a triangle spec: a linear or complex shift.
 
@@ -150,7 +150,7 @@ def compare_do_x1(
     }
 
 
-# ------------------------------------------------------------------- plots
+# %% plots -----------------------------------------------------------------------------
 def finish(fig, path: Path) -> None:
     """Lay out, save at 150 dpi, and close."""
     fig.tight_layout()

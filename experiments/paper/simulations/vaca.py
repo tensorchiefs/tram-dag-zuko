@@ -143,7 +143,7 @@ class VacaTriangle(DatasetDraws):
 
         return pd.DataFrame({"x1": x1, "x2": x2, "x3": x3})
 
-    # -------------------------------------------------------------- ground truth
+    # ground truth
     def true_moments(self, mc_n: int = 1_000_000) -> dict:
         """Give the observational and interventional ground-truth moments.
 

@@ -256,7 +256,7 @@ def _plot_curves(curves, seed) -> None:
 
 
 # %% public functions ------------------------------------------------------------------
-# ----------------------------------------------------------------- workloads
+# %% workloads -------------------------------------------------------------------------
 def all_ls_spec():
     """Give the 5-node all-``ls`` spec of the frozen cohort.
 
@@ -326,7 +326,7 @@ def run_config(workload, phases, extra, batch, device, seed):
     return flow
 
 
-# ----------------------------------------------------------------- reference
+# %% reference -------------------------------------------------------------------------
 def reference_nll(workload: str) -> float:
     """Long-run reference NLL per workload, cached to reference.json."""
     cache = OUT / "reference.json"
@@ -361,7 +361,7 @@ def reference_nll(workload: str) -> float:
     return refs[workload]
 
 
-# --------------------------------------------------------------------- LBFGS
+# %% LBFGS -----------------------------------------------------------------------------
 def run_lbfgs(seed: int, warm_epochs: int = 0) -> dict:
     """Run full-batch LBFGS on the stroke all-ls workload.
 
@@ -424,7 +424,7 @@ def run_lbfgs(seed: int, warm_epochs: int = 0) -> dict:
     }
 
 
-# ----------------------------------------------------------------------- main
+# %% main ------------------------------------------------------------------------------
 def main():
     args = _parse_args()
     seeds = args.seeds[:1] if (args.quick or args.figures_only) else args.seeds

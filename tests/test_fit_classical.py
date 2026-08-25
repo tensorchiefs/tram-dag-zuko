@@ -29,7 +29,7 @@ def _ls_spec() -> dict:
 
 
 # %% public functions ------------------------------------------------------------------
-# ------------------------------------------------------------------ fast
+# %% fast ------------------------------------------------------------------------------
 def test_rejects_non_all_ls():
     spec = {"x1": ContinuousNode(), "x2": ContinuousNode([CS("x1")])}
     flow = CausalFlowDAG(spec)
@@ -96,7 +96,7 @@ def test_max_iter_and_history_size_reach_the_solver(ls_chain):
         CausalFlowDAG(_ls_spec(), seed=0).fit_classical(obs, not_a_kwarg=1)
 
 
-# ------------------------------------------------------------------ slow
+# %% slow ------------------------------------------------------------------------------
 @pytest.mark.slow
 def test_matches_statsmodels_mle(ls_chain):
     """fit_classical reaches the classical proportional-odds MLE.

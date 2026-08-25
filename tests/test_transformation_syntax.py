@@ -21,7 +21,7 @@ def _state_dicts_equal(a, b):
 
 
 # %% public functions ------------------------------------------------------------------
-# ----------------------------------------------------------- normalization
+# %% normalization ---------------------------------------------------------------------
 
 
 def test_sum_list_and_mixed_forms_are_identical():
@@ -73,7 +73,7 @@ def test_a_sum_nested_in_a_list_is_rejected():
         ContinuousNode([I("x1") + LS("x2")])
 
 
-# ------------------------------------------------------- allow_interaction
+# %% allow_interaction -----------------------------------------------------------------
 
 
 def test_several_parented_i_terms_are_rejected():
@@ -87,7 +87,7 @@ def test_multi_parent_i_stays_joint_by_default():
     assert ContinuousNode([I("a", "b")]).terms == [I("a", "b")]
 
 
-# ---------------------------------------------------------- transform on I
+# %% transform on I --------------------------------------------------------------------
 
 
 def test_i_transform_hoists_to_the_node():
@@ -120,7 +120,7 @@ def test_ordinal_rejects_i_transform():
         OrdinalNode(3, [I("a", transform="spline")])
 
 
-# ------------------------------------------------------- signature guards
+# %% signature guards ------------------------------------------------------------------
 
 
 def test_vc_treatment_is_keyword_only():
@@ -128,7 +128,7 @@ def test_vc_treatment_is_keyword_only():
         VC("T", "X2")  # the treatment is the keyword t=
 
 
-# --------------------------------------------------- model-level identity
+# %% model-level identity --------------------------------------------------------------
 
 
 def test_list_and_sum_build_the_identical_model():
@@ -176,7 +176,7 @@ def test_additive_flag_builds_one_net_per_parent():
     assert single.nodes["y"].ci_parents == ["a"]
 
 
-# ------------------------------------------------------------ persistence
+# %% persistence -----------------------------------------------------------------------
 
 
 def test_roundtrip_keeps_hoisted_transform_and_terms():
@@ -251,7 +251,7 @@ def test_malformed_serialized_spec_is_rejected():
         validate_and_sort(spec_from_dict(spec_with(unknown_parent)))
 
 
-# ------------------------------------------------------- constructor aliases
+# %% constructor aliases ---------------------------------------------------------------
 
 
 def test_short_aliases_are_the_definitions():
@@ -274,7 +274,7 @@ def test_short_aliases_are_the_definitions():
     assert short.terms == long.terms
 
 
-# ------------------------------------------------------------------ units
+# %% units -----------------------------------------------------------------------------
 
 
 def test_units_reach_the_networks():

@@ -74,7 +74,7 @@ def test_the_package_needs_no_yaml_parser():
     assert not [d for d in project["dependencies"] if "yaml" in d.lower()]
 
 
-# ------------------------------------------------------------- machine_info
+# %% machine_info ----------------------------------------------------------------------
 def test_machine_info_has_expected_fields():
     assert td.machine_info is machine_info  # the package re-export
     info = machine_info()

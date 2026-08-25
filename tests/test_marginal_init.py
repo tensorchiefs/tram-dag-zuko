@@ -48,7 +48,7 @@ def _mixed_flow_and_df():
 
 
 # %% public functions ------------------------------------------------------------------
-# ------------------------------------------------------------------ fast
+# %% fast ------------------------------------------------------------------------------
 def test_bernstein_marginal_init_is_calibrated_logistic_map():
     """marginal_init θ maps the pre-scaled domain onto [logit .05, logit .95]."""
     ut = BernsteinUT()
@@ -105,7 +105,7 @@ def test_marginal_init_on_by_default_calibrates_roots():
     )
 
 
-# ------------------------------------------------------------------ slow
+# %% slow ------------------------------------------------------------------------------
 @pytest.mark.slow
 def test_marginal_init_is_pure_init_same_optimum(ls_chain):
     """A marginal-init fit and a default fit converge to the same NLL — proving
