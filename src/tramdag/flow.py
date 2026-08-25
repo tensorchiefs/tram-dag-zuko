@@ -611,12 +611,12 @@ class CausalFlowDAG(nn.Module):
             per_node = self.node_log_prob(self._tensorize(df))
         return {k: float(-v.mean()) for k, v in per_node.items()}
 
-    def _set_ranges(self, train_df: pd.DataFrame, marginal_init: bool = False) -> None:
+    def _set_ranges(self, train_df: pd.DataFrame, marginal_init: bool = True) -> None:
         """Map the train ``RANGE_Q``/1-``RANGE_Q`` quantiles onto the domain.
 
         This is the min-max scaling of the original implementation.
 
-        ``marginal_init``: opt-in calibrated Bernstein init (see ``fit``). Applied only
+        ``marginal_init``: calibrated Bernstein init (see ``fit``). Applied only
         on the first fit (the same ``not ut._fitted`` guard as range-setting), so a
         multi-phase fit does not reset a partially-trained intercept.
         """
@@ -811,7 +811,7 @@ class CausalFlowDAG(nn.Module):
         plateau_patience: int = 30,
         freeze_patience: int | None = None,
         min_delta: float = 1e-4,
-        marginal_init: bool = False,
+        marginal_init: bool = True,
         vc_warm_start: bool = True,
         plateau_factor: float = 0.3,
         vc_oof_fit: dict | None = None,
@@ -905,16 +905,17 @@ class CausalFlowDAG(nn.Module):
             check in this repo applies, so it cannot mask a difference
             anyone measures.
         marginal_init : bool, optional
-            If True, calibrate the intercept of each *unconditional* node
-            to its marginal at initialization, instead of zuko's default
-            zero initialization. A Bernstein continuous node gets the
+            Calibrate the intercept of each *unconditional* node to its
+            marginal at initialization (default ``True``), instead of
+            zuko's zero initialization. A Bernstein continuous node gets the
             linear map of the pre-scaled domain onto the standard-logistic
             5%/95% quantiles (the default is about 2.5x too steep). An
             ordinal node gets cutpoints at the empirical class log-odds
             (the default zeros are near-uniform). This is a pure
             initialization: the converged MLE is unchanged. Applied on the
             first fit only. Affects only ``SimpleIntercept`` nodes;
-            conditional ``ci`` intercepts stay untouched. Default False.
+            conditional ``ci`` intercepts stay untouched. ``False`` keeps
+            zuko's zero start.
         vc_warm_start : bool, optional
             If True (default), the ``beta0`` of each ``VC`` term is
             initialized from the classical all-``ls`` solution of its
@@ -1580,7 +1581,9 @@ class CausalFlowDAG(nn.Module):
                 "term 'ls'. This spec has cs, ci or vc terms. Use fit() for "
                 "flexible models."
             )
-        self._set_ranges(train_df)
+        self._set_ranges(
+            train_df, marginal_init=False
+        )  # L-BFGS needs no calibrated start
 
         self.double()  # parameters + buffers (xmin/xmax) -> float64, one call
         t0 = time.perf_counter()

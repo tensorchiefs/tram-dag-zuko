@@ -285,6 +285,15 @@
 
 ### Changed (breaking)
 
+- **`fit(marginal_init=)` defaults to `True`.** Every unconditional
+  intercept starts at its marginal (Bernstein: the linear map onto the
+  latent 5%/95% quantiles; ordinal: the empirical class log-odds) instead
+  of zuko's zero start. A pure initialization — the MLE is unchanged — but
+  a fixed-budget Adam fit lands elsewhere, so the paper replications'
+  ground truth is re-pinned from the CI run that follows. `fit_classical`
+  keeps the zero start: L-BFGS does not need it, and the classical anchor
+  stays bit-identical.
+
 - **`fit(epochs=)` is required.** There is no default training budget any
   more. `docs/training-speed.md` measures a fixed budget going wrong in both
   directions on this repo's own workloads — the stroke fit converges after

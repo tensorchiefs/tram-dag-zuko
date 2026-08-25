@@ -125,7 +125,7 @@ default you can read at the call site. Nothing numeric is buried.
 | schedule, plateau patience, plateau decay factor | `fit(schedule=, plateau_patience=, plateau_factor=)` | None / 30 / 0.3 (lr floor `1e-3 * learning_rate`, stated in the docstring) |
 | per-node freezing | `fit(freeze_patience=, min_delta=)` | off / 1e-4 (freeze guard `1e-2 * learning_rate`) |
 | early stopping | `fit(restore_best=)` | False = exact MLE |
-| calibrated init | `fit(marginal_init=)` | False (pure init, MLE unchanged) |
+| calibrated init | `fit(marginal_init=)` | True (pure init, MLE unchanged; `False` = zuko's zero start) |
 | VC warm start | `fit(vc_warm_start=)` | True (classical `beta0` start) |
 | VC stage-1 proxy fits | `fit(vc_oof_fit=)` | `{"epochs": 300, "learning_rate": 1e-2, "batch_size": 512}` |
 | VC penalty and centering | `VC(penalty=, center=, center_folds=)` | 1.0 / False / 5 |

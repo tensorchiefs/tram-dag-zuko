@@ -103,7 +103,7 @@ learning rates, per-node freezing (below), and the all-`ls` classical fit.
 - **`restore_best`**: when enabled, `fit` snapshots each node's best-validation
   weights and restores them at the end (early-stopping regularization). The
   default is `False`, so the fit sits at the training-data MLE.
-- **`marginal_init=`**: opt-in calibrated initialization of the unconditional
+- **`marginal_init=`** (default on): calibrated initialization of the unconditional
   intercepts — Bernstein nodes start at the linear map onto the latent
   5%/95% quantiles, ordinal cutpoints at the empirical class log-odds. A pure
   init; the converged MLE is unchanged.

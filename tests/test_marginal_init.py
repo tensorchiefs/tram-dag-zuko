@@ -96,9 +96,9 @@ def test_marginal_init_only_touches_unconditional_roots():
         assert torch.equal(v.detach(), ci_before[k]), f"ci param {k} changed"
 
 
-def test_marginal_init_off_by_default_leaves_roots_at_zero():
+def test_marginal_init_on_by_default_calibrates_roots():
     flow, df = _mixed_flow_and_df()
-    flow._set_ranges(df)  # marginal_init defaults to False
+    flow._set_ranges(df, marginal_init=False)  # zuko's zero start, on request
     assert torch.allclose(
         flow.nodes["x1"].intercept.theta.detach(),
         torch.zeros_like(flow.nodes["x1"].intercept.theta),
