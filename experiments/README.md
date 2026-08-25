@@ -66,6 +66,13 @@ Runtime: a triangle variant is 500 epochs of batch 32 over 40 000 rows, about
 (5.5 s per epoch), and eight variants side by side on one box take 78 min
 each. Run them one or two at a time, or with `OMP_NUM_THREADS=2`.
 
+The 500 epochs are the paper's, and they are needed: the linear-shift
+coefficients settle after ~40 epochs, the complex shift does not. Measured
+2026-08-25 — at 100 epochs the cs-curve error is 0.235 (linear-cs, 0.116 at
+500) and 0.395 (mixed exp-cs, 0.126); at 250 epochs 0.112 and 0.203. A
+shorter budget would be a documented deviation for CI runtime only, and the
+70-min wall of the workflow does not need it.
+
 `vaca.py` and `carefl.py` set `net_input_scaling: minmax`, because the
 reference's comparison scripts train in min-max scaled space
 (`comparison/utils.R::scale_df`) and their tanh nets saturate on the raw
