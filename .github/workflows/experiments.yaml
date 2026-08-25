@@ -3,9 +3,10 @@ name: experiments
 # Every experiment, one matrix job each. They run on every push, so a
 # commit's report is always current — note that this trains real models on
 # the paper's own protocol (batch size 32 over 40000 rows for 500 epochs on
-# the triangle scripts), which is 35-80 minutes per triangle job on a 32-core
-# box and longer on a runner. A workflow_dispatch may narrow it to a single
-# script+variant when that is all you need.
+# the triangle scripts). Measured 2026-08-25 on the 2-core runners: triangle
+# jobs 42-69 min, vaca 5 min, carefl 7 min, validate_ls 1-5 min; the jobs run
+# in parallel, so a push costs about 70 min wall. A workflow_dispatch may
+# narrow it to a single script+variant when that is all you need.
 #
 # Each job runs its experiment, compares the metrics against the committed
 # ground truth in <area>/ground_truth/, and posts the run's report — table

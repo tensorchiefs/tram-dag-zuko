@@ -60,6 +60,12 @@ carries its own copy of the bimodal DGP. `benchmarks/tests/` pins that copy to
 the maintained generator, because a drifted copy would silently make the
 collected `final_val_nll` values incomparable.
 
+Runtime: a triangle variant is 500 epochs of batch 32 over 40 000 rows, about
+3.2 s per epoch single-process at 2–4 torch threads (27 min; 42–69 min on the
+2-core CI runners). The step is overhead-bound — 32 threads make it *slower*
+(5.5 s per epoch), and eight variants side by side on one box take 78 min
+each. Run them one or two at a time, or with `OMP_NUM_THREADS=2`.
+
 `vaca.py` and `carefl.py` set `net_input_scaling: minmax`, because the
 reference's comparison scripts train in min-max scaled space
 (`comparison/utils.R::scale_df`) and their tanh nets saturate on the raw
