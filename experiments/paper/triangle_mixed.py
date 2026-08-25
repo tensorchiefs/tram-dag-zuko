@@ -21,6 +21,8 @@ Usage (from experiments/)::
 # %% imports ---------------------------------------------------------------------------
 from __future__ import annotations
 
+from functools import partial
+
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -28,14 +30,14 @@ from common import cli, load_variant, make_output_dir, save_metrics, write_repor
 
 from paper.helpers import (
     compare_do_x1,
-    cs_curve,
+    cs_curve_error,
     finish,
     fit_paper,
     level_bars,
-    plot_cs_curve,
     plot_trajectories,
     shift_term,
     snapshot,
+    true_coefficients,
 )
 from paper.simulations.triangle import TriangleMixed
 from tramdag import LS, SI, ContinuousNode, OrdinalNode
@@ -55,14 +57,6 @@ def build_spec(config: dict) -> dict:
         "x2": ContinuousNode([SI(**basis), LS("x1")]),
         "x3": OrdinalNode(config["levels"], [LS("x1"), shift_term(config)]),
     }
-
-
-def flow_convention_truths(f: str, shift: str) -> dict:
-    """Give the expected fitted weights in the flow's sign convention."""
-    truths = {"beta12": 2.0, "beta13": -0.2}
-    if shift == "ls" and f == "linear":
-        truths["beta23"] = 0.3
-    return truths
 
 
 def odds_below(values, threshold: float) -> float:
@@ -192,15 +186,15 @@ def run(variant: str) -> dict:
         f"fitting triangle-mixed/{config['f']} with a {config['shift']} shift "
         f"on n={config['n_train']} for {config['epochs']} epochs ..."
     )
-    flow, val, trajectory = fit_paper(
+    flow, _, val, trajectory = fit_paper(
         generator,
         build_spec(config),
         config,
         out,
-        record=lambda flow: snapshot(flow, config["shift"]),
+        record=partial(snapshot, shift=config["shift"]),
     )
 
-    truths = flow_convention_truths(config["f"], config["shift"])
+    truths = true_coefficients(config)
     plot_trajectories(
         trajectory,
         truths,
@@ -213,15 +207,12 @@ def run(variant: str) -> dict:
     metrics["val_nll_x3"] = float(flow.nll(val)["x3"])
 
     if config["shift"] == "cs":
-        grid = np.linspace(
-            config["grid_low"], config["grid_high"], config["grid_points"]
-        )
-        metrics["cs_curve_max_abs_err"] = plot_cs_curve(
-            grid,
-            fitted=cs_curve(flow, "x3", "x2", grid),
-            true=generator.true_shift_curve(grid),
-            path=out / "plots" / "cs_curve.png",
-            title=f"complex shift on an ordinal node, DGP f = {config['f']}",
+        metrics["cs_curve_max_abs_err"] = cs_curve_error(
+            flow,
+            generator,
+            config,
+            out,
+            f"complex shift on an ordinal node, DGP f = {config['f']}",
         )
         figures.append("cs_curve.png")
 

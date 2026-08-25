@@ -24,10 +24,10 @@ Experiments run as modules, from this directory:
 
 ```bash
 cd experiments
-uv run --group experiments python -m paper.triangle atan-cs      # fit + figures + metrics
-uv run --group experiments python -m check paper triangle-atan-cs  # vs ground truth
-uv run --group experiments python -m paper.check_data             # frozen data regenerates
-uv run pytest experiments                                        # the area checks (seconds)
+uv run python -m paper.triangle atan-cs        # fit + figures + metrics
+uv run python -m check paper triangle-atan-cs  # vs ground truth
+uv run python -m paper.check_data              # frozen data regenerates
+uv run pytest experiments                      # the area checks (seconds)
 uv run pytest experiments/tests                                  # the shared check.py
 ```
 
@@ -59,6 +59,12 @@ it is meant to be downloaded and run on a machine without a checkout — so it
 carries its own copy of the bimodal DGP. `benchmarks/tests/` pins that copy to
 the maintained generator, because a drifted copy would silently make the
 collected `final_val_nll` values incomparable.
+
+`vaca.py` and `carefl.py` set `net_input_scaling: minmax`, because the
+reference's comparison scripts train in min-max scaled space
+(`comparison/utils.R::scale_df`) and their tanh nets saturate on the raw
+parents (40% of the VACA rows have `|x| > 2`); the triangle scripts fit
+`df_orig`, so those configs leave it `null`.
 
 Which paper figure each variant reproduces — and what is deliberately not
 reproduced — is listed in [`paper/PAPER_COVERAGE.md`](paper/PAPER_COVERAGE.md).

@@ -182,7 +182,8 @@ def compare(area: str, name: str) -> tuple[list[str], list[str], list[str], list
     -------
     tuple[list[str], list[str], list[str], list[str]]
         The failures, the metrics that passed, the metrics with no
-        ground-truth entry, and the bounds outside the useful band.
+        ground-truth entry, and the notes (a bound outside the useful
+        band, a decayed center).
 
     Raises
     ------
@@ -204,21 +205,21 @@ def compare(area: str, name: str) -> tuple[list[str], list[str], list[str], list
     by_kind = {
         k: [m for kind, m in results if kind == k] for k in ("fail", "ok", "note")
     }
-    failures, notes, loose = by_kind["fail"], by_kind["ok"], by_kind["note"]
+    failures, passed, notes = by_kind["fail"], by_kind["ok"], by_kind["note"]
     unchecked = [
         f"{metric}: {metrics[metric]}" for metric in metrics if metric not in truth
     ]
-    return failures, notes, unchecked, loose
+    return failures, passed, unchecked, notes
 
 
 def main(area: str, name: str) -> int:
     """Print the comparison and give the process exit code."""
-    failures, notes, unchecked, loose = compare(area, name)
-    for note in notes:
-        print(f"  ok   {note}")
+    failures, passed, unchecked, notes = compare(area, name)
+    for item in passed:
+        print(f"  ok   {item}")
     for item in unchecked:
         print(f"  --   {item} (no ground-truth entry)")
-    for item in loose:
+    for item in notes:
         print(f"  note {item}")
     for failure in failures:
         print(f"  FAIL {failure}")

@@ -11,9 +11,9 @@ What is left here is the output layout the experiments workflow reads:
 ``results/<name>/`` with ``metrics.json``, ``report.md`` and ``plots/``.
 
 Reading a script's YAML file is here; checking the section it yields is not.
-:func:`load_variant` parses the file and hands the document to
-:func:`tramdag.utils.config_section`, which enforces the exact key set — that
-guarantee is worth having in one place, and it needs no YAML.
+:func:`load_variant` parses the file and picks the variant's section with
+:func:`tramdag.utils.config_section`; that every key in it is read by the
+script is what ``paper/tests/test_configs.py`` checks.
 
 Every function takes the calling script's ``__file__``, so paths resolve
 inside that script's own area with no directory names written in the code.
@@ -34,6 +34,18 @@ from pathlib import Path
 import yaml
 
 from tramdag.utils import config_section
+
+
+# %% private functions------------------------------------------------------------------
+def _variants_of(script: str) -> list[str]:
+    """Give the variant names the script's config file defines.
+
+    ``argparse`` takes its choices from this, so adding a variant to the
+    config file is enough to make it runnable.
+    """
+    path = Path(script).resolve().with_suffix(".yaml")
+    document = yaml.safe_load(path.read_text())
+    return sorted(document["variants"])
 
 
 # %% public functions ------------------------------------------------------------------
@@ -80,21 +92,10 @@ def cli(script: str, doc: str) -> str:
     parser = argparse.ArgumentParser(description=doc.splitlines()[0])
     parser.add_argument(
         "variant",
-        choices=variants_of(script),
+        choices=_variants_of(script),
         help="which variant to run; hyperparameters live in the sibling YAML file",
     )
     return parser.parse_args().variant
-
-
-def variants_of(script: str) -> list[str]:
-    """Give the variant names the script's config file defines.
-
-    ``argparse`` takes its choices from this, so adding a variant to the
-    config file is enough to make it runnable.
-    """
-    path = Path(script).resolve().with_suffix(".yaml")
-    document = yaml.safe_load(path.read_text())
-    return sorted(document["variants"])
 
 
 def make_output_dir(script: str, name: str) -> Path:

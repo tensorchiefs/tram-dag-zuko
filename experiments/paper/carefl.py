@@ -54,12 +54,13 @@ def counterfactual_curve(flow, latents, do_variable, target, alphas) -> list[flo
     ]
 
 
-def plot_curves(alphas, flow_x3, flow_x4, truth, path) -> dict:
+def plot_curves(flow_x3, flow_x4, truth, path) -> dict:
     """Plot both counterfactual queries against the analytic truth (Fig. 6)."""
     panels = [
         (flow_x3, truth["x3_cf_do_x2"], "would $x_2$ have been $\\alpha$", "$x_3$"),
         (flow_x4, truth["x4_cf_do_x1"], "would $x_1$ have been $\\alpha$", "$x_4$"),
     ]
+    alphas = truth["alphas"]
     fig, axes = plt.subplots(1, 2, figsize=(9, 3.6))
     for ax, (fitted, true, xlabel, ylabel) in zip(axes, panels, strict=True):
         ax.plot(alphas, true, "-", color="C3", lw=2, label="DGP (analytic)")
@@ -121,12 +122,11 @@ def run(variant: str) -> dict:
         f"fitting the flexible flow on the CAREFL SCM, n={config['n_train']}: "
         f"{config['epochs']} epochs at lr {config['learning_rate']:g} ..."
     )
-    flow, val, _ = fit_paper(generator, build_spec(config), config, out)
+    flow, _, val, _ = fit_paper(generator, build_spec(config), config, out)
 
     paper_latents = flow.abduct(pd.DataFrame([X_OBS]))
     truth = generator.true_cf_curves()
     metrics = plot_curves(
-        ALPHA_GRID,
         counterfactual_curve(flow, paper_latents, "x2", "x3", ALPHA_GRID),
         counterfactual_curve(flow, paper_latents, "x1", "x4", ALPHA_GRID),
         truth,

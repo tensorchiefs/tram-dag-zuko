@@ -22,17 +22,18 @@ Usage (from experiments/)::
 # %% imports ---------------------------------------------------------------------------
 from __future__ import annotations
 
-import numpy as np
+from functools import partial
+
 from common import cli, load_variant, make_output_dir, save_metrics, write_report
 
 from paper.helpers import (
     compare_do_x1,
-    cs_curve,
+    cs_curve_error,
     fit_paper,
-    plot_cs_curve,
     plot_trajectories,
     shift_term,
     snapshot,
+    true_coefficients,
 )
 from paper.simulations.triangle import TriangleContinuous
 from tramdag import LS, SI, ContinuousNode
@@ -53,19 +54,6 @@ def build_spec(config: dict) -> dict:
     }
 
 
-def true_coefficients(f: str, shift: str) -> dict:
-    """Give the true linear-shift coefficients this variant can be scored on.
-
-    ``beta23`` only has a true value for the linear DGP with an ``ls``
-    model; a nonlinear ``f`` fitted linearly has no true weight, and a
-    ``cs`` model has no weight at all.
-    """
-    truths = {"beta12": 2.0, "beta13": -0.2}
-    if shift == "ls" and f == "linear":
-        truths["beta23"] = 0.3
-    return truths
-
-
 def run(variant: str) -> dict:
     """Run one variant end to end and give its metrics."""
     config = load_variant(__file__, variant)
@@ -78,15 +66,15 @@ def run(variant: str) -> dict:
         f"n={config['n_train']} for {config['epochs']} epochs "
         f"at lr {config['learning_rate']:g} ..."
     )
-    flow, val, trajectory = fit_paper(
+    flow, _, val, trajectory = fit_paper(
         generator,
         build_spec(config),
         config,
         out,
-        record=lambda flow: snapshot(flow, config["shift"]),
+        record=partial(snapshot, shift=config["shift"]),
     )
 
-    truths = true_coefficients(config["f"], config["shift"])
+    truths = true_coefficients(config)
     plot_trajectories(
         trajectory,
         truths,
@@ -99,18 +87,14 @@ def run(variant: str) -> dict:
     metrics["val_nll_x3"] = float(flow.nll(val)["x3"])
 
     if config["shift"] == "cs":
-        grid = np.linspace(
-            config["grid_low"], config["grid_high"], config["grid_points"]
-        )
-        metrics["cs_curve_max_abs_err"] = plot_cs_curve(
-            grid,
-            fitted=cs_curve(flow, "x3", "x2", grid),
-            true=generator.true_shift_curve(grid),
-            path=out / "plots" / "cs_curve.png",
-            # which paper figure this is depends on f (7 right for atan,
-            # 17 for the misspecified linear case, 18 for sin) —
-            # PAPER_COVERAGE.md holds that mapping
-            title=f"complex shift, DGP f = {config['f']}: fitted vs $-f(x_2)$",
+        # which paper figure this is depends on f (7 right for atan, 17 for
+        # the misspecified linear case, 18 for sin) — see PAPER_COVERAGE.md
+        metrics["cs_curve_max_abs_err"] = cs_curve_error(
+            flow,
+            generator,
+            config,
+            out,
+            f"complex shift, DGP f = {config['f']}: fitted vs $-f(x_2)$",
         )
         figures.append("cs_curve.png")
 

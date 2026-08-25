@@ -153,7 +153,6 @@ class Carefl4(DatasetDraws):
 
         return pd.DataFrame({"x1": x1, "x2": x2, "x3": x3, "x4": x4})
 
-    # ground truth
     @staticmethod
     def abduct_noise(obs: dict[str, float] | pd.DataFrame) -> dict[str, np.ndarray]:
         """Give the exact noise values consistent with an observation.

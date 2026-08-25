@@ -123,9 +123,8 @@ def run(variant: str) -> dict:
         f"fitting the flexible flow on the VACA triangle, n={config['n_train']}: "
         f"{config['epochs']} epochs at lr {config['learning_rate']:g} ..."
     )
-    flow, val, _ = fit_paper(generator, build_spec(config), config, out)
+    flow, train, val, _ = fit_paper(generator, build_spec(config), config, out)
 
-    train = generator.observational(config["n_train"])  # the rows fit_paper fitted
     sampled = flow.sample(len(train), seed=config["sample_seed"])
     plot_pairs(
         train,

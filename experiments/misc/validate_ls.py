@@ -25,16 +25,15 @@ Usage (from experiments/)::
 # %% imports ---------------------------------------------------------------------------
 from __future__ import annotations
 
-import argparse
 import json
 from pathlib import Path
 
 import pandas as pd
 from common import (
+    cli,
     load_variant,
     make_output_dir,
     save_metrics,
-    variants_of,
     write_report,
 )
 from statsmodels.miscmodels.ordinal_model import OrderedModel
@@ -263,10 +262,4 @@ def run(variant: str) -> dict:
 
 # %% main ------------------------------------------------------------------------------
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument(
-        "variant",
-        choices=variants_of(__file__),
-        help="which fitting route to use; hyperparameters live in validate_ls.yaml",
-    )
-    run(parser.parse_args().variant)
+    run(cli(__file__, __doc__))

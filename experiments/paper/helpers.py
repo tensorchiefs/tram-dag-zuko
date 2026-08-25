@@ -21,9 +21,6 @@ import torch
 
 from tramdag import CS, LS, CausalFlowDAG
 
-# %% global variables ------------------------------------------------------------------
-PLATEAU_KEYS = ("plateau_patience", "plateau_factor", "plateau_min_lr", "min_delta")
-
 
 # %% public functions ------------------------------------------------------------------
 def fit_paper(generator, spec: dict, config: dict, out: Path, record=None):
@@ -44,13 +41,22 @@ def fit_paper(generator, spec: dict, config: dict, out: Path, record=None):
     Returns
     -------
     tuple
-        ``(flow, val, trajectory)``.
+        ``(flow, train, val, trajectory)``.
     """
     train = generator.observational(config["n_train"])
     val = generator.observational(config["n_val"], seed_offset=1)
-    flow = CausalFlowDAG(spec, seed=config["init_seed"])
+    flow = CausalFlowDAG(
+        spec,
+        seed=config["init_seed"],
+        net_input_scaling=config["net_input_scaling"],
+    )
     plateau = (
-        {key: config[key] for key in PLATEAU_KEYS}
+        {
+            "plateau_patience": config["plateau_patience"],
+            "plateau_factor": config["plateau_factor"],
+            "plateau_min_lr": config["plateau_min_lr"],
+            "min_delta": config["min_delta"],
+        }
         if config["schedule"] == "plateau"
         else {}
     )
@@ -74,7 +80,7 @@ def fit_paper(generator, spec: dict, config: dict, out: Path, record=None):
         ),
     )
     flow.save(out / "flow.pt")
-    return flow, val, trajectory
+    return flow, train, val, trajectory
 
 
 def shift_term(config: dict):
@@ -109,11 +115,36 @@ def ls_weight(flow: CausalFlowDAG, node: str, parent: str) -> float:
     return float(flow.ls_coefficients()[node][parent][0])
 
 
-def cs_curve(flow: CausalFlowDAG, node: str, parent: str, grid) -> np.ndarray:
-    """Evaluate the node's complex-shift network on a grid of parent values."""
-    x = torch.as_tensor(np.asarray(grid), dtype=torch.float32).view(-1, 1)
+def true_coefficients(config: dict) -> dict:
+    """Give the true linear-shift weights this variant can be scored on.
+
+    In the flow's sign convention (an ordinal node subtracts its shift, so
+    the paper's +0.2 / −0.3 read −0.2 / +0.3 here). ``beta23`` only has a
+    true value for the linear DGP with an ``ls`` model; a nonlinear ``f``
+    fitted linearly has no true weight, and a ``cs`` model has no weight.
+    """
+    truths = {"beta12": 2.0, "beta13": -0.2}
+    if config["shift"] == "ls" and config["f"] == "linear":
+        truths["beta23"] = 0.3
+    return truths
+
+
+def cs_curve_error(
+    flow: CausalFlowDAG, generator, config: dict, out: Path, title
+) -> float:
+    """Plot the fitted x3 complex shift against the true curve, give the max error."""
+    grid = np.linspace(config["grid_low"], config["grid_high"], config["grid_points"])
+    x = torch.as_tensor(grid, dtype=torch.float32).view(-1, 1)
+    nd = flow.nodes["x3"]
     with torch.no_grad():
-        return flow.nodes[node].shifts[parent](x).detach().numpy().ravel()
+        fitted = nd.shifts["x2"](nd.net_input({"x2": x}, ("x2",))).numpy().ravel()
+    return plot_cs_curve(
+        grid,
+        fitted=fitted,
+        true=generator.true_shift_curve(grid),
+        path=out / "plots" / "cs_curve.png",
+        title=title,
+    )
 
 
 def compare_do_x1(
@@ -137,7 +168,6 @@ def compare_do_x1(
     plot_hist_grid(
         dgp_samples,
         flow_samples,
-        ["x1", "x2", "x3"],
         out / "plots" / "distributions.png",
         title,
         ordinal_levels,
@@ -155,27 +185,26 @@ def finish(fig, path: Path) -> None:
     plt.close(fig)
 
 
-def hist_overlay(ax, dgp_values, flow_values, bins) -> None:
-    """Draw the DGP histogram filled and the flow histogram stepped."""
-    ax.hist(dgp_values, bins=bins, density=True, alpha=0.45, label="DGP")
+def continuous_hist(ax, dgp, flow, bins: int = 50) -> None:
+    """Draw one panel: the DGP histogram filled, the flow histogram stepped.
+
+    The bins come from the DGP's 0.1%/99.9% quantiles.
+    """
+    low, high = np.quantile(dgp, [0.001, 0.999])
+    if high - low < 1e-9:
+        # a do-clamped column is constant: give the panel a width
+        low, high = low - 1.0, high + 1.0
+    edges = np.linspace(low, high, bins)
+    ax.hist(dgp, bins=edges, density=True, alpha=0.45, label="DGP")
     ax.hist(
-        flow_values,
-        bins=bins,
+        flow,
+        bins=edges,
         density=True,
         histtype="step",
         lw=1.8,
         color="C3",
         label="flow",
     )
-
-
-def continuous_hist(ax, dgp, flow, bins: int = 50) -> None:
-    """Draw one continuous panel, with bins from the DGP's 0.1%/99.9% quantiles."""
-    low, high = np.quantile(dgp, [0.001, 0.999])
-    if high - low < 1e-9:
-        # a do-clamped column is constant: give the panel a width
-        low, high = low - 1.0, high + 1.0
-    hist_overlay(ax, dgp, flow, np.linspace(low, high, bins))
 
 
 def level_bars(ax, dgp_freq, flow_freq, labels=("DGP", "flow")) -> None:
@@ -225,7 +254,6 @@ def plot_cs_curve(grid, fitted, true, path: Path, title: str) -> float:
 def plot_hist_grid(
     dgp_samples: dict,
     flow_samples: dict,
-    columns: list[str],
     path: Path,
     title: str,
     ordinal_levels: dict[str, int],
@@ -239,9 +267,8 @@ def plot_hist_grid(
     Parameters
     ----------
     dgp_samples, flow_samples : dict
-        ``{scenario: DataFrame}``, the same scenarios in both.
-    columns : list[str]
-        Variables to show, one column of panels each.
+        ``{scenario: DataFrame}``, the same scenarios in both; every
+        column of the frames gets a column of panels.
     path : Path
         Where to write the figure.
     title : str
@@ -252,6 +279,7 @@ def plot_hist_grid(
         an empty dict when every column is continuous.
     """
     scenarios = list(dgp_samples)
+    columns = list(next(iter(dgp_samples.values())))
     fig, axes = plt.subplots(
         len(scenarios),
         len(columns),
