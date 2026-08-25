@@ -532,6 +532,14 @@ default the paper replication or the tests had to switch off.
 
 ### Changed (internal, no API surface)
 
+- **The docs site moves from pdoc to MkDocs** (Material, mkdocstrings for the
+  numpy docstrings, mkdocs-jupyter for the executed notebooks, mike for one
+  version per branch). The 233-line workflow with its stub modules, link
+  rewriter and jinja template becomes `mkdocs.yml` plus a 40-line link hook;
+  math renders through MathJax, and the code map's symbols link to the API
+  pages. The PDF is typeset by pandoc + XeLaTeX from README, guides and the
+  executed notebooks, so its math is real math.
+
 - `experiments/paper/helpers.py`: the per-epoch coefficient read-out is
   `fit(after_epoch_callbacks=)` inside one `fit_paper(generator, spec, config, out,
   record)` call — there is no chunked or snapshotting fit helper any more.

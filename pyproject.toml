@@ -18,8 +18,11 @@ dev = [
   "python-lsp-server[all]"
 ]
 docs = [
-  "pdoc",
-  "nbconvert"  # notebooks -> markdown for the pdoc site
+  "mkdocs-material",
+  "mkdocstrings[python]",  # API pages from the numpy docstrings
+  "mkdocs-jupyter",  # executes and renders the jupytext notebooks
+  "mike",  # one site version per branch on gh-pages
+  "nbconvert"  # notebooks -> markdown for the pandoc PDF
 ]
 experiments = [
   "matplotlib",

@@ -1,7 +1,4 @@
-"""tramdag — Interpretable Neural Causal Models (TRAM-DAGs) in PyTorch.
-
-.. include:: ../../README.md
-"""
+"""Interpretable Neural Causal Models (TRAM-DAGs) in PyTorch."""
 
 # %% imports ---------------------------------------------------------------------------
 from importlib.metadata import version

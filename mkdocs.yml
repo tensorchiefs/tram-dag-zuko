@@ -1,0 +1,76 @@
+site_name: tramdag
+site_description: Interpretable Neural Causal Models (TRAM-DAGs) in PyTorch
+site_url: https://tensorchiefs.github.io/tramdag/
+repo_url: https://github.com/tensorchiefs/tramdag
+edit_uri: blob/main/
+docs_dir: docs
+
+theme:
+  name: material
+  features: [navigation.sections, navigation.top, content.code.copy, toc.follow]
+  palette:
+  - scheme: default
+    toggle: {icon: material/brightness-7, name: dark mode}
+  - scheme: slate
+    toggle: {icon: material/brightness-4, name: light mode}
+
+nav:
+- Home: index.md
+- Guides:
+  - Notation: notation.md
+  - Fitting: fitting.md
+  - Training speed: training-speed.md
+  - Scores: scores.md
+  - Varying coefficients: varying-coefficients.md
+  - Paper replication: paper-replication.md
+  - Code map: code-map.md
+  - Zuko upstream: zuko-upstream.md
+- Notebooks:
+  - Demo (Colab): notebooks/demo_tram_dag_colab.py
+  - Introduction: notebooks/intro_tram_dag.py
+  - Additive vs joint intercepts: notebooks/additive_vs_joint_ci.py
+  - Varying coefficients: notebooks/varying_coefficients.py
+  - Classical fitting: notebooks/classical_fit_tram_dag.py
+- API:
+  - tramdag: api/tramdag.md
+  - spec: api/spec.md
+  - flow: api/flow.md
+  - transforms: api/transforms.md
+  - conditioners: api/conditioners.md
+  - scores: api/scores.md
+  - callbacks: api/callbacks.md
+
+hooks: [docs/hooks.py]
+
+plugins:
+- search
+- autorefs
+- mkdocstrings:
+    handlers:
+      python:
+        paths: [src]
+        options:
+          docstring_style: numpy
+          show_source: false
+          members_order: source
+          show_root_heading: true
+          separate_signature: true
+- mkdocs-jupyter:
+    include: ['*.py']
+    execute: false  # docs/hooks.py turns this on when DOCS_EXECUTE=true (CI)
+    allow_errors: false
+    include_source: true
+
+markdown_extensions:
+- admonition
+- tables
+- toc: {permalink: true}
+- pymdownx.superfences
+- pymdownx.arithmatex: {generic: true}
+
+extra_javascript:
+- javascripts/mathjax.js
+- https://unpkg.com/mathjax@3/es5/tex-mml-chtml.js
+
+extra:
+  version: {provider: mike}

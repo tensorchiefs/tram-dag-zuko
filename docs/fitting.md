@@ -205,7 +205,7 @@ each kernel leaves it mostly idle. In that regime, node overlap can help. But th
 right tool is **fusion** (batch same-shaped nodes into one larger tensor op, or
 CUDA streams), not a threaded Python loop (which the GIL fights). That is the
 "vectorize/fuse the per-node loop" direction in
-[Optimizer choice](#optimizer-choice--current-and-future) below. It is a
+[Optimizer choice](#optimizer-choice-current-and-future) below. It is a
 conditional win in that regime, distinct from the unconditional win of freezing.
 
 Benchmarks, schedule trade-offs, and the recommended self-stopping recipe are in
