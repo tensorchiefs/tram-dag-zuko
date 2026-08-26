@@ -65,8 +65,8 @@ See `experiments/README.md`.
   Every parent enters through exactly one edge-owning term (VC modifiers exempt —
   they may also appear prognostically).
 - `transforms.py` — monotone 1-D transforms wrapping zuko (`BernsteinUT`, `SplineUT`,
-  `AffineUT`; pre-scaled from train 5%/95% quantiles to [-5,5], expanding-bracket
-  bisection inverse) + the ordinal ordered-logit transform
+  `AffineUT`; pre-scaled from train 5%/95% quantiles to [-5,5], zuko's own
+  inverse with its closed-form tail) + the ordinal ordered-logit transform
   (`P(Y<=k) = sigmoid(theta_k - shift)`, cutpoints `[t0, t0+cumsum(exp(...))]`).
 - `conditioners.py` — the LS/CS/intercept networks. Default widths and `relu`
   replicate the PyTorch reference (`buehlpa/TramDag`, `tram_models.py`:
@@ -135,24 +135,32 @@ Framework tests (inline DGPs, `tests/conftest.py`):
 Experiments (`experiments/`, seed 42 unless stated, arXiv:2503.16206). The
 paper states only four training numbers — n=40000, 500 epochs, Adam lr 1e-3,
 Bernstein order 20. The configs follow the paper's own R code 1:1 where the
-framework allows: the triangle scripts train one continuous Adam run at Keras'
-default batch size 32 with a separate validation draw (40k / 10k mixed) and
-read the coefficients after every epoch (`fit(callback=)`); the
+framework allows: the triangle scripts train one continuous Adam run with a
+separate validation draw (40k / 10k mixed) and read the coefficients after
+every epoch (`fit(callback=)`) — at batch 256 / lr 0.004 instead of the
+paper's Keras-default batch 32 / lr 0.001, the one deviation taken for CI
+runtime (8× fewer steps, every metric kept; the grid is in
+docs/paper-replication.md); the
 VACA/CAREFL comparisons take one full-batch step per epoch on nTrain = 2500
 for 10000 / 7000 epochs with the reference's ReduceLROnPlateau (factor 0.1,
-patience 50, min_lr 1e-7) on a separate 5000-row validation draw. Every
-seed is a repo choice (the R scripts run unseeded or on R's RNG). Known,
-documented deviations: 5%/95% quantile pre-scaling instead of min-max, a
-bias-free intercept output layer, `calibrate(marginal_init=False)` in
-`helpers.py::fit_paper` (`validate_ls` keeps the default). Matched on
-purpose: `init: glorot` (Keras' Dense default — under the full-batch
-VACA/CAREFL protocol torch's default init gives do(x2) errors 0.52/0.33/0.13,
-glorot 0.035/0.006/0.007) and the plateau rule, torch's `ReduceLROnPlateau`
-on the summed validation NLL, global as in the reference.
-The reference's `scale_df` (everything min-max scaled to [0,1] in the
-comparison scripts) is matched where it matters: `net_input_scaling: minmax`
-feeds the VACA/CAREFL tanh nets scaled parents (raw parents saturate them —
-`do(x2=-3)` error 0.731 → 0.026); the triangle scripts fit `df_orig`, raw.
+patience 50, min_lr 1e-7) — torch's scheduler on the summed validation NLL,
+global as in `update_learning_rate`. Seeds: the triangle scripts run
+unseeded, the comparison scripts seed R's RNG with 42 (not replayable in
+torch), so every seed here is a repo choice. Init follows each reference:
+`init: normal` (Keras `random_normal`, the triangle scripts' `LinearMasked`
+layers) and `init: glorot` (Keras `Dense`, `make_model`) — under the
+full-batch protocol the init decides the fit (VACA do(x2) errors
+0.52/0.33/0.13 with torch's default init, 0.098/0.159/0.026 with glorot at
+the config's seed). Known, documented deviations: the triangle scripts also
+use 5%/95% quantiles for the Bernstein domain (a match), the comparison
+scripts min-max (`scale_df`) — we keep the quantiles there and scale the
+*network inputs* min-max (`net_input_scaling: minmax`; raw parents saturate
+the tanh nets: `do(x2=-3)` error 0.731 → 0.098); a bias-free intercept
+output layer; Adam eps 1e-8 vs Keras 1e-7 (no effect);
+`calibrate(marginal_init=False)` in `helpers.py::fit_paper` (`validate_ls`
+keeps the default); CAREFL trains on a fresh 2500-row draw with a separate
+5000-row validation draw and scores in raw units, where the R run trained on
+CAREFL's own `X.csv` with `val = train` and sd-standardized x3/x4.
 
 **Each config takes its architecture from *its own* reference script**, and the
 reference uses two different ones. The triangle experiments

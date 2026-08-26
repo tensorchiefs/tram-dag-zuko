@@ -40,7 +40,8 @@ default the paper replication or the tests had to switch off.
   calibrated start. The first `fit`/`fit_classical` calls it; a single
   `calibrated` buffer replaces the three per-module first-fit latches
   (`ut._fitted`, `_net_scaled`, `_marginal_inited`) that `load` had to
-  re-close by hand.
+  re-close by hand. Checkpoints saved before this change do not load
+  (the buffer is missing) — refit.
 - **`fit(vc_ehat={node: {t: array}})`** — a centered `VC` term needs its
   out-of-fold propensities from the caller, one per training row; `fit`
   refuses a centered spec without them and a `vc_ehat` that does not match
@@ -64,9 +65,11 @@ default the paper replication or the tests had to switch off.
   layer, the paper's reference; default stays torch's Kaiming-uniform.
   Under the reference's full-batch VACA/CAREFL protocol with its global
   plateau rule the init decides the fit: `do(x2)` errors 0.52 / 0.33 / 0.13
-  with torch's init, 0.035 / 0.006 / 0.007 with glorot (Adam's eps and the
-  Bernstein domain made no such difference). All four paper configs set it.
-  Stored in the checkpoint.
+  with torch's init, 0.098 / 0.159 / 0.026 with glorot at the config's seed
+  (another init draw: 0.035 / 0.006 / 0.007; Adam's eps made no
+  difference). `init="normal"` is Keras' `RandomNormal` (sd 0.05 on weights
+  and biases), the paper's triangle scripts' initializer. The VACA/CAREFL
+  configs set glorot, the triangle configs normal. Stored in the checkpoint.
 - **`CausalFlowDAG(spec, net_input_scaling="minmax")`** — feeds every network
   (complex intercept, complex shift, VC modifiers) its continuous parents
   scaled to `[0, 1]` by the training min and max, the way the paper's
@@ -74,15 +77,10 @@ default the paper replication or the tests had to switch off.
   the VC treatment stay raw, so `ls_coefficients` keep their units. Raw
   parents saturate a tanh net whenever `|x| > 2` — 40% of the VACA rows —
   which is why the VACA/CAREFL replications under the exact reference
-  protocol were 2–20× off the paper: `do(x2=-3)` error 0.731 → 0.026 with
-  the option on. Default off; calibrated at the first `fit`, stored in the
+  protocol were 2–20× off the paper: `do(x2=-3)` error 0.731 → 0.098 with
+  the option on (0.026 under the earlier per-node plateau approximation). Default off; calibrated at the first `fit`, stored in the
   checkpoint (the buffers are part of every node's state, so checkpoints
   saved before this change do not load — refit).
-- **`fit(epoch_callback=)`** — `callback(flow, epoch)` after every epoch, so an
-  experiment reads coefficient trajectories out of one continuous run the way
-  the reference's per-epoch Keras loop does; **`fit(plateau_min_lr=)`** — an
-  absolute learning-rate floor for `schedule="plateau"` (the reference uses
-  1e-7; the default stays `1e-3 * learning_rate`).
 - **`density(df, node, grid, do=)`** — the analytic conditional density of a
   continuous node on a grid, the continuous counterpart of `pmf`; closed
   form from the transform, no sampling. Pinned against `exp(log_prob)` at
@@ -98,11 +96,6 @@ default the paper replication or the tests had to switch off.
   the way out; `spec_from_dict` now turns the lists JSON gives back into the
   tuples `Term` stores, so a spec saved with `json` compares equal and
   hashes the same as the one written.
-- **The inverse warns when a latent escapes its search bracket.** The
-  expanding bisection behind `sample` used to clip such an element to the
-  bracket edge silently; it now emits a `RuntimeWarning` naming how many
-  values were affected.
-
 - **Paper-aligned intercept constructors**: `simple_intercept`/`SI` (the
   parentless baseline) and `complex_intercept`/`CI` (needs at least one
   parent), matching the paper's SI/CI notation. `intercept`/`I` stays as
@@ -145,15 +138,9 @@ default the paper replication or the tests had to switch off.
   normalizes to the same internal term list, and equivalence is pinned by
   state-dict-identical tests (`tests/test_transformation_syntax.py`).
 
-- **Transparent training internals**: the previously hardcoded training
-  knobs are optional kwargs with unchanged defaults —
-  `fit(plateau_factor=0.3)` (per-node plateau decay multiplier) and
-  `fit(vc_oof_fit={...})` (settings of the stage-1 out-of-fold proxy fits
-  behind `VC(center=True)`, default
-  `{"epochs": 300, "learning_rate": 1e-2, "batch_size": 512}`), plus
-  `fit_classical(history_size=50)` (L-BFGS
-  memory). The plateau lr floor (`1e-3 * learning_rate`) and the freeze
-  guard (`1e-2 * learning_rate`) are documented in the `fit` docstring.
+- **`fit_classical(history_size=50)`** — the L-BFGS memory is a keyword
+  (the other training knobs this bullet once listed left `fit` altogether,
+  see *Changed (breaking) — `fit` is one loop*).
 
 - **Pythonic names for every term constructor**, with the short
   notation kept as an alias of the same object: `intercept`/`I`,
@@ -276,13 +263,6 @@ default the paper replication or the tests had to switch off.
   for and skips network shifts; a node with no `LS` term is absent from the
   result. The bug predates 0.4 (`tests/test_api_papercuts.py`).
 
-- **`marginal_init` no longer resets a loaded model.** The calibration is
-  first-fit-only. A continuous node's guard is the transform's `_fitted`
-  flag, which `load` restores; an ordinal node's guard lived on the
-  intercept and `save`/`load` dropped it, so loading a trained model and
-  continuing with `fit(marginal_init=True)` silently reset the cutpoints
-  to the data marginal. `load` now closes both guards
-  (`tests/test_marginal_init.py`).
 
 ### Removed (breaking)
 
@@ -315,10 +295,11 @@ default the paper replication or the tests had to switch off.
   `I("x1", transform="spline", bins=6)`. The canonical storage inside
   `Term.options` is unchanged, so serialized specs are unaffected.
 
-- **`fit(schedule=)` keeps `None` and `"plateau"` only.** `"onecycle"`
-  and `"cosine"` had no caller outside one parametrized test, and the
-  June 2026 benchmark measured both behind plateau on every workload
-  (`docs/training-speed.md` keeps the numbers).
+- **The `"onecycle"` and `"cosine"` schedules.** They had no caller
+  outside one parametrized test, and the June 2026 benchmark measured both
+  behind plateau on every workload (`docs/training-speed.md` keeps the
+  numbers). The plateau schedule itself left `fit` later in this release;
+  a schedule is now a torch `lr_scheduler` on the optimizer you pass.
 
 - **The `bound` knob on the univariate transforms.** Nothing ever set it;
   the pre-scaled domain is fixed at `[-5, 5]` (`transforms.BOUND`).
@@ -334,7 +315,7 @@ default the paper replication or the tests had to switch off.
   0.3-checkpoint shims in `spec_from_dict` (the multi-`I` merge and the
   node-level-basis carry) are gone with the redundant node-level
   `transform`/`transform_kwargs` keys that fed them, VC terms read
-  `center`/`center_folds` directly, and `load` requires a complete
+  `center` directly, and `load` requires a complete
   checkpoint (spec, weights, history, meta) instead of tolerating missing
   blocks. Checkpoints and specs written by earlier versions no longer
   load; regenerate them.
@@ -360,7 +341,7 @@ default the paper replication or the tests had to switch off.
   `Term` itself. When the effect type comes from config or the CLI, hold
   the constructor in the table instead of a label to dispatch on:
   `{"Age": I, "NIHSSa": CS}` then `t["Age"]("Age")` (see
-  `experiments/common.py::build_spec`).
+  `experiments/paper/helpers.py::shift_term`).
 
 ### Changed (breaking)
 
@@ -373,7 +354,7 @@ default the paper replication or the tests had to switch off.
   reference never had), the `polish_*` phase, `fit_in_chunks`. Every
   ground-truth file is re-pinned from these runs; the deviations that
   remain are framework-level and listed in each YAML and CLAUDE.md.
-- **`fit(marginal_init=)` defaults to `True`.** Every unconditional
+- **`calibrate(marginal_init=True)` is the default start.** Every unconditional
   intercept starts at its marginal (Bernstein: the linear map onto the
   latent 5%/95% quantiles; ordinal: the empirical class log-odds) instead
   of zuko's zero start. A pure initialization — the MLE is unchanged — but
@@ -386,16 +367,9 @@ default the paper replication or the tests had to switch off.
   more. `docs/training-speed.md` measures a fixed budget going wrong in both
   directions on this repo's own workloads — the stroke fit converges after
   ~1500 of 4000 budgeted epochs, the vaca fit is 0.03 nats short at 520 — so
-  a package-level number could only be arbitrary. `fit()` without `epochs`
-  now raises with that reason and names the alternative (a generous budget
-  with `schedule="plateau"` and `freeze_patience=`). 50 of the 51 `fit`
-  calls in this repo already passed it — the exception is an internal proxy
-  fit that supplies its own.
-
-- **`fit(plateau_patience=)` default 15 -> 30**, the value
-  `docs/training-speed.md` recommends after measuring the per-node plateau
-  trainer against the hand-tuned two-phase schedule. No caller in the repo
-  used the default.
+  a package-level number could only be arbitrary. `epochs` is a bare
+  keyword-only argument (`TypeError` without it); a generous budget with a
+  stopping `callback` is the alternative.
 
 - **`make_univariate_transform` raises `KeyError`, not `ValueError`.** The
   registry lookup speaks for itself; this package no longer re-words the
@@ -417,11 +391,10 @@ default the paper replication or the tests had to switch off.
   keyword. `VC("X2", "X3", t="T")` reads as
   `(beta0 + b_theta(x2, x3)) * x_t`. (0.3 wrote `VC("T", "X2", "X3")`.)
 
-- **Progress goes through `logging`, not `print`.** `fit`,
-  `fit_classical` and the all-frozen notice emit INFO records on the
-  `tramdag.flow` module logger, still gated by `verbose=`. Scripts and
-  notebooks that relied on stdout add one line:
-  `logging.basicConfig(level=logging.INFO, format="%(message)s")`.
+- **No progress output from the package.** `fit` and `fit_classical`
+  print and log nothing (the `verbose=` gate and the `tramdag.flow`
+  logger of an intermediate state are gone); a `callback` reports what
+  you want, `fit_classical` returns its report dict.
 
 - **The node formula argument is `terms`, not `transformation`.**
   `ContinuousNode(terms=...)` / `OrdinalNode(levels, terms=...)`, and the
@@ -438,7 +411,7 @@ default the paper replication or the tests had to switch off.
 ### Changed (internal, no API surface)
 
 - `experiments/paper/helpers.py`: the per-epoch coefficient read-out is
-  `fit(epoch_callback=)` inside one `fit_paper(generator, spec, config, out,
+  `fit(callback=)` inside one `fit_paper(generator, spec, config, out,
   record)` call — there is no chunked or snapshotting fit helper any more.
 
 - **Every complexity hotspot is dissolved into named stages** — `fit`
@@ -482,13 +455,13 @@ default the paper replication or the tests had to switch off.
 
 ### Added (staged earlier as an unreleased 0.3.1)
 
-- **Propensity-centered VC: `VC(..., center=True, center_folds=5)`** (issue
+- **Propensity-centered VC: `VC(..., center=True)`** (issue
   #30): the R-learner orthogonalization `beta(x)·(t − ê(x))` inside the
   likelihood, as a **two-stage frozen** design — training uses **out-of-fold**
-  ê (K refits of the treatment node only; DML cross-fitting, bookkeeping in
-  `flow.vc_center_info`, pinned by tests so an in-sample "simplification"
-  fails CI), frozen as data (zero gradient into the treatment node from the
-  outcome loss — tested); inference recomputes ê from the flow's own fitted
+  ê, one value per training row passed as `fit(vc_ehat=)` (DML cross-fitting;
+  the caller computes them — six lines with `fit_classical`, see
+  `docs/varying-coefficients.md`), frozen as data (zero gradient into the
+  treatment node from the outcome loss — tested); inference recomputes ê from the flow's own fitted
   treatment node and re-derives `t − ê(x)` under `do` (never cached — tested
   on fresh rows). binary ordinal treatments only; `center=False` (default) is bit-identical
   to the uncentered term (tested). Measured (the Dandl et al. 2024
@@ -518,8 +491,8 @@ default the paper replication or the tests had to switch off.
   deterministic, y-free; equals the abduct-difference for binary treatments).
   The objective is the penalized likelihood `Σ NLL + penalty·‖w‖²` (total-NLL
   scale, `beta0` unpenalized); `penalty → ∞` — or `modifiers=()` exactly —
-  nests `LS(on)`, and `fit(vc_warm_start=True)` (default) starts `beta0` at the
-  classical all-`ls` solution. VC modifiers may also appear in prognostic terms
+  nests `LS(on)`; a classical warm start of `beta0` is two lines of user code.
+  VC modifiers may also appear in prognostic terms
   (only `on` owns its edge). Motivation, measured: the `CS(on, x…)` reduced form
   is *expressive but unestimated* — corr ≈ 0.5 against the true effect function
   even in-class (tramdag-simu#18/PR #21) because nothing in the NLL rewards a

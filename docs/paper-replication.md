@@ -26,16 +26,19 @@ the "paper" column names the figure and what it shows.
 | item | reference | here |
 |---|---|---|
 | latent | standard logistic, shifts added on the continuous scale, subtracted for ordinal `P(Y<=k) = sigmoid(theta_k - shift)` | same (tests pin both signs) |
-| Bernstein basis | `len_theta` unconstrained coefficients, `to_theta` softplus-cumsum, domain = train min/max → [0, 1], tangent-linear extrapolation outside | zuko Bernstein, `n_coeffs` unconstrained (zuko ties two control points on, so the free-parameter count matches), domain = train 5 %/95 % quantiles → [−5, 5], linear extrapolation — **deviation D1** |
-| init | Keras `Dense` default: glorot-uniform, zero bias | same, `init: glorot` (`CausalFlowDAG(init="glorot")`); torch's default init is the framework default and was the decisive deviation under the full-batch protocol, see VACA |
+| Bernstein basis | `len_theta` unconstrained coefficients, `to_theta` softplus-cumsum, domain → [0, 1] with tangent-linear extrapolation outside; the domain comes from the train **5 %/95 % quantiles in the triangle scripts** (`quantile(..., c(0.05, 0.95))`, the min/max lines commented out) and from **min/max** in the comparison scripts (`scale_df`) | zuko Bernstein, `n_coeffs` unconstrained (zuko ties two control points on, so the free-parameter count matches), domain = train 5 %/95 % quantiles → [−5, 5], linear extrapolation. Triangle: a match up to the reparametrization [0,1] vs [−5,5], the tail rule and order 21 vs 19. VACA/CAREFL: quantiles instead of min/max — **deviation D1** |
+| init | triangle scripts: `LinearMasked` layers with Keras `random_normal` (N(0, 0.05²)) on weights and biases, the LS `beta` layer included; comparison scripts: `layer_dense` default, glorot-uniform weights and zero biases | `init: normal` (triangle) and `init: glorot` (VACA/CAREFL), `CausalFlowDAG(init=)`; torch's default init remains the framework default and was the decisive deviation under the full-batch protocol, see VACA |
 | optimizer | Keras Adam, eps 1e-7 | torch Adam, eps 1e-8 — measured: no effect (VACA identical to four digits) |
-| seeds | R scripts run unseeded | every seed is a repo choice |
+| seeds | triangle scripts unseeded (`SEED = -1`); comparison scripts `dgp(..., seed=42)` on R's RNG | not replayable in torch, so every seed is a repo choice (42 for the DGP is kept as a nod to the reference) |
 | calibrated start | none | `flow.calibrate(train, marginal_init=False)` in `helpers.fit_paper` (framework default is True) |
 | intercept output layer | Keras dense with bias | bias-free — **D3** (the same function class; the bias adds a constant to all unconstrained coefficients) |
 | plateau rule (VACA/CAREFL) | `update_learning_rate`: one optimizer, reduce when the summed validation NLL has not improved for 50 epochs (strict `<`), factor 0.1, min 1e-7 | torch `ReduceLROnPlateau(patience=49, threshold=0, threshold_mode="abs", factor=0.1, min_lr=1e-7)` on `sum(flow.nll(val))` — the same rule, verified against torch's source |
 
-D1 and D3 remain; both were measured (below). The per-node plateau
-approximation of 2026-08-25 (D4) is gone with the lean `fit`.
+D1 (VACA/CAREFL only) and D3 remain; both were measured (below). The per-node
+plateau approximation of 2026-08-25 (D4) is gone with the lean `fit`. Two
+further repo choices are CAREFL's: a fresh 2500-row draw with a separate
+validation draw where the R run used CAREFL's file with `val = train`, and raw
+units where the R run sd-standardized x3/x4.
 
 ## Triangle, continuous (`triangle.py`) — paper Sec. 6.1, App. C.3
 
@@ -60,13 +63,14 @@ in `create_param_net` is commented out).
 
 **Results**
 
-| variant | metric | paper | previous | now |
-|---|---|---|---|---|
-| linear-ls | β12 / β13 / β23 | Fig. 14: trajectories at 2 / −0.2 / 0.3 | 1.983 / −0.145 / 0.285 | 1.987 / −0.170 / 0.282 |
-| linear-cs | β13; max \|ĝ − (−f)\| on [−1, 1] | Fig. 17: fitted CS is a straight line | −0.151; 0.507 | −0.175; 0.110 (torch init: 0.116) |
-| atan-cs | β13; cs max err | Fig. 7 right / 15 / 16: CS on −f, coefficients at 2 / −0.2 | −0.149; 0.229 | −0.168; 0.080 (torch init: 0.085) |
-| sin-cs | β13; cs max err | Fig. 18: CS follows the non-monotone f, saturating at the grid ends | −0.185; 2.29 | −0.199; 0.997 (torch init: 1.016) |
-| all | val NLL x3 | — | 2.4603–2.4731 | 2.4607–2.4764 |
+| variant | metric | paper | previous | paper protocol, `init: normal` (batch 32 / lr 0.001) | CI config (batch 256 / lr 0.004), the pinned ground truth |
+|---|---|---|---|---|---|
+| linear-ls | β12 / β13 / β23 | Fig. 14 trajectories; App. C.3 text: 1.98 / −0.21 / 0.26 | 1.983 / −0.145 / 0.285 | 1.987 / −0.170 / 0.282 | 1.988 / −0.171 / 0.295 |
+| linear-cs | β13; max \|ĝ − (−f)\| on [−1, 1] | Fig. 17: fitted CS is a straight line | −0.151; 0.507 | −0.173; 0.122 (glorot init: 0.110, torch: 0.116) | −0.178; 0.088 |
+| atan-cs | β13; cs max err | Fig. 7 right / 15 / 16: CS on −f; text: β12 = 2.07, β13 = −0.203 | −0.149; 0.229 | −0.168; 0.059 (glorot: 0.080, torch: 0.085) | −0.173; 0.077 |
+| sin-cs | β13; cs max err | Fig. 18: CS follows the non-monotone f, saturating at the grid ends | −0.185; 2.29 | −0.195; 1.10 (glorot: 0.997, torch: 1.016) | −0.202; 1.024 |
+| all | \|E[x3 \| do(x1 = −1)] flow − DGP\| | Figs. 16/17: histograms overlap | — | 0.09–0.14 | 0.08–0.12 |
+| all | val NLL x3 | — | 2.4603–2.4731 | 2.4607–2.4764 | 2.4606–2.4764 |
 
 β13 at −0.17 instead of −0.2: x1 has sd 0.254, so SE(β13) ≈ 0.036 at n = 40000
 — inside one SE. The `sin-cs` error of 1.0 is the reference architecture's
@@ -94,20 +98,20 @@ CS net = reference `c(2, 2, 2, 2)`, sigmoid.
 
 **Results**
 
-| variant | metric | paper | previous | now |
-|---|---|---|---|---|
-| linear-ls | β12 / β13 / β23 | Fig. 19: 2 / −0.2 / 0.3 | 1.983 / −0.268 / 0.322 | 1.987 / −0.246 / 0.319 |
-| linear-ls | odds ratio predicted / DGP | e² ≈ 7.39 | 7.26 / 7.19 | 7.29 / 7.19 |
-| linear-ls | CF PMF TV vs analytic; P(true level) flow / analytic / mode bound | — (App. B qualitative) | 0.084; 0.714 / 0.728 / 0.806 | 0.044; 0.718 / 0.728 / 0.806 |
-| exp-cs | β13; cs max err | Fig. 20: distributions match | −0.227; 0.885 | −0.205; 0.071 (torch init: 0.126) |
-| exp-cs | CF PMF TV; P(true level) | — | 0.075; 0.924 / 0.921 | 0.019; 0.917 / 0.921 (torch init: 0.022) |
+| variant | metric | paper | previous | paper protocol, `init: normal` | CI config (batch 256 / lr 0.004), pinned |
+|---|---|---|---|---|---|
+| linear-ls | β12 / β13 / β23 | Fig. 19: 2 / −0.2 / 0.3 | 1.983 / −0.268 / 0.322 | 1.987 / −0.246 / 0.319 | 1.988 / −0.243 / 0.306 |
+| linear-ls | odds ratio predicted / DGP | e² ≈ 7.39; C.4 text: 7.74, CI [7.16, 8.38] | 7.26 / 7.19 | 7.29 / 7.19 | 7.30 / 7.19 |
+| linear-ls | CF PMF TV vs analytic; P(true level) flow / analytic / mode bound | — (App. B qualitative) | 0.084; 0.714 / 0.728 / 0.806 | 0.044; 0.718 / 0.728 / 0.806 | 0.038 |
+| exp-cs | β13; cs max err | Fig. 20: distributions match | −0.227; 0.885 | −0.207; 0.142 (glorot: 0.071, torch: 0.126) | −0.202; 0.107 |
+| exp-cs | CF PMF TV; P(true level) | — | 0.075; 0.924 / 0.921 | 0.023; 0.917 / 0.921 | 0.020 |
 
 ## VACA / CNF benchmark (`vaca.py`) — paper Sec. 5.1–5.2, App. C.1
 
 **DGP** (Sanchez-Martin et al. 2022, App. E.1): x1 ~ 0.5 N(−2, 1.5) + 0.5 N(1.5, 1);
 x2 = −x1 + N(0, 1); x3 = x1 + 0.25 x2 + N(0, 1). Gaussian noise — outside the
 logistic-latent family, so the all-`CI` flow has to fit it. Analytic target:
-E[x3 | do(x2 = a)] = −0.25 + 0.25 a; the paper's Fig. 5 shows a ∈ {−3, −2, 0}.
+E[x3 | do(x2 = a)] = −0.25 + 0.25 a. The paper's Sec. 5.2 text says a ∈ {−3, −2, 0}; its Fig. 5 panels and the R code (`vaca_triangle.r`) intervene at a ∈ {−3, −1, 0} — the code is followed (the frozen `data/vaca/truth.json` holds the same three).
 
 **Model**: `x1: SI`, `x2: CI(x1)`, `x3: CI(x1, x2)`, Bernstein `n_coeffs = 31`
 (reference M = 30, `len_theta = 31`), nets `dense(10, tanh) → dense(100, tanh) → dense(31)`
@@ -116,7 +120,7 @@ E[x3 | do(x2 = a)] = −0.25 + 0.25 a; the paper's Fig. 5 shows a ∈ {−3, −
 | hyperparameter | R code | previous | now |
 |---|---|---|---|
 | train / validation | nTrain 2500 / `dgp(5000)` | 18000 / 2000 split | 2500 / 5000, two draws |
-| epochs | 10000 (`Figure_Triangle_Linear_Bimodal.R`) | 400 in chunks of 50, then 120 "polish" | 10000, one run |
+| epochs | 10000 (`Figure_Triangle_Linear_Bimodal.R`, the sourcing script — not in our copy of the R code, so EPOCHS/M/nTrain for VACA rest on that reading) | 400 in chunks of 50, then 120 "polish" | 10000, one run |
 | lr | 0.001 | 0.01, polish 0.001 | 0.001 |
 | batch | full batch (one `apply_gradients` per epoch) | 512 | 2500 = n_train |
 | schedule | `update_learning_rate`: ReduceLROnPlateau on the summed val NLL, factor 0.1, patience 50, min_lr 1e-7, strict `<` | none | the same rule, global (torch's scheduler through `fit(optimizer=, callback=)`) |
@@ -156,10 +160,13 @@ measurement, and this table is the honest picture.
 
 **DGP** (Khemakhem et al. 2021): x1, x2 ~ Laplace(0, 1/√2); x3 = x1 + 0.5 x2³ + ε;
 x4 = −x2 + 0.5 x1² + ε, ε ~ Laplace(0, 1/√2). Counterfactuals are analytic by
-noise abduction. Observation `x_obs`: noise (2, 1.5, 1.4, −1) → (2, 1.5, 5.0875, −0.5)
-in the SCM's units — the paper prints (2, 1.5, 0.81, −0.28) because CAREFL's
-runner divides x3, x4 by their sample sds (6.01, 1.91). **Before this branch
-the repository used the printed values as raw coordinates**, a 4σ-off point.
+noise abduction. Observation `x_obs`: noise (2, 1.5, 1.4, −1) → (2, 1.5, 5.0875, −0.5) in the
+SCM's units; the R code's `xObs.csv` is that point divided by CAREFL's sample
+sds (6.0104, 1.9114): (2, 1.5, 0.8465, −0.2616). The paper prints (2, 1.5, 0.81,
+−0.28), slightly off it (CAREFL's own text). **Before `feat/followups` the
+repository used the printed values as raw coordinates**, a 4σ-off point. The R
+run also scores in sd-standardized units, so its Fig. 6 y-axis is 6× ours for
+x3 — the `fig6_max_abs_err` entries are in raw units.
 Queries: x3^cf | do(x2 = α) and x4^cf | do(x1 = α), α ∈ [−3, 3].
 
 **Model**: `x1, x2: SI`, `x3, x4: CI(x1, x2)`, Bernstein `n_coeffs = 31`, the
@@ -167,7 +174,7 @@ same `make_model` nets as VACA.
 
 | hyperparameter | R code (`carefl_fig5.r`) | previous | now |
 |---|---|---|---|
-| train / validation | 2500 / `dgp(5000)` | 18000 / 2000 split | 2500 / 5000 |
+| train / validation | CAREFL's own `data/CAREFL_CF/X.csv` (`USE_EXTERNAL_DATA = TRUE`), x3/x4 sd-standardized, **`val = train`** — the plateau rule watched the training NLL | 18000 / 2000 split | 2500 rows drawn from the same SCM / a separate `dgp(5000)` draw, raw units — **repo choice** |
 | epochs | 7000 | 300 in chunks of 50 + 100 polish | 7000 |
 | lr, batch, schedule, input scaling, init | 0.001, full batch, plateau 0.1/50/1e-7, `scale_df`, glorot | 0.01→0.001, 512, none, raw, torch | 0.001, 2500, the same global rule, `minmax`, glorot |
 | scoring | the single `x_obs`, curves over α (Fig. 6) | + 300 held-out rows at α ∈ {−1.5, 0, 1.5} | same |
@@ -180,7 +187,7 @@ same `make_model` nets as VACA.
 | Fig. 6 max \|x4^cf error\| | Fig. 6 | 0.38 | 0.47 | 0.59 |
 | held-out CF MAE x3, α = −1.5 / 0 / 1.5 | — | 0.109 / 0.053 / 0.095 | 0.177 / 0.065 / 0.123 | 0.181 / 0.065 / 0.142 (seeds 8, 9: 0.158–0.171 / 0.069–0.084 / 0.136–0.154) |
 | held-out CF MAE x4, α = −1.5 / 0 / 1.5 | — | 0.078 / 0.059 / 0.085 | 0.117 / 0.059 / 0.115 | 0.204 / 0.134 / 0.162 (0.172–0.178 / 0.113–0.129 / 0.145–0.160) |
-| val NLL x3 / x4 | — | 1.376 / 1.345 | 1.395 / 1.373 | 1.400 / 1.407 |
+| val NLL x3 / x4 | — | 1.376 / 1.345 | 1.395 / 1.373 | 1.403 / 1.419 |
 
 The previous protocol trained on 7× more rows (18000), which is why its
 held-out MAEs are lower; they are not comparable to the paper's nTrain = 2500.
@@ -200,7 +207,30 @@ at 2–4 torch threads (5.5 s at 32 threads, the step is overhead-bound), 42–6
 per variant on the 2-core CI runners; VACA 4.7 min, CAREFL 6.6 min; the
 workflow's ten jobs run in parallel, 70 min wall against a 300-min cap.
 
-A shorter budget was measured as the candidate deviation for CI runtime: at
+The one deviation taken for CI runtime is the triangle **batch size and learning
+rate**: batch 256 at lr 0.004 instead of the paper's batch 32 at lr 0.001, the same
+500 epochs in 8× fewer optimizer steps. Measured on 2026-08-26 against the
+committed ground-truth bands (glorot init, cs max err unless noted):
+
+| batch / lr / epochs | linear-ls β13 | linear-cs | atan-cs | mixed exp-cs (TV) | steps vs paper |
+|---|---|---|---|---|---|
+| **32 / 0.001 / 500 (paper)** | −0.170 | 0.110 | 0.080 | 0.071 (0.019) | 1× |
+| 128 / 0.001 / 500 | −0.170 | 0.170 | 0.041 | 0.126 (0.023) | 1/4 |
+| 128 / 0.004 / 500 | −0.178 | 0.160 | 0.094 | 0.070 (0.014) | 1/4 |
+| 128 / 0.004 / 250 | −0.170 | 0.147 | 0.070 | 0.131 (0.035) | 1/8 |
+| **256 / 0.004 / 500 (CI)** | −0.171 | 0.132 | 0.073 | 0.072 (0.017) | 1/8 |
+| 256 / 0.008 / 500 | −0.181 | 0.163 | 0.113 | 0.073 (0.017) | 1/8 |
+| 512 / 0.010 / 500 | −0.169 | 0.183 | 0.104 | 0.119 (0.015) | 1/16 |
+
+Batch 256 / lr 0.004 is the only row that keeps every cs error within 0.02 of the
+paper protocol; larger batches or rates bend the misspecified linear-cs curve
+(0.16–0.18) and lr 0.008 hurts atan-cs. The grid ran with glorot init; the
+committed configs use `init: normal` (the triangle scripts' initializer), whose
+CI-config numbers are in the result tables above (cs errors 0.088 / 0.077 /
+1.024 / 0.107). The paper-protocol numbers stay in this document as the
+reference; the ground truth is pinned from the CI config.
+
+An epoch cut was measured as well: at
 100 epochs the LS coefficients are unchanged (they settle after ~40 epochs,
 Fig. 14) but the complex shift is not — cs max err 0.235 (linear-cs, 0.116 at
 500) and 0.395 (mixed exp-cs, 0.126); at 250 epochs 0.112 and 0.203. The

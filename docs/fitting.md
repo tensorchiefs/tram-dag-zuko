@@ -234,7 +234,7 @@ lives in RAM:
   and not a file; whatever your callback records is yours
 
 The **only** disk I/O in the module is the explicit, user-called
-[`save`](../src/tramdag/flow.py) (`torch.save` of spec + state_dict + history) and
+[`save`](../src/tramdag/flow.py) (`torch.save` of spec, options, state_dict, history, meta) and
 its counterpart `load`. So a fit produces no temp files, no checkpoints, and no
 scratch directory. Persistence is opt-in via `flow.save(path)`. (The *experiment
 scripts* write the `results/` and `docs/perf/` artifacts in this repo, not the

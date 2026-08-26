@@ -59,7 +59,7 @@ report = flow.fit_classical(train_df)  # exact classical MLE, seconds
 
 ## Method: time-to-target, not loss-go-down
 
-Each config runs once. `fit()` records per-epoch validation NLL *and* wall-clock time.
+Each config runs once. The benchmark's callback records per-epoch validation NLL *and* wall-clock time.
 From these records, we measure the seconds until the fit is within a fixed gap of a cached
 long-run reference (3 torch seeds, medians):
 
@@ -73,7 +73,7 @@ coefficient-equivalent: a fit with gap ≈ 3e-3 already matches the R reference
 coefficients within the tolerances of
 [`experiments/misc/validate_ls.py`](../experiments/misc/validate_ls.py). The same
 exact-MLE-under-plateau-and-freezing property is pinned on an inline DGP by
-`tests/test_fit_schedules.py::test_plateau_freeze_preserves_exact_mle`.
+`tests/test_fit_hooks.py::test_torch_plateau_scheduler_preserves_exact_mle`.
 
 These numbers were measured before the experiment code moved into
 `experiments/benchmarks/`; the workloads are unchanged (same frozen data, same
