@@ -34,7 +34,9 @@ import pandas as pd
 from ._common import DatasetDraws, resolve_latents
 
 # %% global variables ------------------------------------------------------------------
-DO_X2_VALUES = (-3.0, -2.0, 0.0)  # the paper's Fig. 5 interventions
+# the paper's Fig. 5 panels and its R code (vaca_triangle.r) intervene at -3, -1, 0;
+# the paper's text says -3, -2, 0 — the code is followed
+DO_X2_VALUES = (-3.0, -1.0, 0.0)
 
 
 # %% public functions ------------------------------------------------------------------

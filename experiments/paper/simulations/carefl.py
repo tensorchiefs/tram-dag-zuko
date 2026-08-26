@@ -12,9 +12,11 @@ via noise abduction (no Monte Carlo): eps3 = x3 - x1 - 0.5 x2^3 and
 eps4 = x4 + x2 - 0.5 x1^2 are recovered exactly, then the mutilated SCM is
 re-evaluated. The paper's observation is the point with noise
 ``(2, 1.5, 1.4, -1)``; CAREFL's runner divides x3 and x4 by their sample
-standard deviations (6.01, 1.91), which is where the paper's printed
-``(2.00, 1.50, 0.81, -0.28)`` comes from. In the SCM's own units the same
-point is ``X_OBS = (2.00, 1.50, 5.0875, -0.5)``. Two queries are swept for
+standard deviations (6.0104, 1.9114): the R code's ``xObs.csv`` is
+``(2, 1.5, 0.8465, -0.2616)``, and in the SCM's own units that point is
+``X_OBS = (2.00, 1.50, 5.0875, -0.5)``. The paper prints (2.00, 1.50, 0.81,
+-0.28), slightly off that point — CAREFL's own text, not recomputed here.
+Two queries are swept for
 alpha in [-3, 3]:
 
     (i)  x3^cf  given do(x2 = alpha):  x1 + 0.5 alpha^3 + eps3

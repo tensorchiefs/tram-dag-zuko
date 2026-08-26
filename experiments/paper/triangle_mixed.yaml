@@ -7,24 +7,35 @@
 #   * train = dgp(40000), test = dgp(10000): two separate draws, no split;
 #   * 500 epochs, optimizer_adam() = Keras Adam at lr 0.001, Keras fit() with
 #     its default batch size 32, shuffled; one compiled model, so one
-#     continuous optimizer run — the coefficients are read after every epoch;
+#     continuous optimizer run — the coefficients are read after every epoch
+#     (batch and lr are the one deviation below, for CI runtime);
 #   * len_theta = 20, hidden_features_I = hidden_features_CS = c(2, 2, 2, 2),
 #     sigmoid activations (create_param_net; its ReLU line is commented out);
 #   * ordinal cutpoints theta_k = c(-2, 0.42, 1.02), which this repository's
 #     generator reproduces;
 #   * no learning-rate schedule, no early stopping, final weights.
-# Known deviations, all framework-level and documented in CLAUDE.md: the
-# transform is pre-scaled from the train 5%/95% quantiles instead of the
-# reference's min-max scaling; the R script runs unseeded, so every seed
-# below is a repo choice. Weights start from Keras' glorot_uniform / zero
-# bias like the reference (`init: glorot`).
+# Matched on purpose: the Bernstein domain comes from the train 5%/95%
+# quantiles, as in the R script (quantile(..., c(0.05, 0.95)); its min/max
+# lines are commented out), and the weights start from Keras' random_normal,
+# sd 0.05, on weights and biases (`init: normal`, the LinearMasked layers).
+# Known deviations, documented in CLAUDE.md: a [-5, 5] instead of a [0, 1]
+# domain (a reparametrization), zuko's tied end control points instead of the
+# reference's tangent extrapolation, order 21 vs 19 at equal free parameters;
+# the R script runs unseeded, so every seed below is a repo choice.
 
 paper_protocol: &paper_protocol
   n_train: 40000          # dgp(40000)
   n_val: 10000            # test = dgp(10000), a separate draw
   epochs: 500             # num_epochs
-  learning_rate: 0.001    # optimizer_adam() default
-  batch_size: 32          # Keras fit() default
+  # CI-runtime deviation, documented in docs/paper-replication.md: the paper
+  # trains at Keras' default batch 32 with optimizer_adam()'s lr 0.001; 500
+  # epochs of that are 42-69 min per variant on the CI runners. Batch 256 with
+  # the lr scaled 4x runs the same 500 epochs in 8x fewer steps and keeps every
+  # ground-truth metric (measured 2026-08-26: cs max err linear-cs 0.132 vs
+  # 0.110, atan-cs 0.073 vs 0.080, mixed exp-cs 0.072 vs 0.071; batch 512 /
+  # lr 0.01 and lr 0.008 degrade the cs curves, batch 128 / lr 0.001 too).
+  learning_rate: 0.004    # paper: 0.001 (optimizer_adam() default)
+  batch_size: 256         # paper: 32 (Keras fit() default)
   schedule:               # the reference has no schedule
   transform: bernstein
   # len_theta = 20 unconstrained coefficients; zuko ties two more control
@@ -33,7 +44,7 @@ paper_protocol: &paper_protocol
   n_coeffs: 20
   dgp_seed: 42
   init_seed: 7
-  init: glorot                # Keras Dense default: glorot_uniform, zero bias
+  init: normal                # LinearMasked: random_normal weights and biases (sd 0.05)
   net_input_scaling:          # the triangle scripts feed the nets raw parents
   shuffle_seed: 0
   sample_seed: 0          # sampling for the distribution comparisons

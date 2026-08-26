@@ -178,9 +178,12 @@ def compare_do_x1(
         title,
         ordinal_levels,
     )
+    dgp_mean = float(dgp_samples[do_query]["x3"].mean())
+    flow_mean = float(flow_samples[do_query]["x3"].mean())
     return {
-        "mean_x3_dgp_do_x1": float(dgp_samples[do_query]["x3"].mean()),
-        "mean_x3_flow_do_x1": float(flow_samples[do_query]["x3"].mean()),
+        "mean_x3_dgp_do_x1": dgp_mean,
+        "mean_x3_flow_do_x1": flow_mean,
+        "mean_x3_abs_err_do_x1": abs(flow_mean - dgp_mean),
     }
 
 

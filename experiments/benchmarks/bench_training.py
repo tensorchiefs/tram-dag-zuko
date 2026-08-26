@@ -263,6 +263,10 @@ class _PerNodePlateau:
     floored at ``1e-3`` of the start; once it has decayed to ``1e-2`` of the
     start and stayed flat for ``freeze`` epochs the node leaves training
     (rate 0). ``step`` returns True when every node has left.
+
+    Rate 0 keeps the node's weights fixed but its forward/backward still
+    runs — the 0.4 ``fit`` also skipped a frozen node's computation, so the
+    wall-clock of this recipe is not the June 2026 table's; the epochs are.
     """
 
     def __init__(self, lr, patience, freeze, min_delta=1e-4, factor=0.3):
@@ -347,19 +351,21 @@ def total_monitored_nll(history) -> np.ndarray:
 def run_config(workload, phases, extra, batch, device, seed):
     """Run the phases of one recipe; give the flow and its (val, time) record."""
     train, val = WORKLOADS[workload]["data"]()
+    val = train if val is None else val  # stroke-ls: the full-data MLE fit
     torch.manual_seed(seed)
     flow = CausalFlowDAG(WORKLOADS[workload]["spec"](), device=device)
     bs = len(train) if batch == "full" else int(batch)
     hist = {"val": [], "time": []}
     t0 = time.perf_counter()
-    for epochs, lr in phases:
+    extras = extra if isinstance(extra, list) else [extra] * len(phases)
+    for (epochs, lr), phase_extra in zip(phases, extras, strict=True):
         opt = torch.optim.Adam(
             [
                 {"params": list(flow.nodes[n].parameters()), "lr": lr, "node": n}
                 for n in flow.order
             ]
         )
-        sched = _PerNodePlateau(lr, **extra) if extra else None
+        sched = _PerNodePlateau(lr, **phase_extra) if phase_extra else None
 
         def monitor(f, epoch, opt, sched=sched):
             nll = f.nll(val)
@@ -383,8 +389,13 @@ def reference_nll(workload: str) -> float:
             workload, [(4000, 1e-2), (2000, 1e-3), (1000, 1e-4)], {}, 512, "cpu", 123
         )
     else:
-        _, hist = run_config(
-            workload, [(3000, 1e-2)], {"patience": 25, "freeze": 120}, 512, "cpu", 123
+        _, hist = run_config(  # plateau+freeze, then the constant-lr polish
+            workload,
+            [(3000, 1e-2), (300, 1e-3)],
+            [{"patience": 25, "freeze": 120}, {}],
+            512,
+            "cpu",
+            123,
         )
     refs[workload] = float(total_monitored_nll(hist).min())
     OUT.mkdir(parents=True, exist_ok=True)

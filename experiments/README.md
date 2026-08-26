@@ -60,18 +60,20 @@ carries its own copy of the bimodal DGP. `benchmarks/tests/` pins that copy to
 the maintained generator, because a drifted copy would silently make the
 collected `final_val_nll` values incomparable.
 
-Runtime: a triangle variant is 500 epochs of batch 32 over 40 000 rows, about
-3.2 s per epoch single-process at 2–4 torch threads (27 min; 42–69 min on the
-2-core CI runners). The step is overhead-bound — 32 threads make it *slower*
-(5.5 s per epoch), and eight variants side by side on one box take 78 min
-each. Run them one or two at a time, or with `OMP_NUM_THREADS=2`.
+Runtime: at the paper's batch 32 a triangle variant is 500 epochs × 1250
+steps over 40 000 rows, about 3.2 s per epoch single-process at 2–4 torch
+threads (27 min; 42–69 min on the 2-core CI runners). The step is
+overhead-bound — 32 threads make it *slower* (5.5 s per epoch), and eight
+variants side by side on one box take 78 min each. Run them one or two at a
+time, or with `OMP_NUM_THREADS=2`.
 
-The 500 epochs are the paper's, and they are needed: the linear-shift
-coefficients settle after ~40 epochs, the complex shift does not. Measured
-2026-08-25 — at 100 epochs the cs-curve error is 0.235 (linear-cs, 0.116 at
-500) and 0.395 (mixed exp-cs, 0.126); at 250 epochs 0.112 and 0.203. A
-shorter budget would be a documented deviation for CI runtime only, and the
-70-min wall of the workflow does not need it.
+The configs therefore take one documented deviation for CI runtime: batch 256
+at lr 0.004 instead of the paper's batch 32 at lr 0.001 — the same 500 epochs
+in 8× fewer steps, every ground-truth metric kept (the grid that chose it is
+in `docs/paper-replication.md`). The 500 epochs stay: the linear-shift
+coefficients settle after ~40 epochs, the complex shift does not (at 100
+epochs the cs-curve error doubles to triples; at 250 mixed exp-cs is still
++60 %).
 
 `vaca.py` and `carefl.py` set `net_input_scaling: minmax`, because the
 reference's comparison scripts train in min-max scaled space
