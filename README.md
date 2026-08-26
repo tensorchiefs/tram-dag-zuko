@@ -181,6 +181,11 @@ and what is not (the competing CNF/NSF baselines), is in
 **Training speed** — schedules, per-node freezing, L-BFGS and device benchmarks:
 [`docs/training-speed.md`](docs/training-speed.md).
 
+**Paper replication** — every hyperparameter of the eight `experiments/paper`
+variants with its source in the paper's R code, the deviations, and the
+numbers (paper / previous protocol / now):
+[`docs/paper-replication.md`](docs/paper-replication.md).
+
 ## Testing policy
 See the [`tests/README.md`](tests/README.md) file for more details.
 
@@ -201,7 +206,8 @@ notebooks/              four executed examples: didactic intro, Colab demo,
                         additive-vs-joint intercepts, varying coefficients
 docs/                   code-map.md (every class/function + all knobs),
                         fitting.md, notation.md, training-speed.md,
-                        varying-coefficients.md, scores.md
+                        paper-replication.md, varying-coefficients.md,
+                        scores.md
 ```
 
 Implementation conventions (latent-scale signs, raw/one-hot parent encoding,

@@ -80,7 +80,9 @@ parents (40% of the VACA rows have `|x| > 2`); the triangle scripts fit
 `df_orig`, so those configs leave it `null`.
 
 Which paper figure each variant reproduces — and what is deliberately not
-reproduced — is listed in [`paper/PAPER_COVERAGE.md`](paper/PAPER_COVERAGE.md).
+reproduced — is listed in [`paper/PAPER_COVERAGE.md`](paper/PAPER_COVERAGE.md);
+every hyperparameter with its source in the R code, the deviations and the
+measured numbers are in [`docs/paper-replication.md`](../docs/paper-replication.md).
 
 All five have the same shape: imports, function definitions, a `run(variant)`
 function holding the whole experiment, and a `__main__` block whose argparse
