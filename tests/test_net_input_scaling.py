@@ -48,9 +48,11 @@ def test_net_inputs_span_unit_interval_after_first_fit():
         scaled = node.net_input(feats, ("x1",))
         assert torch.allclose(scaled.min(0).values, torch.zeros(scaled.shape[1]))
         assert torch.allclose(scaled.max(0).values, torch.ones(scaled.shape[1]))
-    # a second fit on other rows keeps the first calibration
+    # a second fit on other rows keeps the first calibration, ranges included
+    xmin = float(flow.nodes["x1"].ut.xmin)
     flow.fit(df + 10.0, epochs=1, batch_size=100)
     assert float(flow.nodes["x2"].net_lo[0]) == pytest.approx(df["x1"].min())
+    assert float(flow.nodes["x1"].ut.xmin) == xmin
 
 
 def test_linear_shift_stays_raw():

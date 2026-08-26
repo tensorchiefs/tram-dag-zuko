@@ -387,8 +387,8 @@ class _ScaledUT(torch.nn.Module):
     def inverse(self, theta: Tensor, z0: Tensor) -> Tensor:
         """Map pre-shift latents back to original units.
 
-        The inverse uses expanding-bracket bisection, so it also covers
-        latents far outside the pre-scaled domain.
+        The inverse is zuko's own: bisection inside the bound, closed form
+        (linear or identity, per transform) outside it.
 
         Parameters
         ----------

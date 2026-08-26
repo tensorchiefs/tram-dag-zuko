@@ -91,6 +91,18 @@ def _term_cells(term) -> list[tuple[str, str]]:
     return [(p, tag) for p in term.parents]
 
 
+def _init_linear(m: nn.Linear, init: str) -> None:
+    """Keras' two initializers on one linear layer: ``glorot`` or ``normal``."""
+    if init == "glorot":
+        nn.init.xavier_uniform_(m.weight)
+        if m.bias is not None:
+            nn.init.zeros_(m.bias)
+    else:
+        nn.init.normal_(m.weight, std=0.05)
+        if m.bias is not None:
+            nn.init.normal_(m.bias, std=0.05)
+
+
 def _covered_by_classical(term) -> bool:
     """Say whether the exact classical fit handles this term.
 
@@ -395,12 +407,15 @@ class CausalFlowDAG(nn.Module):
     init : str, optional
         Weight initialization of every linear layer (the LS weights and the
         CI/CS/VC networks): ``"torch"`` (default, ``nn.Linear``'s
-        Kaiming-uniform) or ``"glorot"`` — Keras' ``Dense`` default,
-        ``glorot_uniform`` weights and zero biases, which the paper's
-        reference implementation uses. Under the reference's full-batch
-        protocol the choice decides the fit: VACA's ``do(x2)`` error is
-        0.52 / 0.33 / 0.13 with torch's init and 0.035 / 0.006 / 0.007
-        with glorot (measured 2026-08-26). Stored in the checkpoint.
+        Kaiming-uniform), ``"glorot"`` — Keras' ``Dense`` default,
+        glorot-uniform weights and zero biases, the paper's VACA/CAREFL
+        scripts — or ``"normal"`` — Keras' ``RandomNormal``, N(0, 0.05^2)
+        on weights and biases, the paper's triangle scripts. A VC head's
+        output layer stays zero either way. Under the reference's full-batch
+        protocol the choice decides the fit: VACA's ``do(x2)`` error at the
+        config's seed is 0.52 / 0.33 / 0.13 with torch's init and
+        0.098 / 0.159 / 0.026 with glorot (another draw: 0.035 / 0.006 /
+        0.007; measured 2026-08-26). Stored in the checkpoint.
     """
 
     def __init__(
@@ -416,8 +431,10 @@ class CausalFlowDAG(nn.Module):
             raise ValueError(
                 f"net_input_scaling must be None or 'minmax', got {net_input_scaling!r}"
             )
-        if init not in ("torch", "glorot"):
-            raise ValueError(f"init must be 'torch' or 'glorot', got {init!r}")
+        if init not in ("torch", "glorot", "normal"):
+            raise ValueError(
+                f"init must be 'torch', 'glorot' or 'normal', got {init!r}"
+            )
         if seed is not None:
             torch.manual_seed(seed)
         self.spec = spec
@@ -427,12 +444,7 @@ class CausalFlowDAG(nn.Module):
         self.nodes = nn.ModuleDict(
             {name: _Node(spec[name], spec, net_input_scaling) for name in self.order}
         )
-        if init == "glorot":  # Keras Dense default: glorot_uniform weights, zero bias
-            for m in self.modules():
-                if isinstance(m, nn.Linear):
-                    nn.init.xavier_uniform_(m.weight)
-                    if m.bias is not None:
-                        nn.init.zeros_(m.bias)
+        self._apply_init(init)
         self.device = torch.device(device)
         # the data-dependent state (ranges, net min-max, calibrated start) is
         # taken once, by calibrate(); a checkpoint carries the flag
@@ -440,6 +452,24 @@ class CausalFlowDAG(nn.Module):
         self.history: dict = {"train": []}  # per-node mean train NLL per epoch
         self.meta: dict = {}  # provenance attached at save() (version, time)
         self.to(self.device)
+
+    def _apply_init(self, init: str) -> None:
+        """Re-initialize every linear layer the Keras way, if asked.
+
+        ``"glorot"`` is Keras' ``Dense`` default (glorot-uniform weights, zero
+        biases); ``"normal"`` is Keras' ``RandomNormal`` (N(0, 0.05^2)) on
+        weights and biases, the initializer of the paper's triangle scripts.
+        A VC head's output layer stays zero: ``beta(x) = beta0`` at the start
+        is part of that term's design.
+        """
+        if init == "torch":
+            return
+        for m in self.modules():
+            if isinstance(m, nn.Linear):
+                _init_linear(m, init)
+        for m in self.modules():
+            if isinstance(m, VaryingCoef) and m.net is not None:
+                nn.init.zeros_(m.net[-1].weight)
 
     def _encode_parent(self, name: str, values: Tensor) -> Tensor:
         """Encode the values of a node for use as a parent feature.
@@ -637,9 +667,10 @@ class CausalFlowDAG(nn.Module):
         it is shorter (docs/training-speed.md).
 
         The first ``fit`` or ``fit_classical`` calls this when it has not run
-        yet; a loaded model is already calibrated. Calling it yourself is how
-        to choose ``marginal_init=False`` (the paper replications do, to
-        match a reference that has no such step).
+        yet; a loaded model is already calibrated, and later fits on other rows
+        reuse this state — data on a new scale needs a new flow. Calling it
+        yourself is how to choose ``marginal_init=False`` (the paper
+        replications do, to match a reference that has no such step).
 
         Returns
         -------
@@ -659,10 +690,15 @@ class CausalFlowDAG(nn.Module):
             if node.kind == "continuous" and isinstance(node.ut, BernsteinUT):
                 theta = node.ut.marginal_init_theta()
             elif node.kind == "ordinal":
+                levels = self.spec[name].levels
                 counts = np.bincount(
-                    train_df[name].to_numpy().astype(np.int64),
-                    minlength=self.spec[name].levels,
+                    train_df[name].to_numpy().astype(np.int64), minlength=levels
                 )
+                if counts.size != levels:
+                    raise ValueError(
+                        f"node {name!r}: data has level {counts.size - 1}, the spec "
+                        f"declares {levels} levels (0..{levels - 1})"
+                    )
                 theta = ordinal_marginal_init_theta(counts)
             else:
                 continue
@@ -677,7 +713,8 @@ class CausalFlowDAG(nn.Module):
         """Turn the user's stage-1 propensities into the training-time tensors.
 
         A centered ``VC`` term needs ``vc_ehat[node][t]``: ``P(t = 1 | pa_t)``
-        for every training row, computed **out of fold** (the cross-fitting
+        for every training row, positionally aligned with ``train_df``,
+        computed **out of fold** (the cross-fitting
         requirement of the DML design; in-sample values reintroduce the
         own-observation bias). How they are computed is the user's choice —
         a ``fit_classical`` on the treatment spec per fold, or any
@@ -707,6 +744,10 @@ class CausalFlowDAG(nn.Module):
                 raise ValueError(
                     f"vc_ehat[{node!r}][{on!r}] has {len(e)} rows, not {n}"
                 )
+            if not ((e >= 0) & (e <= 1)).all():
+                raise ValueError(
+                    f"vc_ehat[{node!r}][{on!r}] must hold probabilities in [0, 1]"
+                )
             out.setdefault(node, {})[on] = torch.as_tensor(e, device=self.device)
         return out
 
@@ -733,8 +774,10 @@ class CausalFlowDAG(nn.Module):
         learning-rate schedules, early stopping, best-weight restoration,
         logging — is the caller's, through ``optimizer`` and ``callback``::
 
+            from torch.optim.lr_scheduler import ReduceLROnPlateau
+
             opt = torch.optim.Adam(flow.parameters(), lr=1e-3)
-            plateau = torch.optim.lr_scheduler.ReduceLROnPlateau(opt, 0.1, 50)
+            plateau = ReduceLROnPlateau(opt, factor=0.1, patience=50)
 
             def monitor(flow, epoch, opt):
                 val = sum(flow.nll(val_df).values())
@@ -803,8 +846,8 @@ class CausalFlowDAG(nn.Module):
             raise ValueError(f"batch_size must be at least 1, got {batch_size}")
         if seed is not None:
             torch.manual_seed(seed)
+        ehat = self._vc_ehat_train(train_df, vc_ehat)  # validate before calibrating
         self.calibrate(train_df)
-        ehat = self._vc_ehat_train(train_df, vc_ehat)
         vals = self._tensorize(train_df)
         opt = optimizer or torch.optim.Adam(self.parameters(), lr=learning_rate)
         penalized = [

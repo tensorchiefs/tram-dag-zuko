@@ -1,6 +1,5 @@
-"""Tests for the API papercuts in issue #12: constructor seeding, history +
-and machine-info persistence through save/load (the helper itself is
-tested in test_utils.py).
+"""Tests for the API papercuts in issue #12: constructor seeding, history and
+version metadata through save/load, the init option.
 """
 
 # %% imports ---------------------------------------------------------------------------
@@ -142,6 +141,18 @@ def test_glorot_init_is_keras_dense_default(tmp_path):
             bound = (6.0 / (m.in_features + m.out_features)) ** 0.5
             assert float(m.weight.abs().max()) <= bound
             assert m.bias is None or torch.equal(m.bias, torch.zeros_like(m.bias))
+    vc_spec = {
+        "x": td.ContinuousNode(),
+        "t": td.OrdinalNode(2, td.LS("x")),
+        "y": td.ContinuousNode(td.LS("x") + td.VC("x", t="t")),
+    }
+    head = td.CausalFlowDAG(vc_spec, seed=0, init="glorot").nodes["y"].shifts["t"]
+    assert torch.equal(head.net[-1].weight, torch.zeros_like(head.net[-1].weight))
+    normal = td.CausalFlowDAG(spec, seed=0, init="normal")
+    weights = torch.cat(
+        [m.weight.flatten() for m in normal.modules() if isinstance(m, torch.nn.Linear)]
+    )
+    assert 0.03 < float(weights.std()) < 0.07  # Keras RandomNormal, sd 0.05
     a = td.CausalFlowDAG(spec, seed=0).state_dict()
     b = td.CausalFlowDAG(spec, seed=0, init="torch").state_dict()
     assert all(torch.equal(a[k], b[k]) for k in a)

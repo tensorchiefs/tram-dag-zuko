@@ -98,6 +98,8 @@ unrelated acceptance bars.
 |---|---|
 | [`test_flow.py`](test_flow.py) | core unit tests — transforms, ordinal log-prob, DAG validation, abduction/counterfactual mechanics, `save`/`load`, the proportional-odds identity |
 | [`test_fit_hooks.py`](test_fit_hooks.py) | `fit(optimizer=, callback=)` — stop, snapshots, a torch scheduler; the guard that it still lands on the MLE |
+| [`test_density.py`](test_density.py) | `density()` integrates to one and matches sampling |
+| [`test_net_input_scaling.py`](test_net_input_scaling.py) | `net_input_scaling="minmax"` — nets scaled, LS raw, read-outs consistent, checkpoint |
 | [`test_fit_classical.py`](test_fit_classical.py) | `fit_classical` — guard on non-`ls` specs, determinism, float64 round-trip, agreement with `statsmodels` and Adam |
 | [`test_spec_terms.py`](test_spec_terms.py) | term constructors, edge ownership, the meta-adjacency view |
 | [`test_transformation_syntax.py`](test_transformation_syntax.py) | the formula syntax — every spelling normalizes identically, the constructor aliases, `units=`, round-trips, and rejection of a malformed serialized spec |

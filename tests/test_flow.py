@@ -55,6 +55,8 @@ def test_univariate_roundtrip(ut):
     x = torch.linspace(-6.0, 10.0, n)  # includes values outside the fitted range
     z0, ladj = ut.forward(theta, x)
     assert torch.isfinite(z0).all()
+    far = ut.inverse(theta[:2], torch.tensor([-40.0, 60.0]))  # far tails: closed form
+    assert torch.isfinite(far).all()
     assert torch.isfinite(ladj).all()
     x_rec = ut.inverse(theta, z0)
     assert torch.allclose(x_rec, x, atol=1e-3), (x_rec - x).abs().max()

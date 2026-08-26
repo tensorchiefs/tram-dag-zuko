@@ -624,6 +624,9 @@ def varying_coefficient(
     units : list[int] | tuple[int, ...] | None, optional
         Hidden layers of ``b_theta``, by default ``[16]`` — see
         :class:`tramdag.conditioners.VaryingCoef` for why that size.
+    activation : str | None, optional
+        Activation of ``b_theta``'s hidden layers, by default the
+        conditioners' ``relu``.
 
     Returns
     -------
