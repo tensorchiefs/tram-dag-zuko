@@ -41,7 +41,7 @@ def test_invalid_value_rejected():
 def test_net_inputs_span_unit_interval_after_first_fit():
     df = _frame()
     flow = CausalFlowDAG(SPEC, seed=0, net_input_scaling="minmax")
-    flow.fit(df, epochs=1, batch_size=100, verbose=False)
+    flow.fit(df, epochs=1, batch_size=100)
     feats = flow._features(_tensors(df))
     for name in ("x2", "x3"):
         node = flow.nodes[name]
@@ -49,7 +49,7 @@ def test_net_inputs_span_unit_interval_after_first_fit():
         assert torch.allclose(scaled.min(0).values, torch.zeros(scaled.shape[1]))
         assert torch.allclose(scaled.max(0).values, torch.ones(scaled.shape[1]))
     # a second fit on other rows keeps the first calibration
-    flow.fit(df + 10.0, epochs=1, batch_size=100, verbose=False)
+    flow.fit(df + 10.0, epochs=1, batch_size=100)
     assert float(flow.nodes["x2"].net_lo[0]) == pytest.approx(df["x1"].min())
 
 
@@ -59,15 +59,15 @@ def test_linear_shift_stays_raw():
     spec = {"x1": ContinuousNode(), "x2": ContinuousNode(LS("x1"))}
     raw = CausalFlowDAG(spec, seed=1)
     scaled = CausalFlowDAG(spec, seed=1, net_input_scaling="minmax")
-    raw.fit(df, epochs=2, batch_size=50, verbose=False, seed=0)
-    scaled.fit(df, epochs=2, batch_size=50, verbose=False, seed=0)
+    raw.fit(df, epochs=2, batch_size=50, seed=0)
+    scaled.fit(df, epochs=2, batch_size=50, seed=0)
     assert raw.ls_coefficients() == scaled.ls_coefficients()
 
 
 def test_save_load_keeps_option_and_calibration(tmp_path):
     df = _frame()
     flow = CausalFlowDAG(SPEC, seed=0, net_input_scaling="minmax")
-    flow.fit(df, epochs=1, batch_size=100, verbose=False)
+    flow.fit(df, epochs=1, batch_size=100)
     flow.save(tmp_path / "flow.pt")
     loaded = CausalFlowDAG.load(tmp_path / "flow.pt")
     assert loaded.net_input_scaling == "minmax"
@@ -81,7 +81,7 @@ def test_mixed_node_scales_only_the_network_input():
     """``CS("x1") + LS("x2")``: the net sees the scaled x1, the LS the raw x2."""
     df = _frame()
     flow = CausalFlowDAG(SPEC, seed=0, net_input_scaling="minmax")
-    flow.fit(df, epochs=1, batch_size=100, verbose=False)
+    flow.fit(df, epochs=1, batch_size=100)
     nd = flow.nodes["x3"]
     feats = flow._features(_tensors(df))
     with torch.no_grad():
@@ -111,7 +111,7 @@ def test_read_outs_use_the_scaled_inputs():
         ),
     }
     flow = CausalFlowDAG(spec, seed=0, net_input_scaling="minmax")
-    flow.fit(df, epochs=1, batch_size=100, verbose=False)
+    flow.fit(df, epochs=1, batch_size=100)
     nd = flow.nodes["y"]
     feats = flow._features(_tensors(df))
     with torch.no_grad():
@@ -129,7 +129,7 @@ def test_ordinal_parent_passes_through_one_hot():
     spec = {"k": OrdinalNode(3), "y": ContinuousNode(CS("k", units=[4]))}
     df = pd.DataFrame({"k": [0, 1, 2, 1], "y": [0.1, 0.5, -0.3, 0.2]})
     flow = CausalFlowDAG(spec, seed=0, net_input_scaling="minmax")
-    flow.fit(df, epochs=1, batch_size=4, verbose=False)
+    flow.fit(df, epochs=1, batch_size=4)
     feats = flow._features(_tensors(df))
     assert torch.equal(flow.nodes["y"].net_input(feats, ("k",)), feats["k"])
 
@@ -138,4 +138,4 @@ def test_constant_parent_is_rejected():
     df = _frame().assign(x1=1.0)
     flow = CausalFlowDAG(SPEC, seed=0, net_input_scaling="minmax")
     with pytest.raises(ValueError, match="constant"):
-        flow.fit(df, epochs=1, batch_size=100, verbose=False)
+        flow.fit(df, epochs=1, batch_size=100)

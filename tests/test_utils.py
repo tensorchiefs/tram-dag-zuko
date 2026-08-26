@@ -10,8 +10,7 @@ import pathlib
 
 import pytest
 
-import tramdag as td
-from tramdag.utils import config_section, machine_info
+from tramdag.utils import config_section
 
 # %% global variables ------------------------------------------------------------------
 DOCUMENT = {
@@ -72,12 +71,3 @@ def test_the_package_needs_no_yaml_parser():
         pytest.skip("no pyproject.toml next to the tests")
     project = tomllib.loads(pyproject.read_text())["project"]
     assert not [d for d in project["dependencies"] if "yaml" in d.lower()]
-
-
-def test_machine_info_has_expected_fields():
-    assert td.machine_info is machine_info  # the package re-export
-    info = machine_info()
-    for key in ("hostname", "os", "python", "torch", "tramdag", "cpu_count"):
-        assert key in info
-    assert info["torch"]
-    assert info["python"]

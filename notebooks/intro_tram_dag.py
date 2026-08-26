@@ -311,7 +311,7 @@ plt.show()
 # Fitting maximizes the joint likelihood. Because the flow is triangular, the
 # negative log-likelihood **decomposes per node**
 # ($\log p(x) = \sum_i \log p(x_i \mid \mathrm{pa}(x_i))$). Thus one Adam
-# optimizer trains all nodes at once. With `restore_best=False` (the default) we
+# optimizer trains all nodes at once. `fit` keeps the final weights, so we
 # keep the final converged weights. These weights are the exact MLE.
 
 # %%
@@ -325,12 +325,8 @@ spec = {
 flow = CausalFlowDAG(
     spec, seed=1
 )  # seed here too, for the Bernsteins' initial uniform knots
-flow.fit(
-    train_df, val_df, epochs=800, learning_rate=1e-2, batch_size=20000, verbose=200
-)
-flow.fit(
-    train_df, val_df, epochs=300, learning_rate=1e-3, batch_size=512, verbose=300
-)  # polish
+flow.fit(train_df, epochs=800, learning_rate=1e-2, batch_size=20000)
+flow.fit(train_df, epochs=300, learning_rate=1e-3, batch_size=512)  # polish
 flow.nll(val_df)
 
 # %% [markdown]
@@ -557,8 +553,8 @@ spec_ls = {
 }
 torch.manual_seed(7)
 flow_ls = CausalFlowDAG(spec_ls)
-flow_ls.fit(train_df, val_df, epochs=800, learning_rate=1e-2, batch_size=512, verbose=0)
-flow_ls.fit(train_df, val_df, epochs=300, learning_rate=1e-3, batch_size=512, verbose=0)
+flow_ls.fit(train_df, epochs=800, learning_rate=1e-2, batch_size=512)
+flow_ls.fit(train_df, epochs=300, learning_rate=1e-3, batch_size=512)
 
 print(
     f"misspecified beta_32 (X2 -> X3): "
@@ -714,9 +710,9 @@ plt.show()
 #   `uv run python -m paper.vaca flexible` (from `experiments/`) for an all-intercept flow on a
 #   bimodal benchmark with analytic interventional truth.
 # * **Early stopping vs. exact MLE** — this notebook's DGP has no unobserved
-#   confounding, so the MLE (`restore_best=False`, the default) is the right
+#   confounding, so the MLE (the final weights `fit` keeps) is the right
 #   target. Under observational confounding, flexible (`I`/`CS`) models can
-#   *overfit the confounding* at the MLE and need `restore_best=True` to recover
+#   *overfit the confounding* at the MLE and need best-validation weights (a `callback`) to recover
 #   the causal effect. See `CHANGELOG.md`.
 # * **Validation against classical models** — an all-`LS` flow trained to
 #   convergence *is* the classical proportional-odds MLE

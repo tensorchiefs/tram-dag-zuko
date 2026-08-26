@@ -15,8 +15,6 @@ Causal queries:
 # %% imports ---------------------------------------------------------------------------
 from __future__ import annotations
 
-import copy
-import logging
 import time
 from datetime import datetime, timezone
 from pathlib import Path
@@ -37,9 +35,7 @@ from .conditioners import (
 from .scores import effect_modifier_scan as _effect_modifier_scan
 from .scores import node_scores as _node_scores
 from .spec import (
-    LS,
     ContinuousNode,
-    I,
     NodeSpec,
     OrdinalNode,
     node_parents,
@@ -59,12 +55,9 @@ from .transforms import (
     ordinal_pmf,
     ordinal_sample,
 )
-from .utils import machine_info
 
 # %% global variables ------------------------------------------------------------------
 __all__ = ["CausalFlowDAG"]
-
-logger = logging.getLogger(__name__)
 
 
 # %% private functions -----------------------------------------------------------------
@@ -108,70 +101,6 @@ def _covered_by_classical(term) -> bool:
 
 
 # %% private classes -------------------------------------------------------------------
-class _FitSchedule:
-    """Per-node plateau decay and freezing bookkeeping for one ``fit`` call.
-
-    The per-node losses have independent gradients, so per-node learning
-    rates and freezing are exactly equivalent to independent per-node
-    training. ``step`` runs once per epoch on the validation NLLs.
-    """
-
-    def __init__(
-        self,
-        order: list[str],
-        schedule: str | None,
-        learning_rate: float,
-        plateau_patience: int,
-        plateau_factor: float,
-        freeze_patience: int | None,
-        min_delta: float,
-        min_lr: float | None = None,
-    ):
-        self.schedule = schedule
-        self.lr = learning_rate
-        self.min_lr = learning_rate * 1e-3 if min_lr is None else min_lr
-        self.patience = plateau_patience
-        self.factor = plateau_factor
-        self.freeze_patience = freeze_patience
-        self.min_delta = min_delta
-        self.best = dict.fromkeys(order, float("inf"))
-        self.bad = dict.fromkeys(order, 0)
-        self.frozen: set[str] = set()
-
-    def step(self, opt, val_per_node: dict[str, float], history: dict) -> None:
-        """Decay plateaued learning rates and freeze converged nodes."""
-        for g in opt.param_groups:
-            name = g["node"]
-            if name in self.frozen:
-                continue
-            if val_per_node[name] < self.best[name] - self.min_delta:
-                self.best[name] = val_per_node[name]
-                self.bad[name] = 0
-            else:
-                self.bad[name] += 1
-            if (
-                self.schedule == "plateau"
-                and self.bad[name] > 0
-                and self.bad[name] % self.patience == 0
-            ):
-                g["lr"] = max(g["lr"] * self.factor, self.min_lr)
-            # under "plateau", only freeze nodes whose lr has already been
-            # decayed substantially — otherwise a node can freeze while a
-            # smaller lr would still make progress toward the optimum
-            lr_decayed = self.schedule != "plateau" or g["lr"] <= self.lr * 1e-2 * (
-                1 + 1e-9
-            )
-            if (
-                self.freeze_patience is not None
-                and lr_decayed
-                and self.bad[name] >= self.freeze_patience
-            ):
-                self.frozen.add(name)
-                history.setdefault("frozen", {}).setdefault(
-                    name, len(history["val"])
-                )  # 1-based global epoch
-
-
 class _VCGroup(NamedTuple):
     """Bookkeeping for one VC term of a node.
 
@@ -185,17 +114,14 @@ class _VCGroup(NamedTuple):
         ``True`` when the treatment is a binary ordinal node. The raw
         treatment column is then the level-1 one-hot indicator.
     center : bool
-        ``True`` centers the regressor with out-of-fold propensities from
-        refits of the treatment node.
-    folds : int
-        Number of folds for those refits.
+        ``True`` centers the regressor with the caller's out-of-fold
+        propensities (``fit(vc_ehat=)``).
     """
 
     on: str
     mods: tuple[str, ...]
     on_is_ord: bool
     center: bool
-    folds: int
 
 
 class _Node(nn.Module):
@@ -231,7 +157,6 @@ class _Node(nn.Module):
         self.register_buffer("net_lo", torch.zeros(k))
         self.register_buffer("net_hi", torch.ones(k))
         self.net_input_scaling = net_input_scaling
-        self._net_scaled = False  # min-max taken from the first fit's rows
         i_term = next((t for t in terms if t.effect == "I" and t.parents), None)
         if i_term is None:
             i_groups = []
@@ -316,7 +241,6 @@ class _Node(nn.Module):
                         mods,
                         isinstance(spec[on], OrdinalNode),
                         term.center,
-                        term.center_folds,
                     )
                 )
             elif term.effect in ("LS", "CS"):
@@ -347,8 +271,8 @@ class _Node(nn.Module):
         return t
 
     def set_net_range(self, train_df: pd.DataFrame) -> None:
-        """Take the network-input min-max from the first fit's training rows."""
-        if self.net_input_scaling is None or self._net_scaled:
+        """Take the network-input min-max from the training rows (``calibrate``)."""
+        if self.net_input_scaling is None:
             return
         for i, p in enumerate(self.continuous_parents):
             lo, hi = float(train_df[p].min()), float(train_df[p].max())
@@ -358,7 +282,6 @@ class _Node(nn.Module):
                     "training rows"
                 )
             self.net_lo[i], self.net_hi[i] = lo, hi
-        self._net_scaled = True
 
     def net_input(self, feats: dict[str, Tensor], parents) -> Tensor:
         """Concatenate parent features for a network, scaled when configured.
@@ -467,8 +390,17 @@ class CausalFlowDAG(nn.Module):
         training min and max, the way the paper's reference implementation
         does; raw parents (default ``None``) saturate a tanh net whenever
         ``|x| > 2``. Linear shifts and the VC treatment stay raw, so their
-        coefficients keep their units. Set at the first ``fit``; stored in
+        coefficients keep their units. Set by ``calibrate``; stored in
         the checkpoint.
+    init : str, optional
+        Weight initialization of every linear layer (the LS weights and the
+        CI/CS/VC networks): ``"torch"`` (default, ``nn.Linear``'s
+        Kaiming-uniform) or ``"glorot"`` — Keras' ``Dense`` default,
+        ``glorot_uniform`` weights and zero biases, which the paper's
+        reference implementation uses. Under the reference's full-batch
+        protocol the choice decides the fit: VACA's ``do(x2)`` error is
+        0.52 / 0.33 / 0.13 with torch's init and 0.035 / 0.006 / 0.007
+        with glorot (measured 2026-08-26). Stored in the checkpoint.
     """
 
     def __init__(
@@ -477,24 +409,36 @@ class CausalFlowDAG(nn.Module):
         device: str = "cpu",
         seed: int | None = None,
         net_input_scaling: str | None = None,
+        init: str = "torch",
     ):
         super().__init__()
         if net_input_scaling not in (None, "minmax"):
             raise ValueError(
                 f"net_input_scaling must be None or 'minmax', got {net_input_scaling!r}"
             )
+        if init not in ("torch", "glorot"):
+            raise ValueError(f"init must be 'torch' or 'glorot', got {init!r}")
         if seed is not None:
             torch.manual_seed(seed)
         self.spec = spec
         self.order = validate_and_sort(spec)
         self.net_input_scaling = net_input_scaling
+        self.init = init
         self.nodes = nn.ModuleDict(
             {name: _Node(spec[name], spec, net_input_scaling) for name in self.order}
         )
+        if init == "glorot":  # Keras Dense default: glorot_uniform weights, zero bias
+            for m in self.modules():
+                if isinstance(m, nn.Linear):
+                    nn.init.xavier_uniform_(m.weight)
+                    if m.bias is not None:
+                        nn.init.zeros_(m.bias)
         self.device = torch.device(device)
-        self.history: dict = {"train": [], "val": [], "lr": [], "time": []}
-        self.meta: dict = {}  # provenance attached at save() (machine, versions)
-        self.vc_center_info: dict = {}  # OOF bookkeeping of centered VC terms (fit)
+        # the data-dependent state (ranges, net min-max, calibrated start) is
+        # taken once, by calibrate(); a checkpoint carries the flag
+        self.register_buffer("calibrated", torch.tensor(False))
+        self.history: dict = {"train": []}  # per-node mean train NLL per epoch
+        self.meta: dict = {}  # provenance attached at save() (version, time)
         self.to(self.device)
 
     def _encode_parent(self, name: str, values: Tensor) -> Tensor:
@@ -548,7 +492,7 @@ class CausalFlowDAG(nn.Module):
 
         ``P(x <= 0) = sigmoid(theta_0 - s)``, so the answer is
         ``sigmoid(s - theta_0)``. No ``vc_ehat``: chained centering is refused
-        at fit time, so a treatment node never carries a centered term itself.
+        by the spec, so a treatment node never carries a centered term itself.
         """
         feats = self._features({p: values[p] for p in nd.parents})
         theta, shift = nd.theta_shift(feats, n)
@@ -609,8 +553,8 @@ class CausalFlowDAG(nn.Module):
         values : dict[str, Tensor]
             Raw node values, keyed by node name, each shape ``(n,)``.
         nodes : list[str] | None, optional
-            Restrict the computation to these nodes. ``fit`` uses this to
-            skip frozen nodes. That is valid because the per-node losses
+            Restrict the computation to these nodes. A subset is exact
+            because the per-node losses
             are independent. ``None`` (default) computes every node.
         vc_ehat : dict[str, dict[str, Tensor]] | None, optional
             Propensity override for centered VC terms, as
@@ -677,630 +621,235 @@ class CausalFlowDAG(nn.Module):
             per_node = self.node_log_prob(self._tensorize(df))
         return {k: float(-v.mean()) for k, v in per_node.items()}
 
-    def _set_ranges(self, train_df: pd.DataFrame, marginal_init: bool = True) -> None:
-        """Map the train ``RANGE_Q``/1-``RANGE_Q`` quantiles onto the domain.
+    def calibrate(
+        self, train_df: pd.DataFrame, marginal_init: bool = True
+    ) -> CausalFlowDAG:
+        """Take the data-dependent state from the training rows, once.
 
-        This is the min-max scaling of the original implementation.
+        Per continuous node the transform's domain: the train ``RANGE_Q`` /
+        ``1 - RANGE_Q`` quantiles map onto ``[-5, 5]`` (the min-max scaling
+        of the original implementation, made robust to outliers). With
+        ``net_input_scaling="minmax"`` the min and max of every continuous
+        parent, for the networks. With ``marginal_init`` a calibrated start:
+        a Bernstein simple intercept starts at the data marginal instead of
+        zuko's default (about 2.5x too steep), an ordinal simple intercept at
+        the marginal class log-odds. The optimum is unchanged, the path to
+        it is shorter (docs/training-speed.md).
 
-        ``marginal_init``: calibrated Bernstein init (see ``fit``). Applied only
-        on the first fit (the same ``not ut._fitted`` guard as range-setting), so a
-        multi-phase fit does not reset a partially-trained intercept.
+        The first ``fit`` or ``fit_classical`` calls this when it has not run
+        yet; a loaded model is already calibrated. Calling it yourself is how
+        to choose ``marginal_init=False`` (the paper replications do, to
+        match a reference that has no such step).
+
+        Returns
+        -------
+        CausalFlowDAG
+            ``self``.
         """
+        if bool(self.calibrated):
+            return self
         for name in self.order:
             node = self.nodes[name]
             node.set_net_range(train_df)
-            if node.kind == "continuous" and not node.ut._fitted:
+            if node.kind == "continuous":
                 q = train_df[name].quantile([RANGE_Q, 1.0 - RANGE_Q])
                 node.ut.set_range(q.iloc[0], q.iloc[1])
-                if (
-                    marginal_init
-                    and isinstance(node.ut, BernsteinUT)
-                    and isinstance(node.intercept, SimpleIntercept)
-                ):
-                    with torch.no_grad():
-                        node.intercept.theta.copy_(node.ut.marginal_init_theta())
-            elif (
-                node.kind == "ordinal"
-                and marginal_init
-                and isinstance(node.intercept, SimpleIntercept)
-                and not getattr(node.intercept, "_marginal_inited", False)
-            ):
-                # calibrate unconditional cutpoints to the marginal class log-odds
+            if not (marginal_init and isinstance(node.intercept, SimpleIntercept)):
+                continue
+            if node.kind == "continuous" and isinstance(node.ut, BernsteinUT):
+                theta = node.ut.marginal_init_theta()
+            elif node.kind == "ordinal":
                 counts = np.bincount(
                     train_df[name].to_numpy().astype(np.int64),
                     minlength=self.spec[name].levels,
                 )
-                with torch.no_grad():
-                    node.intercept.theta.copy_(ordinal_marginal_init_theta(counts))
-                node.intercept._marginal_inited = True
+                theta = ordinal_marginal_init_theta(counts)
+            else:
+                continue
+            with torch.no_grad():
+                node.intercept.theta.copy_(theta)
+        self.calibrated.fill_(True)
+        return self
 
-    def _best_store(self, restore_best: bool) -> dict | None:
-        """Give the cross-call best-weights store, creating it on first use."""
-        if not restore_best:
-            return None
-        if not hasattr(self, "_best"):
-            self._best = {name: (float("inf"), None) for name in self.order}
-        return self._best
+    def _vc_ehat_train(
+        self, train_df: pd.DataFrame, vc_ehat: dict | None
+    ) -> dict[str, dict[str, Tensor]] | None:
+        """Turn the user's stage-1 propensities into the training-time tensors.
 
-    def _make_optimizer(self, learning_rate: float) -> torch.optim.Adam:
-        """Build Adam with one parameter group per node, tagged by name."""
-        return torch.optim.Adam(
-            [
-                {
-                    "params": list(self.nodes[name].parameters()),
-                    "lr": learning_rate,
-                    "node": name,
-                }
-                for name in self.order
-            ]
-        )
-
-    def _val_nll(self, val_vals: dict[str, Tensor]) -> dict[str, float]:
-        """Give the mean validation NLL per node, for the epoch monitor."""
-        with torch.no_grad():
-            return {
-                k: float(-v.mean()) for k, v in self.node_log_prob(val_vals).items()
-            }
-
-    def _vc_penalized(self) -> dict[str, list]:
-        """List the VC effect heads whose L2 penalty joins the loss, per node."""
-        return {
-            name: [
-                self.nodes[name].shifts[g.on]
-                for g in self.nodes[name]._vc_groups
-                if g.mods and self.nodes[name].shifts[g.on].penalty > 0
-            ]
+        A centered ``VC`` term needs ``vc_ehat[node][t]``: ``P(t = 1 | pa_t)``
+        for every training row, computed **out of fold** (the cross-fitting
+        requirement of the DML design; in-sample values reintroduce the
+        own-observation bias). How they are computed is the user's choice —
+        a ``fit_classical`` on the treatment spec per fold, or any
+        classifier. The training loss uses these frozen values; every query
+        after the fit uses the live treatment node (:meth:`_vc_ehat_live`).
+        """
+        centered = {
+            (name, g.on)
             for name in self.order
+            for g in self.nodes[name]._vc_groups
+            if g.center
         }
-
-    def _log_epoch(
-        self,
-        verbose: int,
-        epoch: int,
-        epochs: int,
-        train_acc: dict[str, float],
-        val_per_node: dict[str, float],
-        frozen: set[str],
-    ) -> None:
-        """Emit the periodic progress record (INFO on the ``tramdag.flow`` logger)."""
-        if not verbose or (epoch % verbose and epoch != epochs - 1):
-            return
-        logger.info(
-            "[epoch %5d/%d] train NLL %.4f  val NLL %.4f%s",
-            epoch + 1,
-            epochs,
-            sum(train_acc.values()),
-            sum(val_per_node.values()),
-            f"  frozen {sorted(frozen)}" if frozen else "",
-        )
-
-    def _end_epoch(
-        self,
-        *,
-        opt: torch.optim.Optimizer,
-        sched: _FitSchedule,
-        best: dict | None,
-        verbose: int,
-        epoch: int,
-        epochs: int,
-        train_acc: dict[str, float],
-        val_vals: dict[str, Tensor],
-        t_start: tuple[float, float],
-    ) -> bool:
-        """Record one epoch, update the schedules, snapshot, and log.
-
-        Returns ``True`` when every node froze, which stops the fit.
-        """
-        val_per_node = self._val_nll(val_vals)
-        t0, t_offset = t_start
-        self.history["train"].append(train_acc)
-        self.history["val"].append(val_per_node)
-        self.history["lr"].append(max(g["lr"] for g in opt.param_groups))
-        # after the val pass, so an epoch's record includes its own monitoring
-        self.history["time"].append(t_offset + time.perf_counter() - t0)
-        sched.step(opt, val_per_node, self.history)
-        if best is not None:
-            self._snapshot_best(best, val_per_node)
-        self._log_epoch(verbose, epoch, epochs, train_acc, val_per_node, sched.frozen)
-        if len(sched.frozen) < len(self.order):
-            return False
-        if verbose:
-            logger.info("[epoch %5d] all nodes frozen — stopping.", epoch + 1)
-        return True
-
-    def _fit_epoch(
-        self,
-        train_vals: dict[str, Tensor],
-        prev_acc: dict[str, float],
-        frozen: set[str],
-        opt: torch.optim.Optimizer,
-        batch_size: int,
-        vc_ehat_train: dict[str, dict[str, Tensor]] | None,
-        vc_penalized: dict[str, list],
-    ) -> dict[str, float]:
-        """Run one epoch of minibatch training over the non-frozen nodes.
-
-        Returns the epoch-mean train NLL per node; a frozen node carries
-        its last computed value forward. The VC penalty joins the loss but
-        never the returned NLLs.
-        """
-        active = [name for name in self.order if name not in frozen]
-        n = len(next(iter(train_vals.values())))
-        perm = torch.randperm(n, device=self.device)
-        acc = dict.fromkeys(active, 0.0)
-        for start in range(0, n, batch_size):
-            idx = perm[start : start + batch_size]
-            batch = {k: v[idx] for k, v in train_vals.items()}
-            per_node = self.node_log_prob(
-                batch, nodes=active, vc_ehat=_slice_ehat(vc_ehat_train, idx)
+        given = {(node, on) for node, d in (vc_ehat or {}).items() for on in d}
+        if centered != given:
+            raise ValueError(
+                "fit(vc_ehat=) must hold exactly the centered VC terms "
+                f"{sorted(centered)} as {{node: {{t: P(t=1|pa_t) per row}}}}, "
+                f"got {sorted(given)}. The values must be out of fold."
             )
-            node_nlls = {k: -v.mean() for k, v in per_node.items()}
-            loss = torch.stack(list(node_nlls.values())).sum()
-            for name in active:  # VC penalty joins the loss (never the history)
-                for m in vc_penalized[name]:
-                    loss = loss + m.penalty * m.l2() / n
-            opt.zero_grad()
-            loss.backward()
-            opt.step()
-            w = len(idx) / n
-            for k, v in node_nlls.items():
-                acc[k] += float(v.detach()) * w
-        return {
-            name: acc.get(name, prev_acc.get(name, float("nan"))) for name in self.order
-        }
-
-    def _snapshot_best(self, best: dict, val_per_node: dict[str, float]) -> None:
-        """Deep-copy a node's weights whenever its validation NLL improves."""
-        for name in self.order:
-            if val_per_node[name] < best[name][0]:
-                best[name] = (
-                    val_per_node[name],
-                    copy.deepcopy(self.nodes[name].state_dict()),
+        if not centered:
+            return None
+        n = len(train_df)
+        out: dict[str, dict[str, Tensor]] = {}
+        for node, on in centered:
+            e = np.asarray(vc_ehat[node][on], dtype=self._np_dtype).reshape(-1)
+            if len(e) != n:
+                raise ValueError(
+                    f"vc_ehat[{node!r}][{on!r}] has {len(e)} rows, not {n}"
                 )
-
-    def _load_best_weights(self, best: dict) -> None:
-        """Restore each node's best-validation snapshot, where one exists."""
-        for name, (_, state) in best.items():
-            if state is not None:
-                self.nodes[name].load_state_dict(state)
+            out.setdefault(node, {})[on] = torch.as_tensor(e, device=self.device)
+        return out
 
     def fit(
         self,
         train_df: pd.DataFrame,
-        val_df: pd.DataFrame | None = None,
-        epochs: int | None = None,
+        *,
+        epochs: int,
         learning_rate: float = 1e-2,
         batch_size: int = 512,
-        verbose: int = 50,
         seed: int | None = None,
-        restore_best: bool = False,
-        schedule: str | None = None,
-        plateau_patience: int = 30,
-        freeze_patience: int | None = None,
-        min_delta: float = 1e-4,
-        marginal_init: bool = True,
-        vc_warm_start: bool = True,
-        plateau_factor: float = 0.3,
-        plateau_min_lr: float | None = None,
-        vc_oof_fit: dict | None = None,
-        epoch_callback=None,
+        optimizer: torch.optim.Optimizer | None = None,
+        callback=None,
+        vc_ehat: dict | None = None,
     ) -> CausalFlowDAG:
-        """Fit all nodes jointly by maximum likelihood.
+        """Fit all nodes jointly by maximum likelihood — one minibatch Adam loop.
 
-        By default training keeps the **final** (converged) weights. An
-        all-``ls`` model trained to convergence then reproduces the classical
-        maximum-likelihood estimate exactly, and matches ``statsmodels`` and
-        R ``polr``.
+        The joint NLL decomposes per node with independent gradients, so one
+        optimizer over all parameters is the same as one per node. The loop
+        keeps the **final** weights: an all-``ls`` model trained to
+        convergence reproduces the classical maximum-likelihood estimate and
+        matches ``statsmodels`` and R ``polr``. A second ``fit`` call
+        continues the training. Everything else — validation monitoring,
+        learning-rate schedules, early stopping, best-weight restoration,
+        logging — is the caller's, through ``optimizer`` and ``callback``::
 
-        The optimizer holds one parameter group per node. The joint NLL
-        decomposes per node with independent gradients. Per-node learning
-        rates and freezing are therefore exactly equivalent to independent
-        per-node training.
+            opt = torch.optim.Adam(flow.parameters(), lr=1e-3)
+            plateau = torch.optim.lr_scheduler.ReduceLROnPlateau(opt, 0.1, 50)
 
-        A second ``fit`` call continues the training, for example a second
-        phase with a lower learning rate. Freezing state does not carry
-        across calls.
+            def monitor(flow, epoch, opt):
+                val = sum(flow.nll(val_df).values())
+                plateau.step(val)
+                return val > 1e6  # True stops the fit
+
+            flow.fit(train_df, epochs=10000, optimizer=opt, callback=monitor)
 
         Parameters
         ----------
         train_df : pd.DataFrame
             Training data, one column per node.
-        val_df : pd.DataFrame | None, optional
-            Held-out set, used only for monitoring and for
-            ``restore_best``, ``schedule="plateau"`` and
-            ``freeze_patience``. If omitted, the training set supplies the
-            validation metric.
         epochs : int
-            Number of training epochs. **Required**: there is no defensible
-            default. ``docs/training-speed.md`` measures fixed budgets going
-            wrong in both directions on the repo's own workloads (stroke
-            over-spends by 2.5x, vaca under-spends by 0.03 nats), so pick a
-            budget for the data, or set a generous one and let
-            ``schedule="plateau"`` with ``freeze_patience`` stop the fit.
+            Number of passes over the data. There is no default: a fixed
+            budget over-spends on some workloads and under-spends on others
+            (docs/training-speed.md).
         learning_rate : float, optional
-            Adam learning rate, by default 1e-2 — the rate every row of the
-            ``docs/training-speed.md`` benchmark runs at, and the one its
-            recommended recipe uses. The paper replications in
-            ``experiments/`` run at 1e-3, which is the paper's own value.
+            Adam step size of the default optimizer, by default 1e-2.
+            Ignored when ``optimizer`` is given.
         batch_size : int, optional
-            Minibatch size, by default 512. Measured: full-batch loses on
-            time-to-target despite higher epoch throughput, and 16k batches
-            only helped raw throughput at n=50k
-            (``docs/training-speed.md``, finding 4).
-        verbose : int, optional
-            Emit a progress record every ``verbose`` epochs, by default 50.
-            On the fits this package is for, minutes pass between epochs 0
-            and 500, and silence is indistinguishable from a hang. These are
-            INFO records on the ``tramdag.flow`` logger, so a caller sees
-            them only after configuring logging
-            (``logging.basicConfig(level=logging.INFO)``). 0 turns them off.
+            Rows per gradient step, by default 512. ``len(train_df)`` is one
+            full-batch step per epoch.
         seed : int | None, optional
-            Seeds the minibatch shuffling only. Weight initialization
-            happens at construction, see the class docstring.
-        restore_best : bool, optional
-            If True, snapshot each node's best-validation weights during
-            training and restore them at the end. This is a mild
-            early-stopping regularization and the convention of the
-            original implementation. The snapshots persist on the model
-            across ``fit`` calls, so a multi-phase fit restores the best
-            epoch of *all* its phases; they are not saved in checkpoints.
-            The fit is then *not* the training-data MLE, so leave it False
-            for an exact classical comparison. Default False.
-        schedule : str | None, optional
-            ``None`` (default) keeps the learning rate constant, so a fit is
-            reproducible from the rate and the budget alone; the measured
-            recommendation for everyday fits is ``"plateau"``
-            (``docs/training-speed.md``).
-            ``"plateau"`` decays **per node**: when the validation NLL of
-            a node did not improve by ``min_delta`` for
-            ``plateau_patience`` epochs, its learning rate decreases by
-            ``plateau_factor``, with floor ``1e-3 * learning_rate``.
-        plateau_patience : int, optional
-            Epochs without improvement before one plateau decay step, by
-            default 30 — the value ``docs/training-speed.md`` recommends
-            after measuring it against the hand-tuned two-phase schedule.
-        freeze_patience : int | None, optional
-            If set, a node whose validation NLL did not improve by
-            ``min_delta`` for this many epochs is **frozen** — excluded
-            from the loss and the backward pass. This is a real compute
-            saving, because the per-node losses are independent. When
-            every node is frozen the fit returns early. Freeze epochs are
-            recorded in ``history["frozen"]``. Under ``schedule="plateau"``
-            a node freezes only after its learning rate decayed to
-            ``1e-2 * learning_rate`` or below.
-        min_delta : float, optional
-            Smallest validation improvement that counts, by default 1e-4 —
-            an order of magnitude below the +1e-3/+5e-3 NLL tolerances any
-            check in this repo applies, so it cannot mask a difference
-            anyone measures.
-        marginal_init : bool, optional
-            Calibrate the intercept of each *unconditional* node to its
-            marginal at initialization (default ``True``), instead of
-            zuko's zero initialization. A Bernstein continuous node gets the
-            linear map of the pre-scaled domain onto the standard-logistic
-            5%/95% quantiles (the default is about 2.5x too steep). An
-            ordinal node gets cutpoints at the empirical class log-odds
-            (the default zeros are near-uniform). This is a pure
-            initialization: the converged MLE is unchanged. Applied on the
-            first fit only. Affects only ``SimpleIntercept`` nodes;
-            conditional ``ci`` intercepts stay untouched. ``False`` keeps
-            zuko's zero start.
-        vc_warm_start : bool, optional
-            If True (default), the ``beta0`` of each ``VC`` term is
-            initialized from the classical all-``ls`` solution of its
-            node's conditional (deterministic L-BFGS on a throwaway
-            proxy). The penalized head then starts at the classical answer
-            and only learns deviations. Applied once per term — a buffer
-            that survives ``save``/``load`` guards against re-runs. Does
-            nothing without VC terms.
-        plateau_factor : float, optional
-            Multiplier of one per-node plateau decay step, by default 0.3.
-            Gentler than torch's own ``ReduceLROnPlateau`` (0.1), which
-            matters here because the decay is per node off a noisy per-node
-            validation curve: three 0.3 steps land near one 0.1 step, but a
-            single spurious plateau costs a third of the rate instead of a
-            tenth. Read only under ``schedule="plateau"``.
-        plateau_min_lr : float | None, optional
-            Absolute floor of the per-node learning rate under
-            ``schedule="plateau"``. ``None`` (default) keeps the floor at
-            ``1e-3 * learning_rate``; the paper's reference code uses an
-            absolute ``1e-7``.
-        vc_oof_fit : dict | None, optional
-            Keyword overrides for the stage-1 out-of-fold proxy fits of
-            centered VC terms, merged over the default
-            ``{"epochs": 300, "learning_rate": 1e-2, "batch_size": 512}``.
-            Nothing in this repo measures those three numbers; they are the
-            pre-0.4 values, kept so centered fits stay comparable. They set
-            the quality of ``e_hat``, which is what the centering buys, so
-            override them if stage 1 underfits.
-            Ignored when the treatment node is all-``ls`` — the
-            deterministic :meth:`fit_classical` runs instead.
-        epoch_callback : callable | None, optional
-            ``epoch_callback(flow, epoch)`` runs after every epoch, once the
-            validation pass, the schedules and the best-weight snapshot are
-            done. This is how an experiment reads out coefficient trajectories
-            from one continuous run, the way the reference's per-epoch Keras
-            loop does. ``epoch`` counts from 1.
+            Seeds torch's global RNG before the loop, for the minibatch
+            shuffling. Weight initialization is seeded at construction
+            (``CausalFlowDAG(spec, seed=...)``).
+        optimizer : torch.optim.Optimizer | None, optional
+            Any torch optimizer over ``flow.parameters()``; the default is
+            ``Adam(lr=learning_rate)``. Build it yourself to attach a
+            ``torch.optim.lr_scheduler`` or to continue with its state.
+        callback : callable | None, optional
+            ``callback(flow, epoch, optimizer)`` after every epoch (``epoch``
+            counts from 1), once the epoch's train NLLs are in
+            ``flow.history["train"]``. Return ``True`` to stop the fit. Use
+            it for validation (``flow.nll(val_df)``), schedules, snapshots
+            and coefficient trajectories.
+        vc_ehat : dict | None, optional
+            Out-of-fold propensities ``{node: {t: array}}`` for every centered
+            ``VC`` term, one value per training row; required when the spec
+            has one (see docs/varying-coefficients.md).
 
         Returns
         -------
         CausalFlowDAG
-            ``self``, fitted.
+            ``self``, fitted, in eval mode.
 
         Raises
         ------
         ValueError
-            If ``epochs`` is not given, if ``schedule`` is neither ``None``
-            nor ``"plateau"``, or if ``batch_size`` is below 1.
+            If ``batch_size`` is below 1, or ``vc_ehat`` does not match the
+            centered VC terms of the spec.
 
         Notes
         -----
         For ``VC`` terms the objective is the **penalized** NLL on the
-        total-likelihood scale. Each term adds
+        total-likelihood scale: each term adds
         ``penalty * ||b_theta weights||^2`` to the summed NLL, that is
-        ``penalty * ||w||^2 / n_train`` to the mean loss. This is a fixed
-        Gaussian prior: the shrinkage vanishes as n grows, the classical
-        penalized-likelihood convention. ``beta0`` is not penalized. The
-        recorded ``history`` NLLs stay pure likelihoods. After training,
-        each ``b_theta`` is re-centered to mean zero over the training
-        data. That preserves the function: the constant moves into
-        ``beta0``.
-
-        ``VC(center=...)`` terms run a stage-1 out-of-fold propensity
-        computation before the loop (:meth:`_vc_oof_stage`). The training
-        loss uses those frozen out-of-fold values. The epoch-level
-        validation monitor, and every post-fit query, uses the live
-        full-fit treatment node.
+        ``penalty * ||w||^2 / n_train`` to the mean loss — a fixed Gaussian
+        prior whose shrinkage vanishes as n grows. ``beta0`` is not
+        penalized, and ``history["train"]`` holds pure likelihoods. After
+        the loop each ``b_theta`` is re-centered to mean zero over the
+        training rows; the constant moves into ``beta0``, the function is
+        unchanged.
         """
-        if epochs is None:
-            raise ValueError(
-                "fit() needs epochs=. There is no default budget: a fixed one "
-                "over-spends on some workloads and under-spends on others "
-                "(docs/training-speed.md). Set a budget, or a generous one "
-                "with schedule='plateau' and freeze_patience= to stop early."
-            )
-        if schedule not in (None, "plateau"):
-            raise ValueError(f"unknown schedule {schedule!r}")
         if batch_size < 1:
             raise ValueError(f"batch_size must be at least 1, got {batch_size}")
         if seed is not None:
             torch.manual_seed(seed)
-        self._set_ranges(train_df, marginal_init=marginal_init)
-        if vc_warm_start:
-            self._vc_warm_start(train_df)
-        vc_penalized = self._vc_penalized()
-        # stage 1 for centered VC terms (issue #30): frozen OUT-OF-FOLD e_hat
-        # for the training rows — a plain tensor, so the Y-node loss has no
-        # gradient path into the treatment node (per-node factorization intact).
-        vc_ehat_train = self._vc_oof_stage(train_df, vc_oof_fit)
-
-        train_vals = self._tensorize(train_df)
-        val_vals = self._tensorize(val_df) if val_df is not None else train_vals
-
-        opt = self._make_optimizer(learning_rate)
-        best = self._best_store(restore_best)
-        sched = _FitSchedule(
-            self.order,
-            schedule,
-            learning_rate,
-            plateau_patience,
-            plateau_factor,
-            freeze_patience,
-            min_delta,
-            plateau_min_lr,
-        )
-        t0 = time.perf_counter()
-        t_offset = self.history["time"][-1] if self.history.get("time") else 0.0
-        train_acc: dict[str, float] = {}
-
-        for epoch in range(epochs):
+        self.calibrate(train_df)
+        ehat = self._vc_ehat_train(train_df, vc_ehat)
+        vals = self._tensorize(train_df)
+        opt = optimizer or torch.optim.Adam(self.parameters(), lr=learning_rate)
+        penalized = [
+            nd.shifts[g.on]
+            for nd in self.nodes.values()
+            for g in nd._vc_groups
+            if g.mods and nd.shifts[g.on].penalty > 0
+        ]
+        for epoch in range(1, epochs + 1):
             self.train()
-            train_acc = self._fit_epoch(
-                train_vals,
-                train_acc,
-                sched.frozen,
-                opt,
-                batch_size,
-                vc_ehat_train,
-                vc_penalized,
+            self.history["train"].append(
+                self._fit_epoch(vals, ehat, opt, batch_size, penalized)
             )
             self.eval()
-            if self._end_epoch(
-                opt=opt,
-                sched=sched,
-                best=best,
-                verbose=verbose,
-                epoch=epoch,
-                epochs=epochs,
-                train_acc=train_acc,
-                val_vals=val_vals,
-                t_start=(t0, t_offset),
-            ):
+            if callback is not None and callback(self, epoch, opt):
                 break
-            if epoch_callback is not None:
-                epoch_callback(self, epoch + 1)
-
-        if best is not None:  # restore per-node best-validation weights
-            self._load_best_weights(best)
-        self._recenter_vc(train_vals)
+        self._recenter_vc(vals)
         self.eval()
         return self
 
-    def _source_proxies(self, parents) -> dict[str, NodeSpec]:
-        """Give a proxy spec whose parents are sources.
-
-        A single-node proxy only has to reproduce one conditional, which the
-        parent marginals cannot influence — so each parent collapses to a
-        source node of the right kind.
-        """
-        out: dict[str, NodeSpec] = {}
-        for p in parents:
-            pn = self.spec[p]
-            out[p] = (
-                OrdinalNode(pn.levels)
-                if isinstance(pn, OrdinalNode)
-                else ContinuousNode([I(transform="affine")])
-            )
-        return out
-
-    def _ls_proxy_spec(self, name: str) -> dict[str, NodeSpec]:
-        """Give a throwaway all-``ls`` proxy spec of one node's conditional.
-
-        Same kind and transform, every parent an LS term, every parent a
-        source (their marginals cannot influence the conditional).
-        """
-        node_spec = self.spec[name]
-        nd = self.nodes[name]
-        proxy_spec = self._source_proxies(nd.parents)
-        ls_terms = [LS(p) for p in nd.parents]
-        if isinstance(node_spec, OrdinalNode):
-            proxy_spec[name] = OrdinalNode(node_spec.levels, ls_terms)
-        else:
-            proxy_spec[name] = ContinuousNode(
-                [
-                    I(
-                        transform=node_spec.transform,
-                        **dict(node_spec.transform_kwargs),
-                    ),
-                    *ls_terms,
-                ]
-            )
-        return proxy_spec
-
-    def _vc_warm_start(self, train_df: pd.DataFrame) -> None:
-        """Initialize every VC term's ``beta0`` from the classical solution.
-
-        The value comes from the all-``ls`` solution of the node's conditional.
-        Issue #28 recommends this warm start.
-
-        A throwaway proxy of the node (same kind/transform, every parent an LS
-        term, parent marginals irrelevant to the conditional because the joint
-        NLL decomposes per node) is fitted with the deterministic
-        :meth:`fit_classical`, and the ``on`` coefficient copied into ``beta0``
-        (for a binary ordinal treatment, the identified one-hot difference
-        ``w[1] - w[0]``). ``b_theta`` already starts at the zero function
-        (zero-initialized output layer). Runs once per term — the
-        ``warm_started`` buffer survives ``save``/``load``.
-        """
-        for name in self.order:
-            nd = self.nodes[name]
-            todo = [g for g in nd._vc_groups if not bool(nd.shifts[g[0]].warm_started)]
-            if not todo:
-                continue
-            proxy = CausalFlowDAG(self._ls_proxy_spec(name), device=str(self.device))
-            proxy.fit_classical(train_df[[*nd.parents, name]], verbose=False)
-            for g in todo:
-                w = proxy.nodes[name].shifts[g.on].weight.detach()
-                b0 = float(w[-1] - w[0]) if g.on_is_ord else float(w[0])
-                m = nd.shifts[g.on]
-                with torch.no_grad():
-                    m.beta0.fill_(b0)
-                m.warm_started.fill_(True)
-
-    @torch.no_grad()
-    def _predict_p1(self, on: str, df: pd.DataFrame) -> np.ndarray:
-        """Give ``P(on = 1 | pa_on)`` from this flow's ``on`` node.
-
-        The treatment is binary ordinal, so the value is
-        ``sigmoid(shift - theta_0)``.
-        """
-        nd = self.nodes[on]
-        values = self._tensorize(df, nd.parents)
-        return self._binary_p1(nd, values, len(df)).cpu().numpy()
-
-    def _vc_oof_stage(
-        self, train_df: pd.DataFrame, vc_oof_fit: dict | None = None
-    ) -> dict[str, dict[str, Tensor]] | None:
-        """Compute stage 1 of the two-stage centered-VC design, issue #30.
-
-        The result holds the frozen training-time propensities, as
-        ``{node: {on: (n,) tensor}}``.
-
-        The values are **out-of-fold** — K refits of the treatment node
-        only, each predicting its held-out fold (the DML cross-fitting
-        requirement; in-sample e_hat reintroduces the own-observation bias
-        and can be worse than no centering). Bookkeeping lands in
-        ``self.vc_center_info[(node, on)]`` (``e_oof``, ``fold_id``,
-        ``folds``, ``n``) so tests can assert the fold structure — a later
-        "simplification" to in-sample e_hat fails CI.
-        """
-        jobs = [
-            (name, g)
-            for name in self.order
-            for g in self.nodes[name]._vc_groups
-            if g.center
-        ]
-        if not jobs:
-            return None
-        self.vc_center_info = {}
-        np_dtype = self._np_dtype
-        out: dict[str, dict[str, Tensor]] = {}
-        rng_state = torch.get_rng_state()  # proxies reseed; keep fit reproducible
-        try:
-            for name, g in jobs:
-                e, fold_id = self._vc_oof_propensity(
-                    g.on, train_df, g.folds, vc_oof_fit
-                )
-                out.setdefault(name, {})[g.on] = torch.as_tensor(
-                    e.astype(np_dtype), device=self.device
-                )
-                self.vc_center_info[(name, g.on)] = {
-                    "folds": int(g.folds),
-                    "fold_id": fold_id,
-                    "e_oof": e.copy(),
-                    "n": len(train_df),
-                }
-        finally:
-            torch.set_rng_state(rng_state)
-        return out
-
-    def _vc_oof_propensity(
-        self, on: str, train_df: pd.DataFrame, k: int, vc_oof_fit: dict | None = None
-    ) -> tuple[np.ndarray, np.ndarray]:
-        """Compute the out-of-fold ``P(on=1|pa_on)``.
-
-        The function refits the ``on`` node K times, and only that node. Each
-        refit uses a single-node proxy whose parents are sources, because their
-        marginals cannot influence the conditional. Each refit then predicts the
-        fold it never saw.
-
-        A treatment with all-``ls`` terms uses :meth:`fit_classical`, which is
-        deterministic and takes seconds. Any other treatment uses a
-        fixed-budget Adam fit — ``vc_oof_fit`` overrides its keywords, see
-        :meth:`fit`.
-        """
-        on_nd = self.nodes[on]
-        if any(g.center for g in on_nd._vc_groups):
-            raise NotImplementedError(
-                f"treatment node {on!r} itself has a centered VC term. "
-                "Chained centering is not supported."
-            )
-        node_spec = self.spec[on]
-        proxy_spec = self._source_proxies(on_nd.parents)
-        terms = node_terms(node_spec)
-        proxy_spec[on] = OrdinalNode(2, terms)
-        all_ls = all(map(_covered_by_classical, terms))
-        cols = [*on_nd.parents, on]
-
-        n = len(train_df)
-        fold_id = np.random.default_rng(0).permutation(n) % k
-        e = np.empty(n, dtype=np.float64)
-        for j in range(k):
-            proxy = CausalFlowDAG(
-                proxy_spec,
-                device=str(self.device),
-                seed=0,
-                net_input_scaling=self.net_input_scaling,
-            )
-            held_in = train_df.iloc[fold_id != j][cols]
-            if all_ls:
-                proxy.fit_classical(held_in, verbose=False)
-            else:
-                fit_kw = {"epochs": 300, "learning_rate": 1e-2, "batch_size": 512}
-                fit_kw.update(vc_oof_fit or {})
-                proxy.fit(held_in, verbose=0, seed=0, restore_best=False, **fit_kw)
-            e[fold_id == j] = proxy._predict_p1(on, train_df.iloc[fold_id == j])
-        return e, fold_id
+    def _fit_epoch(
+        self,
+        vals: dict[str, Tensor],
+        ehat: dict[str, dict[str, Tensor]] | None,
+        opt: torch.optim.Optimizer,
+        batch_size: int,
+        penalized: list,
+    ) -> dict[str, float]:
+        """One shuffled pass over the rows; give the epoch-mean train NLL per node."""
+        n = len(next(iter(vals.values())))
+        acc = dict.fromkeys(self.order, 0.0)
+        for idx in torch.randperm(n, device=self.device).split(batch_size):
+            batch = {k: v[idx] for k, v in vals.items()}
+            per_node = self.node_log_prob(batch, vc_ehat=_slice_ehat(ehat, idx))
+            nlls = {k: -v.mean() for k, v in per_node.items()}
+            loss = torch.stack(list(nlls.values())).sum()
+            for m in penalized:  # the penalty joins the loss, not the history
+                loss = loss + m.penalty * m.l2() / n
+            opt.zero_grad()
+            loss.backward()
+            opt.step()
+            w = len(idx) / n
+            for k, v in nlls.items():
+                acc[k] += float(v.detach()) * w
+        return acc
 
     @torch.no_grad()
     def _recenter_vc(self, values: dict[str, Tensor]) -> None:
@@ -1598,7 +1147,6 @@ class CausalFlowDAG(nn.Module):
         max_iter: int = 400,
         tol: float = 1e-9,
         history_size: int = 50,
-        verbose: bool = True,
     ) -> dict:
         """Fit an all-``ls`` model the classical way.
 
@@ -1628,9 +1176,6 @@ class CausalFlowDAG(nn.Module):
             running to the iteration cap.
         history_size : int, optional
             L-BFGS memory, by default 50.
-        verbose : bool, optional
-            Log a one-line INFO summary on the ``tramdag.flow`` logger, by
-            default True.
 
         Returns
         -------
@@ -1670,9 +1215,7 @@ class CausalFlowDAG(nn.Module):
                 "term 'ls'. This spec has cs, ci or vc terms. Use fit() for "
                 "flexible models."
             )
-        self._set_ranges(
-            train_df, marginal_init=False
-        )  # L-BFGS needs no calibrated start
+        self.calibrate(train_df, marginal_init=False)  # L-BFGS needs no warm start
 
         self.double()  # parameters + buffers (xmin/xmax) -> float64, one call
         t0 = time.perf_counter()
@@ -1707,20 +1250,16 @@ class CausalFlowDAG(nn.Module):
                     ).sum()
                 )
             grad_norm = float(
-                torch.cat(
-                    [
-                        p.grad.reshape(-1)
-                        for p in self.parameters()
-                        if p.grad is not None
-                    ]
-                ).norm()
+                torch.nn.utils.get_total_norm(
+                    [p.grad for p in self.parameters() if p.grad is not None]
+                )
             )
             coefs = self.ls_coefficients()  # read while still float64
         finally:
             self.float()  # restore canonical float32 (lossy ~1e-7, harmless)
         self.eval()
 
-        report = {
+        return {
             "converged": converged,
             "n_iter": n_iter,
             "final_nll": final_nll,
@@ -1728,15 +1267,6 @@ class CausalFlowDAG(nn.Module):
             "seconds": time.perf_counter() - t0,
             "coefficients": coefs,
         }
-        if verbose:
-            logger.info(
-                "fit_classical: %d L-BFGS iters, NLL %.6f, %.2fs%s",
-                n_iter,
-                final_nll,
-                report["seconds"],
-                "" if converged else f"  (NLL still moving at {max_iter} iters)",
-            )
-        return report
 
     @torch.no_grad()
     def sample(
@@ -2015,10 +1545,8 @@ class CausalFlowDAG(nn.Module):
         """Write the model, its history and its provenance to a checkpoint.
 
         The file holds the spec and the weights, the training ``history``,
-        and a ``meta`` block with the tramdag version, the save time, the
-        device, and the machine that trained the model. A cached run
-        therefore stays self-describing: the file alone is enough to
-        rebuild a training-curve plot or to compare timings.
+        and a ``meta`` block with the tramdag version, the save time and the
+        device.
 
         Parameters
         ----------
@@ -2033,12 +1561,12 @@ class CausalFlowDAG(nn.Module):
             "tramdag_version": __version__,
             "saved_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
             "device": str(self.device),
-            "machine": machine_info(),
         }
         torch.save(
             {
                 "spec": spec_to_dict(self.spec),
                 "net_input_scaling": self.net_input_scaling,
+                "init": self.init,
                 "state_dict": self.state_dict(),
                 "history": self.history,
                 "meta": meta,
@@ -2050,9 +1578,7 @@ class CausalFlowDAG(nn.Module):
     def load(cls, path: str | Path, device: str = "cpu") -> CausalFlowDAG:
         """Restore a model from a checkpoint.
 
-        ``flow.history`` and ``flow.meta`` are refilled. A cached model can
-        therefore still produce training and diagnostic plots, and can
-        report the machine that trained it.
+        ``flow.history`` and ``flow.meta`` are refilled.
 
         Parameters
         ----------
@@ -2071,18 +1597,9 @@ class CausalFlowDAG(nn.Module):
             spec_from_dict(ckpt["spec"]),
             device=device,
             net_input_scaling=ckpt.get("net_input_scaling"),
+            init=ckpt.get("init", "torch"),
         )
-        # A loaded model carries trained parameters, so both first-fit guards
-        # must already be closed: re-fitting with marginal_init=True would
-        # otherwise reset the intercept to the data marginal.
-        for name in flow.order:
-            node = flow.nodes[name]
-            node._net_scaled = True
-            if node.kind == "continuous":
-                node.ut._fitted = True
-            elif isinstance(node.intercept, SimpleIntercept):
-                node.intercept._marginal_inited = True
-        flow.load_state_dict(ckpt["state_dict"])
+        flow.load_state_dict(ckpt["state_dict"])  # includes the `calibrated` flag
         flow.history = ckpt["history"]
         flow.meta = ckpt["meta"]
         flow.eval()

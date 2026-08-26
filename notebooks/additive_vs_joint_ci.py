@@ -42,12 +42,29 @@
 # space, and that is precisely what `intercept_contributions` surfaces.
 
 # %%
+import copy
+
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import torch
 
 from tramdag import CI, CausalFlowDAG, ContinuousNode
+
+
+def keep_best(flow, val):
+    """The former ``restore_best`` as a callback: snapshot the best-validation
+    weights; load them back after ``fit``.
+    """
+    best = {"nll": np.inf, "state": None}
+
+    def cb(f, epoch, opt):
+        nll = sum(f.nll(val).values())
+        if nll < best["nll"]:
+            best.update(nll=nll, state=copy.deepcopy(f.state_dict()))
+
+    return best, cb
+
 
 # %% [markdown]
 # ## The data
@@ -95,7 +112,9 @@ flow_joint = make_flow(joint=True)
 flow_add = make_flow(joint=False)
 
 for f in (flow_joint, flow_add):
-    f.fit(train, val, epochs=1200, learning_rate=1e-2, verbose=0, restore_best=True)
+    best, cb = keep_best(f, val)
+    f.fit(train, epochs=1200, learning_rate=1e-2, callback=cb)
+    f.load_state_dict(best["state"])
 
 # Both fit the data well; the joint model is only marginally better on held-out
 # likelihood. A flexible additive Bernstein intercept can *mimic* a lot of

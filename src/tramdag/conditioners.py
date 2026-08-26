@@ -311,7 +311,6 @@ class VaryingCoef(nn.Module):
         self.penalty = float(penalty)
         self.beta0 = nn.Parameter(torch.zeros(()))
         self.register_buffer("center", torch.zeros(()))
-        self.register_buffer("warm_started", torch.tensor(False))
         if n_features > 0:
             # zero-initialised output: beta(x) == beta0 at init
             self.net = _mlp(

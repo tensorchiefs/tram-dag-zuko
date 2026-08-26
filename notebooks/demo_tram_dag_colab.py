@@ -145,9 +145,9 @@ plt.show()
 # Each node gets a monotone Bernstein transform. The terms say how parents
 # enter (`I(...)` = the parents control the transform parameters, for maximal
 # flexibility). Training maximizes the exact joint likelihood with one Adam.
-# `schedule="plateau"` + `freeze_patience` lets each node decay its
-# learning rate **independently** and leave training after it converges.
-# The fit stops itself.
+# `fit` is a plain loop; validation, the learning-rate schedule and early
+# stopping are a few lines of your own through `callback=` — here torch's
+# `ReduceLROnPlateau` on the validation NLL, and a stop after 30 flat epochs.
 
 # %%
 spec = {
@@ -156,55 +156,52 @@ spec = {
     "x3": ContinuousNode(I("x1", "x2")),
 }
 
+
+def early_stopping(val, patience):
+    """Validation NLL per epoch, ReduceLROnPlateau, stop after `patience` flat epochs."""
+    log = {"val": [], "lr": []}
+
+    def cb(f, epoch, opt):
+        if not log["lr"]:
+            log["sched"] = torch.optim.lr_scheduler.ReduceLROnPlateau(
+                opt, factor=0.3, patience=patience // 3
+            )
+        nll = sum(f.nll(val).values())
+        log["val"].append(nll)
+        log["lr"].append(opt.param_groups[0]["lr"])
+        log["sched"].step(nll)
+        return len(log["val"]) - int(np.argmin(log["val"])) > patience
+
+    return log, cb
+
+
 torch.manual_seed(0)
 flow = CausalFlowDAG(spec, device=DEVICE)
+log, cb = early_stopping(val, patience=30)
 t0 = time.perf_counter()
-flow.fit(
-    train,
-    val,
-    epochs=400,
-    learning_rate=1e-1,
-    batch_size=4096,
-    verbose=50,
-    schedule="plateau",
-    plateau_patience=10,
-    freeze_patience=30,
-    marginal_init=True,
-)
+flow.fit(train, epochs=400, learning_rate=1e-1, batch_size=4096, callback=cb)
 t_fit = time.perf_counter() - t0
 print(
     f"\nfitted on {DEVICE} in {t_fit:.1f}s "
-    f"({len(flow.history['val'])} epochs, then froze itself)"
+    f"({len(log['val'])} epochs, then the callback stopped it)"
 )
 
 # %% [markdown]
-# Training diagnostics come for free. `fit` records per-node train/val NLL,
-# learning rates, wall-clock time, and the freeze epochs. Watch the nodes leave
-# training one by one:
+# `fit` records the per-node train NLL; the callback recorded the validation
+# NLL and the learning rate. Watch the plateau rule step the rate down:
 
 # %%
-hist = flow.history
-ep = np.arange(1, len(hist["val"]) + 1)
-tot_tr = np.array([sum(d.values()) for d in hist["train"]])
-tot_va = np.array([sum(d.values()) for d in hist["val"]])
+ep = np.arange(1, len(log["val"]) + 1)
+tot_tr = np.array([sum(d.values()) for d in flow.history["train"]])
+tot_va = np.array(log["val"])
 fig, ax = plt.subplots(figsize=(7.5, 3.6))
 ax.plot(ep, tot_tr, label="train NLL (total)")
 ax.plot(ep, tot_va, label="val NLL (total)")
-for _, (name, e) in enumerate(
-    sorted(hist.get("frozen", {}).items(), key=lambda kv: kv[1])
-):
+for e in np.nonzero(np.diff(log["lr"]) < 0)[0] + 1:
     ax.axvline(e, ls="--", lw=1, color="gray")
-    ax.annotate(
-        f" {name} frozen",
-        (e, ax.get_ylim()[1]),
-        rotation=90,
-        va="top",
-        fontsize=8,
-        color="gray",
-    )
 ax.set_ylim(tot_va.min() - 0.02, tot_va.min() + 0.6)  # zoom past the initial drop
 ax.set_xlabel("epoch"), ax.set_ylabel("NLL"), ax.legend()
-ax.set_title("training curve — per-node plateau decay, then self-freezing")
+ax.set_title("training curve — dashed: the plateau rule lowered the learning rate")
 fig.tight_layout()
 plt.show()
 
@@ -331,17 +328,8 @@ fits = {"bernstein": flow}  # already trained above
 for tr in ["spline", "affine"]:
     torch.manual_seed(0)
     f = CausalFlowDAG(make_spec(tr), device=DEVICE)
-    f.fit(
-        train,
-        val,
-        epochs=400,
-        learning_rate=1e-2,
-        batch_size=4096,
-        verbose=0,
-        schedule="plateau",
-        plateau_patience=10,
-        freeze_patience=30,
-    )
+    _, cb = early_stopping(val, patience=30)
+    f.fit(train, epochs=400, learning_rate=1e-2, batch_size=4096, callback=cb)
     fits[tr] = f
 print("held-out NLL (lower is better):")
 for tr, f in fits.items():

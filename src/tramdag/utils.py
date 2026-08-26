@@ -1,22 +1,16 @@
 """Helpers that are useful around a fit without being part of one.
 
-Two of them: :func:`config_section`, which picks a section out of an
-already-parsed configuration, and :func:`machine_info`, the environment
-snapshot ``save`` stores with a model.
-
-Neither is about causal modelling, which is why they live together here
-rather than being spread through the modelling modules.
-
-Nothing is imported at module level: reading a config needs no dependency at
-all, and the environment snapshot pulls in ``torch`` and ``platform`` only
-when it is actually called.
+:func:`config_section` picks a section out of an already-parsed
+configuration. It is not about causal modelling, which is why it lives here
+rather than in a modelling module, and it imports nothing: reading a config
+needs no dependency at all.
 """
 
 # %% imports ---------------------------------------------------------------------------
 from __future__ import annotations
 
 # %% global variables ------------------------------------------------------------------
-__all__ = ["config_section", "machine_info"]
+__all__ = ["config_section"]
 
 
 # %% public functions ------------------------------------------------------------------
@@ -76,51 +70,3 @@ def config_section(document: dict, *keys: str) -> dict:
         raise ValueError(f"{where} is {type(node).__name__}, not a mapping")  # noqa: TRY004
 
     return dict(node)
-
-
-def machine_info() -> dict:
-    """Describe the machine and the software environment.
-
-    The snapshot holds the host name, the operating system, the CPU and GPU,
-    the core count, the RAM size, and the versions of python, torch, zuko and
-    tramdag. ``save`` stores it with the model, so timing and benchmark
-    numbers stay comparable across machines.
-
-    Returns
-    -------
-    dict
-        One key per property. ``ram_gb`` is ``None`` off POSIX, where the
-        page-count call does not exist.
-    """
-    import os
-    import platform
-    import socket
-
-    import torch
-
-    info: dict = {
-        "hostname": socket.gethostname().split(".")[0],
-        "os": f"{platform.system()} {platform.release()}",
-        "machine": platform.machine(),
-        "processor": platform.processor() or platform.machine(),
-        "cpu_count": os.cpu_count(),
-        "python": platform.python_version(),
-        "torch": torch.__version__,
-        "cuda": (torch.cuda.get_device_name(0) if torch.cuda.is_available() else None),
-        "mps": bool(
-            getattr(torch.backends, "mps", None) and torch.backends.mps.is_available()
-        ),
-    }
-    import zuko  # a hard dependency: tramdag cannot import without it
-
-    from . import __version__
-
-    info["zuko"] = zuko.__version__
-    info["tramdag"] = __version__
-    try:  # total RAM (POSIX)
-        info["ram_gb"] = round(
-            os.sysconf("SC_PAGE_SIZE") * os.sysconf("SC_PHYS_PAGES") / 1e9, 1
-        )
-    except (ValueError, OSError, AttributeError):
-        info["ram_gb"] = None
-    return info

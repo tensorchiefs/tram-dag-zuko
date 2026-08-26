@@ -33,11 +33,28 @@
 # confounding.
 
 # %%
+import copy
+
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
 from tramdag import CS, LS, VC, CausalFlowDAG, ContinuousNode, I, OrdinalNode
+
+
+def keep_best(flow, val):
+    """The former ``restore_best`` as a callback: snapshot the best-validation
+    weights; load them back after ``fit``.
+    """
+    best = {"nll": np.inf, "state": None}
+
+    def cb(f, epoch, opt):
+        nll = sum(f.nll(val).values())
+        if nll < best["nll"]:
+            best.update(nll=nll, state=copy.deepcopy(f.state_dict()))
+
+    return best, cb
+
 
 plt.rcParams["figure.dpi"] = 110
 
@@ -104,7 +121,7 @@ def cheap_all_ls():
 
 
 screen = CausalFlowDAG(cheap_all_ls(), seed=0)
-screen.fit_classical(train, verbose=False)
+screen.fit_classical(train)
 print(screen.effect_modifier_scan(train, "Y", t="T"))
 
 # %% [markdown]
@@ -132,7 +149,7 @@ def simulate_linear_x1(n, seed):
 
 well_specified = simulate_linear_x1(4500, 1)
 screen2 = CausalFlowDAG(cheap_all_ls(), seed=0)
-screen2.fit_classical(well_specified, verbose=False)
+screen2.fit_classical(well_specified)
 print(screen2.effect_modifier_scan(well_specified, "Y", t="T"))
 
 # %% [markdown]
@@ -157,16 +174,9 @@ spec = {
     "Y": ContinuousNode([CS("X1", "X2", "X3"), VC("X2", "X3", t="T")]),
 }
 flow = CausalFlowDAG(spec, seed=0)
-flow.fit(
-    train,
-    val,
-    epochs=300,
-    learning_rate=1e-2,
-    batch_size=512,
-    verbose=0,
-    seed=0,
-    restore_best=True,
-)
+best, cb = keep_best(flow, val)
+flow.fit(train, epochs=300, learning_rate=1e-2, batch_size=512, seed=0, callback=cb)
+flow.load_state_dict(best["state"])
 print(flow.to_matrix())
 
 # %% [markdown]
@@ -238,7 +248,9 @@ print(f"max |beta(x) - (u(T=1) - u(T=0))| = {np.abs(beta_hat - (u1 - u0)).max():
 # $\tau = -1$, and a quadratic prognostic part fitted with a linear term.
 # `center=True` replaces $t$ by $t - \hat e(x)$ using **cross-fitted**
 # (out-of-fold) propensities, so the head sees the part of the treatment that
-# the covariates do not explain.
+# the covariates do not explain. Stage 1 — the propensities — is yours: any
+# classifier, predicted out of fold, handed to `fit(vc_ehat=)`. Here, five
+# classical fits of the treatment spec.
 
 # %%
 TAU = -1.0
@@ -254,6 +266,19 @@ def confounded(n, seed):
 
 c_train, c_val, c_test = confounded(5400, 0), confounded(600, 7), confounded(3000, 1000)
 
+# stage 1 of the centered design, the caller's job: cross-fitted P(T=1|X), each
+# fold predicted by a treatment model that never saw it (the DML requirement)
+fold_id = np.random.default_rng(0).permutation(len(c_train)) % 5
+e_oof = np.empty(len(c_train))
+for j in range(5):
+    t_spec = {
+        "X": ContinuousNode([I(transform="affine")]),
+        "T": OrdinalNode(2, [LS("X")]),
+    }
+    proxy = CausalFlowDAG(t_spec, seed=0)
+    proxy.fit_classical(c_train.iloc[fold_id != j][["X", "T"]])
+    e_oof[fold_id == j] = proxy.pmf(c_train.iloc[fold_id == j], "T")[:, 1]
+
 for center in (False, True):
     spec_c = {
         "X": ContinuousNode([I(transform="affine")]),
@@ -262,16 +287,17 @@ for center in (False, True):
         "Y": ContinuousNode([LS("X"), VC("X", center=center, t="T")]),
     }
     fc = CausalFlowDAG(spec_c, seed=0)
+    best, cb = keep_best(fc, c_val)
     fc.fit(
         c_train,
-        c_val,
         epochs=250,
         learning_rate=1e-2,
         batch_size=512,
-        verbose=0,
         seed=0,
-        restore_best=True,
+        callback=cb,
+        vc_ehat={"Y": {"T": e_oof}} if center else None,
     )
+    fc.load_state_dict(best["state"])
     b = fc.varying_coef("Y", c_test)
     print(
         f"center={center!s:5s}  mean |beta - tau| = {np.abs(b - TAU).mean():.3f}"

@@ -83,7 +83,6 @@ DEFAULT_TRANSFORM = "bernstein"
 _OPTION_DEFAULTS = {
     "penalty": None,  # VC: L2 weight on b_theta
     "center": False,  # VC: propensity centering
-    "center_folds": 5,  # VC: folds of the out-of-fold refits
     "transform": None,  # I: basis of the monotone transform
     "transform_kwargs": None,  # I: kwargs of the basis, as sorted pairs
     "units": None,  # I/CS/VC: hidden layers of the term's network
@@ -263,6 +262,11 @@ def _check_vc_term(name: str, term: Term, spec: dict[str, NodeSpec]) -> tuple[st
             f"Node '{name}': VC(center=...) needs a binary ordinal "
             f"treatment, and '{on}' is continuous. E[T|x] centering "
             "is a follow-up."
+        )
+    if term.center and any(t.effect == "VC" and t.center for t in node_terms(on_node)):
+        raise ValueError(
+            f"Node '{name}': treatment '{on}' carries a centered VC term itself; "
+            "chained centering is not supported."
         )
     return (on,)
 
@@ -565,7 +569,6 @@ def varying_coefficient(
     t: str,
     penalty: float = 1.0,
     center: bool = False,
-    center_folds: int = 5,
     units: list[int] | tuple[int, ...] | None = None,
     activation: str | None = None,
 ) -> Term:
@@ -618,11 +621,6 @@ def varying_coefficient(
         ``beta(x) * (x_t - e_hat(pa_t))`` — the Robinson/R-learner
         orthogonalization inside the likelihood. Requires a binary ordinal
         ``t``.
-    center_folds : int, optional
-        Fold count for the out-of-fold refits under ``center=True``, by
-        default 5 — the standard cross-fitting count of double machine
-        learning. Must be >= 2. Each fold costs one refit of the treatment
-        node.
     units : list[int] | tuple[int, ...] | None, optional
         Hidden layers of ``b_theta``, by default ``[16]`` — see
         :class:`tramdag.conditioners.VaryingCoef` for why that size.
@@ -635,14 +633,13 @@ def varying_coefficient(
     Raises
     ------
     ValueError
-        If ``t`` is also a modifier, if ``penalty`` is negative, or if
-        ``center_folds`` is below 2.
+        If ``t`` is also a modifier or if ``penalty`` is negative.
 
     Notes
     -----
-    With ``center=True``, training uses **out-of-fold** ``e_hat``:
-    ``center_folds``-fold refits of the ``t`` node only, the DML
-    requirement — in-sample centering can be *worse* than none. The values
+    With ``center=True``, training needs **out-of-fold** ``e_hat`` for every
+    training row, passed as ``fit(vc_ehat=)`` — the DML cross-fitting
+    requirement; in-sample centering can be *worse* than none. The values
     are frozen as data, so no gradient reaches the ``t`` node from this
     node's loss. Inference (``log_prob``/``sample``/``abduct``/``pmf``)
     recomputes ``e_hat`` from the flow's own fitted ``t`` node — the
@@ -658,15 +655,12 @@ def varying_coefficient(
         )
     if penalty < 0:
         raise ValueError(f"VC(): penalty must be >= 0, got {penalty}.")
-    if center_folds < 2:
-        raise ValueError(f"VC(): center_folds must be >= 2, got {center_folds}.")
     return Term(
         "VC",
         (t, *modifiers),
         _options(
             penalty=float(penalty),
             center=center,
-            center_folds=int(center_folds),
             units=tuple(units) if units else None,
             activation=activation,
         ),
@@ -840,9 +834,9 @@ class Term:
         Effect-specific settings as canonical ``(key, value)`` pairs:
         sorted by key, defaults omitted. Attribute access serves them
         with their defaults, so ``term.penalty`` stays valid on every
-        term. Keys: ``penalty``, ``center`` and ``center_folds`` (VC,
-        see :func:`VC`); ``transform`` and ``transform_kwargs`` (I, the
-        basis of the monotone transform, kwargs stored as sorted pairs);
+        term. Keys: ``penalty`` and ``center`` (VC, see :func:`VC`);
+        ``transform`` and ``transform_kwargs`` (I, the basis of the monotone
+        transform, kwargs stored as sorted pairs);
         ``units`` (hidden layers of the term's network);
         ``allow_interaction`` (multi-parent I: one joint net or one net
         per parent).
