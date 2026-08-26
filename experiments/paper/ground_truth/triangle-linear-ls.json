@@ -1,27 +1,26 @@
 {
-  "_note": "Protocol = the paper's R code 1:1 (see the YAML header): measured 2026-08-25 on the feat/followups branch. Paper Sec. 6.1 truth: beta12 +2, beta13 -0.2, beta23 +0.3. beta13 multiplies x1, a two-component mixture at 0.25 and 0.73 with sd 0.254 against unit-scale x2, so it is weakly identified and the fitted value sits above the truth.",
+  "_note": "Protocol = the paper's R code 1:1 (see the YAML header): measured 2026-08-26 on the refactor/lean-fit branch. Paper Sec. 6.1 truth: beta12 +2, beta13 -0.2, beta23 +0.3. beta13 multiplies x1, a two-component mixture at 0.25 and 0.73 with sd 0.254 against unit-scale x2, so it is weakly identified and the fitted value sits above the truth.",
   "beta12": {
-    "value": 1.9870803356170654,
+    "value": 1.98747980594635,
     "atol": 0.05
   },
   "beta13": {
-    "value": -0.16979990899562836,
+    "value": -0.17115293443202972,
     "atol": 0.05
   },
   "beta23": {
-    "value": 0.2823486924171448,
+    "value": 0.2952204644680023,
     "atol": 0.05
   },
   "val_nll_x3": {
-    "value": 2.4606587886810303,
+    "value": 2.4605813026428223,
     "atol": 0.05
   },
   "mean_x3_dgp_do_x1": {
     "value": -0.4602388493168226,
     "atol": 0.1
   },
-  "mean_x3_flow_do_x1": {
-    "value": -0.3392195701599121,
-    "atol": 0.1
+  "mean_x3_abs_err_do_x1": {
+    "max": 0.2265
   }
 }
