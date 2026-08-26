@@ -1,26 +1,26 @@
 {
   "_note": "Protocol = the paper's R code 1:1 (see the YAML header): measured 2026-08-25 on the feat/followups branch. Paper Fig. 7/15/16. The complex shift must recover -f(x2) up to a constant; cs_curve_max_abs_err is measured after anchoring at x2=0.",
   "beta12": {
-    "value": 1.9870803356170654,
+    "value": 1.9870796203613281,
     "atol": 0.05
   },
   "beta13": {
-    "value": -0.16879042983055115,
+    "value": -0.16825422644615173,
     "atol": 0.05
   },
   "val_nll_x3": {
-    "value": 2.4608659744262695,
+    "value": 2.4608421325683594,
     "atol": 0.05
   },
   "cs_curve_max_abs_err": {
-    "max": 0.2126
+    "max": 0.1991
   },
   "mean_x3_dgp_do_x1": {
     "value": 0.9375383689278238,
     "atol": 0.1
   },
   "mean_x3_flow_do_x1": {
-    "value": 1.043830394744873,
+    "value": 1.0485937595367432,
     "atol": 0.1
   }
 }

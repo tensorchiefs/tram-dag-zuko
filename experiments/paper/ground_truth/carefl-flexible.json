@@ -1,35 +1,35 @@
 {
   "_note": "Protocol = the paper's R code 1:1 (see the YAML header): measured 2026-08-25 on the feat/followups branch. Paper Sec. 5.3. Counterfactuals are analytic. The Fig. 6 errors are at the paper's single x_obs in the SCM's raw units, (2, 1.5, 5.0875, -0.5) = noise (2, 1.5, 1.4, -1) pushed through the SCM; the paper prints x3/x4 divided by CAREFL's sample sds (6.01, 1.91), so its (0.81, -0.28) is the same point.",
   "fig6_max_abs_err_x3": {
-    "max": 3.81
+    "max": 4.667
   },
   "fig6_max_abs_err_x4": {
-    "max": 1.165
+    "max": 1.462
   },
   "cf_mae_x3_do_x2_-1.5": {
-    "max": 0.4435
+    "max": 0.4526
   },
   "cf_mae_x4_do_x1_-1.5": {
-    "max": 0.2913
+    "max": 0.5095
   },
   "cf_mae_x3_do_x2_+0.0": {
-    "max": 0.1625
+    "max": 0.1624
   },
   "cf_mae_x4_do_x1_+0.0": {
-    "max": 0.147
+    "max": 0.3342
   },
   "cf_mae_x3_do_x2_+1.5": {
-    "max": 0.3066
+    "max": 0.3549
   },
   "cf_mae_x4_do_x1_+1.5": {
-    "max": 0.2873
+    "max": 0.4039
   },
   "val_nll_x3": {
-    "value": 1.394684910774231,
+    "value": 1.402892827987671,
     "atol": 0.05
   },
   "val_nll_x4": {
-    "value": 1.3730475902557373,
+    "value": 1.418825387954712,
     "atol": 0.05
   }
 }

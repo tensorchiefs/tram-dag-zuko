@@ -1,26 +1,26 @@
 {
   "_note": "Protocol = the paper's R code 1:1 (see the YAML header): measured 2026-08-25 on the feat/followups branch. As triangle-atan-cs with a second nonlinear f. sin has two turning points on the grid, and the reference shift net (hidden_features_CS = c(2, 25, 25, 2), sigmoid) has a 2-unit input bottleneck: it tracks -f(x2) through the middle and saturates at both ends, so cs_curve_max_abs_err sits where the plateaus start (|x2| > 0.75) rather than near zero. That is the reference architecture's capacity, not a fit failure -- the paper's own claim is made with atan, which is monotone on the grid, and triangle-atan-cs recovers it.",
   "beta12": {
-    "value": 1.9870803356170654,
+    "value": 1.9870796203613281,
     "atol": 0.05
   },
   "beta13": {
-    "value": -0.19903810322284698,
+    "value": -0.19914016127586365,
     "atol": 0.05
   },
   "val_nll_x3": {
-    "value": 2.4763522148132324,
+    "value": 2.4763545989990234,
     "atol": 0.05
   },
   "cs_curve_max_abs_err": {
-    "max": 2.539
+    "max": 2.491
   },
   "mean_x3_dgp_do_x1": {
     "value": 2.1092599399621044,
     "atol": 0.1
   },
   "mean_x3_flow_do_x1": {
-    "value": 2.2082629203796387,
+    "value": 2.20241379737854,
     "atol": 0.1
   }
 }

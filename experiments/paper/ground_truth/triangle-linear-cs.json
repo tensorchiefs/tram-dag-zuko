@@ -1,26 +1,26 @@
 {
   "_note": "Protocol = the paper's R code 1:1 (see the YAML header): measured 2026-08-25 on the feat/followups branch. Paper App. C.3.3 / Fig. 17, the misspecified case: the DGP's x2 -> x3 effect is linear (-0.3*x2), and a complex shift fitted to it must reproduce that straight line (the flow learns -f(x2) up to a constant, so +0.3*x2). cs_curve_max_abs_err is measured after anchoring both curves at x2 = 0.",
   "beta12": {
-    "value": 1.9870803356170654,
+    "value": 1.9870796203613281,
     "atol": 0.05
   },
   "beta13": {
-    "value": -0.1747378259897232,
+    "value": -0.1748318374156952,
     "atol": 0.05
   },
   "val_nll_x3": {
-    "value": 2.4607198238372803,
+    "value": 2.460723400115967,
     "atol": 0.05
   },
   "cs_curve_max_abs_err": {
-    "max": 0.29
+    "max": 0.2754
   },
   "mean_x3_dgp_do_x1": {
     "value": -0.4602388493168226,
     "atol": 0.1
   },
   "mean_x3_flow_do_x1": {
-    "value": -0.3198793828487396,
+    "value": -0.3224329352378845,
     "atol": 0.1
   }
 }
