@@ -15,9 +15,9 @@
 #   * no learning-rate schedule, no early stopping, final weights.
 # Known deviations, all framework-level and documented in CLAUDE.md: the
 # transform is pre-scaled from the train 5%/95% quantiles instead of the
-# reference's min-max scaling; weights start from torch's default init, not
-# Keras glorot; the R script runs unseeded, so every seed below is a repo
-# choice.
+# reference's min-max scaling; the R script runs unseeded, so every seed
+# below is a repo choice. Weights start from Keras' glorot_uniform / zero
+# bias like the reference (`init: glorot`).
 
 paper_protocol: &paper_protocol
   n_train: 40000          # dgp(40000)
@@ -33,6 +33,7 @@ paper_protocol: &paper_protocol
   n_coeffs: 20
   dgp_seed: 42
   init_seed: 7
+  init: glorot                # Keras Dense default: glorot_uniform, zero bias
   net_input_scaling:          # the triangle scripts feed the nets raw parents
   shuffle_seed: 0
   sample_seed: 0          # sampling for the distribution comparisons

@@ -13,12 +13,15 @@
 #     factor 0.1, patience 50, min_lr 1e-7, no min_delta (strict <);
 #   * make_model: one net per node, dense(10, tanh) -> dense(100, tanh) ->
 #     dense(len_theta), M = 30 so len_theta = 31; final weights, no early stop.
-# Known deviations, all framework-level and documented in CLAUDE.md: the
-# plateau rule decays each node on its own validation NLL (the reference
-# decays one optimizer on the sum); the transform is pre-scaled from the train
-# 5%/95% quantiles instead of min-max to [0, 1]; the intercept net's output
-# layer has no bias (Keras dense has one); torch init and Adam eps 1e-8 vs
-# Keras glorot and 1e-7; torch cannot replay R's stream, so every seed below
+# The plateau rule is torch's ReduceLROnPlateau on the summed validation NLL,
+# global like the reference's, and the weights start from Keras' glorot_uniform
+# / zero bias (`init: glorot`) — under this full-batch protocol the init
+# decides the fit (VACA do(x2) error 0.52/0.33/0.13 with torch's default init,
+# 0.035/0.006/0.007 with glorot; measured 2026-08-26). Known deviations, all
+# framework-level and documented in CLAUDE.md: the transform is pre-scaled
+# from the train 5%/95% quantiles instead of min-max to [0, 1]; the intercept
+# net's output layer has no bias (Keras dense has one); Adam eps 1e-8 vs 1e-7
+# (measured: no effect); torch cannot replay R's stream, so every seed below
 # is a repo choice.
 #
 variants:
@@ -43,6 +46,7 @@ variants:
     activation: tanh            # make_model's activation
     dgp_seed: 42                # repo choice
     init_seed: 7                # repo choice
+    init: glorot                # Keras Dense default: glorot_uniform, zero bias
     net_input_scaling: minmax   # comparison/utils.R::scale_df: parents scaled to [0, 1]
     shuffle_seed: 0             # full batch: the shuffle seed has no effect
     sample_seed: 1

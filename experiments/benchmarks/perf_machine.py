@@ -147,6 +147,53 @@ def _output_dir(out_arg: str | None) -> Path:
 
 
 # %% public functions ------------------------------------------------------------------
+def machine_info() -> dict:
+    """Describe the machine and the software environment.
+
+    The snapshot holds the host name, the operating system, the CPU and GPU,
+    the core count, the RAM size, and the versions of python, torch, zuko and
+    tramdag, so the collected numbers stay comparable across machines.
+
+    Returns
+    -------
+    dict
+        One key per property. ``ram_gb`` is ``None`` off POSIX, where the
+        page-count call does not exist.
+    """
+    import os
+    import platform
+    import socket
+
+    import torch
+
+    info: dict = {
+        "hostname": socket.gethostname().split(".")[0],
+        "os": f"{platform.system()} {platform.release()}",
+        "machine": platform.machine(),
+        "processor": platform.processor() or platform.machine(),
+        "cpu_count": os.cpu_count(),
+        "python": platform.python_version(),
+        "torch": torch.__version__,
+        "cuda": (torch.cuda.get_device_name(0) if torch.cuda.is_available() else None),
+        "mps": bool(
+            getattr(torch.backends, "mps", None) and torch.backends.mps.is_available()
+        ),
+    }
+    import zuko  # a hard dependency: tramdag cannot import without it
+
+    from tramdag import __version__
+
+    info["zuko"] = zuko.__version__
+    info["tramdag"] = __version__
+    try:  # total RAM (POSIX)
+        info["ram_gb"] = round(
+            os.sysconf("SC_PAGE_SIZE") * os.sysconf("SC_PHYS_PAGES") / 1e9, 1
+        )
+    except (ValueError, OSError, AttributeError):
+        info["ram_gb"] = None
+    return info
+
+
 def vaca_dgp(n: int, seed: int = 42) -> pd.DataFrame:
     """Draw the bimodal benchmark SCM, written out so this file stands alone.
 
@@ -222,11 +269,9 @@ def run_workload(name: str, device: str) -> dict:
     torch.manual_seed(0)
     flow = CausalFlowDAG(w["spec"](), device=device)
     # warm-up: kernel compilation / first-touch allocations, excluded from timing
-    flow.fit(train, val, epochs=3, learning_rate=1e-2, batch_size=w["batch"], verbose=0)
+    flow.fit(train, epochs=3, learning_rate=1e-2, batch_size=w["batch"])
     t0 = time.perf_counter()
-    flow.fit(
-        train, val, epochs=EPOCHS, learning_rate=1e-2, batch_size=w["batch"], verbose=0
-    )
+    flow.fit(train, epochs=EPOCHS, learning_rate=1e-2, batch_size=w["batch"])
     fit_s = time.perf_counter() - t0
 
     t0 = time.perf_counter()
@@ -247,7 +292,7 @@ def run_workload(name: str, device: str) -> dict:
         "sample_100k_s": round(sample_s, 2),
         "abduct_10k_s": round(abduct_s, 2),
         # cross-machine sanity check: same seed + data -> NLL must be ~equal
-        "final_val_nll": round(sum(flow.history["val"][-1].values()), 4),
+        "final_val_nll": round(sum(flow.nll(val).values()), 4),
         "_sample_mean_x_last": round(float(samp.iloc[:, -1].mean()), 4),
     }
 
@@ -313,7 +358,7 @@ def main() -> None:
         report(args.report)
         return
 
-    info = td.machine_info()
+    info = machine_info()
     devices = args.devices or available_devices()
     print(
         f"tramdag {info['tramdag']} | torch {info['torch']} | "
