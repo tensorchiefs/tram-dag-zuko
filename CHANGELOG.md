@@ -2,8 +2,71 @@
 
 ## 0.4.0 (unreleased)
 
+### Changed (breaking) — `fit` is one loop, the strategies are yours
+
+`CausalFlowDAG.fit` shrank from 18 keyword arguments to a minibatch Adam loop
+with two hooks (`flow.py` 2089 → 1606 lines). Three independent reviews of the
+file agreed on the cut: what left was training *strategy* — choices tuned on
+this repository's own DGPs — not the TRAM-DAG model, and each of them had a
+default the paper replication or the tests had to switch off.
+
+- **`fit(train_df, *, epochs, learning_rate=1e-2, batch_size=512, seed=None,
+  optimizer=None, callback=None, vc_ehat=None)`.** One optimizer over all
+  parameters (the per-node NLLs have independent gradients, so this equals
+  per-node training); `optimizer=` takes any torch optimizer, which is how a
+  `torch.optim.lr_scheduler` attaches; `callback(flow, epoch, optimizer)`
+  runs after every epoch and stops the fit on `True`. `flow.history` holds
+  the per-node train NLL per epoch and nothing else. `epochs` is a required
+  keyword.
+- **Gone from `fit`, with what replaces them** (all shown in
+  `docs/fitting.md`): `val_df` (compute `flow.nll(val_df)` in the callback);
+  `schedule="plateau"`, `plateau_patience`, `plateau_factor`,
+  `plateau_min_lr`, `min_delta` (torch's `ReduceLROnPlateau` on the
+  optimizer you pass — the paper's VACA/CAREFL replication now runs the
+  reference's *global* rule instead of the per-node approximation that was
+  a documented deviation); `freeze_patience` and the per-node freeze
+  (`experiments/benchmarks/bench_training.py::_PerNodePlateau`, the recipe
+  the benchmark measures, 40 lines); `restore_best` (a six-line snapshot
+  callback); `verbose` and the `tramdag.flow` logger (print or log in the
+  callback); `epoch_callback` (renamed `callback`, now receives the
+  optimizer); `marginal_init` (moved to `calibrate`); `vc_warm_start` and
+  the hidden classical proxy fit (two lines of user code, see
+  `docs/varying-coefficients.md`; measured on `vc_hetero`: `beta0` 0.16
+  from the truth without it, recovery correlation 0.99 either way);
+  `vc_oof_fit` and the hidden five-fold stage-1 fits behind
+  `VC(center=True)` (see next bullet).
+- **`flow.calibrate(train_df, marginal_init=True)`** — the data-dependent
+  state, taken once: transform ranges, the network-input min-max, the
+  calibrated start. The first `fit`/`fit_classical` calls it; a single
+  `calibrated` buffer replaces the three per-module first-fit latches
+  (`ut._fitted`, `_net_scaled`, `_marginal_inited`) that `load` had to
+  re-close by hand.
+- **`fit(vc_ehat={node: {t: array}})`** — a centered `VC` term needs its
+  out-of-fold propensities from the caller, one per training row; `fit`
+  refuses a centered spec without them and a `vc_ehat` that does not match
+  the spec. `VC(center_folds=)` is gone with the built-in stage (the fold
+  count is the caller's), as is `flow.vc_center_info`.
+- **`fit_classical`** lost `verbose` (the report dict is the summary) and
+  computes its gradient norm with `torch.nn.utils.get_total_norm`.
+- **`save`** no longer records the machine; `machine_info` left the package
+  for `experiments/benchmarks/perf_machine.py`, the one caller that
+  compares machines. `meta` keeps version, time and device.
+- **`transforms`**: the inverse is zuko's own (`Transform.inv`: bisection
+  inside the bound, closed-form linear/identity tail) — the 85-line
+  expanding-bracket bisection duplicated it; measured identical residuals,
+  spline inverse 166 ms → 0.3 ms on 4000 rows. `StandardLogistic.icdf` is
+  `torch.logit(u, eps)`.
+
 ### Added
 
+- **`CausalFlowDAG(spec, init="glorot")`** — Keras' `Dense` default
+  initialization (glorot-uniform weights, zero biases) for every linear
+  layer, the paper's reference; default stays torch's Kaiming-uniform.
+  Under the reference's full-batch VACA/CAREFL protocol with its global
+  plateau rule the init decides the fit: `do(x2)` errors 0.52 / 0.33 / 0.13
+  with torch's init, 0.035 / 0.006 / 0.007 with glorot (Adam's eps and the
+  Bernstein domain made no such difference). All four paper configs set it.
+  Stored in the checkpoint.
 - **`CausalFlowDAG(spec, net_input_scaling="minmax")`** — feeds every network
   (complex intercept, complex shift, VC modifiers) its continuous parents
   scaled to `[0, 1]` by the training min and max, the way the paper's

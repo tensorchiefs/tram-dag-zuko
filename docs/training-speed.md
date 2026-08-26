@@ -12,30 +12,25 @@ It runs fixed 200-epoch workloads on all available devices and writes a machine
 fingerprint to JSON, and it needs nothing but `pip install tramdag`. The raw CSV
 is a local run artifact and is not committed.
 
-## The options, and how to use them
+## The recipes, and where they live now
 
-**Schedules** (`fit(..., schedule=...)`) control the learning rate over training:
+The recipes this benchmark compares were `fit()` options in 0.3
+(`schedule="plateau"`, `freeze_patience=`, `restore_best=`). In 0.4 `fit` is
+one minibatch Adam loop and the recipes are **callbacks** — training
+strategies, not part of the model (see [fitting.md](fitting.md)):
 
-| value | behavior |
-|---|---|
-| `None` (default) | constant lr — the classic behavior, exactly as before this PR |
-| `"plateau"` | **per-node**: a node whose own validation NLL hasn't improved by `min_delta` (default 1e-4) for `plateau_patience` epochs (default 30) gets its lr × 0.3, floored at 1e-3 × the initial lr. Each node decays independently — valid because the per-node losses have independent gradients. |
+| recipe | behavior | today |
+|---|---|---|
+| constant | one lr for the whole run | `flow.fit(train, epochs=, learning_rate=)` |
+| plateau+freeze | **per-node**: a node whose own validation NLL hasn't improved by `min_delta` (1e-4) for `patience` epochs gets its lr × 0.3, floored at 1e-3 × the start; once decayed ≥ 100× and flat for `freeze` epochs it leaves training (rate 0). Valid because the per-node losses have independent gradients. | `experiments/benchmarks/bench_training.py::_PerNodePlateau`, a callback over one parameter group per node |
+| global plateau | torch's `ReduceLROnPlateau` on the summed validation NLL — the paper reference's rule | `experiments/paper/helpers.py::fit_paper` |
 
 `"onecycle"` and `"cosine"` were part of this benchmark and lost to
 `"plateau"` on every workload; 0.4.0 removed both. The result tables below
 keep their measured rows as the record of that decision.
 
-**Early stopping / freezing** (`fit(..., freeze_patience=N)`): if the validation NLL of a
-node does not improve for `N` epochs, the fit *freezes* that node. A frozen node leaves
-the loss and the backward pass, which saves real compute. Its weights stay fixed from then
-on. When all nodes are frozen, the fit returns early. The fit records the freeze epochs in
-`flow.history["frozen"]`. Under `schedule="plateau"`, freezing also waits until the lr of
-the node is decayed ≥ 100×. This delay prevents a freeze while a smaller step size can
-still make progress. Freezing state is per-`fit()`-call: a second `fit` call trains all
-nodes again.
-
-**Switching it all off**: for an exact comparison with classical methods (`statsmodels`,
-R `polr`/`tram`), omit both arguments. The benchmark changed no defaults, so
+**The exact-MLE path**: for an exact comparison with classical methods
+(`statsmodels`, R `polr`/`tram`) no recipe is needed —
 
 ```python
 flow.fit(train_df, epochs=4000, learning_rate=1e-2, batch_size=512)  # constant lr
@@ -43,11 +38,11 @@ flow.fit(train_df, epochs=2000, learning_rate=1e-3, batch_size=512)  # 2nd phase
 ```
 
 is still the exact-MLE path (`experiments/misc/validate_ls.py` runs a three-phase variant
-of it, 4000/2000/1000 epochs at 1e-2/1e-3/1e-4, batch 256). Independent of all
-this, `restore_best=False` remains the default (see CHANGELOG). The guard test
-`tests/test_fit_schedules.py::test_plateau_freeze_preserves_exact_mle` also shows that
-even *with* plateau+freezing the all-`ls` fit lands on the classical MLE within the usual
-tolerances.
+of it, 4000/2000/1000 epochs at 1e-2/1e-3/1e-4, batch 256). `fit` keeps the
+final weights. The guard test
+`tests/test_fit_hooks.py::test_torch_plateau_scheduler_preserves_exact_mle` shows
+that a schedule through the hooks still lands the all-`ls` fit on the classical
+MLE within the usual tolerances.
 
 **LBFGS** is *not* a `fit()` option — it ships as its own method.
 [`fit_classical`](fitting.md) runs float64 full-batch L-BFGS with a strong-Wolfe
@@ -146,26 +141,22 @@ decade. This is why the two-phase recipe existed.
 For everyday fits:
 
 ```python
-flow.fit(
-    train,
-    val,
-    epochs=4000,
-    learning_rate=1e-2,
-    batch_size=512,
-    schedule="plateau",
-    plateau_patience=30,
-    freeze_patience=120,
-)
+opt = torch.optim.Adam(flow.parameters(), lr=1e-2)
+plateau = torch.optim.lr_scheduler.ReduceLROnPlateau(opt, factor=0.3, patience=30)
+
+def on_epoch(flow, epoch, opt):
+    plateau.step(sum(flow.nll(val).values()))
+    return opt.param_groups[0]["lr"] < 1e-5
+
+flow.fit(train, epochs=4000, batch_size=512, optimizer=opt, callback=on_epoch)
 ```
 
-The generous `epochs` value is only a ceiling. The fit stops itself. For exact classical
-comparisons where the last 1e-3 matters, append a short constant-lr polish phase
-(`epochs=500, learning_rate=1e-3`) after the plateau fit. Or run the old two-phase recipe.
+The generous `epochs` value is only a ceiling; the callback stops the fit. For exact
+classical comparisons where the last 1e-3 matters, append a short constant-lr polish
+phase (`epochs=500, learning_rate=1e-3`). The per-node variant with freezing is the
+benchmark's own `_PerNodePlateau`.
 
-The benchmark itself changed no defaults — that is its own reviewed decision (see
-the `restore_best` episode in CHANGELOG.md). Two of its findings have since been
-adopted: `plateau_patience` defaults to the 30 recommended here, and `epochs` has no
-default at all, because finding 6 is precisely that a fixed budget cannot be right for
-every workload. The paper scripts follow the paper's own protocol (one constant-lr
+One finding is a package default: `epochs` has no default at all, because
+finding 6 is precisely that a fixed budget cannot be right for every workload. The paper scripts follow the paper's own protocol (one constant-lr
 run, or the reference's ReduceLROnPlateau for VACA/CAREFL); `validate_ls` runs a
 three-phase constant-lr descent. Each states its recipe in its own YAML.

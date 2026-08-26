@@ -7,8 +7,10 @@ model, every hyperparameter with its source, what deviates from the paper and
 why, and the numbers: what the paper reports, what the previous protocol of
 this repository measured, and what the current 1:1 protocol measures.
 
-Measured 2026-08-25 on `feat/followups` (seeds: DGP 42, init 7, shuffle 0);
-CI run 32878435001 reproduced every number within the committed tolerances.
+Measured 2026-08-26 on `refactor/lean-fit` (seeds: DGP 42, init 7, shuffle 0)
+with the exact reference protocol — global plateau rule and Keras init; the
+2026-08-25 numbers of `feat/followups` (per-node plateau, torch init; CI run
+32878435001) are kept in the "R 1:1, torch init" column where they differ.
 "Previous" is the protocol before that branch: a 90/10 split of one draw,
 batch 512, the fit restarted in chunks (`fit_in_chunks`), and for VACA/CAREFL
 a second "polish" fit at a lower rate — a repository recipe, not the paper's.
@@ -25,13 +27,15 @@ the "paper" column names the figure and what it shows.
 |---|---|---|
 | latent | standard logistic, shifts added on the continuous scale, subtracted for ordinal `P(Y<=k) = sigmoid(theta_k - shift)` | same (tests pin both signs) |
 | Bernstein basis | `len_theta` unconstrained coefficients, `to_theta` softplus-cumsum, domain = train min/max → [0, 1], tangent-linear extrapolation outside | zuko Bernstein, `n_coeffs` unconstrained (zuko ties two control points on, so the free-parameter count matches), domain = train 5 %/95 % quantiles → [−5, 5], linear extrapolation — **deviation D1** |
-| init | Keras glorot | torch default — **D2** (glorot measured worse on VACA: 0.19 vs 0.026) |
-| optimizer | Keras Adam, eps 1e-7 | torch Adam, eps 1e-8 |
+| init | Keras `Dense` default: glorot-uniform, zero bias | same, `init: glorot` (`CausalFlowDAG(init="glorot")`); torch's default init is the framework default and was the decisive deviation under the full-batch protocol, see VACA |
+| optimizer | Keras Adam, eps 1e-7 | torch Adam, eps 1e-8 — measured: no effect (VACA identical to four digits) |
 | seeds | R scripts run unseeded | every seed is a repo choice |
-| calibrated start | none | `marginal_init=False` hard-coded in `helpers.fit_paper` (framework default is True) |
-| intercept output layer | Keras dense with bias | bias-free — **D3** (a bias is redundant with the first Bernstein coefficient) |
+| calibrated start | none | `flow.calibrate(train, marginal_init=False)` in `helpers.fit_paper` (framework default is True) |
+| intercept output layer | Keras dense with bias | bias-free — **D3** (the same function class; the bias adds a constant to all unconstrained coefficients) |
+| plateau rule (VACA/CAREFL) | `update_learning_rate`: one optimizer, reduce when the summed validation NLL has not improved for 50 epochs (strict `<`), factor 0.1, min 1e-7 | torch `ReduceLROnPlateau(patience=49, threshold=0, threshold_mode="abs", factor=0.1, min_lr=1e-7)` on `sum(flow.nll(val))` — the same rule, verified against torch's source |
 
-D1 is the only deviation with a measured effect (see CAREFL below).
+D1 and D3 remain; both were measured (below). The per-node plateau
+approximation of 2026-08-25 (D4) is gone with the lean `fit`.
 
 ## Triangle, continuous (`triangle.py`) — paper Sec. 6.1, App. C.3
 
@@ -51,17 +55,17 @@ in `create_param_net` is commented out).
 | lr | 0.001 (`optimizer_adam()` default) | 0.001 | 0.001 |
 | batch | 32 (Keras `fit()` default) | 512 | 32 |
 | `len_theta` / `n_coeffs` | 20 | 20 | 20 |
-| schedule / early stop | none / none, final weights | none / none | none / none |
-| coefficient read-out | after every epoch (Keras loop) | at chunk boundaries | `fit(epoch_callback=)`, every epoch |
+| schedule / early stop / init | none / none, final weights / glorot | none / none / torch | none / none / glorot |
+| coefficient read-out | after every epoch (Keras loop) | at chunk boundaries | `fit(callback=)`, every epoch |
 
 **Results**
 
 | variant | metric | paper | previous | now |
 |---|---|---|---|---|
 | linear-ls | β12 / β13 / β23 | Fig. 14: trajectories at 2 / −0.2 / 0.3 | 1.983 / −0.145 / 0.285 | 1.987 / −0.170 / 0.282 |
-| linear-cs | β13; max \|ĝ − (−f)\| on [−1, 1] | Fig. 17: fitted CS is a straight line | −0.151; 0.507 | −0.175; 0.116 |
-| atan-cs | β13; cs max err | Fig. 7 right / 15 / 16: CS on −f, coefficients at 2 / −0.2 | −0.149; 0.229 | −0.169; 0.085 |
-| sin-cs | β13; cs max err | Fig. 18: CS follows the non-monotone f, saturating at the grid ends | −0.185; 2.29 | −0.199; 1.016 |
+| linear-cs | β13; max \|ĝ − (−f)\| on [−1, 1] | Fig. 17: fitted CS is a straight line | −0.151; 0.507 | −0.175; 0.110 (torch init: 0.116) |
+| atan-cs | β13; cs max err | Fig. 7 right / 15 / 16: CS on −f, coefficients at 2 / −0.2 | −0.149; 0.229 | −0.168; 0.080 (torch init: 0.085) |
+| sin-cs | β13; cs max err | Fig. 18: CS follows the non-monotone f, saturating at the grid ends | −0.185; 2.29 | −0.199; 0.997 (torch init: 1.016) |
 | all | val NLL x3 | — | 2.4603–2.4731 | 2.4607–2.4764 |
 
 β13 at −0.17 instead of −0.2: x1 has sd 0.254, so SE(β13) ≈ 0.036 at n = 40000
@@ -83,7 +87,7 @@ CS net = reference `c(2, 2, 2, 2)`, sigmoid.
 | hyperparameter | paper / R code | previous | now |
 |---|---|---|---|
 | train / validation | `dgp(40000)` / `dgp(10000)` | 36000 / 4000 split | 40000 / 10000, two draws |
-| epochs, lr, batch, schedule | 500, 0.001, 32, none | 500 (chunks of 10), 0.001, 512 | 500 continuous, 0.001, 32, none |
+| epochs, lr, batch, schedule, init | 500, 0.001, 32, none, glorot | 500 (chunks of 10), 0.001, 512, torch | 500 continuous, 0.001, 32, none, glorot |
 | `n_coeffs` (x1, x2) | 20 | 20 | 20 |
 | odds-ratio check (App. C.4) | odds(x2 ≤ −1) under do(x1 += 1), theory e² ≈ 7.39 | 40000 rows, seed 99 | same |
 | counterfactual PMF (App. B) | Fig. 10 explains why point counterfactuals fail for the ordinal node | 2000 rows × 200 draws | same |
@@ -95,8 +99,8 @@ CS net = reference `c(2, 2, 2, 2)`, sigmoid.
 | linear-ls | β12 / β13 / β23 | Fig. 19: 2 / −0.2 / 0.3 | 1.983 / −0.268 / 0.322 | 1.987 / −0.246 / 0.319 |
 | linear-ls | odds ratio predicted / DGP | e² ≈ 7.39 | 7.26 / 7.19 | 7.29 / 7.19 |
 | linear-ls | CF PMF TV vs analytic; P(true level) flow / analytic / mode bound | — (App. B qualitative) | 0.084; 0.714 / 0.728 / 0.806 | 0.044; 0.718 / 0.728 / 0.806 |
-| exp-cs | β13; cs max err | Fig. 20: distributions match | −0.227; 0.885 | −0.207; 0.126 |
-| exp-cs | CF PMF TV; P(true level) | — | 0.075; 0.924 / 0.921 | 0.022; 0.919 / 0.921 |
+| exp-cs | β13; cs max err | Fig. 20: distributions match | −0.227; 0.885 | −0.205; 0.071 (torch init: 0.126) |
+| exp-cs | CF PMF TV; P(true level) | — | 0.075; 0.924 / 0.921 | 0.019; 0.917 / 0.921 (torch init: 0.022) |
 
 ## VACA / CNF benchmark (`vaca.py`) — paper Sec. 5.1–5.2, App. C.1
 
@@ -115,27 +119,38 @@ E[x3 | do(x2 = a)] = −0.25 + 0.25 a; the paper's Fig. 5 shows a ∈ {−3, −
 | epochs | 10000 (`Figure_Triangle_Linear_Bimodal.R`) | 400 in chunks of 50, then 120 "polish" | 10000, one run |
 | lr | 0.001 | 0.01, polish 0.001 | 0.001 |
 | batch | full batch (one `apply_gradients` per epoch) | 512 | 2500 = n_train |
-| schedule | `update_learning_rate`: ReduceLROnPlateau on the summed val NLL, factor 0.1, patience 50, min_lr 1e-7, strict `<` | none | `plateau`, same numbers, **per node** — D4 |
+| schedule | `update_learning_rate`: ReduceLROnPlateau on the summed val NLL, factor 0.1, patience 50, min_lr 1e-7, strict `<` | none | the same rule, global (torch's scheduler through `fit(optimizer=, callback=)`) |
 | input scaling | `scale_df`: everything min-max to [0, 1] | raw | `net_input_scaling: minmax` (network inputs; targets D1) |
 | n_compare | — | 50000 | 50000 |
 
 **Results** — the check is the flow's error against the analytic mean, not a pinned flow value.
 
-| metric | paper | previous | now |
-|---|---|---|---|
-| \|E[x3 \| do(x2 = −3)] − (−1.0)\| | Fig. 5: densities overlap | 0.037 | 0.026 |
-| \|E[x3 \| do(x2 = −2)] − (−0.75)\| | Fig. 5 | — (do(−1) was scored: 0.012) | 0.034 |
-| \|E[x3 \| do(x2 = 0)] − (−0.25)\| | Fig. 5 | 0.010 | 0.077 |
-| sd(x1) flow vs analytic 2.0767 | Fig. 4: bimodal x1 fitted (the default CNF fails) | 2.074 | error 0.0077 |
-| val NLL x3 | — | 1.4356 | 1.4351 |
+| metric | paper | previous | R 1:1, torch init, per-node plateau (08-25) | now: R 1:1, glorot, global plateau |
+|---|---|---|---|---|
+| \|E[x3 \| do(x2 = −3)] − (−1.0)\| | Fig. 5: densities overlap | 0.037 | 0.026 | 0.098 (seeds 8, 9: 0.268, 0.217) |
+| \|E[x3 \| do(x2 = −2)] − (−0.75)\| | Fig. 5 | — (do(−1) was scored: 0.012) | 0.034 | 0.159 (0.119, 0.031) |
+| \|E[x3 \| do(x2 = 0)] − (−0.25)\| | Fig. 5 | 0.010 | 0.077 | 0.026 (0.005, 0.021) |
+| sd(x1) flow vs analytic 2.0767 | Fig. 4: bimodal x1 fitted (the default CNF fails) | 2.074 | error 0.0077 | error 0.028 (0.019, 0.036) |
+| val NLL x3 | — | 1.4356 | 1.4351 | 1.4499 (1.4495, 1.4516) |
 
-Under the exact R protocol with **raw** inputs the errors were 0.731 / 0.426 /
-0.017 — the tanh nets saturate (40 % of the rows have |x1| > 2, 43 % |x2| > 2).
-Min-max scaled inputs, as in `scale_df`, give the row above. The other
-deviations were each measured under the R protocol: Bernstein on min/max
-(D1 off) 0.134 at do(−3), glorot init 0.19, no plateau rule 0.56 / 0.35 / 0.14
-with val NLL 1.459 — the plateau rule is what stops the full-batch overfit, so
-per-node vs global (D4) is not where a gap comes from.
+How the gap was traced, one change at a time under the exact protocol
+(inputs min-max scaled unless stated; do(x2) errors at −3 / −2 / 0):
+
+| variant | error | reading |
+|---|---|---|
+| raw parents into the nets | 0.731 / 0.426 / 0.017 | the tanh nets saturate: 40 % of the rows have \|x1\| > 2, 43 % \|x2\| > 2 |
+| per-node plateau, torch init | 0.026 / 0.034 / 0.077 | the 2026-08-25 approximation |
+| global plateau (R's rule), torch init | 0.523 / 0.334 / 0.129 | the summed NLL keeps improving through x1 while x3 overfits |
+| … without any plateau | 0.562 / 0.354 / 0.142 | the rule is what stops the full-batch overfit |
+| … Adam eps 1e-7 | 0.523 / 0.334 / 0.129 | no effect |
+| … Bernstein on train min/max (D1 off) | 0.154 / 0.012 / 0.062 | helps, not the cause |
+| … glorot init | 0.035 / 0.006 / 0.007 | the cause (a different random draw than the config's seed 7) |
+| … glorot + min/max | 0.035 / 0.056 / 0.057 | |
+
+Under the exact protocol the result is **seed-sensitive at the off-manifold
+point** do(x2 = −3): 0.03–0.27 over four init draws, 0.005–0.026 at do(x2 = 0).
+The paper shows one run's densities. The committed bound is 2.5× the seed-7
+measurement, and this table is the honest picture.
 
 ## CAREFL benchmark (`carefl.py`) — paper Sec. 5.3, App. C.2
 
@@ -154,25 +169,29 @@ same `make_model` nets as VACA.
 |---|---|---|---|
 | train / validation | 2500 / `dgp(5000)` | 18000 / 2000 split | 2500 / 5000 |
 | epochs | 7000 | 300 in chunks of 50 + 100 polish | 7000 |
-| lr, batch, schedule, input scaling | 0.001, full batch, plateau 0.1/50/1e-7, `scale_df` | 0.01→0.001, 512, none, raw | 0.001, 2500, plateau (per node), `minmax` |
+| lr, batch, schedule, input scaling, init | 0.001, full batch, plateau 0.1/50/1e-7, `scale_df`, glorot | 0.01→0.001, 512, none, raw, torch | 0.001, 2500, the same global rule, `minmax`, glorot |
 | scoring | the single `x_obs`, curves over α (Fig. 6) | + 300 held-out rows at α ∈ {−1.5, 0, 1.5} | same |
 
 **Results**
 
-| metric | paper | previous (wrong x_obs) | now |
-|---|---|---|---|
-| Fig. 6 max \|x3^cf error\| over α at `x_obs` | Fig. 6: flow tracks the DGP curve | 1.64 | 1.52 (at α = 3, x3 ≈ 17) |
-| Fig. 6 max \|x4^cf error\| | Fig. 6 | 0.38 | 0.47 |
-| held-out CF MAE x3, α = −1.5 / 0 / 1.5 | — | 0.109 / 0.053 / 0.095 | 0.177 / 0.065 / 0.123 |
-| held-out CF MAE x4, α = −1.5 / 0 / 1.5 | — | 0.078 / 0.059 / 0.085 | 0.117 / 0.059 / 0.115 |
-| val NLL x3 / x4 | — | 1.376 / 1.345 | 1.395 / 1.373 |
+| metric | paper | previous (wrong x_obs) | R 1:1, torch init, per-node plateau (08-25) | now: R 1:1, glorot, global plateau |
+|---|---|---|---|---|
+| Fig. 6 max \|x3^cf error\| over α at `x_obs` | Fig. 6: flow tracks the DGP curve | 1.64 | 1.52 (at α = 3, x3 ≈ 17) | 1.87 (at α = 3) |
+| Fig. 6 max \|x4^cf error\| | Fig. 6 | 0.38 | 0.47 | 0.59 |
+| held-out CF MAE x3, α = −1.5 / 0 / 1.5 | — | 0.109 / 0.053 / 0.095 | 0.177 / 0.065 / 0.123 | 0.181 / 0.065 / 0.142 (seeds 8, 9: 0.158–0.171 / 0.069–0.084 / 0.136–0.154) |
+| held-out CF MAE x4, α = −1.5 / 0 / 1.5 | — | 0.078 / 0.059 / 0.085 | 0.117 / 0.059 / 0.115 | 0.204 / 0.134 / 0.162 (0.172–0.178 / 0.113–0.129 / 0.145–0.160) |
+| val NLL x3 / x4 | — | 1.376 / 1.345 | 1.395 / 1.373 | 1.400 / 1.407 |
 
 The previous protocol trained on 7× more rows (18000), which is why its
 held-out MAEs are lower; they are not comparable to the paper's nTrain = 2500.
-With D1 switched off (Bernstein domain on train min/max, `RANGE_Q = 0`) under
-the R protocol: x3 MAE 0.083 / 0.038 / 0.050 (better), x4 0.143 / 0.083 / 0.154
-(worse), val NLL 1.444 / 1.476 (worse). The quantile domain stays the default;
-a `range_quantile` knob would make R's choice available.
+Under the exact protocol the CAREFL numbers are stable across init seeds
+(spread ≈ 0.03) and the x4 query is 1.5–2× worse than under the per-node
+approximation — the reference's rule, faithfully applied, is not the best
+optimizer for this DGP, and the paper's Fig. 6 is a visual match either way.
+With D1 switched off (Bernstein domain on train min/max, `RANGE_Q = 0`, under
+the per-node protocol): x3 MAE 0.083 / 0.038 / 0.050 (better), x4 0.143 / 0.083
+/ 0.154 (worse), val NLL 1.444 / 1.476 (worse). The quantile domain stays the
+default; a `range_quantile` knob would make R's choice available.
 
 ## Runtime and the epochs
 

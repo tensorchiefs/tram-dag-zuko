@@ -75,8 +75,8 @@ See `experiments/README.md`.
   config sets explicitly instead.
 - `utils.py` — the non-modelling helpers, with no module-level imports:
   `config_section` (pick a section out of an already-parsed config — parsing
-  stays with the caller, so the package needs no config parser) and
-  `machine_info` (the environment snapshot `save` stores).
+  stays with the caller, so the package needs no config parser;
+  `machine_info` moved to `experiments/benchmarks/perf_machine.py`).
 - `flow.py` — `CausalFlowDAG`: `fit`, `fit_classical` (float64 full-batch
   L-BFGS, exact MLE for all-`ls` specs), `sample(n, do=, u=)`, `abduct`, `pmf`,
   `density` (its continuous counterpart, on a grid),
@@ -108,12 +108,16 @@ See `experiments/README.md`.
   range is misweighted whenever the true tail slope differs — the structural reason
   `spline` consistently trails `bernstein` (whose linear extrapolation follows the
   boundary derivative). Demonstrated in `notebooks/demo_tram_dag_colab.py` section 6.
-- **`fit(restore_best=False)` is the default** (keeps final converged weights = exact
-  MLE; an all-`ls` model then matches statsmodels/R-polr to ~1e-3). `restore_best=True`
-  = per-node best-validation restoration (early stopping). Key empirical finding:
-  **flexible (CI/CS) models overfit observational confounding at the MLE and need
-  `restore_best=True` to recover the causal effect; all-`ls` models don't.**
-  See CHANGELOG.md.
+- **`fit` keeps the final weights and is one minibatch Adam loop** — an
+  all-`ls` model then matches statsmodels/R-polr to ~1e-3. Validation, lr
+  schedules, early stopping / best-weight restoration and logging are the
+  caller's, through `fit(optimizer=, callback=)` (`callback(flow, epoch, opt)`
+  after every epoch, `True` stops); `flow.calibrate(train_df, marginal_init=)`
+  takes the data-dependent state once (ranges, net min-max, calibrated start)
+  and is called by the first fit. Key empirical finding (stroke storyline):
+  **flexible (CI/CS) models overfit observational confounding at the MLE and
+  need best-validation weights to recover the causal effect; all-`ls` models
+  don't** — a six-line callback now, see docs/fitting.md.
 
 ## Ground truth & reference numbers
 
@@ -133,15 +137,18 @@ paper states only four training numbers — n=40000, 500 epochs, Adam lr 1e-3,
 Bernstein order 20. The configs follow the paper's own R code 1:1 where the
 framework allows: the triangle scripts train one continuous Adam run at Keras'
 default batch size 32 with a separate validation draw (40k / 10k mixed) and
-read the coefficients after every epoch (`fit(epoch_callback=)`); the
+read the coefficients after every epoch (`fit(callback=)`); the
 VACA/CAREFL comparisons take one full-batch step per epoch on nTrain = 2500
 for 10000 / 7000 epochs with the reference's ReduceLROnPlateau (factor 0.1,
 patience 50, min_lr 1e-7) on a separate 5000-row validation draw. Every
 seed is a repo choice (the R scripts run unseeded or on R's RNG). Known,
-documented deviations: 5%/95% quantile pre-scaling instead of min-max,
-torch init instead of Keras glorot, per-node instead of global plateau, a
-bias-free intercept output layer, `marginal_init=False` hard-coded in
-`helpers.py::fit_paper` (`validate_ls` keeps the default).
+documented deviations: 5%/95% quantile pre-scaling instead of min-max, a
+bias-free intercept output layer, `calibrate(marginal_init=False)` in
+`helpers.py::fit_paper` (`validate_ls` keeps the default). Matched on
+purpose: `init: glorot` (Keras' Dense default — under the full-batch
+VACA/CAREFL protocol torch's default init gives do(x2) errors 0.52/0.33/0.13,
+glorot 0.035/0.006/0.007) and the plateau rule, torch's `ReduceLROnPlateau`
+on the summed validation NLL, global as in the reference.
 The reference's `scale_df` (everything min-max scaled to [0,1] in the
 comparison scripts) is matched where it matters: `net_input_scaling: minmax`
 feeds the VACA/CAREFL tanh nets scaled parents (raw parents saturate them —
@@ -177,7 +184,7 @@ extra control points on, so `n_coeffs=20` is order 21 where the reference's
   (2, 1.5, 5.0875, −0.5), noise (2, 1.5, 1.4, −1), a typical point. Held-out
   rows are scored next to it because one point is a noisy yardstick.
 - **`validate_ls`** (`experiments/misc/data/magic-mrclean/ls`, seed 7, n=1275, full data,
-  `restore_best=False`): flow = statsmodels = R polr at Age 0.0526, NIHSSa 0.1630,
+  final weights): flow = statsmodels = R polr at Age 0.0526, NIHSSa 0.1630,
   T −0.9424; ATE +0.1429 vs +0.1428, true ATE +0.132. The R reference
   (`fit_ls.R`, needs `tram`/`MASS`) has its outputs committed under `ref_ls/`, so
   nothing needs R installed.

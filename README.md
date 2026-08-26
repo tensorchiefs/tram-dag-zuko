@@ -45,6 +45,7 @@ Pin the dev install to a commit for reproducibility, e.g. `...tramdag.git@<sha>`
 ## 30 seconds of API
 
 ```python
+import torch
 from tramdag import CausalFlowDAG, ContinuousNode, OrdinalNode, I, LS, CS
 
 spec = {  # the spec IS the labelled DAG
@@ -55,19 +56,16 @@ spec = {  # the spec IS the labelled DAG
 }
 flow = CausalFlowDAG(spec)  # validates acyclicity, builds the flow
 
-# self-stopping training: per-node plateau lr decay + freezing of converged
-# nodes (exact, since the per-node NLLs have independent gradients);
-# see docs/training-speed.md for benchmarks and the classic two-phase recipe
-flow.fit(
-    train_df,
-    val_df,
-    epochs=4000,
-    learning_rate=1e-2,
-    batch_size=512,
-    schedule="plateau",
-    plateau_patience=30,
-    freeze_patience=120,
-)
+# fit() is one minibatch Adam loop; validation, schedules and early stopping
+# are yours through optimizer= and callback= (docs/fitting.md)
+opt = torch.optim.Adam(flow.parameters(), lr=1e-2)
+plateau = torch.optim.lr_scheduler.ReduceLROnPlateau(opt, factor=0.3, patience=30)
+
+def on_epoch(flow, epoch, opt):
+    plateau.step(sum(flow.nll(val_df).values()))
+    return opt.param_groups[0]["lr"] < 1e-5  # True stops the fit
+
+flow.fit(train_df, epochs=4000, batch_size=512, optimizer=opt, callback=on_epoch)
 
 # all-`ls` model? fit it classically instead: deterministic float64 L-BFGS,
 # exact MLE matching statsmodels/R (see docs/fitting.md)

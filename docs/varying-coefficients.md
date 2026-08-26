@@ -26,8 +26,8 @@ spec = {
     ),
 }
 flow = td.CausalFlowDAG(spec, seed=0).fit(
-    train, val, epochs=500, learning_rate=1e-2, batch_size=512, restore_best=True
-)
+    train, epochs=500, learning_rate=1e-2, batch_size=512
+)  # best-validation weights: a callback, see fitting.md
 
 beta = flow.varying_coef("Y", df_new)  # (n,) array beta(x) — deterministic, y-free
 beta0 = float(flow.nodes["Y"].shifts["T"].beta0)  # interpretable main effect
@@ -76,11 +76,12 @@ framework.
   to mean zero over the training data, which preserves the function. Thus
   `beta0` is the main effect in the training population, the `Colr` reading
   when `beta` is constant.
-- **Warm start**: `fit(vc_warm_start=True)` (the default) initializes
-  `beta0` from the classical all-`ls` solution of the node's conditional,
-  once per term. That solution comes from a deterministic L-BFGS on a
-  throwaway proxy. Thus training starts at the classical answer and only
-  learns deviations.
+- **Warm start** (optional, two lines): fit the all-`ls` version of the
+  node classically and copy the treatment weight into
+  `flow.nodes[node].shifts[t].beta0` before `fit`, so training starts at the
+  classical answer and only learns deviations. Measured on the `vc_hetero`
+  DGP: `beta0` lands within 0.15 of the truth with it, 0.16 from the zero
+  start; the recovery correlation is 0.99 either way.
 - **Treatments**: the treatment `x_on` can be continuous or binary (2-level)
   ordinal. The term is linear in `x_on`. A binary ordinal enters as its 0/1
   level, so `beta` is the identified level-1-vs-0 contrast. Multi-level
@@ -94,8 +95,8 @@ framework.
 ## Propensity-centered VC: `center=True` (R-learner orthogonalization)
 
 ```python
-td.VC("X2", "X3", t="T", penalty=1.0, center=True, center_folds=5)
-# contributes  beta(x) * (t - e_hat(x))  to the shift
+td.VC("X2", "X3", t="T", penalty=1.0, center=True)
+# contributes  beta(x) * (t - e_hat(x))  to the shift; e_hat comes from you
 ```
 
 This is Robinson/R-learner centering inside the likelihood. Dandl et al.
@@ -113,14 +114,27 @@ misspecification that you do not know you have.
 The naive implementations are wrong. Thus this is a **two-stage frozen**
 design:
 
-- **Training** uses **out-of-fold** ê: the fit does `center_folds` refits of
-  the treatment node *only*, and each refit predicts the fold that it never
-  saw. This is the DML cross-fitting requirement. In-sample ê reintroduces
-  the own-observation bias and can be *worse* than no centering. The OOF
-  values enter the outcome loss as frozen data. Thus **no gradient reaches
-  the treatment node** from the outcome node, and the per-node factorization
-  stays intact (pinned by a gradient-isolation test). The flow exposes the
-  fold bookkeeping in `flow.vc_center_info`, pinned by tests.
+- **Training** uses **out-of-fold** ê that *you* compute and pass as
+  `fit(vc_ehat={"Y": {"T": e_oof}})`, one value per training row: any
+  propensity model, each fold predicted by a fit that never saw it. This is
+  the DML cross-fitting requirement — in-sample ê reintroduces the
+  own-observation bias and can be *worse* than no centering. Six lines with
+  the flow's own classical fit:
+
+  ```python
+  fold_id = np.random.default_rng(0).permutation(len(train)) % 5
+  e_oof = np.empty(len(train))
+  for j in range(5):
+      proxy = td.CausalFlowDAG(t_spec, seed=0)          # the treatment node's spec
+      proxy.fit_classical(train.iloc[fold_id != j][["X", "T"]])
+      e_oof[fold_id == j] = proxy.pmf(train.iloc[fold_id == j], "T")[:, 1]
+  ```
+
+  The OOF values enter the outcome loss as frozen data. Thus **no gradient
+  reaches the treatment node** from the outcome node, and the per-node
+  factorization stays intact (pinned by a gradient-isolation test). `fit`
+  refuses a centered spec without `vc_ehat` and a `vc_ehat` that does not
+  match the spec.
 - **Inference** (`log_prob` / `sample` / `abduct` / `pmf` / `scores`)
   recomputes ê from the flow's **own fitted treatment node**, the full-data
   fit (the standard DML train/predict split). The computation is detached
