@@ -72,9 +72,8 @@ jobs:
     - name: build the site with pdoc
       run: |
         uv run --group notebooks --group docs env PYTHONPATH=build/stubs \
-          pdoc -d numpy --math --template-directory .github/pdoc-templates \
-            -o site tramdag tramdag.spec tramdag.flow tramdag.transforms \
-            tramdag.conditioners tramdag.scores tramdag.utils guides examples
+          pdoc -d numpy --template-directory .github/pdoc-templates \
+            -o site tramdag guides examples
 
     - name: rewrite repo-relative links
       run: |
@@ -117,38 +116,12 @@ jobs:
             depth = len(rel.parts) - 1
             basedir = "docs" if depth and rel.parts[0] == "guides" else ""
             fix(page, basedir, "../" * depth)
-
-        # code-map.md names every symbol in backticks; link each one to the
-        # anchor pdoc rendered for it (only names pdoc actually emitted)
-        anchors = {}
-        api_pages = [site / "tramdag.html", *sorted((site / "tramdag").glob("*.html"))]
-        for api in (a for a in api_pages if a.exists()):
-            href = "../" + api.relative_to(site).as_posix()
-            for name in re.findall(r'\bid="([A-Za-z_][\w.]*)"', api.read_text()):
-                parts = name.removeprefix("tramdag.").split(".")
-                for i in range(len(parts)):  # flow.CausalFlowDAG.fit, CausalFlowDAG.fit, fit
-                    anchors.setdefault(".".join(parts[i:]), f"{href}#{name}")
-                anchors.setdefault(parts[-1] + "()", f"{href}#{name}")
-        code_map = site / "guides" / "code_map.html"
-        if code_map.exists():
-            def link(m):
-                text = m.group(2)
-                key = text if text in anchors else text.rstrip("()") if text.endswith("()") else None
-                target = anchors.get(text) or (anchors.get(key) if key else None)
-                return f'<a href="{target}">{m.group(0)}</a>' if target else m.group(0)
-            html = code_map.read_text()
-            html = re.sub(
-                r"(<a [^>]*>)?<code>([A-Za-z_][\w.]*(?:\(\))?)</code>",
-                lambda m: m.group(0) if m.group(1) else link(m),
-                html,
-            )
-            code_map.write_text(html)
         EOF
 
     # The PDF is a convenience, so it must not gate the site: it is bounded by
     # its own timeout and marked continue-on-error, and the publish step
     # republishes the previous PDF when this one produced nothing.
-    - name: build the PDF (README + guides + executed notebooks)
+    - name: build the PDF (README + guides)
       timeout-minutes: 10
       continue-on-error: true
       run: |
@@ -168,15 +141,23 @@ jobs:
         sed -E -e 's#\[!\[[^]]*\]\([^)]*\)\]\([^)]*\)##g' \
                -e 's#!\[[^]]*\]\(https?://[^)]*\)##g' \
           README.md > build/pdf/README.md
-        # gfm+tex_math_dollars reads the $...$ math of the guides and
-        # notebooks; WeasyPrint runs no JavaScript, so --webtex renders each
-        # formula to an image instead of MathJax
-        nbmd=(); for n in $NOTEBOOKS; do nbmd+=("build/nbmd/$n.md"); done
-        uv run --group notebooks --group docs --with weasyprint pandoc \
-          -f gfm+tex_math_dollars -s --webtex \
-          --resource-path=.:docs:build/nbmd --metadata title="tramdag documentation" \
-          --toc --toc-depth=2 --css=pdf.css build/pdf/README.md docs/*.md "${nbmd[@]}" \
-          -o site/tramdag-docs.pdf --pdf-engine=weasyprint
+        # Two steps on purpose. Going straight to PDF leaves the stylesheet
+        # and the guides' images as file:// links that WeasyPrint resolves
+        # against the CWD and fails to find (--embed-resources only inlines
+        # for HTML output). Rendering HTML first makes the page genuinely
+        # self-contained: CSS in a <style> block, images as data: URIs.
+        uv run --group notebooks --group docs pandoc -f gfm -s --embed-resources \
+          --resource-path=.:docs --metadata title="tramdag documentation" \
+          --toc --toc-depth=2 --css=docs/pdf.css build/pdf/README.md docs/*.md \
+          -o build/pdf/docs.html
+        # both assertions must fail the step, so neither may use `!`:
+        # a negated command is exempt from errexit (shellcheck SC2251)
+        grep -q 'id="TOC"' build/pdf/docs.html   # pandoc must emit the TOC
+        if grep -q 'href="docs/pdf.css"' build/pdf/docs.html; then
+          echo "pdf.css stayed a link instead of being inlined" >&2
+          exit 1
+        fi
+        uv run --with weasyprint weasyprint build/pdf/docs.html site/tramdag-docs.pdf
 
     - name: publish to gh-pages
       env:
