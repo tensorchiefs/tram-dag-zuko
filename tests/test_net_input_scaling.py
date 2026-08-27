@@ -119,9 +119,9 @@ def test_read_outs_use_the_scaled_inputs():
     with torch.no_grad():
         vc = nd.shifts["t"]
         beta = vc.beta(nd.net_input(feats, ("x1",)), len(df))
-        parts = flow.intercept_contributions("y", df)
+        parts = flow.intercept_contributions(df, "y")
         raw = nd.intercept_nets[0](nd.net_input(feats, ("x1",)))
-    np.testing.assert_allclose(flow.varying_coef("y", df), beta.numpy().ravel())
+    np.testing.assert_allclose(flow.varying_coef(df, "y"), beta.numpy().ravel())
     np.testing.assert_allclose(
         parts["contributions"]["x1"], (raw - raw.mean(0)).numpy(), atol=1e-6
     )
@@ -136,8 +136,18 @@ def test_ordinal_parent_passes_through_one_hot():
     assert torch.equal(flow.nodes["y"].net_input(feats, ("k",)), feats["k"])
 
 
-def test_constant_parent_is_rejected():
+def test_degenerate_column_is_rejected():
+    """A constant column has no transform domain and no min-max: fail loudly.
+
+    ``calibrate`` checks the node's own quantiles first, so that message wins
+    over the network-scaling one; either way nothing trains into NaN.
+    """
     df = _frame().assign(x1=1.0)
     flow = CausalFlowDAG(SPEC, seed=0, net_input_scaling="minmax")
-    with pytest.raises(ValueError, match="constant"):
+    with pytest.raises(ValueError, match="quantiles coincide"):
         flow.fit(df, epochs=1, batch_size=100)
+    # 95 % of one value is degenerate too: the 5 %/95 % quantiles coincide
+    mostly = _frame()
+    mostly.loc[mostly.index[:190], "x1"] = 0.0
+    with pytest.raises(ValueError, match="quantiles coincide"):
+        CausalFlowDAG(SPEC, seed=0).fit(mostly, epochs=1, batch_size=100)

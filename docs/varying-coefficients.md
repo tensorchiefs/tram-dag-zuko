@@ -29,7 +29,7 @@ flow = td.CausalFlowDAG(spec, seed=0).fit(
     train, epochs=500, learning_rate=1e-2, batch_size=512
 )  # best-validation weights: a callback, see fitting.md
 
-beta = flow.varying_coef("Y", df_new)  # (n,) array beta(x) — deterministic, y-free
+beta = flow.varying_coef(df_new, "Y")  # (n,) array beta(x) — deterministic, y-free
 beta0 = float(flow.nodes["Y"].shifts["T"].beta0)  # interpretable main effect
 ```
 
@@ -86,7 +86,7 @@ framework.
   ordinal. The term is linear in `x_on`. A binary ordinal enters as its 0/1
   level, so `beta` is the identified level-1-vs-0 contrast. Multi-level
   ordinal treatments are a planned follow-up.
-- **Read-out**: `flow.varying_coef(node, data, t=...)` evaluates
+- **Read-out**: `flow.varying_coef(df, node, t=...)` evaluates
   `beta0 + b_theta(modifiers)` in closed form. The result is deterministic
   and y-free, and it needs no abduction. For a binary treatment, it equals
   the abduct-difference `u(x, t=1, y) − u(x, t=0, y)` identically (pinned by

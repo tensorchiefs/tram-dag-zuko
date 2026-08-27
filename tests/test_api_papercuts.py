@@ -153,6 +153,16 @@ def test_glorot_init_is_keras_dense_default(tmp_path):
         [m.weight.flatten() for m in normal.modules() if isinstance(m, torch.nn.Linear)]
     )
     assert 0.03 < float(weights.std()) < 0.07  # Keras RandomNormal, sd 0.05
+    biases = torch.cat(
+        [
+            m.bias.flatten()
+            for m in normal.modules()
+            if isinstance(m, torch.nn.Linear) and m.bias is not None
+        ]
+    )
+    assert biases.numel() > 0
+    assert float(biases.abs().max()) < 0.3  # drawn, not zeroed (sd 0.05)
+    assert float(biases.abs().max()) > 0.0
     a = td.CausalFlowDAG(spec, seed=0).state_dict()
     b = td.CausalFlowDAG(spec, seed=0, init="torch").state_dict()
     assert all(torch.equal(a[k], b[k]) for k in a)

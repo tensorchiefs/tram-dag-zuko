@@ -41,7 +41,7 @@ def test_baseline_plus_contributions_reproduces_theta():
     df = _data()
     flow.calibrate(df)  # not needed for theta, but exercises the realistic path
 
-    res = flow.intercept_contributions("x3", df)
+    res = flow.intercept_contributions(df, "x3")
     # reconstruct theta from the centered components + baseline
     recon = res["baseline"][None, :] + sum(res["contributions"].values())
 
@@ -59,7 +59,7 @@ def test_baseline_plus_contributions_reproduces_theta():
 def test_contributions_are_mean_centered():
     flow = _additive_ci_flow()
     df = _data()
-    res = flow.intercept_contributions("x3", df)
+    res = flow.intercept_contributions(df, "x3")
     assert set(res["contributions"]) == {"x1", "x2"}
     for contrib in res["contributions"].values():
         # each column (transform parameter) averages to ~0 over the rows
@@ -69,7 +69,7 @@ def test_contributions_are_mean_centered():
 def test_shapes_and_parents():
     flow = _additive_ci_flow()
     df = _data(n=123)
-    res = flow.intercept_contributions("x3", df)
+    res = flow.intercept_contributions(df, "x3")
     P = flow.nodes["x3"].ut.n_params
     assert res["baseline"].shape == (P,)
     for contrib in res["contributions"].values():
@@ -86,7 +86,7 @@ def test_ordinal_additive_ci():
     flow = CausalFlowDAG(spec, seed=2)
     df = _data()
     df["y"] = np.random.default_rng(3).integers(0, 4, len(df)).astype(float)
-    res = flow.intercept_contributions("y", df)
+    res = flow.intercept_contributions(df, "y")
     assert res["baseline"].shape == (3,)  # levels - 1 cutpoint params
     for contrib in res["contributions"].values():
         np.testing.assert_allclose(contrib.mean(axis=0), 0.0, atol=1e-6)
@@ -105,7 +105,7 @@ def test_works_for_any_continuous_transform(transform, P):
     }
     flow = CausalFlowDAG(spec, seed=5)
     df = _data()
-    res = flow.intercept_contributions("x3", df)
+    res = flow.intercept_contributions(df, "x3")
     if P is not None:
         assert res["baseline"].shape == (P,)
     # exactness + sum-to-zero hold in unconstrained theta-space regardless of transform
@@ -130,23 +130,23 @@ def test_raises_on_node_without_complex_intercept():
     flow = CausalFlowDAG(spec, seed=0)
     df = _data()
     with pytest.raises(ValueError, match="no complex-intercept"):
-        flow.intercept_contributions("x2", df)
+        flow.intercept_contributions(df, "x2")
     # source node (unconditional simple intercept) also has nothing to decompose
     with pytest.raises(ValueError, match="no complex-intercept"):
-        flow.intercept_contributions("x1", df)
+        flow.intercept_contributions(df, "x1")
 
 
 def test_raises_on_unknown_node():
     flow = _additive_ci_flow()
     with pytest.raises(KeyError):
-        flow.intercept_contributions("nope", _data())
+        flow.intercept_contributions(_data(), "nope")
 
 
 def test_raises_on_missing_parent_column():
     flow = _additive_ci_flow()
     df = _data().drop(columns=["x2"])
     with pytest.raises(KeyError, match="missing intercept-parent"):
-        flow.intercept_contributions("x3", df)
+        flow.intercept_contributions(df, "x3")
 
 
 def test_joint_complex_intercept_single_component():
@@ -158,7 +158,7 @@ def test_joint_complex_intercept_single_component():
     }
     flow = CausalFlowDAG(spec, seed=4)
     df = _data()
-    res = flow.intercept_contributions("x3", df)
+    res = flow.intercept_contributions(df, "x3")
     assert set(res["contributions"]) == {"x1+x2"}
     assert res["parents"] == {"x1+x2": ("x1", "x2")}
     recon = res["baseline"][None, :] + res["contributions"]["x1+x2"]
@@ -174,7 +174,7 @@ def test_does_not_mutate_model_outputs():
     df = _data()
     before = flow.log_prob(df).detach().numpy().copy()
     params_before = [p.detach().clone() for p in flow.parameters()]
-    flow.intercept_contributions("x3", df)
+    flow.intercept_contributions(df, "x3")
     after = flow.log_prob(df).detach().numpy()
     np.testing.assert_array_equal(before, after)
     for a, b in zip(params_before, flow.parameters(), strict=True):

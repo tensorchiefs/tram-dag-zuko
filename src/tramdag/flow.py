@@ -103,7 +103,7 @@ def _init_linear(m: nn.Linear, init: str) -> None:
             nn.init.normal_(m.bias, std=0.05)
 
 
-def _covered_by_classical(term) -> bool:
+def _is_classical_term(term) -> bool:
     """Say whether the exact classical fit handles this term.
 
     It handles an ``LS``, and a parentless ``I()`` — the simple-intercept
@@ -287,13 +287,10 @@ class _Node(nn.Module):
         if self.net_input_scaling is None:
             return
         for i, p in enumerate(self.continuous_parents):
-            lo, hi = float(train_df[p].min()), float(train_df[p].max())
-            if hi == lo:
-                raise ValueError(
-                    f"net_input_scaling='minmax': parent {p!r} is constant on the "
-                    "training rows"
-                )
-            self.net_lo[i], self.net_hi[i] = lo, hi
+            # min < max is guaranteed: a constant column fails calibrate's
+            # quantile check on the parent's own node first
+            self.net_lo[i] = float(train_df[p].min())
+            self.net_hi[i] = float(train_df[p].max())
 
     def net_input(self, feats: dict[str, Tensor], parents) -> Tensor:
         """Concatenate parent features for a network, scaled when configured.
@@ -652,7 +649,7 @@ class CausalFlowDAG(nn.Module):
         return {k: float(-v.mean()) for k, v in per_node.items()}
 
     def calibrate(
-        self, train_df: pd.DataFrame, marginal_init: bool = True
+        self, train_df: pd.DataFrame, *, marginal_init: bool = True
     ) -> CausalFlowDAG:
         """Take the data-dependent state from the training rows, once.
 
@@ -681,31 +678,59 @@ class CausalFlowDAG(nn.Module):
             return self
         for name in self.order:
             node = self.nodes[name]
+            if node.kind == "ordinal":
+                self._check_levels(name, train_df)
             node.set_net_range(train_df)
             if node.kind == "continuous":
-                q = train_df[name].quantile([RANGE_Q, 1.0 - RANGE_Q])
-                node.ut.set_range(q.iloc[0], q.iloc[1])
-            if not (marginal_init and isinstance(node.intercept, SimpleIntercept)):
-                continue
-            if node.kind == "continuous" and isinstance(node.ut, BernsteinUT):
-                theta = node.ut.marginal_init_theta()
-            elif node.kind == "ordinal":
-                levels = self.spec[name].levels
-                counts = np.bincount(
-                    train_df[name].to_numpy().astype(np.int64), minlength=levels
-                )
-                if counts.size != levels:
-                    raise ValueError(
-                        f"node {name!r}: data has level {counts.size - 1}, the spec "
-                        f"declares {levels} levels (0..{levels - 1})"
-                    )
-                theta = ordinal_marginal_init_theta(counts)
-            else:
-                continue
-            with torch.no_grad():
-                node.intercept.theta.copy_(theta)
+                self._set_range(name, train_df)
+            if marginal_init and isinstance(node.intercept, SimpleIntercept):
+                self._marginal_start(name, train_df)
         self.calibrated.fill_(True)
         return self
+
+    def _set_range(self, name: str, train_df: pd.DataFrame) -> None:
+        """Map the train ``RANGE_Q``/1-``RANGE_Q`` quantiles onto the domain."""
+        q = train_df[name].quantile([RANGE_Q, 1.0 - RANGE_Q])
+        if q.iloc[1] <= q.iloc[0]:
+            raise ValueError(
+                f"node {name!r}: the {RANGE_Q:.0%} and {1 - RANGE_Q:.0%} quantiles "
+                f"coincide at {q.iloc[0]}. A continuous node needs a spread of "
+                "values; a level index needs OrdinalNode()."
+            )
+        self.nodes[name].ut.set_range(q.iloc[0], q.iloc[1])
+
+    def _marginal_start(self, name: str, train_df: pd.DataFrame) -> None:
+        """Start a simple intercept at the node's data marginal."""
+        node = self.nodes[name]
+        if node.kind == "ordinal":
+            counts = np.bincount(
+                train_df[name].to_numpy().astype(np.int64),
+                minlength=self.spec[name].levels,
+            )
+            theta = ordinal_marginal_init_theta(counts)
+        elif isinstance(node.ut, BernsteinUT):
+            theta = node.ut.marginal_init_theta()
+        else:  # a spline or affine transform has no calibrated start
+            return
+        with torch.no_grad():
+            node.intercept.theta.copy_(theta)
+
+    def _check_levels(self, name: str, train_df: pd.DataFrame) -> None:
+        """Reject an ordinal column that is not a level index of its node.
+
+        ``bincount`` and the cutpoint likelihood both take the column as
+        ``0..levels-1``; a 1-based or non-integer column would silently be
+        truncated instead of failing.
+        """
+        levels = self.spec[name].levels
+        v = train_df[name].to_numpy(dtype=np.float64)
+        fractional = bool((v != np.round(v)).any())
+        if fractional or v.min() < 0 or v.max() >= levels:
+            raise ValueError(
+                f"node {name!r}: an ordinal column holds the level indices "
+                f"0..{levels - 1}, got values in [{v.min()}, {v.max()}]"
+                f"{' (non-integer)' if fractional else ''}"
+            )
 
     def _vc_ehat_train(
         self, train_df: pd.DataFrame, vc_ehat: dict | None
@@ -913,14 +938,14 @@ class CausalFlowDAG(nn.Module):
 
     @torch.no_grad()
     def varying_coef(
-        self, node: str, data: pd.DataFrame, t: str | None = None
+        self, df: pd.DataFrame, node: str, *, t: str | None = None
     ) -> np.ndarray:
         """Evaluate the fitted effect function ``beta(x)`` of a ``VC`` term.
 
         This is the first-class read-out of issue #28. The value comes in
         closed form from the fitted term, as ``beta0 + b_theta(modifiers)``.
         It is deterministic and needs no abduction. It is free of ``y``,
-        because only the modifier columns of ``data`` are read. For a binary
+        because only the modifier columns of ``df`` are read. For a binary
         treatment it is identical to the abduction difference
         ``u(x, t=1, y) - u(x, t=0, y)``.
 
@@ -936,7 +961,7 @@ class CausalFlowDAG(nn.Module):
         ----------
         node : str
             Name of the node that carries the VC term.
-        data : pd.DataFrame
+        df : pd.DataFrame
             Rows at which to evaluate ``beta``. Must contain every modifier
             column of the term.
         t : str | None, optional
@@ -953,7 +978,7 @@ class CausalFlowDAG(nn.Module):
         ------
         KeyError
             If ``node`` is unknown, if the node has no VC term on ``t``, or
-            if a modifier column is missing from ``data``.
+            if a modifier column is missing from ``df``.
         ValueError
             If the node has no VC term, or if ``t`` is omitted while the
             node has several VC terms.
@@ -976,13 +1001,13 @@ class CausalFlowDAG(nn.Module):
         mods = vcs[t]
         mod_feat = None
         if mods:
-            feats = self._features(self._tensorize(data, mods))
+            feats = self._features(self._tensorize(df, mods))
             mod_feat = nd.net_input(feats, mods)
-        return nd.shifts[t].beta(mod_feat, len(data)).cpu().numpy()
+        return nd.shifts[t].beta(mod_feat, len(df)).cpu().numpy()
 
-    def _is_all_ls(self) -> bool:
+    def _is_classical(self) -> bool:
         return all(
-            _covered_by_classical(term)
+            _is_classical_term(term)
             for node in self.spec.values()
             for term in node_terms(node)
         )
@@ -1038,7 +1063,7 @@ class CausalFlowDAG(nn.Module):
         return m
 
     @torch.no_grad()
-    def intercept_contributions(self, node: str, data: pd.DataFrame) -> dict:
+    def intercept_contributions(self, df: pd.DataFrame, node: str) -> dict:
         """Decompose a complex intercept into mean-centered per-term parts.
 
         The parts are contributions to the transform parameters of the node.
@@ -1055,7 +1080,7 @@ class CausalFlowDAG(nn.Module):
 
         This method resolves the ambiguity with the usual additive-model
         (GAM) convention: a **sum-to-zero (mean-centering) constraint over
-        the rows of** ``data``. Each term's contribution is centered to mean
+        the rows of** ``df``. Each term's contribution is centered to mean
         zero per parameter. The removed constants collect into a single
         ``baseline``. The decomposition is exact:
 
@@ -1073,7 +1098,7 @@ class CausalFlowDAG(nn.Module):
         node : str
             Name of a node with at least one complex-intercept (``I``) term
             that has parents.
-        data : pd.DataFrame
+        df : pd.DataFrame
             Rows over which to center and at which to evaluate the
             contributions. Must contain every intercept-parent column.
 
@@ -1094,7 +1119,7 @@ class CausalFlowDAG(nn.Module):
         ------
         KeyError
             If ``node`` is unknown, or if an intercept-parent column is
-            missing from ``data``.
+            missing from ``df``.
         ValueError
             If the node has no complex-intercept term with parents.
 
@@ -1113,11 +1138,11 @@ class CausalFlowDAG(nn.Module):
                 f"node {node!r} has no complex-intercept (I) terms with parents. "
                 "Its intercept is unconditional, so there is nothing to decompose."
             )
-        missing = [p for p in nd.ci_parents if p not in data.columns]
+        missing = [p for p in nd.ci_parents if p not in df.columns]
         if missing:
-            raise KeyError(f"data is missing intercept-parent column(s): {missing}")
+            raise KeyError(f"df is missing intercept-parent column(s): {missing}")
 
-        feats = self._features(self._tensorize(data, nd.ci_parents))
+        feats = self._features(self._tensorize(df, nd.ci_parents))
         # one net per group: the additive case stores them in intercept_nets;
         # a single (possibly joint) I-term is the lone `intercept` network.
         nets = (
@@ -1252,7 +1277,7 @@ class CausalFlowDAG(nn.Module):
         Correctness is therefore verified by comparison to classical
         software (see ``experiments/misc/validate_ls.py``), not by this flag.
         """
-        if not self._is_all_ls():
+        if not self._is_classical():
             raise ValueError(
                 "fit_classical requires an all-`ls` spec, that is every edge "
                 "term 'ls'. This spec has cs, ci or vc terms. Use fit() for "
@@ -1302,7 +1327,7 @@ class CausalFlowDAG(nn.Module):
             self.float()  # restore canonical float32 (lossy ~1e-7, harmless)
         self.eval()
 
-        return {
+        report = {
             "converged": converged,
             "n_iter": n_iter,
             "final_nll": final_nll,
@@ -1310,6 +1335,10 @@ class CausalFlowDAG(nn.Module):
             "seconds": time.perf_counter() - t0,
             "coefficients": coefs,
         }
+        self.history["classical"] = {
+            k: v for k, v in report.items() if k != "coefficients"
+        }
+        return report
 
     @torch.no_grad()
     def sample(
@@ -1382,7 +1411,7 @@ class CausalFlowDAG(nn.Module):
         return pd.DataFrame({k: v.cpu().numpy() for k, v in values.items()})
 
     @torch.no_grad()
-    def abduct(self, df: pd.DataFrame, seed: int | None = None) -> pd.DataFrame:
+    def abduct(self, df: pd.DataFrame, *, seed: int | None = None) -> pd.DataFrame:
         """Recover the latent variables ``u`` from observations (Pearl step 1).
 
         A continuous node inverts exactly: ``u = h(x) + shift``. For an
@@ -1419,11 +1448,30 @@ class CausalFlowDAG(nn.Module):
                 u[name] = u0 + shift
             else:
                 u[name] = ordinal_abduct(theta, shift, x, generator=gen)
-        return pd.DataFrame({k: v.cpu().numpy() for k, v in u.items()})
+        return pd.DataFrame({k: v.cpu().numpy() for k, v in u.items()}, index=df.index)
+
+    def _conditional(
+        self, df: pd.DataFrame, node: str, do: dict[str, float] | None
+    ) -> tuple[_Node, Tensor, Tensor, int]:
+        """Evaluate one node's conditional at the rows of ``df``.
+
+        ``do`` overrides columns before the parents are read, which is what
+        makes :meth:`pmf` and :meth:`density` interventional. Gives the node,
+        its transform parameters, its shift and the row count.
+        """
+        nd = self._node(node)
+        df = df.assign(**(do or {}))
+        n = len(df)
+        values = self._tensorize(df, list(nd.parents) + self._vc_ehat_columns(nd))
+        feats = self._features({p: values[p] for p in nd.parents})
+        theta, shift = nd.theta_shift(
+            feats, n, vc_ehat=self._vc_ehat_live(nd, values, n)
+        )
+        return nd, theta, shift, n
 
     @torch.no_grad()
     def pmf(
-        self, df: pd.DataFrame, node: str, do: dict[str, float] | None = None
+        self, df: pd.DataFrame, node: str, *, do: dict[str, float] | None = None
     ) -> np.ndarray:
         """Give the analytic class probabilities of an ordinal node.
 
@@ -1451,16 +1499,7 @@ class CausalFlowDAG(nn.Module):
             raise ValueError(  # noqa: TRY004
                 f"pmf() requires an ordinal node, '{node}' is continuous."
             )
-        df_local = df.copy()
-        for col, val in (do or {}).items():
-            df_local[col] = val
-        nd = self.nodes[node]
-        cols = list(nd.parents) + self._vc_ehat_columns(nd)  # + e_hat inputs
-        values = self._tensorize(df_local, cols)
-        feats = self._features({p: values[p] for p in nd.parents})
-        theta, shift = nd.theta_shift(
-            feats, len(df_local), vc_ehat=self._vc_ehat_live(nd, values, len(df_local))
-        )
+        _, theta, shift, _ = self._conditional(df, node, do)
         return ordinal_pmf(theta, shift).cpu().numpy()
 
     @torch.no_grad()
@@ -1469,6 +1508,7 @@ class CausalFlowDAG(nn.Module):
         df: pd.DataFrame,
         node: str,
         grid,
+        *,
         do: dict[str, float] | None = None,
     ) -> np.ndarray:
         """Give the analytic conditional density of a continuous node on a grid.
@@ -1503,16 +1543,7 @@ class CausalFlowDAG(nn.Module):
             raise ValueError(  # noqa: TRY004
                 f"density() requires a continuous node, '{node}' is ordinal; use pmf()."
             )
-        df_local = df.copy()
-        for col, val in (do or {}).items():
-            df_local[col] = val
-        nd = self.nodes[node]
-        n = len(df_local)
-        values = self._tensorize(df_local, list(nd.parents) + self._vc_ehat_columns(nd))
-        feats = self._features({p: values[p] for p in nd.parents})
-        theta, shift = nd.theta_shift(
-            feats, n, vc_ehat=self._vc_ehat_live(nd, values, n)
-        )
+        nd, theta, shift, n = self._conditional(df, node, do)
         y = torch.as_tensor(np.asarray(grid, dtype=self._np_dtype), device=self.device)
         m = y.numel()
         # one (row, grid value) pair per evaluation: rows repeat, the grid tiles
@@ -1553,7 +1584,12 @@ class CausalFlowDAG(nn.Module):
 
     @torch.no_grad()
     def effect_modifier_scan(
-        self, df: pd.DataFrame, node: str, t: str, candidates: list[str] | None = None
+        self,
+        df: pd.DataFrame,
+        node: str,
+        *,
+        t: str,
+        candidates: list[str] | None = None,
     ) -> pd.DataFrame:
         """Rank candidate effect modifiers with a fluctuation scan.
 

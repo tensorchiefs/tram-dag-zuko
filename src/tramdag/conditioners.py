@@ -92,7 +92,12 @@ def _mlp(
     KeyError
         From :data:`ACTIVATIONS` if the name is not one of its keys.
     """
-    make_activation = ACTIVATIONS[activation or DEFAULT_ACTIVATION]
+    name = activation or DEFAULT_ACTIVATION
+    if name not in ACTIVATIONS:
+        raise ValueError(
+            f"unknown activation {name!r}; choose one of {sorted(ACTIVATIONS)}"
+        )
+    make_activation = ACTIVATIONS[name]
     layers: list[nn.Module] = []
     width = n_in
     for u in units:

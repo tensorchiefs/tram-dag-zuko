@@ -95,9 +95,9 @@ call selects the variant.
 
 Each script reads its sibling `<script>.yaml` and **nothing else**: no defaults
 in the code, no CLI flags that change a number. `common.py::load_variant` parses
-the file and hands the document to `tramdag.utils.config_section`, which picks
-the variant's section. The parsing stays here, so the package depends on no
-config parser.
+the file and picks the variant's section with `common.py::_config_section`.
+Both live here, so the package depends on no config parser and ships no config
+helper.
 Values shared by several variants are written once under a YAML anchor and
 merged with `<<`, which keeps the merge visible in the file.
 

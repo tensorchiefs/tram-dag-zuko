@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import math
 
+import numpy as np
 import torch
 from torch import Tensor
 from zuko.transforms import (
@@ -172,8 +173,6 @@ def ordinal_marginal_init_theta(counts) -> Tensor:
     Bernstein marginal-init, this is a pure initialization: the converged
     MLE is unchanged.
     """
-    import numpy as np
-
     counts = np.asarray(counts, dtype=np.float64)
     p = counts / counts.sum()
     F = np.clip(np.cumsum(p)[:-1], _CDF_EPS, 1 - _CDF_EPS)  # P(Y<=k), k=0..K-2

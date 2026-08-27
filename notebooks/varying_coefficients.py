@@ -193,7 +193,7 @@ print(flow.to_matrix())
 # `Y` values.
 
 # %%
-beta_hat = flow.varying_coef("Y", test)
+beta_hat = flow.varying_coef(test, "Y")
 beta_true = true_beta(test)
 corr = float(np.corrcoef(beta_hat, beta_true)[0, 1])
 beta0 = float(flow.nodes["Y"].shifts["T"].beta0)
@@ -298,7 +298,7 @@ for center in (False, True):
         vc_ehat={"Y": {"T": e_oof}} if center else None,
     )
     fc.load_state_dict(best["state"])
-    b = fc.varying_coef("Y", c_test)
+    b = fc.varying_coef(c_test, "Y")
     print(
         f"center={center!s:5s}  mean |beta - tau| = {np.abs(b - TAU).mean():.3f}"
         f"   mean beta = {b.mean():+.3f}  (true tau {TAU:+.1f})"
@@ -317,7 +317,7 @@ for center in (False, True):
 # | you want | use | read it with |
 # |---|---|---|
 # | one interpretable effect | `LS("T")` | `ls_coefficients()` |
-# | an effect that varies with covariates | `VC(*modifiers, t="T")` | `varying_coef(node, df)` |
+# | an effect that varies with covariates | `VC(*modifiers, t="T")` | `varying_coef(df, node)` |
 # | the same under confounding + a misspecified prognostic part | `VC(..., center=True)` | the same read-out |
 # | a shortlist of modifiers before you commit | `effect_modifier_scan` on a cheap all-`ls` fit | its `flag` column, read as screening |
 #

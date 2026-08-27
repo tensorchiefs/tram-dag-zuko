@@ -35,6 +35,26 @@ default the paper replication or the tests had to switch off.
   from the truth without it, recovery correlation 0.99 either way);
   `vc_oof_fit` and the hidden five-fold stage-1 fits behind
   `VC(center=True)` (see next bullet).
+- **`tramdag.utils` is gone.** `config_section` moved to
+  `experiments/common.py::_config_section`, its only caller; `machine_info`
+  had already left for the benchmark. The installed package is modelling
+  code only: `spec`, `transforms`, `conditioners`, `flow`, `scores`.
+- **Degenerate columns fail loudly instead of training into NaN.**
+  `calibrate` raises when a continuous node's 5%/95% quantiles coincide (a
+  constant or 95%-constant column: the transform has no domain) and when an
+  ordinal column is not an integer level index in `0..levels-1` — both used
+  to run and produce `nan` or silently truncated levels. An unknown
+  `activation=` and an unknown `init=` now raise with the valid choices
+  instead of a bare `KeyError` / a silent fallback.
+- **`abduct` keeps the caller's index**, and `fit_classical` records its
+  report (minus the coefficients) in `flow.history["classical"]`, so a
+  classically fitted checkpoint says how it was fitted.
+- **Every query and read-out is `(df, node, *, ...)`.** `varying_coef` and
+  `intercept_contributions` took the node first and called the frame `data`;
+  they now match `pmf`, `density`, `scores`, `design_matrix` and
+  `effect_modifier_scan`. `do=`, `seed=`, `t=`, `candidates=` and
+  `calibrate(marginal_init=)` are keyword-only, as every `fit` knob already
+  was.
 - **`flow.calibrate(train_df, marginal_init=True)`** — the data-dependent
   state, taken once: transform ranges, the network-input min-max, the
   calibrated start. The first `fit`/`fit_classical` calls it; a single
@@ -49,9 +69,10 @@ default the paper replication or the tests had to switch off.
   count is the caller's), as is `flow.vc_center_info`.
 - **`fit_classical`** lost `verbose` (the report dict is the summary) and
   computes its gradient norm with `torch.nn.utils.get_total_norm`.
-- **`save`** no longer records the machine; `machine_info` left the package
-  for `experiments/benchmarks/perf_machine.py`, the one caller that
-  compares machines. `meta` keeps version, time and device.
+- **`save`** no longer records the machine, and **`tramdag.utils` is gone**:
+  `machine_info` moved to `experiments/benchmarks/perf_machine.py` and
+  `config_section` to `experiments/common.py`, each next to its only caller.
+  `meta` keeps version, time and device; the package ships modelling code only.
 - **`transforms`**: the inverse is zuko's own (`Transform.inv`: bisection
   inside the bound, closed-form linear/identity tail) — the 85-line
   expanding-bracket bisection duplicated it; measured identical residuals,
@@ -487,7 +508,7 @@ default the paper replication or the tests had to switch off.
   first staged as `VC(on, *modifiers, penalty=)`, see Changed (breaking)):
   a treatment-effect head `beta(x) = beta0 + b_theta(x)` with a small (16-unit),
   **penalized**, zero-initialised network that only multiplies `x_on`, plus the
-  first-class read-out `flow.varying_coef(node, data)` (closed-form,
+  first-class read-out `flow.varying_coef(df, node)` (closed-form,
   deterministic, y-free; equals the abduct-difference for binary treatments).
   The objective is the penalized likelihood `Σ NLL + penalty·‖w‖²` (total-NLL
   scale, `beta0` unpenalized); `penalty → ∞` — or `modifiers=()` exactly —
@@ -504,7 +525,7 @@ default the paper replication or the tests had to switch off.
   (recovery bar corr ≥ 0.9 at n = 5000, measured min-over-seeds 0.986). Docs:
   `docs/varying-coefficients.md`.
 
-- **`flow.intercept_contributions(node, data)`** (issue #20, Option A) — post-hoc,
+- **`flow.intercept_contributions(df, node)`** (issue #20, Option A) — post-hoc,
   mean-centered decomposition of an **additive complex intercept**
   (`CI("x1", "x2", allow_interaction=False)`). The per-term networks are summed in unconstrained
   parameter space, so the sum is identified but each term's contribution only up to

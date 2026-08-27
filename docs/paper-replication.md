@@ -55,10 +55,10 @@ in `create_param_net` is commented out).
 |---|---|---|---|
 | train / validation | `dgp(40000)` / `dgp(40000)`, two draws | 36000 / 4000, one draw split | 40000 / 40000, two draws |
 | epochs | 500 | 500 (in chunks of 10, Adam restarted each chunk) | 500, one continuous run |
-| lr | 0.001 (`optimizer_adam()` default) | 0.001 | 0.001 |
-| batch | 32 (Keras `fit()` default) | 512 | 32 |
+| lr | 0.001 (`optimizer_adam()` default) | 0.001 | **0.004**, the CI deviation |
+| batch | 32 (Keras `fit()` default) | 512 | **256**, the CI deviation |
 | `len_theta` / `n_coeffs` | 20 | 20 | 20 |
-| schedule / early stop / init | none / none, final weights / glorot | none / none / torch | none / none / glorot |
+| schedule / early stop / init | none / none, final weights / random_normal | none / none / torch | none / none / `init: normal` |
 | coefficient read-out | after every epoch (Keras loop) | at chunk boundaries | `fit(callback=)`, every epoch |
 
 **Results**
@@ -91,7 +91,7 @@ CS net = reference `c(2, 2, 2, 2)`, sigmoid.
 | hyperparameter | paper / R code | previous | now |
 |---|---|---|---|
 | train / validation | `dgp(40000)` / `dgp(10000)` | 36000 / 4000 split | 40000 / 10000, two draws |
-| epochs, lr, batch, schedule, init | 500, 0.001, 32, none, glorot | 500 (chunks of 10), 0.001, 512, torch | 500 continuous, 0.001, 32, none, glorot |
+| epochs, lr, batch, schedule, init | 500, 0.001, 32, none, random_normal | 500 (chunks of 10), 0.001, 512, torch | 500 continuous, none, `init: normal`; **lr 0.004 / batch 256**, the CI deviation |
 | `n_coeffs` (x1, x2) | 20 | 20 | 20 |
 | odds-ratio check (App. C.4) | odds(x2 ≤ −1) under do(x1 += 1), theory e² ≈ 7.39 | 40000 rows, seed 99 | same |
 | counterfactual PMF (App. B) | Fig. 10 explains why point counterfactuals fail for the ordinal node | 2000 rows × 200 draws | same |
@@ -131,14 +131,22 @@ E[x3 | do(x2 = a)] = −0.25 + 0.25 a. The paper's Sec. 5.2 text says a ∈ {−
 
 | metric | paper | previous | R 1:1, torch init, per-node plateau (08-25) | now: R 1:1, glorot, global plateau |
 |---|---|---|---|---|
-| \|E[x3 \| do(x2 = −3)] − (−1.0)\| | Fig. 5: densities overlap | 0.037 | 0.026 | 0.098 (seeds 8, 9: 0.268, 0.217) |
-| \|E[x3 \| do(x2 = −2)] − (−0.75)\| | Fig. 5 | — (do(−1) was scored: 0.012) | 0.034 | 0.159 (0.119, 0.031) |
-| \|E[x3 \| do(x2 = 0)] − (−0.25)\| | Fig. 5 | 0.010 | 0.077 | 0.026 (0.005, 0.021) |
-| sd(x1) flow vs analytic 2.0767 | Fig. 4: bimodal x1 fitted (the default CNF fails) | 2.074 | error 0.0077 | error 0.028 (0.019, 0.036) |
-| val NLL x3 | — | 1.4356 | 1.4351 | 1.4499 (1.4495, 1.4516) |
+| \|E[x3 \| do(x2 = −3)] − (−1.0)\| | Fig. 5: densities overlap | 0.037 | 0.026 | 0.097 |
+| \|E[x3 \| do(x2 = −1)] − (−0.5)\| | Fig. 5 | 0.012 | — (do(−2) was scored: 0.034) | 0.088 |
+| \|E[x3 \| do(x2 = 0)] − (−0.25)\| | Fig. 5 | 0.010 | 0.077 | 0.019 |
+| sd(x1) flow vs analytic 2.0767 | Fig. 4: bimodal x1 fitted (the default CNF fails) | 2.074 | error 0.0077 | error 0.032 |
+| val NLL x3 | — | 1.4356 | 1.4351 | 1.4496 |
+
+The 08-25 and 08-26 columns are not the same three interventions: the do(x2)
+set moved from the paper text's {−3, −2, 0} to the R code's {−3, −1, 0} (see
+the DGP paragraph above), so only do(x2 = −3) and do(x2 = 0) compare directly.
+At the earlier grid and with glorot the errors were 0.098 / 0.159 / 0.026 at
+this seed and 0.268 / 0.119 / 0.005 and 0.217 / 0.031 / 0.021 at init seeds 8
+and 9 — the spread quoted below.
 
 How the gap was traced, one change at a time under the exact protocol
-(inputs min-max scaled unless stated; do(x2) errors at −3 / −2 / 0):
+(inputs min-max scaled unless stated; do(x2) errors at the then-current grid
+−3 / −2 / 0):
 
 | variant | error | reading |
 |---|---|---|
@@ -242,6 +250,6 @@ paper's 500 stay.
 
 Seeds; the validation draw sizes for the triangle scripts (the R code's
 `test`); `n_compare`; `n_heldout = 300` and the α set {−1.5, 0, 1.5} scored
-next to the single `x_obs`; the do(x2) set {−3, −2, 0} read off Fig. 5; the
+next to the single `x_obs`; the
 mixed cutpoints from the R code; the odds-ratio sample (40000 rows) and the
 counterfactual-PMF sample (2000 rows × 200 draws).

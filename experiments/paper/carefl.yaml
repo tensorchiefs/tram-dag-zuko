@@ -18,14 +18,16 @@
 # The plateau rule is torch's ReduceLROnPlateau on the summed validation NLL,
 # global like the reference's update_learning_rate, and the weights start from
 # Keras' Dense default, glorot_uniform / zero bias (`init: glorot`, make_model's
-# layer_dense) — under this full-batch protocol the init decides the fit (VACA
-# do(x2) error 0.52/0.33/0.13 with torch's default init, 0.098/0.159/0.026 with
-# glorot at the config's seed; measured 2026-08-26). Known deviations, all
-# framework-level and documented in CLAUDE.md: the Bernstein domain comes from
-# the train 5%/95% quantiles, not min-max to [0, 1] (scale_df); the intercept
-# net's output layer has no bias (Keras dense has one); Adam eps 1e-8 vs 1e-7
-# (measured: no effect); the reference seeds R's RNG with 42, which torch
-# cannot replay, so every seed below is a repo choice.
+# layer_dense) — under this full-batch protocol the init decides the fit: at
+# the config's seed the VACA do(x2) errors are 0.097/0.088/0.019 with glorot
+# (measured 2026-08-26 at the R code's -3/-1/0 grid), against 0.52/0.33/0.13
+# with torch's default init (at the earlier -3/-2/0 grid).
+# Known deviations, all framework-level and documented in CLAUDE.md: the
+# Bernstein domain comes from the train 5%/95% quantiles, not min-max to [0,
+# 1] (scale_df); the intercept net's output layer has no bias (Keras dense has
+# one); Adam eps 1e-8 vs 1e-7 (measured: no effect); the reference seeds R's
+# RNG with 42, which torch cannot replay, so every seed below is a repo
+# choice.
 #
 variants:
   # all conditionals complex intercepts

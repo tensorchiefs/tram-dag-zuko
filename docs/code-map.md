@@ -95,15 +95,6 @@ config in `experiments/paper/` states `units=` and `activation=` itself.
 | `sup_bb_pvalue()` | `P(sup |Brownian bridge| > stat)`, the Kolmogorov series. |
 | (`_dl_ds`, `_ls_score_columns`, `CRIT_5PCT`) | Closed-form latent-scale derivative; the LS/one-hot score-column builder; the 5% critical value 1.3581. |
 
-## `utils.py` — helpers that are not about modelling
-
-Nothing is imported at module level here: `config_section` needs no
-dependency.
-
-| Name | Role |
-|---|---|
-| `config_section()` | Pick a mapping out of an **already-parsed** configuration, descending through any number of keys. Parsing stays with the caller, so the package needs no config parser. |
-
 ## What is *not* in the package
 
 The SCM generators, the frozen datasets and the replication scripts are

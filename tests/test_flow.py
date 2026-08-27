@@ -9,9 +9,11 @@ import torch
 from tramdag import CS, LS, CausalFlowDAG, ContinuousNode, I, OrdinalNode
 from tramdag.spec import validate_and_sort
 from tramdag.transforms import (
+    BOUND,
     AffineUT,
     BernsteinUT,
     SplineUT,
+    StandardLogistic,
     ordinal_cutpoints,
     ordinal_log_prob,
     ordinal_pmf,
@@ -206,3 +208,25 @@ def test_ls_node_equals_proportional_odds():
         res.params, exog=df[["X1", "X2"]].values[:500], which="prob"
     )
     assert np.abs(pmf_flow - pmf_sm).max() < 0.01
+
+
+def test_affine_zero_theta_is_the_logistic_density():
+    """A closed-form anchor for the continuous path: with an affine transform at
+    theta = 0 the model *is* the standard logistic, rescaled by the pre-map's
+    Jacobian log(2*BOUND / (xmax - xmin)).
+    """
+    df = pd.DataFrame({"x": np.linspace(-4.0, 6.0, 400)})
+    flow = CausalFlowDAG({"x": ContinuousNode(I(transform="affine"))}, seed=0)
+    flow.calibrate(df, marginal_init=False)
+    with torch.no_grad():
+        flow.nodes["x"].intercept.theta.zero_()
+    xmin, xmax = (float(v) for v in (flow.nodes["x"].ut.xmin, flow.nodes["x"].ut.xmax))
+    z = (df["x"].to_numpy() - xmin) / (xmax - xmin) * 2 * BOUND - BOUND
+    expected = StandardLogistic.log_prob(torch.tensor(z, dtype=torch.float32))
+    expected = expected + np.log(2 * BOUND / (xmax - xmin))
+    np.testing.assert_allclose(
+        flow.log_prob(df).detach().numpy(), expected.numpy(), atol=1e-5
+    )
+    # the transform ranges are the train 5%/95% quantiles, as calibrate documents
+    q = df["x"].quantile([0.05, 0.95])
+    assert (xmin, xmax) == pytest.approx((q.iloc[0], q.iloc[1]))

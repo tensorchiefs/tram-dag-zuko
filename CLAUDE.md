@@ -73,10 +73,10 @@ See `experiments/README.md`.
   `ComplexShiftDefaultTabular` 64-128-64, `ComplexInterceptDefaultTabular` 8-8,
   `n_thetas=20`) — **not** the paper's R nets, which every `experiments/paper/`
   config sets explicitly instead.
-- `utils.py` — the non-modelling helpers, with no module-level imports:
-  `config_section` (pick a section out of an already-parsed config — parsing
-  stays with the caller, so the package needs no config parser;
-  `machine_info` moved to `experiments/benchmarks/perf_machine.py`).
+- (no `utils.py` any more: `config_section` moved to
+  `experiments/common.py`, `machine_info` to
+  `experiments/benchmarks/perf_machine.py` — each next to its only caller, so
+  the package is modelling code only.)
 - `flow.py` — `CausalFlowDAG`: `fit`, `fit_classical` (float64 full-batch
   L-BFGS, exact MLE for all-`ls` specs), `sample(n, do=, u=)`, `abduct`, `pmf`,
   `density` (its continuous counterpart, on a grid),

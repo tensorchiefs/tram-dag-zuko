@@ -130,3 +130,12 @@ def test_torch_plateau_scheduler_preserves_exact_mle(ls_chain):
     assert float(coefs["x2"][0]) == pytest.approx(res.params["x2"], abs=0.03)
     assert (w_t[1] - w_t[0]) == pytest.approx(res.params["t[1]"], abs=0.06)
     assert len(flow.history["train"]) < 4000  # the callback stopped it
+
+
+def test_history_accumulates_across_fit_calls(ls_chain):
+    """A second fit continues the record instead of replacing it."""
+    df = ls_chain["draw"](200, 5)[["x1", "x2"]]
+    flow = CausalFlowDAG(_two_node_spec(), seed=0)
+    flow.fit(df, epochs=2, batch_size=100)
+    flow.fit(df, epochs=3, batch_size=100)
+    assert len(flow.history["train"]) == 5

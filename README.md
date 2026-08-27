@@ -82,12 +82,12 @@ cf = flow.sample(do={"T": 1}, u=u)  # L3 steps 2+3: counterfactuals
 
 flow.ls_coefficients()  # interpret: per-edge log-odds-ratios (LS terms)
 # per-parent partial effects of an additive complex intercept (centered):
-# flow.intercept_contributions("Y", df) on a CI("A", "B", allow_interaction=False)
+# flow.intercept_contributions(df, "Y") on a CI("A", "B", allow_interaction=False)
 
 # heterogeneous treatment effects: a small, penalized effect head beta(x)*T
 # (VC term) with a first-class read-out — see docs/varying-coefficients.md
 # e.g. CS("X1", "X2") + VC("X1", t="T") ->
-# flow.varying_coef("Y", df)               # beta(x): deterministic, y-free
+# flow.varying_coef(df, "Y")               # beta(x): deterministic, y-free
 
 flow.scores(df, node="Y")  # per-observation scores dl_i/dtheta
 flow.effect_modifier_scan(df, "Y", t="T")  # which VC modifiers? (CUSUM
@@ -191,7 +191,7 @@ See the [`tests/README.md`](tests/README.md) file for more details.
 
 ```
 src/tramdag/            spec.py transforms.py conditioners.py flow.py
-                        scores.py utils.py        <- the framework, and nothing else
+                        scores.py                 <- the framework, and nothing else
 tests/                  unit tests, identities, acceptance bars, three inline DGPs
 experiments/            research code, one directory per area, each self-contained:
                           paper/       the replications + generators + frozen data

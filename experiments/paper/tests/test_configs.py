@@ -12,24 +12,28 @@ import pytest
 import yaml
 
 # %% global variables ------------------------------------------------------------------
-PAPER = Path(__file__).resolve().parents[1]
-SCRIPTS = ["triangle", "triangle_mixed", "vaca", "carefl"]
+EXPERIMENTS = Path(__file__).resolve().parents[2]
+CONFIGS = sorted(EXPERIMENTS.glob("*/*.yaml"))  # the same glob the workflow plans from
 
 
 # %% private functions -----------------------------------------------------------------
-def _keys_read(script: str) -> set[str]:
-    """Keys the script or helpers.py read as ``config["key"]``."""
-    source = (PAPER / f"{script}.py").read_text() + (PAPER / "helpers.py").read_text()
-    return set(re.findall(r'config\["([a-z_0-9]+)"\]', source))
+def _keys_read(script: Path) -> set[str]:
+    """Keys the script reads as ``config["key"]``, its area helpers included."""
+    source = script.read_text()
+    for helper in ("helpers.py", "common.py"):
+        sibling = script.parent / helper
+        if sibling.exists():
+            source += sibling.read_text()
+    return set(re.findall(r"""config\[["']([a-z_0-9]+)["']\]""", source))
 
 
 # %% public functions ------------------------------------------------------------------
-@pytest.mark.parametrize("script", SCRIPTS)
-def test_every_yaml_key_is_read_by_the_script(script):
-    document = yaml.safe_load((PAPER / f"{script}.yaml").read_text())
-    read = _keys_read(script)
-    for variant, config in document["variants"].items():
-        unread = set(config) - read
+@pytest.mark.parametrize("config", CONFIGS, ids=lambda p: f"{p.parent.name}/{p.stem}")
+def test_every_yaml_key_is_read_by_the_script(config):
+    document = yaml.safe_load(config.read_text())
+    read = _keys_read(config.with_suffix(".py"))
+    for variant, values in document["variants"].items():
+        unread = set(values) - read
         assert not unread, (
-            f"{script}.yaml[{variant}]: keys nothing reads: {sorted(unread)}"
+            f"{config.name}[{variant}]: keys nothing reads: {sorted(unread)}"
         )

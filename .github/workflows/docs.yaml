@@ -74,7 +74,7 @@ jobs:
         uv run --group notebooks --group docs env PYTHONPATH=build/stubs \
           pdoc -d numpy --math --template-directory .github/pdoc-templates \
             -o site tramdag tramdag.spec tramdag.flow tramdag.transforms \
-            tramdag.conditioners tramdag.scores tramdag.utils guides examples
+            tramdag.conditioners tramdag.scores guides examples
 
     - name: rewrite repo-relative links
       run: |

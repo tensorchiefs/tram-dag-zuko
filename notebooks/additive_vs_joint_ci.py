@@ -32,7 +32,7 @@
 # The additive form is the interpretable one: you can ask "what does `x1`
 # *alone* do?". The catch (issue #20) is that the additive sum is identified only
 # up to a constant moving between the nets, so the **raw** per-parent outputs are
-# not comparable. `flow.intercept_contributions(node, data)` resolves this with a
+# not comparable. `flow.intercept_contributions(data, node)` resolves this with a
 # sum-to-zero (mean-centering) constraint and returns each parent's centered
 # contribution.
 
@@ -131,8 +131,8 @@ print("val NLL  additive:", round(sum(flow_add.nll(val).values()), 4))
 # over the rows of the `data` you pass, and the decomposition is exact.
 
 # %%
-res_add = flow_add.intercept_contributions("x3", train)
-res_joint = flow_joint.intercept_contributions("x3", train)
+res_add = flow_add.intercept_contributions(train, "x3")
+res_joint = flow_joint.intercept_contributions(train, "x3")
 
 print("additive terms :", list(res_add["contributions"]))  # 'x1', 'x2' — separable
 print("joint terms    :", list(res_joint["contributions"]))  # 'x1+x2' — inseparable

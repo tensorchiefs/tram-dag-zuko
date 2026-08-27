@@ -135,8 +135,8 @@ def test_fit_classical_rejects_vc(vc_hetero):
 def test_varying_coef_deterministic_and_y_free(small_fitted):
     flow, dgp = small_fitted
     new = dgp["draw"](300, 900)
-    b1 = flow.varying_coef("Y", new)
-    b2 = flow.varying_coef("Y", new.drop(columns=["Y", "T", "X1"]))  # modifiers only
+    b1 = flow.varying_coef(new, "Y")
+    b2 = flow.varying_coef(new.drop(columns=["Y", "T", "X1"]), "Y")  # nur Modifier
     np.testing.assert_array_equal(b1, b2)
     assert b1.shape == (300,)
     assert b1.std() > 0
@@ -150,7 +150,7 @@ def test_varying_coef_equals_abduct_difference(small_fitted):
     new = dgp["draw"](300, 901)
     u1 = flow.abduct(new.assign(T=1.0), seed=0)["Y"].values
     u0 = flow.abduct(new.assign(T=0.0), seed=0)["Y"].values
-    np.testing.assert_allclose(flow.varying_coef("Y", new), u1 - u0, rtol=0, atol=1e-5)
+    np.testing.assert_allclose(flow.varying_coef(new, "Y"), u1 - u0, rtol=0, atol=1e-5)
 
 
 def test_beta_recentered_over_training_data(small_fitted):
@@ -160,7 +160,7 @@ def test_beta_recentered_over_training_data(small_fitted):
     flow, dgp = small_fitted
     train = dgp["draw"](1500, 100).iloc[:1300]
     beta0 = float(flow.nodes["Y"].shifts["T"].beta0)
-    assert np.mean(flow.varying_coef("Y", train)) == pytest.approx(beta0, abs=1e-5)
+    assert np.mean(flow.varying_coef(train, "Y")) == pytest.approx(beta0, abs=1e-5)
 
 
 def test_save_load_roundtrip_vc(tmp_path, small_fitted):
@@ -172,7 +172,7 @@ def test_save_load_roundtrip_vc(tmp_path, small_fitted):
     vc = next(t for t in flow2.spec["Y"].terms if t.effect == "VC")
     assert vc.penalty == 1.0
     np.testing.assert_allclose(
-        flow2.varying_coef("Y", new), flow.varying_coef("Y", new), atol=1e-7
+        flow2.varying_coef(new, "Y"), flow.varying_coef(new, "Y"), atol=1e-7
     )
     assert torch.allclose(flow2.log_prob(new), flow.log_prob(new), atol=1e-6)
 
@@ -205,7 +205,7 @@ def test_nesting_large_penalty_matches_classical_ls(vc_hetero):
             seed=0,
         )
     # the head is dead: beta(x) constant
-    assert flow.varying_coef("Y", df).std() < 1e-3
+    assert flow.varying_coef(df, "Y").std() < 1e-3
 
     ls_spec = {
         **spec,
@@ -230,7 +230,7 @@ def test_recovery_bar_on_hetero_dgp(vc_hetero):
 
     flow = CausalFlowDAG(_vc_spec(), seed=0)
     flow.fit(train, epochs=300, learning_rate=1e-2, batch_size=512, seed=0)
-    beta_hat = flow.varying_coef("Y", test)
+    beta_hat = flow.varying_coef(test, "Y")
     corr = float(np.corrcoef(beta_hat, vc_hetero["beta"](test))[0, 1])
     assert corr >= 0.9, f"recovery corr {corr:.3f} < 0.9"
     # beta0 is the interpretable main effect, the mean of beta(x) over the
@@ -260,7 +260,7 @@ def test_vc_continuous_treatment():
     flow = CausalFlowDAG(spec, seed=0)
     flow.fit(df, epochs=30, seed=0)
     assert torch.isfinite(flow.log_prob(df)).all()
-    beta = flow.varying_coef("Y", df)
+    beta = flow.varying_coef(df, "Y")
     u2 = flow.abduct(df.assign(D=2.0), seed=0)["Y"].values
     u0 = flow.abduct(df.assign(D=0.0), seed=0)["Y"].values
     np.testing.assert_allclose(2.0 * beta, u2 - u0, rtol=0, atol=1e-4)

@@ -5,9 +5,10 @@ name: experiments
 # the paper's own protocol (500 epochs over 40000 rows on the triangle
 # scripts, at batch 256 — the one documented CI deviation from the paper's
 # batch 32, see docs/paper-replication.md). Measured 2026-08-26 on the 2-core
-# runners: triangle jobs 7-11 min (42-69 min at batch 32), vaca 6 min, carefl
-# 7 min, validate_ls 1-4 min; the jobs run in parallel, so a push costs about
-# 12 min wall. A workflow_dispatch may narrow it to a single script+variant.
+# runners (run 32974872751): triangle jobs 7-11 min (42-69 min at batch 32),
+# vaca 5.8 min, carefl 6.7 min, validate_ls 0.8-4.4 min; the jobs run in
+# parallel, so a push costs about 12 min wall. A workflow_dispatch may narrow
+# it to a single script+variant.
 #
 # Each job runs its experiment, compares the metrics against the committed
 # ground truth in <area>/ground_truth/, and posts the run's report — table
@@ -39,6 +40,7 @@ jobs:
   # can never disagree. A dispatch may narrow it to one script+variant.
   plan:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     outputs:
       include: ${{ steps.pick.outputs.include }}
     steps:
@@ -67,7 +69,8 @@ jobs:
         include = []
         for path in sorted(pathlib.Path(".").glob("*/*.yaml")):
             area, script = path.parent.name, path.stem
-            for variant in sorted(yaml.safe_load(path.read_text())["variants"]):
+            document = yaml.safe_load(path.read_text()) or {}
+            for variant in sorted(document.get("variants", ())):
                 if only_script and (script, variant) != (only_script, only_variant):
                     continue
                 include.append(
@@ -83,7 +86,7 @@ jobs:
   replicate:
     needs: plan
     runs-on: ubuntu-latest
-    timeout-minutes: 300
+    timeout-minutes: 60   # the slowest job measures 11 min; a hang is a hang
     strategy:
       fail-fast: false           # one drifting experiment must not hide the rest
       matrix:
@@ -108,8 +111,9 @@ jobs:
       id: result
       run: |
         set -euo pipefail
-        name="${{ matrix.script }}-${{ matrix.variant }}"
-        echo "name=${name//_/-}" >> "$GITHUB_OUTPUT"
+        # make_output_dir dashes the script name and keeps the variant verbatim
+        script="${{ matrix.script }}"
+        echo "name=${script//_/-}-${{ matrix.variant }}" >> "$GITHUB_OUTPUT"
 
     - name: check the metrics against the committed ground truth
       working-directory: experiments

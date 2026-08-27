@@ -16,8 +16,10 @@
 #   * no learning-rate schedule, no early stopping, final weights.
 # Matched on purpose: the Bernstein domain comes from the train 5%/95%
 # quantiles, as in the R script (quantile(..., c(0.05, 0.95)); its min/max
-# lines are commented out), and the weights start from Keras' random_normal,
-# sd 0.05, on weights and biases (`init: normal`, the LinearMasked layers).
+# lines are commented out), and every linear layer starts from Keras'
+# random_normal, sd 0.05, on weights and biases (`init: normal`, the
+# LinearMasked layers). A simple intercept's theta is not a linear layer: it
+# starts at zero here (marginal_init=False), as `bernp$beta` does in R.
 # Known deviations, documented in CLAUDE.md: a [-5, 5] instead of a [0, 1]
 # domain (a reparametrization), zuko's tied end control points instead of the
 # reference's tangent extrapolation, order 21 vs 19 at equal free parameters;
@@ -31,9 +33,10 @@ paper_protocol: &paper_protocol
   # trains at Keras' default batch 32 with optimizer_adam()'s lr 0.001; 500
   # epochs of that are 42-69 min per variant on the CI runners. Batch 256 with
   # the lr scaled 4x runs the same 500 epochs in 8x fewer steps and keeps every
-  # ground-truth metric (measured 2026-08-26: cs max err linear-cs 0.132 vs
-  # 0.110, atan-cs 0.073 vs 0.080, mixed exp-cs 0.072 vs 0.071; batch 512 /
-  # lr 0.01 and lr 0.008 degrade the cs curves, batch 128 / lr 0.001 too).
+  # ground-truth metric. The grid ran with glorot init (measured 2026-08-26:
+  # cs max err linear-cs 0.132 vs 0.110, atan-cs 0.073 vs 0.080, mixed exp-cs
+  # 0.072 vs 0.071; batch 512 / lr 0.01 and lr 0.008 degrade the cs curves,
+  # batch 128 / lr 0.001 too); this config's own numbers are in ground_truth/.
   learning_rate: 0.004    # paper: 0.001 (optimizer_adam() default)
   batch_size: 256         # paper: 32 (Keras fit() default)
   schedule:               # the reference has no schedule

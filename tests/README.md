@@ -111,7 +111,6 @@ unrelated acceptance bars.
 | [`test_scores.py`](test_scores.py) | analytic scores vs finite differences, the effect-modifier scan |
 | [`test_marginal_init.py`](test_marginal_init.py) | calibrated marginal initialization — pure-init property |
 | [`test_api_papercuts.py`](test_api_papercuts.py) | error messages, `save`/`load` meta, small API contracts |
-| [`test_utils.py`](test_utils.py) | `config_section` |
 
 ## Adding tests
 

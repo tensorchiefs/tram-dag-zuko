@@ -176,7 +176,7 @@ def test_do_recomputes_centered_regressor(confounded):
     flow.fit(df, epochs=40, seed=0, vc_ehat={"Y": {"T": _oof_propensity(df)[0]}})
     fresh = confounded["draw"](300, 99)  # never seen in fit
 
-    beta = flow.varying_coef("Y", fresh)
+    beta = flow.varying_coef(fresh, "Y")
     u1 = flow.abduct(fresh.assign(T=1.0), seed=0)["Y"].values
     u0 = flow.abduct(fresh.assign(T=0.0), seed=0)["Y"].values
     np.testing.assert_allclose(u1 - u0, beta, rtol=0, atol=1e-5)
@@ -221,8 +221,8 @@ def test_dandl_centering_reduces_bias(confounded):
     test = confounded["draw"](3000, 1000)
     flow_u = _fit(_misspecified_spec(False), df)
     flow_c = _fit(_misspecified_spec(True), df)
-    bias_u = float(np.mean(np.abs(flow_u.varying_coef("Y", test) - tau)))
-    bias_c = float(np.mean(np.abs(flow_c.varying_coef("Y", test) - tau)))
+    bias_u = float(np.mean(np.abs(flow_u.varying_coef(test, "Y") - tau)))
+    bias_c = float(np.mean(np.abs(flow_c.varying_coef(test, "Y") - tau)))
     assert bias_u > 0.5, f"trap not armed (uncentered bias {bias_u:.3f})"
     assert bias_c < 0.5 * bias_u, (bias_u, bias_c)
 
@@ -247,3 +247,13 @@ def test_centered_save_load_and_queries(tmp_path, confounded):
             flow.log_prob(df.head(50)).detach().numpy(),
             atol=1e-6,
         )
+
+
+def test_propensities_must_be_probabilities(confounded):
+    """A centered term takes P(t=1|pa_t): outside [0, 1] is a caller error."""
+    df = confounded["draw"](200, 8)
+    flow = CausalFlowDAG(_misspecified_spec(True), seed=0)
+    bad = _oof_propensity(df)[0].copy()
+    bad[0] = 1.4
+    with pytest.raises(ValueError, match="probabilities"):
+        flow.fit(df, epochs=1, vc_ehat={"Y": {"T": bad}})
