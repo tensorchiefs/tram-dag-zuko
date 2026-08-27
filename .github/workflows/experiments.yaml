@@ -2,11 +2,12 @@ name: experiments
 
 # Every experiment, one matrix job each. They run on every push, so a
 # commit's report is always current — note that this trains real models on
-# the paper's own protocol (batch size 32 over 40000 rows for 500 epochs on
-# the triangle scripts). Measured 2026-08-25 on the 2-core runners: triangle
-# jobs 42-69 min, vaca 5 min, carefl 7 min, validate_ls 1-5 min; the jobs run
-# in parallel, so a push costs about 70 min wall. A workflow_dispatch may
-# narrow it to a single script+variant when that is all you need.
+# the paper's own protocol (500 epochs over 40000 rows on the triangle
+# scripts, at batch 256 — the one documented CI deviation from the paper's
+# batch 32, see docs/paper-replication.md). Measured 2026-08-26 on the 2-core
+# runners: triangle jobs 7-11 min (42-69 min at batch 32), vaca 6 min, carefl
+# 7 min, validate_ls 1-4 min; the jobs run in parallel, so a push costs about
+# 12 min wall. A workflow_dispatch may narrow it to a single script+variant.
 #
 # Each job runs its experiment, compares the metrics against the committed
 # ground truth in <area>/ground_truth/, and posts the run's report — table

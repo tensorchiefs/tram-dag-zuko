@@ -70,7 +70,8 @@ time, or with `OMP_NUM_THREADS=2`.
 The configs therefore take one documented deviation for CI runtime: batch 256
 at lr 0.004 instead of the paper's batch 32 at lr 0.001 — the same 500 epochs
 in 8× fewer steps, every ground-truth metric kept (the grid that chose it is
-in `docs/paper-replication.md`). The 500 epochs stay: the linear-shift
+in `docs/paper-replication.md`). Measured on CI (run 32974872751): triangle
+jobs 7–11 min instead of 42–69, the whole workflow about 12 min wall. The 500 epochs stay: the linear-shift
 coefficients settle after ~40 epochs, the complex shift does not (at 100
 epochs the cs-curve error doubles to triples; at 250 mixed exp-cs is still
 +60 %).

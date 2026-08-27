@@ -224,7 +224,9 @@ committed ground-truth bands (glorot init, cs max err unless noted):
 
 Batch 256 / lr 0.004 is the only row that keeps every cs error within 0.02 of the
 paper protocol; larger batches or rates bend the misspecified linear-cs curve
-(0.16–0.18) and lr 0.008 hurts atan-cs. The grid ran with glorot init; the
+(0.16–0.18) and lr 0.008 hurts atan-cs. On CI (run 32974872751) the triangle
+jobs take 7–11 min instead of 42–69, the workflow about 12 min wall instead of
+70. The grid ran with glorot init; the
 committed configs use `init: normal` (the triangle scripts' initializer), whose
 CI-config numbers are in the result tables above (cs errors 0.088 / 0.077 /
 1.024 / 0.107). The paper-protocol numbers stay in this document as the
