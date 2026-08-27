@@ -35,17 +35,18 @@ repos:
   rev: v2.4.3
   hooks:
   # nd: the _Node variable in flow.py; continous: quotes the upstream
-  # R script's filename (tensorchiefs/tram-dag), typo and all
+  # R script's filename (tensorchiefs/tram-dag), typo and all; lik: R prints
+  # its log-likelihood as "'log Lik.'", quoted verbatim in a notebook
   - id: codespell
     name: codespell (tracked files)
-    args: [-L, 'nd,continous']
+    args: [-L, 'nd,continous,lik']
     exclude: ^(experiments/.*/data/|uv\.lock|.*\.ipynb$|.*texfrag/)
   # a commit-msg-stage hook is handed ONLY the message file, so the message is
   # spell-checked without the file excludes above applying to it
   - id: codespell
     alias: codespell-commit-msg
     name: codespell (commit message)
-    args: [-L, 'nd,continous']
+    args: [-L, 'nd,continous,lik']
     stages: [commit-msg]
 
 - repo: https://github.com/rohaquinlop/complexipy-pre-commit

@@ -31,7 +31,8 @@ notebooks = [
   "jupytext",
   "ipykernel",  # so JupyterLab / VS Code can run the generated .ipynb
   "matplotlib",  # the notebooks plot ...
-  "scipy"  # ... and use scipy.stats
+  "scipy",  # ... and use scipy.stats
+  "statsmodels"  # classical_fit_tram_dag.py checks against OrderedModel
 ]
 test = [
   "pytest",

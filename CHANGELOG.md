@@ -4,6 +4,42 @@
 
 ### Added
 
+- **`notebooks/classical_fit_tram_dag.py` is back**, ported to the 0.4 term
+  syntax. It had been deleted along with `notebooks/stale/`; the deletion
+  moved its ordinal half to `experiments/misc/validate_ls.py` and its
+  warm-start lesson to `docs/fitting.md`, but the notebook itself is the only
+  place `fit_classical` is walked through end to end. The port drops the
+  `tramdag.simulations` import (the VACA triangle is simulated inline, as the
+  other notebooks do), reads the stroke cohort from `experiments/misc/data/`,
+  and replaces the hand-rolled one-hot design with
+  `flow.design_matrix(..., drop_first=True)`. It joins the docs workflow's
+  `NOTEBOOKS` list, so it is executed on every push to `main` and `dev-*`.
+
+- **Section 1 now reproduces the continuous fit outside the flow too.** R
+  `tram::Colr` is shown with its real output rather than as untested code,
+  and `statsmodels` gets a route it was previously said to lack: a continuous
+  transformation model is the limit of an ordered logit, so cutting the
+  outcome into `K` quantile bins and fitting `OrderedModel` converges to the
+  flow's shift coefficients. Both are labelled **consistency checks, not
+  identities** — unlike Sections 0 and 2 they compare two different sieve
+  approximations of `h` and agree to ~0.1%, not 1e-8. Section 1 now writes its
+  1000-row sample to `notebooks/data/vaca.csv` and reads it back, so the R
+  snippet runs on the identical rows the flow was fitted on. The cell also
+  makes the
+  per-node-kind sign convention explicit: a continuous node adds its shift, so
+  `OrderedModel`'s coefficients need negating, while an ordinal node's do not.
+
+- **Logistic regression is the zeroth example**, opening
+  `classical_fit_tram_dag.py`: a two-level `OrdinalNode` with `LS` terms *is*
+  logistic regression, `logit P(Y=1) = -theta_0 + w_0 + sum_p w_p x_p`. It
+  runs on `MASS::birthwt` (new `notebooks/data/`, exported verbatim from
+  MASS, with a pasteable `glm` snippet that needs no file because the data
+  ships with MASS) and agrees with `statsmodels.Logit` and R `glm` on all
+  four coefficients to ~1e-8, on the log-likelihood to 1e-5, and on the
+  fitted probabilities to 9e-8. It makes two conventions concrete on the simplest
+  possible model: an ordinal node *subtracts* its shift, and an ordinal
+  parent's one-hot level-0 column is part of the intercept.
+
 - **A source node is canonical too.** `ContinuousNode()` and `OrdinalNode(k)`
   now hold `[SI()]` instead of `None`, so `node.terms[0]` really is always
   the intercept, `ContinuousNode() == ContinuousNode([SI()])`, and node
