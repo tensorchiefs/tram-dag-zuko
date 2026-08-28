@@ -72,7 +72,7 @@ jobs:
     - name: build the site with pdoc
       run: |
         uv run --group notebooks --group docs env PYTHONPATH=build/stubs \
-          pdoc -d numpy --template-directory .github/pdoc-templates \
+          pdoc -d numpy --math --template-directory .github/pdoc-templates \
             -o site tramdag guides examples
 
     - name: rewrite repo-relative links

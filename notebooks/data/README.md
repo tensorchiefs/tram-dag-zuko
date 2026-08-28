@@ -16,12 +16,13 @@ re-fit in R.
 | `age` | mother's age in years |
 | `lwt` | mother's weight at last menstrual period, lbs |
 | `smoke` | smoking during pregnancy (0/1) |
+| `bwt` | birth weight in grams — the continuous outcome `low` is cut from |
 
 Exported verbatim from MASS 7.3-58.2 under R 4.2.3:
 
 ```r
 library(MASS)
-write.csv(birthwt[, c("low", "age", "lwt", "smoke")],
+write.csv(birthwt[, c("low", "age", "lwt", "smoke", "bwt")],
           "notebooks/data/birthwt.csv", row.names = FALSE)
 ```
 
@@ -46,10 +47,11 @@ x2 = -x1 + N(0, 1)
 x3 =  x1 + 0.25 x2 + N(0, 1)
 ```
 
-Unlike `birthwt.csv`, this file is an **output** of the notebook, not an input.
-The cell writes it with `sample_vaca(1000, seed=42)` and then reads it back, so
+The notebook carries its generator in an `if False:` block, so a normal run
+reads this file and does not rewrite it. Run that block by hand to regenerate
+the sample, which is seeded and therefore reproducible. The file is tracked so
 that the R snippet in the same section reads the identical rows the flow was
-fitted on. The generator is seeded, so each run rewrites the file byte for byte.
+fitted on.
 
 The notebook pins R's reference coefficients from that file:
 

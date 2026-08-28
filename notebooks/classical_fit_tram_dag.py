@@ -15,25 +15,24 @@
 # # Classical fitting of all-`ls` TRAM-DAGs (`fit_classical`)
 #
 # When **every edge of a TRAM-DAG is a linear shift (`LS`)**, each
-# node-conditional is a *classical transformation model* — an ordered-logit /
-# proportional-odds model for ordinal nodes, a continuous-outcome logistic
-# transformation model (R's `tram::Colr`) for continuous ones. For such a model,
-# the classical optimizer is best suited.
+# node-conditional is a *classical transformation model*
 #
-# `flow.fit_classical()` is the classical optimizer for exactly this case:
+#  * an ordered-logit / proportional-odds model for ordinal nodes
 #
+#  * a continuous-outcome logistic transformation model (R's `tram::Colr`) for continuous ones.
+#
+# For such a model, the classical optimizer `flow.fit_classical()` is best suited:
 # - **full-batch, float64, L-BFGS** with a strong-Wolfe line search,
 # - **deterministic** — no minibatching, so the same start gives bit-identical
 #   results,
 # - lands on the **exact maximum-likelihood estimate**, matching `statsmodels`
-#   and R to ~1e-3 on the well-identified coefficients,
-# - **raises** on any `CS`/`CI`/`VC` term (use `fit()` there — minibatch noise
-#   also regularizes the MLPs).
+#   and R to ~1e-3 on the well-identified coefficients.
 #
-# This notebook starts from the most familiar all-`ls` model of all — a plain
-# logistic regression on `MASS::birthwt`, checked against R — then fits two
-# larger DAGs with `fit_classical`, compares each with the classical solution,
-# and shows how a classical fit can **warm-start** further training.
+# Every R reference printed below is hard-coded from a real fit, and every one
+# of those fits lives in `notebooks/classical_fit_tram_dag.R`. Run
+# `Rscript notebooks/classical_fit_tram_dag.R` from the repo root to re-check
+# them; it needs `MASS` (ships with R) and `tram`.
+#
 
 # %%
 import logging
@@ -146,20 +145,24 @@ flow_bw.fit_classical(bw)
 # they enter raw and their weights compare directly. `smoke` is ordinal, so it
 # enters **one-hot over both levels**.
 #
-# > **Careful Different Coding compared to R** — In contrast to R we use one-hot encoding and the
-# > binary variable smoking get to levels.  Only `w[1] - w[0]` is
-# > determined by the data. Each level on its own is fixed by the weight
-# > initialization: a different `seed` shifts both levels by the same constant
-# > and moves `theta_0` to compensate, leaving every fitted probability
-# > unchanged. .
-# - only the *difference* between levels is identified, so `w[1] - w[0]` is what
-#   R's single `smoke` coefficient means (Section 2 leans on that same rule for
-#   a 6-level parent);
-# - the level-0 column is a column of ones on the untreated rows, so it doubles
-#   as part of the intercept. Writing the shift out,
-#   $w_0 \mathbb{1}[s{=}0] + w_1 \mathbb{1}[s{=}1] = w_0 + (w_1 - w_0)\,s$,
-#   the constant $w_0$ lands on the intercept: R's `(Intercept)` is
-#   $-\theta_0 + w_0$, not $-\theta_0$.
+# > **Careful — different coding from R.** R gives a binary predictor one
+# > column; we give it two, $w_0$ and $w_1$. Only the difference $w_1 - w_0$ is
+# > determined by the data, and it is what R's single `smoke` coefficient means.
+# > Each level alone is fixed by the weight initialization: a different `seed`
+# > shifts both by the same constant and moves $\theta_0$ to compensate, leaving
+# > every fitted probability unchanged. Section 2 uses the same rule for `T`.
+#
+# The second column also moves the intercept. With $s \in \{0, 1\}$ we have
+# $\mathbf{1}[s = 0] = 1 - s$, so the one-hot pair collapses to
+#
+# $$w_0\,\mathbf{1}[s = 0] + w_1\,\mathbf{1}[s = 1] \;=\; w_0 + (w_1 - w_0)\,s ,$$
+#
+# and the node reads
+#
+# $$\operatorname{logit} P(\texttt{low} = 1) \;=\; (-\theta_0 + w_0) \;+\; w_{\text{age}}\,\texttt{age} \;+\; w_{\text{lwt}}\,\texttt{lwt} \;+\; (w_1 - w_0)\,s .$$
+#
+# The first bracket is R's `(Intercept)` — it is $-\theta_0 + w_0$, not
+# $-\theta_0$ — and the last is R's `smoke`.
 
 # %%
 import statsmodels.formula.api as smf  # noqa: E402
@@ -216,12 +219,196 @@ print(
 )
 
 # %% [markdown]
-# So the framework's zeroth model is one you can check against a textbook.
-# Everything that follows — more levels, continuous outcomes, several nodes at
-# once — is this model repeated along a DAG.
+# ## 1. Continuous case
+#
+# Section 0 modelled `low`, the *dichotomized* birth weight. `birthwt` also
+# carries the number it was cut from — `bwt`, the weight in grams — so the same
+# three predictors can be fitted against a continuous outcome. That is a
+# continuous outcome logistic transformation model, R's `tram::Colr`
+# bwt ~ age + lwt + smoke
+# No way to model this with glm.
+
+# %%
+R_COLR_BWT = {  # Colr(bwt ~ age + lwt + smoke, order = 21); R 4.2.3 / tram 1.0.4
+    "age": -0.021971,
+    "lwt": -0.010233,
+    "smoke": 0.668698,
+    "loglik": -1499.6678,
+}
+
+spec_bwt = {
+    "age": ContinuousNode([SI(transform="affine")]),  # nuisance marginals
+    "lwt": ContinuousNode([SI(transform="affine")]),
+    "smoke": OrdinalNode(2),
+    "bwt": ContinuousNode(
+        [SI(n_coeffs=20), LS("age"), LS("lwt"), LS("smoke")]  # degree 21
+    ),
+}
+
+flow_bwt = CausalFlowDAG(spec_bwt, seed=0)
+flow_bwt.fit_classical(bw, max_iter=800, verbose=False)
+
+w = flow_bwt.ls_coefficients()["bwt"]
+fitted = {
+    "age": w["age"][0],
+    "lwt": w["lwt"][0],
+    "smoke": w["smoke"][1] - w["smoke"][0],  # one-hot: read the difference
+    "loglik": -flow_bwt.nll(bw)["bwt"] * len(bw),
+}
+
+print(f"{'':<9}{'age':>9}{'lwt':>9}{'smoke':>9}{'logLik':>11}")
+for name, r in [("flow", fitted), ("R Colr", R_COLR_BWT)]:
+    print(
+        f"{name:<9}{r['age']:>9.4f}{r['lwt']:>9.4f}{r['smoke']:>9.4f}"
+        f"{r['loglik']:>11.2f}"
+    )
+diff = {k: abs(fitted[k] - R_COLR_BWT[k]) for k in fitted}
+print(
+    f"{'|diff|':<9}{diff['age']:>9.4f}{diff['lwt']:>9.4f}{diff['smoke']:>9.4f}"
+    f"{diff['loglik']:>11.2f}"
+)
 
 # %% [markdown]
-# ## 1. Continuous case — the bimodal demo data
+# The largest *absolute* difference is in `smoke`, but that only reflects its
+# coefficient being some thirty times bigger than the others; as a fraction of
+# the estimate it is the smallest of the three. Neither comparison is the useful
+# one. A difference matters when it is large relative to the **sampling
+# uncertainty** of the estimate — and that is a quantity we have not computed
+# yet.
+
+# %% [markdown]
+# ### Standard errors and confidence intervals
+#
+# The sampling distribution of the maximum likelihood estimator is
+#
+# $$\hat{\theta} \;\overset{\cdot}{\sim}\; N(\theta, I^{-1})$$
+#
+# where $I$ is the Fisher information matrix. Since $\theta$ is unknown we
+# evaluate $I$ at $\hat\theta$, and read the standard errors off the diagonal of
+# $I^{-1}$. For a contrast $c$, we read off $\sqrt{c^\top I^{-1} c}$.
+#
+# The **observed** Fisher information is the Hessian of the *negative*
+# log-likelihood at the MLE,
+#
+# $$I_{ab} = \frac{\partial^{2}(-\ell)}{\partial\theta_a\,\partial\theta_b}\bigg|_{\hat\theta},$$
+#
+# which autograd gives directly: one backward pass produces the gradient with
+# the graph retained, then one further backward pass per component produces a
+# row of $I$.
+#
+# Here $I$ is singular, so $I^{-1}$ does not exist. It is symmetric, so it has an
+# orthonormal eigendecomposition, and the **pseudo-inverse** inverts only the
+# directions that carry curvature:
+#
+# $$I = \sum_{k=1}^{P} \lambda_k\, e_k e_k^{\top}
+#   \qquad\Longrightarrow\qquad
+#   I^{+} = \sum_{k\,:\ \lambda_k > \tau} \frac{1}{\lambda_k}\, e_k e_k^{\top},
+#   \qquad \tau = 10^{-7}\,\lambda_{\max}.$$
+#
+# Terms with $\lambda_k \le \tau$ are dropped rather than inverted. That is right
+# for a contrast which avoids the flat subspace, and the `leak` column measures
+# exactly how far it fails to:
+#
+# $$\operatorname{leak}(c) = \max_{k\,:\ \lambda_k \le \tau} \left| c^{\top} e_k \right| .$$
+#
+# Only interpret rows whose leak is close to zero. The choice of $\tau$ is not
+# delicate here: the eigenvalues split into 13 below $4.4\times10^{-8}$ and 11
+# above $0.27$, a gap of seven orders of magnitude, so any threshold in between
+# gives the same answer.
+from scipy.stats import norm  # noqa: E402
+
+
+def observed_information(flow, node, data):
+    """Give one node's NLL Hessian, the gradient norm, and parameter offsets."""
+    flow.double()  # second derivatives need float64
+    names, params = zip(*flow.nodes[node].named_parameters(), strict=True)
+    nll = -flow.node_log_prob(flow._tensorize(data))[node].sum()
+    grad = torch.cat(
+        [g.reshape(-1) for g in torch.autograd.grad(nll, params, create_graph=True)]
+    )
+    hess = torch.stack(
+        [
+            torch.cat(
+                [
+                    h.reshape(-1)
+                    for h in torch.autograd.grad(grad[i], params, retain_graph=True)
+                ]
+            )
+            for i in range(grad.numel())
+        ]
+    )
+    offsets, at = {}, 0
+    for name, p in zip(names, params, strict=True):
+        offsets[name] = at
+        at += p.numel()
+    result = hess.detach().numpy(), float(grad.detach().norm()), offsets
+    flow.float()  # back to the stored precision
+    return result
+
+
+def ls_conf_int(flow, node, data, level=0.95):
+    """Give Wald intervals for the linear-shift coefficients of one node."""
+    hess, grad_norm, offsets = observed_information(flow, node, data)
+    evals, evecs = np.linalg.eigh(hess)
+    rcond = 1e-7
+    tau = rcond * np.abs(evals).max()  # one threshold, used for both
+    flat = evecs[:, np.abs(evals) <= tau]  # the directions without curvature
+    cov = np.linalg.pinv(hess, rcond=rcond)  # invert only the rest
+    z = norm.ppf(0.5 + level / 2)
+
+    rows = []
+    for parent, w in flow.ls_coefficients()[node].items():
+        c = np.zeros(hess.shape[0])
+        key = next(n for n in offsets if n.startswith(f"shifts.{parent}"))
+        if len(w) == 1:  # continuous parent: one weight
+            c[offsets[key]], estimate, term = 1.0, w[0], parent
+        else:  # ordinal parent: the contrast w[1] - w[0]
+            c[offsets[key]], c[offsets[key] + 1] = -1.0, 1.0
+            estimate, term = w[1] - w[0], f"{parent} (1 vs 0)"
+        se = float(np.sqrt(c @ cov @ c))
+        rows.append(
+            {
+                "term": term,
+                "estimate": estimate,
+                "se": se,
+                "lower": estimate - z * se,
+                "upper": estimate + z * se,
+                # 0 = the contrast avoids the flat subspace, so the SE is real
+                "leak": float(np.abs(c @ flat).max()) if flat.size else 0.0,
+            }
+        )
+    diagnostics = {
+        "n_params": hess.shape[0],
+        "n_flat": flat.shape[1],
+        "grad_norm": grad_norm,
+    }
+    return pd.DataFrame(rows).set_index("term"), diagnostics
+
+
+# %%
+table, diag = ls_conf_int(flow_bwt, "bwt", bw)
+print(table.round(6).to_string())
+print(
+    f"\n{diag['n_params']} parameters, {diag['n_flat']} of them without curvature"
+    f"   |grad| = {diag['grad_norm']:.1e}"
+)
+print("\nR: sqrt(diag(vcov(m))) -> age 0.025305   lwt 0.004116   smoke 0.260131")
+print("   confint(m)           -> age [-0.07157, +0.02763]")
+print("                           lwt [-0.01830, -0.00217]")
+print("                           smoke [+0.15885, +1.17854]")
+
+# %% [markdown]
+# The standard errors reproduce `Colr`'s to three decimals. R's
+# `confint()` on a `Colr` fit is Wald too.
+#
+#
+# Before adding the Confidence Intervals to the core code. We have to think harder on
+# 1. $|\nabla\ell|$ is 1.7e-02 rather than 0, because `fit_classical` stops on flatness of the NLL rather than on the gradient norm, so the Hessian is taken a hair off the exact stationary point.
+#
+# 2. Since CI make sense only for estimable parameters, a `conf_int` returning one row per parameter would be mostly nonsense. We have to think harder on this.
+
+# %% [markdown]
+# ## 1b. A bimodal DAG — the demo data
 #
 # The VACA benchmark triangle (`x1 → x2 → x3 ← x1`, the demo notebook's bimodal
 # SCM): `x1` is a two-component Gaussian mixture, `x2 = -x1 + N(0,1)`,
@@ -249,34 +436,79 @@ if False:
     df = sample_vaca(1000, seed=42)
     df.to_csv(NB_DATA / "vaca.csv", index=False)
 
+# %% [markdown]
+# ### The R you can copy-paste
+#
+# `tram::Colr` fits the same model family — a continuous outcome logistic
+# transformation model with a Bernstein baseline. The cell above already wrote
+# `notebooks/data/vaca.csv`, so R reads the identical rows the flow is fitted on.
+#
+# The two libraries **count the basis differently**, and the comparison is only
+# meaningful at the same polynomial degree. The flow's `n_coeffs` unconstrained
+# coefficients become `n_coeffs + 2` control points, that is a Bernstein
+# polynomial of degree `n_coeffs + 1` (`order = n + 1` in `transforms.py`). So
+# `N_COEFFS = 20` below is tram's `order = 21`, **not** `order = 19`.
+#
+# ```r
+# library(tram)
+# d <- read.csv("notebooks/data/vaca.csv")
+#
+# m2 <- Colr(x2 ~ x1, data = d, order = 21)
+# coef(m2)     # -> x1 1.800042
+# logLik(m2)   # -> -1401.213542
+#
+# m3 <- Colr(x3 ~ x1 + x2, data = d, order = 21)
+# coef(m3)     # -> x1 -1.777289   x2 -0.455282
+# logLik(m3)   # -> -1411.901958
+# ```
+#
+# The coefficients need **no sign flip**: `Colr` reports the shift on the same
+# side as the flow.
+
+# %%
+R_COLR = {  # Colr(..., order = 21) on vaca.csv; R 4.2.3 / tram 1.0.4
+    "x2": {"coef": {"x1": 1.800042}, "loglik": -1401.213542},
+    "x3": {"coef": {"x1": -1.777289, "x2": -0.455282}, "loglik": -1411.901958},
+}
+
 # %%
 df = pd.read_csv(NB_DATA / "vaca.csv")
+# n_coeffs is stated rather than left to the default, because Section 1 compares
+# against R and the two libraries count the basis differently: the flow's
+# n_coeffs unconstrained coefficients become n_coeffs + 2 control points, i.e. a
+# Bernstein polynomial of degree n_coeffs + 1 (see `order = n + 1` in
+# transforms.py). So n_coeffs=20 here is tram's `order = 21`, not `order = 19`.
+N_COEFFS = 20  # -> Bernstein degree 21
+
 spec_vaca = {
-    "x1": ContinuousNode(),
-    "x2": ContinuousNode([LS("x1")]),
-    "x3": ContinuousNode([LS("x1"), LS("x2")]),
+    "x1": ContinuousNode([SI(n_coeffs=N_COEFFS)]),
+    "x2": ContinuousNode([SI(n_coeffs=N_COEFFS), LS("x1")]),
+    "x3": ContinuousNode([SI(n_coeffs=N_COEFFS), LS("x1"), LS("x2")]),
 }
 
 flow_c = CausalFlowDAG(spec_vaca, seed=0)
 rep = flow_c.fit_classical(df)  # logs iters / NLL / time
-print("\nlinear-shift coefficients (log-odds scale):")
+print(f"\n{'':<12}{'fit_classical':>14}{'R Colr':>12}{'|diff|':>10}")
+loglik = {k: -v * len(df) for k, v in flow_c.nll(df).items()}  # nll() is a mean
 for node, parents in flow_c.ls_coefficients().items():
     for p, w in parents.items():
-        print(f"  {p:>3} -> {node:<3}: {w[0]:+.4f}")
+        c, r = w[0], R_COLR[node]["coef"][p]
+        print(f"{p + ' -> ' + node:<12}{c:>14.4f}{r:>12.4f}{abs(c - r):>10.4f}")
+    c, r = loglik[node], R_COLR[node]["loglik"]
+    print(f"{'logLik ' + node:<12}{c:>14.4f}{r:>12.4f}{abs(c - r):>10.4f}")
 
 # %% [markdown]
-# **Deterministic?** Same seed, twice — bit-identical (no minibatch RNG):
-
-
-# %%
-def fit_x1_coef(seed):
-    f = CausalFlowDAG(spec_vaca, seed=seed)
-    f.fit_classical(df, verbose=False)
-    return f.ls_coefficients()["x2"]["x1"][0]
-
-
-a, b = fit_x1_coef(0), fit_x1_coef(0)
-print(f"two runs, same seed: {a:.10f} == {b:.10f}  ->  {a == b}")
+# We note that the coefficients are very close to the R Colr coefficients.
+# ### Why this one is not an exact-MLE check
+#
+# The coefficients agree to about 0.002, and not to 1e-8 as in Sections 0 and 2.
+# The two libraries implement `h` differently, so neither result is the more
+# correct one. The largest difference is where the basis sits: the flow puts it
+# on the 5%/95% quantiles, and `h` is a straight line outside them. This leaves
+# 10% of the rows in the tails, while `Colr` uses the full range of the data.
+#
+# The shift coefficients agree to about 0.1% regardless, which is why the
+# ordered logit above finds the same two numbers with no Bernstein basis.
 
 # %% [markdown]
 # **Classical vs Adam — same optimum.** A converged Adam fit (no early stopping)
@@ -309,60 +541,7 @@ for node, p in [("x2", "x1"), ("x3", "x1"), ("x3", "x2")]:
 print(f"\nclassical {rep['seconds']:.2f}s  vs  adam {t_adam:.1f}s")
 
 # %% [markdown]
-# ### Reproduce the continuous fit outside the flow
-#
-# Unlike Sections 0 and 2, this one is a **consistency check, not an identity**.
-# There the flow and the classical software are the same estimator and agree to
-# 1e-8. Here they are two different sieve approximations of the same `h`, so
-# they agree to about 0.1% and no closer. Both routes below show that.
-#
-# **R — `tram::Colr`** is the same model family: a continuous outcome logistic
-# transformation model with a Bernstein baseline. Save `df` to `vaca.csv`, then:
-#
-# ```r
-# library(tram)
-# d <- read.csv("notebooks/data/vaca.csv")
-# m <- Colr(x3 ~ x1 + x2, data = d, order = 19)
-# coef(m)        # -> x1 -1.778313   x2 -0.455721
-# logLik(m)      # -> -1412.012824
-# ```
-#
-# Those coefficients need **no sign flip**: `Colr` reports the shift on the same
-# side as the flow. The gap to the flow is ~0.0014, and at n=1000 no single
-# cause is worth naming: re-running `Colr` at `order` 20 or 21 moves it by about
-# as much again. Two sieves for the same `h` stop in slightly different places.
-#
-# **Python — a binned ordered logit.** `statsmodels` has no continuous
-# transformation model, but it does not need one: a continuous transformation
-# model *is* the limit of an ordered logit as the cutpoints multiply. Cut `x3`
-# into `K` quantile bins and fit `OrderedModel`, and the shift coefficients
-# converge to the flow's as `K` grows.
-#
-# Here the sign **does** flip. A continuous node *adds* its shift,
-# `P(X <= x) = sigmoid(h(x) + shift)`, while `OrderedModel` subtracts it. That
-# is why Sections 0 and 2 compared coefficients directly and this one negates
-# them — the same framework, two conventions, one per node kind.
-
-# %%
-R_COLR = {"x1": -1.778313, "x2": -0.455721}  # Colr(x3 ~ x1 + x2, order = 19)
-
-w3 = flow_c.ls_coefficients()["x3"]
-print(f"{'':>9}{'x1':>10}{'x2':>10}")
-print(f"{'flow':>9}{w3['x1'][0]:>10.4f}{w3['x2'][0]:>10.4f}")
-print(f"{'R Colr':>9}{R_COLR['x1']:>10.4f}{R_COLR['x2']:>10.4f}")
-print("\nstatsmodels ordered logit, x3 cut into K quantile bins (signs flipped):")
-for K in (5, 25, 100):
-    binned = pd.qcut(df["x3"], K, labels=False, duplicates="drop")
-    fitted_k = OrderedModel(binned, df[["x1", "x2"]], distr="logit").fit(
-        method="bfgs", disp=False
-    )
-    print(
-        f"{'K=' + str(K):>9}{-fitted_k.params['x1']:>10.4f}"
-        f"{-fitted_k.params['x2']:>10.4f}"
-    )
-
-# %% [markdown]
-# ## 2. Ordinal case — exact, self-contained classical check
+# ## 2. Ordinal case (treatment effect)
 #
 # For an **ordinal** outcome the classical model is the ordered-logit, which
 # `statsmodels.OrderedModel` fits — so here the equivalence is checkable in
@@ -383,20 +562,9 @@ flow_s = CausalFlowDAG(spec_stroke, seed=0)  # the seed validate_ls.py checks
 flow_s.fit_classical(obs)
 
 # %% [markdown]
-# The log line says the NLL was *still moving* at the iteration cap, and that is
-# expected rather than a failed fit: a cutpoint model's rare one-hot levels and
-# the flat treatment-effect ridge keep drifting along near-zero-curvature
-# valleys long after the likelihood and the well-identified coefficients have
-# reached the MLE. Correctness is judged by the comparison below, not by that
-# flag — `experiments/misc/validate_ls.py` runs the same 400-iteration budget.
-
-# %% [markdown]
-# Classical reference for the outcome node (`statsmodels` ordered logit).
-# `flow.design_matrix(..., drop_first=True)` hands over the *same* encoding the
-# flow feeds its own shifts, in the form a classical reference expects: a
-# continuous parent stays raw, an ordinal parent becomes one column per level
-# with level 0 dropped. With cutpoints only differences to level 0 are
-# identified, so on the flow side we compare `w[k] - w[0]`.
+### Using a classical fit
+# This can be done quite easily with statsmodels just have to hand over the design matrix
+# `flow.design_matrix(..., drop_first=True)`
 
 # %%
 
@@ -416,14 +584,75 @@ for name, a_, b_ in rows:
     print(f"{name:<14}{a_:>14.4f}{b_:>13.4f}{abs(a_ - b_):>9.4f}")
 
 # %% [markdown]
-# Age and NIHSSa match to ~1e-3; the treatment effect `T` is *weakly identified*
-# in this cohort (a nearly flat likelihood ridge — documented in the project's
-# CLAUDE.md), so it agrees only to ~1e-2 — exactly the same ambiguity classical
-# software shows. The likelihood is at its optimum; some directions are simply
-# flat.
+# ### Standard errors, and what is actually weakly identified
+#
+# The helper from Section 1 needs no change: give it the node, and it builds the
+# contrast for each ordinal parent. `statsmodels` reports the same quantities,
+# so every number below has an external check.
+
+# %%
+table_s, diag_s = ls_conf_int(flow_s, "mRS_3m", obs)
+ci_sm = res.conf_int()
+print(
+    f"{'':<12}{'flow SE':>9}{'sm SE':>8}{'|est|/SE':>10}   "
+    f"{'flow 95%':>18}{'statsmodels 95%':>20}"
+)
+for term, key in [("Age", "Age"), ("NIHSSa", "NIHSSa"), ("T (1 vs 0)", "T[1]")]:
+    r = table_s.loc[term]
+    print(
+        f"{term:<12}{r['se']:>9.4f}{res.bse[key]:>8.4f}"
+        f"{abs(r['estimate']) / r['se']:>10.2f}   "
+        f"[{r['lower']:+.3f}, {r['upper']:+.3f}]  "
+        f"[{ci_sm.loc[key, 0]:+.3f}, {ci_sm.loc[key, 1]:+.3f}]"
+    )
+print(
+    f"\n{diag_s['n_params']} parameters, {diag_s['n_flat']} without curvature"
+    " — one per one-hot parent, mRS_pre and T"
+)
+
+# %% [markdown]
+# The standard errors agree with `statsmodels` to four decimals, and the
+# treatment effect is **not** the uncertain one: at 6.6 standard errors from
+# zero it is the best determined coefficient in the table.
+#
+# To find the weak one, look at every `mRS_pre` level instead of only the first,
+# and print how many rows carry it.
+
+# %%
+hess_s, _, offsets_s = observed_information(flow_s, "mRS_3m", obs)
+cov_s = np.linalg.pinv(hess_s, rcond=1e-7)
+at = offsets_s[next(n for n in offsets_s if n.startswith("shifts.mRS_pre"))]
+w_pre = flow_s.ls_coefficients()["mRS_3m"]["mRS_pre"]
+counts = obs["mRS_pre"].value_counts()
+
+print(f"{'level':>6}{'rows':>7}{'estimate':>10}{'SE':>9}{'|est|/SE':>10}   95% CI")
+for level in range(1, 6):
+    c = np.zeros(hess_s.shape[0])
+    c[at], c[at + level] = -1.0, 1.0  # w[level] - w[0]
+    est = w_pre[level] - w_pre[0]
+    se = float(np.sqrt(c @ cov_s @ c))
+    print(
+        f"{level:>6}{counts.get(level, 0):>7}{est:>10.4f}{se:>9.4f}"
+        f"{abs(est) / se:>10.2f}   [{est - 1.96 * se:+.3f}, {est + 1.96 * se:+.3f}]"
+    )
+
+# %% [markdown]
+# There it is. Level 5 is carried by **7 of 1275 rows**, and its standard error
+# is 0.88 — six times that of level 1, with an interval from +0.10 to +3.55 that
+# only just excludes zero. That is what a weakly identified coefficient looks
+# like, and the cause is visible in the second column: too few rows.
+#
+# This also explains the `|diff|` column above. The gap between the flow and
+# `statsmodels` is not evidence about identification, it is the optimizer
+# stopping while the likelihood is still flat. The displacement it causes,
+# $c^\top I^{+}\nabla\ell$, is +1.4e-03 for `Age` and +7.4e-03 for `T` — which
+# is exactly the difference each column shows. `Age` looks worse only because
+# its standard error is 0.005, so the same numerical slack is 28% of an SE for
+# `Age` and 5% for `T`.
 #
 # `experiments/misc/validate_ls.py` runs this comparison as a checked
-# experiment, and adds R (`MASS::polr` / `tram`) and the treatment effect.
+# experiment, and adds R (`MASS::polr` / `tram`) and the treatment effect. Its
+# docstring records the same finding about `mRS_pre` level 5.
 
 # %% [markdown]
 # ## 3. Warm-start handoff: classical fit → further training
@@ -451,16 +680,3 @@ for p in ["Age", "NIHSSa", "T"]:
     print(f"  {p:<8} max|Δ| = {d:.4f}")
 print("\n-> small drift = the classical fit was already at the optimum;")
 print("   fit_classical is a valid warm start for continued / flexible training.")
-
-# %% [markdown]
-# ## When to use which
-#
-# | situation | use |
-# |---|---|
-# | all-`ls` model, final estimates / classical comparison / reproducibility | **`fit_classical`** |
-# | any `CS`/`CI`/`VC` term (flexible model) | `fit(..., schedule="plateau")` |
-# | need a fast, principled init for a flexible model | `fit_classical` (all-`ls` core) → upgrade terms → `fit()` |
-#
-# `fit_classical` is also the groundwork for **standard errors**: fitting at the
-# MLE in float64 is exactly what a Hessian-based covariance needs (a future
-# addition — see the CHANGELOG).

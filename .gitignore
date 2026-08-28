@@ -45,3 +45,7 @@ REVIEW.md
 
 # emacs lock files
 .#*
+
+# personal scratch — notes in progress, never committed
+scratch/
+.DS_Store
