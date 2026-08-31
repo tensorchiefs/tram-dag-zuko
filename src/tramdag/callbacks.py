@@ -145,7 +145,7 @@ class PerNodePlateau:
         Flat epochs before a decay, and before a decayed node freezes.
         The training-speed benchmark runs ``patience=30, freeze=120`` on its
         stroke workload and ``patience=15, freeze=50`` on the VACA one
-        (docs/training-speed.md).
+        (``experiments/benchmarks/bench_training.py``).
     min_delta : float, optional
         Improvement below this is flat, by default 1e-4.
     factor : float, optional

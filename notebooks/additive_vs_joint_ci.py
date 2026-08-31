@@ -116,7 +116,7 @@ print("val NLL  additive:", round(sum(flow_add.nll(val).values()), 4))
 #
 # It returns each `I`-term's mean-centered (sum-to-zero) contribution to the
 # transform parameters `theta`, plus the absorbed `baseline`. The centering is
-# over the rows of the `data` you pass, and the decomposition is exact.
+# over the rows of the `df` you pass, and the decomposition is exact.
 
 # %%
 res_add = flow_add.intercept_contributions(train, "x3")

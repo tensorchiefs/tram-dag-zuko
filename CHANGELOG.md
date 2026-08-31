@@ -5,8 +5,8 @@
 ### Changed (breaking) — `fit` is one loop, the strategies are yours
 
 `CausalFlowDAG.fit` shrank from 18 keyword arguments to a minibatch Adam loop
-with an `optimizer=` hook and three callback lists (`flow.py` 2089 → 1606
-lines). Three independent reviews of the
+with an `optimizer=` hook and three callback lists (`flow.py` 2089 → ~1750
+lines, the shipped recipes in their own `callbacks.py`). Three independent reviews of the
 file agreed on the cut: what left was training *strategy* — choices tuned on
 this repository's own DGPs — not the TRAM-DAG model, and each of them had a
 default the paper replication or the tests had to switch off.
@@ -75,6 +75,10 @@ default the paper replication or the tests had to switch off.
   count is the caller's), as is `flow.vc_center_info`.
 - **`fit_classical`** lost `verbose` (the report dict is the summary) and
   computes its gradient norm with `torch.nn.utils.get_total_norm`.
+- **`sample` returns ordinal columns as int64 level indices** (they were
+  float32), matching what `fit` requires on the way in; **`log_prob` runs
+  under `no_grad`** like every other query — differentiate through
+  `node_log_prob` instead.
 - **`save`** no longer records the machine, and **`tramdag.utils` is gone**:
   `machine_info` moved to `experiments/benchmarks/perf_machine.py` and
   `config_section` to `experiments/common.py`, each next to its only caller.

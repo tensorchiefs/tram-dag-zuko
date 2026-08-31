@@ -231,6 +231,9 @@ extra control points on, so `n_coeffs=20` is order 21 where the reference's
 
 ## Roadmap notes
 
+- Upstream PRs to zuko: five ranked candidates (analytic Bernstein
+  `call_and_ladj`, linear spline tails, public `_constrain_theta` inverse,
+  θ-shape docstring fix, `Logistic` distribution) in docs/zuko-upstream.md.
 - ~~Generalize the generators beyond the stroke DAG~~ — done for the TRAM-DAG
   paper's DGPs (triangle/triangle-mixed/vaca/carefl, June 2026). Still open:
   hidden confounding à la DeCaFlow.

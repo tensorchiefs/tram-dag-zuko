@@ -220,7 +220,7 @@ for i, ci in enumerate(cols):
             # Plot DGP histogram
             ax.hist(df[ci], bins=bins, density=True, alpha=0.5, label="DGP")
             # KDE for TRAM-DAG samples
-            kde = st.gaussian_kde(samp[ci][:50_000])
+            kde = st.gaussian_kde(samp[ci])
             x_eval = np.linspace(bins[0], bins[-1], 300)
             ax.plot(x_eval, kde(x_eval), color="C3", lw=1.8, label="TRAM-DAG KDE")
         else:

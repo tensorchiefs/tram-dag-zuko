@@ -77,8 +77,10 @@ def _check_callbacks(cbs: list, args: tuple[str, ...], name: str) -> None:
     that only raises after the last epoch, losing the whole run.
     """
     for cb in cbs:
+        if not callable(cb):
+            raise TypeError(f"{name}_callbacks entries must be callable, got {cb!r}")
         try:
-            sig = inspect.signature(cb)
+            sig = inspect.signature(cb, follow_wrapped=False)
         except (TypeError, ValueError):  # a callable without a signature
             continue
         try:
@@ -901,8 +903,12 @@ class CausalFlowDAG(nn.Module):
         Raises
         ------
         ValueError
-            If ``batch_size`` is below 1, or ``vc_ehat`` does not match the
-            centered VC terms of the spec.
+            If ``epochs`` or ``batch_size`` is below 1, or ``vc_ehat`` does
+            not match the centered VC terms of the spec.
+        TypeError
+            If a callback does not accept its hook's arguments — checked
+            before the first epoch, so a mis-registered callback cannot
+            waste a run.
 
         Notes
         -----

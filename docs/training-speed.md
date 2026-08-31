@@ -22,7 +22,7 @@ strategies, not part of the model (see [fitting.md](fitting.md)):
 | recipe | behavior | today |
 |---|---|---|
 | constant | one lr for the whole run | `flow.fit(train, epochs=, learning_rate=)` |
-| plateau+freeze | **per-node**: a node whose own validation NLL hasn't improved by `min_delta` (1e-4) for `patience` epochs gets its lr × 0.3, floored at 1e-3 × the start; once decayed ≥ 100× and flat for `freeze` epochs it leaves training (rate 0). Valid because the per-node losses have independent gradients. | `tramdag.callbacks.PerNodePlateau`, a callback over one parameter group per node (`per_node_adam`), measured in `experiments/benchmarks/bench_training.py |
+| plateau+freeze | **per-node**: a node whose own validation NLL hasn't improved by `min_delta` (1e-4 default; the stroke run uses 1e-5, see the benchmark) for `patience` epochs gets its lr × 0.3, floored at 1e-3 × the start; once decayed ≥ 100× and flat for `freeze` epochs it leaves training (rate 0). Valid because the per-node losses have independent gradients. | `tramdag.callbacks.PerNodePlateau`, a callback over one parameter group per node (`per_node_adam`), measured in `experiments/benchmarks/bench_training.py` |
 | global plateau | torch's `ReduceLROnPlateau` on the summed validation NLL — the paper reference's rule | `experiments/paper/helpers.py::fit_paper` |
 
 `"onecycle"` and `"cosine"` were part of this benchmark and lost to

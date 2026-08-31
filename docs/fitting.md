@@ -138,7 +138,8 @@ flow.fit(
 ```
 
 Anything else is a few lines of your own. A learning-rate schedule is torch's,
-stepped from the hook — this is what `RestoreBest` does inside, written out:
+stepped from the hook; the snapshot half of this snippet is what `RestoreBest`
+does inside, written out:
 
 ```python
 import copy
