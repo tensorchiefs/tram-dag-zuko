@@ -11,9 +11,9 @@ What is left here is the output layout the experiments workflow reads:
 ``results/<name>/`` with ``metrics.json``, ``report.md`` and ``plots/``.
 
 Reading a script's YAML file is here; checking the section it yields is not.
-:func:`load_variant` parses the file and hands the document to
-:func:`tramdag.utils.config_section`, which enforces the exact key set — that
-guarantee is worth having in one place, and it needs no YAML.
+:func:`load_variant` parses the file and picks the variant's section with
+:func:`_config_section` below; that every key in it is read by the
+script is what ``paper/tests/test_configs.py`` checks.
 
 Every function takes the calling script's ``__file__``, so paths resolve
 inside that script's own area with no directory names written in the code.
@@ -27,18 +27,85 @@ Run an experiment as a module, from ``experiments/``::
 # %% imports ---------------------------------------------------------------------------
 from __future__ import annotations
 
+import argparse
 import json
 from pathlib import Path
 
 import yaml
 
-from tramdag.utils import config_section
+
+# %% private functions------------------------------------------------------------------
+def _config_section(document: dict, *keys: str) -> dict:
+    """Pick a mapping out of a parsed configuration.
+
+    Parsing is the caller's job — pass whatever ``yaml.safe_load``,
+    ``json.load`` or ``tomllib.load`` returned. This descends through
+    ``keys`` and gives the mapping found there as a shallow copy.
+
+    Parameters
+    ----------
+    document : dict
+        The parsed configuration.
+    *keys : str
+        Keys to descend through before the mapping is returned, for example
+        ``"variants", "atan-cs"`` for a document that groups several
+        variants. Without any key the document itself is used.
+
+    Returns
+    -------
+    dict
+        The selected mapping, as a shallow copy.
+
+    Raises
+    ------
+    KeyError
+        If one of ``keys`` is not present. The message lists what is
+        available at that level.
+    ValueError
+        If a selected value is not a mapping.
+
+    Examples
+    --------
+    >>> document = {"variants": {"fast": {"epochs": 5, "lr": 0.01}}}
+    >>> _config_section(document, "variants", "fast")
+    {'epochs': 5, 'lr': 0.01}
+    """
+    node = document
+    for depth, key in enumerate(keys):
+        if not isinstance(node, dict):
+            # malformed config data, not a wrongly typed argument
+            raise ValueError(  # noqa: TRY004
+                f"{' -> '.join(keys[:depth]) or 'the document'} is "
+                f"{type(node).__name__}, not a mapping"
+            )
+        if key not in node:
+            raise KeyError(
+                f"no '{key}' in {' -> '.join(keys[:depth]) or 'the document'}. "
+                f"Available: {', '.join(sorted(map(str, node)))}"
+            )
+        node = node[key]
+
+    where = " -> ".join(keys) or "the document"
+    if not isinstance(node, dict):
+        # malformed config data, not a wrongly typed argument
+        raise ValueError(f"{where} is {type(node).__name__}, not a mapping")  # noqa: TRY004
+
+    return dict(node)
+
+
+def _variants_of(script: str) -> list[str]:
+    """Give the variant names the script's config file defines.
+
+    ``argparse`` takes its choices from this, so adding a variant to the
+    config file is enough to make it runnable.
+    """
+    path = Path(script).resolve().with_suffix(".yaml")
+    document = yaml.safe_load(path.read_text())
+    return sorted(document["variants"])
 
 
 # %% public functions ------------------------------------------------------------------
-def load_variant(
-    script: str, variant: str, expected_keys: set[str] | None = None
-) -> dict:
+def load_variant(script: str, variant: str) -> dict:
     """Read one variant's hyperparameters from the script's own YAML file.
 
     The file lists every value the experiment uses, one section per variant
@@ -53,13 +120,6 @@ def load_variant(
         with the same stem and a ``.yaml`` suffix.
     variant : str
         Key under ``variants:``.
-    expected_keys : set[str] | None, optional
-        The keys the script reads. A config that does not match this set
-        exactly is an error: a missing key would otherwise become a hidden
-        default, an extra key a silently ignored setting. ``None`` skips the
-        check, for the two scripts that read a value (the model family) before
-        they know which keys apply — ``triangle`` and ``triangle_mixed``, which
-        then call again with the full set.
 
     Returns
     -------
@@ -75,18 +135,23 @@ def load_variant(
     if not path.exists():
         raise FileNotFoundError(f"no config next to {Path(script).name}: {path}")
     document = yaml.safe_load(path.read_text())
-    return config_section(document, "variants", variant, require=expected_keys)
+    return _config_section(document, "variants", variant)
 
 
-def variants_of(script: str) -> list[str]:
-    """Give the variant names the script's config file defines.
+def cli(script: str, doc: str) -> str:
+    """Parse an experiment script's command line and give the chosen variant.
 
-    ``argparse`` takes its choices from this, so adding a variant to the
-    config file is enough to make it runnable.
+    The one positional argument is the variant; its choices come from the
+    script's YAML file and the description from the first line of its
+    module docstring.
     """
-    path = Path(script).resolve().with_suffix(".yaml")
-    document = yaml.safe_load(path.read_text())
-    return sorted(document["variants"])
+    parser = argparse.ArgumentParser(description=doc.splitlines()[0])
+    parser.add_argument(
+        "variant",
+        choices=_variants_of(script),
+        help="which variant to run; hyperparameters live in the sibling YAML file",
+    )
+    return parser.parse_args().variant
 
 
 def make_output_dir(script: str, name: str) -> Path:

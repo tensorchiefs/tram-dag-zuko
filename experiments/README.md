@@ -24,10 +24,10 @@ Experiments run as modules, from this directory:
 
 ```bash
 cd experiments
-uv run --group experiments python -m paper.triangle atan-cs      # fit + figures + metrics
-uv run --group experiments python -m check paper triangle-atan-cs  # vs ground truth
-uv run --group experiments python -m paper.check_data             # frozen data regenerates
-uv run pytest experiments                                        # the area checks (seconds)
+uv run python -m paper.triangle atan-cs        # fit + figures + metrics
+uv run python -m check paper triangle-atan-cs  # vs ground truth
+uv run python -m paper.check_data              # frozen data regenerates
+uv run pytest experiments                      # the area checks (seconds)
 uv run pytest experiments/tests                                  # the shared check.py
 ```
 
@@ -60,8 +60,32 @@ carries its own copy of the bimodal DGP. `benchmarks/tests/` pins that copy to
 the maintained generator, because a drifted copy would silently make the
 collected `final_val_nll` values incomparable.
 
+Runtime: at the paper's batch 32 a triangle variant is 500 epochs × 1250
+steps over 40 000 rows, about 3.2 s per epoch single-process at 2–4 torch
+threads (27 min; 42–69 min on the 2-core CI runners). The step is
+overhead-bound — 32 threads make it *slower* (5.5 s per epoch), and eight
+variants side by side on one box take 78 min each. Run them one or two at a
+time, or with `OMP_NUM_THREADS=2`.
+
+The configs therefore take one documented deviation for CI runtime: batch 256
+at lr 0.004 instead of the paper's batch 32 at lr 0.001 — the same 500 epochs
+in 8× fewer steps, every ground-truth metric kept (the grid that chose it is
+in `docs/paper-replication.md`). Measured on CI (run 32974872751): triangle
+jobs 7–11 min instead of 42–69, the whole workflow about 12 min wall. The 500 epochs stay: the linear-shift
+coefficients settle after ~40 epochs, the complex shift does not (at 100
+epochs the cs-curve error doubles to triples; at 250 mixed exp-cs is still
++60 %).
+
+`vaca.py` and `carefl.py` set `net_input_scaling: minmax`, because the
+reference's comparison scripts train in min-max scaled space
+(`comparison/utils.R::scale_df`) and their tanh nets saturate on the raw
+parents (40% of the VACA rows have `|x| > 2`); the triangle scripts fit
+`df_orig`, so those configs leave it `null`.
+
 Which paper figure each variant reproduces — and what is deliberately not
-reproduced — is listed in [`paper/PAPER_COVERAGE.md`](paper/PAPER_COVERAGE.md).
+reproduced — is listed in [`paper/PAPER_COVERAGE.md`](paper/PAPER_COVERAGE.md);
+every hyperparameter with its source in the R code, the deviations and the
+measured numbers are in [`docs/paper-replication.md`](../docs/paper-replication.md).
 
 All five have the same shape: imports, function definitions, a `run(variant)`
 function holding the whole experiment, and a `__main__` block whose argparse
@@ -71,11 +95,9 @@ call selects the variant.
 
 Each script reads its sibling `<script>.yaml` and **nothing else**: no defaults
 in the code, no CLI flags that change a number. `common.py::load_variant` parses
-the file and hands the document to `tramdag.utils.config_section`, which
-compares the variant's keys against the set the script declares and fails on a
-mismatch. A missing key cannot quietly become a default, and an unused key
-cannot look effective. The parsing stays here and only the check lives in the
-framework, so the package depends on no config parser.
+the file and picks the variant's section with `common.py::_config_section`.
+Both live here, so the package depends on no config parser and ships no config
+helper.
 Values shared by several variants are written once under a YAML anchor and
 merged with `<<`, which keeps the merge visible in the file.
 

@@ -45,11 +45,10 @@ def _ls_spec() -> dict:
 def mle_flow():
     df = _hetero_df(4000)
     flow = CausalFlowDAG(_ls_spec(), seed=0)
-    flow.fit_classical(df, verbose=False)
+    flow.fit_classical(df)
     return flow, df
 
 
-# ---------------------------------------------------------- acceptance 1: sums
 def test_score_sums_vanish_at_mle(mle_flow):
     """At the MLE the score sums are ~0 per column (the defining property)."""
     flow, df = mle_flow
@@ -73,12 +72,11 @@ def test_score_sums_vanish_at_mle_ordinal_outcome():
         "Y": OrdinalNode(3, [LS("X")]),
     }
     flow = CausalFlowDAG(spec, seed=0)
-    flow.fit_classical(df, verbose=False)
+    flow.fit_classical(df)
     psi = flow.scores(df, node="Y")
     assert (psi.sum(axis=0).abs() / n < 1e-4).all()
 
 
-# ------------------------------------------------ acceptance 2: exact FD check
 def test_scores_match_finite_differences():
     """Analytic scores equal float64 central differences at an arbitrary
     (non-MLE) parameter point, for LS on continuous and ordinal parents, on
@@ -93,7 +91,7 @@ def test_scores_match_finite_differences():
         "Y": ContinuousNode([LS("X1"), CS("X3"), VC("X2", "X3", t="T")]),
     }
     flow = CausalFlowDAG(spec, seed=1)
-    flow.fit(df, epochs=5, verbose=0, seed=1)  # any point works; move off init
+    flow.fit(df, epochs=5, seed=1)  # any point works; move off init
     flow.double()
     try:
         for node, targets in [
@@ -129,7 +127,6 @@ def test_scores_match_finite_differences():
         flow.float()
 
 
-# --------------------------------------------- acceptance 3: end-to-end CUSUM
 def test_effect_modifier_scan_flags_true_modifiers(mle_flow):
     """The point of the feature: on the heterogeneous SCM the scan must flag
     the true modifiers X2 and X3 and NOT the inert X1 (issue #29).
@@ -159,7 +156,7 @@ def test_scan_null_is_quiet():
         "Y": ContinuousNode([LS("X1"), LS("X2"), LS("T")]),
     }
     flow = CausalFlowDAG(spec, seed=0)
-    flow.fit_classical(df, verbose=False)
+    flow.fit_classical(df)
     scan = flow.effect_modifier_scan(df, node="Y", t="T", candidates=["X1", "X2"])
     assert not scan["flag"].any(), scan.to_dict()
 
@@ -174,14 +171,13 @@ def test_scores_on_vc_model_and_scan_column_resolution():
         "Y": ContinuousNode([LS("X1"), LS("X2"), LS("X3"), VC("X2", t="T")]),
     }
     flow = CausalFlowDAG(spec, seed=0)
-    flow.fit(df, epochs=40, verbose=0, seed=0)
+    flow.fit(df, epochs=40, seed=0)
     psi = flow.scores(df, node="Y")
     assert "T" in psi.columns  # beta0 score, not one-hot columns
     scan = flow.effect_modifier_scan(df, node="Y", t="T", candidates=["X2"])
     assert list(scan.index) == ["X2"]
 
 
-# ------------------------------------------------------------------ error paths
 def test_scores_error_paths(mle_flow):
     flow, df = mle_flow
     with pytest.raises(KeyError, match="unknown node"):

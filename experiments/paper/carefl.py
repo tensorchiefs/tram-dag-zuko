@@ -6,9 +6,9 @@ is the one benchmark where a flow's abduction can be scored against exact
 values instead of a second sample.
 
 Two things are measured. The paper's Fig. 6 curves at its single observation
-``x_obs``, and — because that observation sits at a roughly 2.9-sigma abducted
-noise value and is therefore a hard extrapolation — the mean absolute
-counterfactual error over a sample of typical held-out rows, which is the
+``x_obs`` (in the SCM's raw units; the paper prints x3/x4 divided by
+CAREFL's sample sds), and — because one point is a noisy yardstick — the
+mean absolute counterfactual error over a sample of held-out rows, which is the
 number to watch for regressions.
 
 Usage (from experiments/)::
@@ -19,48 +19,14 @@ Usage (from experiments/)::
 # %% imports ---------------------------------------------------------------------------
 from __future__ import annotations
 
-import argparse
-
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-from common import (
-    load_variant,
-    make_output_dir,
-    save_metrics,
-    variants_of,
-    write_report,
-)
+from common import cli, load_variant, make_output_dir, save_metrics, write_report
 
-from paper.helpers import (
-    finish,
-    fit_with_snapshots,
-    split_train_val,
-)
+from paper.helpers import finish, fit_paper
 from paper.simulations.carefl import ALPHA_GRID, X_OBS, Carefl4
 from tramdag import CI, SI, ContinuousNode
-
-# %% global variables ------------------------------------------------------------------
-CONFIG_KEYS = {
-    "n_train",
-    "transform",
-    "n_coeffs",
-    "intercept_units",
-    "activation",
-    "n_val",
-    "epochs",
-    "chunk_epochs",
-    "learning_rate",
-    "batch_size",
-    "polish_epochs",
-    "polish_learning_rate",
-    "dgp_seed",
-    "init_seed",
-    "shuffle_seed",
-    "n_heldout",
-    "heldout_seed",
-    "alphas_scored",
-}
 
 
 # %% public functions ------------------------------------------------------------------
@@ -88,12 +54,13 @@ def counterfactual_curve(flow, latents, do_variable, target, alphas) -> list[flo
     ]
 
 
-def plot_curves(alphas, flow_x3, flow_x4, truth, path) -> dict:
+def plot_curves(flow_x3, flow_x4, truth, path) -> dict:
     """Plot both counterfactual queries against the analytic truth (Fig. 6)."""
     panels = [
         (flow_x3, truth["x3_cf_do_x2"], "would $x_2$ have been $\\alpha$", "$x_3$"),
         (flow_x4, truth["x4_cf_do_x1"], "would $x_1$ have been $\\alpha$", "$x_4$"),
     ]
+    alphas = truth["alphas"]
     fig, axes = plt.subplots(1, 2, figsize=(9, 3.6))
     for ax, (fitted, true, xlabel, ylabel) in zip(axes, panels, strict=True):
         ax.plot(alphas, true, "-", color="C3", lw=2, label="DGP (analytic)")
@@ -101,9 +68,10 @@ def plot_curves(alphas, flow_x3, flow_x4, truth, path) -> dict:
         ax.set_xlabel(xlabel)
         ax.set_ylabel(ylabel)
         ax.legend()
+    x_obs = ", ".join(f"{value:.2f}" for value in X_OBS.values())
     fig.suptitle(
-        "CAREFL counterfactual queries at $x_{obs}$ = (2.00, 1.50, 0.81, -0.28) "
-        "(Fig. 6)"
+        f"CAREFL counterfactual queries at $x_{{obs}}$ = ({x_obs}), raw units\n"
+        "(Fig. 6; the paper prints x3/x4 standardized)"
     )
     finish(fig, path)
     return {
@@ -124,7 +92,7 @@ def heldout_errors(generator, flow, config) -> dict:
     each row — the flow's abduction is compared against that.
     """
     rows = generator.observational(
-        config["n_heldout"], seed_offset=config["heldout_seed"]
+        config["n_heldout"], seed_offset=config["heldout_seed_offset"]
     )
     flow_latents = flow.abduct(rows)
     dgp_noise = generator.abduct_noise(rows)
@@ -146,51 +114,28 @@ def heldout_errors(generator, flow, config) -> dict:
 
 def run(variant: str) -> dict:
     """Run the benchmark end to end and give its metrics."""
-    config = load_variant(__file__, variant, CONFIG_KEYS)
+    config = load_variant(__file__, variant)
     out = make_output_dir(__file__, f"carefl-{variant}")
 
     generator = Carefl4(seed=config["dgp_seed"])
-    sample = generator.observational(config["n_train"] + config["n_val"])
-    train, val = split_train_val(sample, config["n_train"], config["n_val"])
-
     print(
-        f"fitting the flexible flow on the CAREFL SCM, n={len(train)}: "
-        f"{config['epochs']} epochs at lr {config['learning_rate']:g}, then "
-        f"{config['polish_epochs']} at lr {config['polish_learning_rate']:g} ..."
+        f"fitting the flexible flow on the CAREFL SCM, n={config['n_train']}: "
+        f"{config['epochs']} epochs at lr {config['learning_rate']:g} ..."
     )
-    flow, _ = fit_with_snapshots(
-        build_spec(config),
-        train,
-        val,
-        epochs=config["epochs"],
-        learning_rate=config["learning_rate"],
-        batch_size=config["batch_size"],
-        chunk_epochs=config["chunk_epochs"],
-        init_seed=config["init_seed"],
-        shuffle_seed=config["shuffle_seed"],
-    )
-    flow.fit(
-        train,
-        val,
-        epochs=config["polish_epochs"],
-        learning_rate=config["polish_learning_rate"],
-        batch_size=config["batch_size"],
-        verbose=0,
-    )
-    flow.save(out / "flow.pt")
+    flow, _, val, _ = fit_paper(generator, build_spec(config), config, out)
 
     paper_latents = flow.abduct(pd.DataFrame([X_OBS]))
     truth = generator.true_cf_curves()
     metrics = plot_curves(
-        ALPHA_GRID,
         counterfactual_curve(flow, paper_latents, "x2", "x3", ALPHA_GRID),
         counterfactual_curve(flow, paper_latents, "x1", "x4", ALPHA_GRID),
         truth,
         out / "plots" / "cf_curves.png",
     )
     metrics.update(heldout_errors(generator, flow, config))
-    metrics["val_nll_x3"] = float(flow.nll(val)["x3"])
-    metrics["val_nll_x4"] = float(flow.nll(val)["x4"])
+    val_nll = flow.nll(val)
+    metrics["val_nll_x3"] = float(val_nll["x3"])
+    metrics["val_nll_x4"] = float(val_nll["x4"])
 
     save_metrics(out, metrics)
     write_report(
@@ -206,10 +151,4 @@ def run(variant: str) -> dict:
 
 # %% main ------------------------------------------------------------------------------
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument(
-        "variant",
-        choices=variants_of(__file__),
-        help="which model to run; hyperparameters live in carefl.yaml",
-    )
-    run(parser.parse_args().variant)
+    run(cli(__file__, __doc__))

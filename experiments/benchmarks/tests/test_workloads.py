@@ -48,7 +48,7 @@ def test_all_ls_spec_builds_and_is_classical():
     observed, validation = stroke_data()
     assert validation is None  # full-data MLE fit
     assert len(observed) == 1275
-    report = flow.fit_classical(observed, max_iter=5, verbose=False)
+    report = flow.fit_classical(observed, max_iter=5)
     assert np.isfinite(report["final_nll"])
 
 

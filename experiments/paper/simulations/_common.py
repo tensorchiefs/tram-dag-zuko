@@ -14,11 +14,6 @@ import pandas as pd
 
 
 # %% public functions ------------------------------------------------------------------
-def logistic(rng: np.random.Generator, size: int) -> np.ndarray:
-    """Draw the standard logistic latent, the TRAM base distribution."""
-    return rng.logistic(loc=0.0, size=size)
-
-
 def sigmoid(x: np.ndarray) -> np.ndarray:
     """Give the logistic function of ``x``."""
     return 1.0 / (1.0 + np.exp(-x))

@@ -24,7 +24,6 @@ from .spec import (
     simple_intercept,
     varying_coefficient,
 )
-from .utils import machine_info
 
 # %% global variables ------------------------------------------------------------------
 __all__ = [
@@ -42,7 +41,6 @@ __all__ = [
     "complex_shift",
     "intercept",
     "linear_shift",
-    "machine_info",
     "simple_intercept",
     "varying_coefficient",
 ]

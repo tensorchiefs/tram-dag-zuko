@@ -21,7 +21,7 @@ is a drawing of a model or DAG, not a result: nothing to compute.
 
 | Figure | Subject | Reproduced by |
 |---|---|---|
-| 10 | Why counterfactuals fail for interval-censored discrete variables | `triangle_mixed.py` (either variant) → `plots/counterfactual_pmf.png`, scored against the analytic counterfactual law |
+| 10 | Why counterfactuals fail for interval-censored discrete variables | schematic (App. B) — the measured version is gap 2 below: `triangle_mixed.py` → `plots/counterfactual_pmf.png`, scored against the analytic counterfactual law |
 | 11 | DAG of the original VACA DGP | schematic |
 | 12 | VACA observational fit with a Neural Spline Flow | **not reproduced** — a competing method, see gaps |
 | 13 | DAG of the four-variable counterfactual experiment | schematic |
@@ -53,8 +53,5 @@ in the DGP under `do(x1 += 1)`, theory `e² ≈ 7.39`).
    checked against realised counterfactuals in `paper/tests/`), and the flow's
    averaged abduction draws are scored against that distribution rather than against
    a level no model could predict.
-3. **The `cubic` f variant** exists in the generator but has no experiment
-   variant: the paper's C.3 uses `linear`, `atan` and `sin`. Add a section to
-   `paper/triangle.yaml` if it is ever wanted.
-4. **Section 7's application** (the clinical case study) is not here: that data
+3. **Section 7's application** (the clinical case study) is not here: that data
    is private and its storyline lives in its own repository.

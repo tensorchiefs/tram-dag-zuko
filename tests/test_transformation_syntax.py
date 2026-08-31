@@ -21,7 +21,6 @@ def _state_dicts_equal(a, b):
 
 
 # %% public functions ------------------------------------------------------------------
-# ----------------------------------------------------------- normalization
 
 
 def test_sum_list_and_mixed_forms_are_identical():
@@ -73,9 +72,6 @@ def test_a_sum_nested_in_a_list_is_rejected():
         ContinuousNode([I("x1") + LS("x2")])
 
 
-# ------------------------------------------------------- allow_interaction
-
-
 def test_several_parented_i_terms_are_rejected():
     with pytest.raises(ValueError, match="allow_interaction=False"):
         ContinuousNode(I("a") + I("b"))
@@ -85,9 +81,6 @@ def test_several_parented_i_terms_are_rejected():
 
 def test_multi_parent_i_stays_joint_by_default():
     assert ContinuousNode([I("a", "b")]).terms == [I("a", "b")]
-
-
-# ---------------------------------------------------------- transform on I
 
 
 def test_i_transform_hoists_to_the_node():
@@ -120,15 +113,9 @@ def test_ordinal_rejects_i_transform():
         OrdinalNode(3, [I("a", transform="spline")])
 
 
-# ------------------------------------------------------- signature guards
-
-
 def test_vc_treatment_is_keyword_only():
     with pytest.raises(TypeError):
         VC("T", "X2")  # the treatment is the keyword t=
-
-
-# --------------------------------------------------- model-level identity
 
 
 def test_list_and_sum_build_the_identical_model():
@@ -176,9 +163,6 @@ def test_additive_flag_builds_one_net_per_parent():
     assert single.nodes["y"].ci_parents == ["a"]
 
 
-# ------------------------------------------------------------ persistence
-
-
 def test_roundtrip_keeps_hoisted_transform_and_terms():
     spec = {
         "x1": ContinuousNode([I(transform="spline")]),
@@ -212,7 +196,7 @@ def test_every_option_survives_the_roundtrip():
         "y": ContinuousNode(
             [
                 I("a", "b", allow_interaction=False, units=[4, 4]),
-                VC("b", t="t", penalty=2.5, center=True, center_folds=3),
+                VC("b", t="t", penalty=2.5, center=True),
             ]
         ),
     }
@@ -220,7 +204,7 @@ def test_every_option_survives_the_roundtrip():
     assert back == spec
     i_term, vc_term = back["y"].terms
     assert (i_term.allow_interaction, i_term.units) == (False, (4, 4))
-    assert (vc_term.penalty, vc_term.center, vc_term.center_folds) == (2.5, True, 3)
+    assert (vc_term.penalty, vc_term.center) == (2.5, True)
     assert back["a"].transform_kwargs == {"bins": 6}
 
 
@@ -251,9 +235,6 @@ def test_malformed_serialized_spec_is_rejected():
         validate_and_sort(spec_from_dict(spec_with(unknown_parent)))
 
 
-# ------------------------------------------------------- constructor aliases
-
-
 def test_short_aliases_are_the_definitions():
     """LS is linear_shift, and both spellings build the same spec."""
     import tramdag as td
@@ -272,9 +253,6 @@ def test_short_aliases_are_the_definitions():
         + td.varying_coefficient("z", t="y")
     )
     assert short.terms == long.terms
-
-
-# ------------------------------------------------------------------ units
 
 
 def test_units_reach_the_networks():

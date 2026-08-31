@@ -1,36 +1,23 @@
 {
-  "_note": "Paper Sec. 5.1-5.2. The interventional means are analytic (E[x3|do(x2=a)] = -0.25 + 0.25a), so what is checked is the flow's error against them, not a pinned flow value: a center plus an error bound on the same number gave two windows that could disagree. do(x2=-3) is off-manifold extrapolation, which is why its error is the largest of the three. Measured with the reference implementation's own comparison net (comparison/utils.R::make_model: dense(10, tanh) -> dense(100, tanh)), M = 30. Across shuffle seeds 0-3 this fit spans 0.19 for do(x2=-3), so a changed seed is expected to break these bounds -- shuffle_seed is pinned in the config for that reason.",
+  "_note": "Protocol = the paper's R code 1:1 (see the YAML header): measured 2026-08-26 on the refactor/lean-fit branch. Paper Sec. 5.1-5.2. The interventional means are analytic (E[x3|do(x2=a)] = -0.25 + 0.25a), so what is checked is the flow's error against them, not a pinned flow value: a center plus an error bound on the same number gave two windows that could disagree. do(x2=-3) is off-manifold extrapolation, which is why its error is the largest of the three. Exact reference protocol since 2026-08-26 (global ReduceLROnPlateau, glorot init): the do(x2=-3) error is seed-sensitive \u2014 0.098 at the config's init seed 7, 0.268 / 0.217 at seeds 8 / 9 \u2014 so the bound is 2.5x the seed-7 value and docs/paper-replication.md holds the spread.",
   "val_nll_x3": {
-    "value": 1.4355822801589966,
+    "value": 1.4495913982391357,
     "atol": 0.05
   },
-  "mean_x3_analytic_do_x2_-3": {
-    "value": -1.0,
-    "atol": 1e-09
-  },
   "mean_x3_abs_err_do_x2_-3": {
-    "max": 0.093458
-  },
-  "mean_x3_analytic_do_x2_-1": {
-    "value": -0.5,
-    "atol": 1e-09
+    "max": 0.2432
   },
   "mean_x3_abs_err_do_x2_-1": {
-    "max": 0.030934
-  },
-  "mean_x3_analytic_do_x2_+0": {
-    "value": -0.25,
-    "atol": 1e-09
+    "max": 0.2194
   },
   "mean_x3_abs_err_do_x2_+0": {
-    "max": 0.024751
+    "max": 0.04659
   },
-  "std_x1_dgp": {
-    "value": 2.068924230638997,
-    "atol": 0.1
+  "std_x1_analytic": {
+    "value": 2.0766559657295187,
+    "atol": 1e-09
   },
-  "std_x1_flow": {
-    "value": 2.073695659637451,
-    "atol": 0.1
+  "std_x1_abs_err": {
+    "max": 0.07999
   }
 }

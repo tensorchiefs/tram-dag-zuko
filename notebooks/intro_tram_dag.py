@@ -115,6 +115,9 @@
 # | CI — $\boldsymbol{\vartheta}$ depends on parents | `I("X1")` (several `I(...)` parents feed **one joint** network → interactions) |
 # | LS — $\beta_{ij} x_j$ | `LS("X1")` (a single weight, no bias) |
 # | CS — $g_{ik}(x_k)$ | `CS("X1")` (64-128-64 MLP, additive) |
+#
+# `I(...)` dispatches on its arguments: no parents → a simple intercept (`SI`),
+# parents → a complex intercept (`CI`). The explicit names work too.
 
 # %% [markdown]
 # ### Gallery: a transformation *is* an additive decomposition
@@ -123,12 +126,12 @@
 # in **exactly one** term: the intercept (the *shape*) or one shift. The
 # table shows the resulting decomposition for a single continuous target $X_3$:
 #
-# | `transformation` | $u_3 = h(x_3 \mid \mathrm{pa})$ | what carries each parent |
+# | formula (`terms`) | $u_3 = h(x_3 \mid \mathrm{pa})$ | what carries each parent |
 # |---|---|---|
-# | `None` / `[I]` (source) | $h_{\boldsymbol{\vartheta}}(x_3)$ | `SimpleIntercept` — $\boldsymbol{\vartheta}$ a free vector |
+# | `None` / `[SI()]` (source) | $h_{\boldsymbol{\vartheta}}(x_3)$ | `SimpleIntercept` — $\boldsymbol{\vartheta}$ a free vector |
+# | `[CI("X1")]` | $h_{\boldsymbol{\vartheta}(x_1)}(x_3)$ | `ComplexIntercept` — **no shift term**; $\boldsymbol{\vartheta}$ (the whole shape) bends with $x_1$ |
 # | `[LS("X1")]` | $h_{\boldsymbol{\vartheta}}(x_3) + \beta\,x_1$ | `LinearShift` — **one number** $\beta$ |
 # | `[CS("X1")]` | $h_{\boldsymbol{\vartheta}}(x_3) + g_1(x_1)$ | `ComplexShift` — additive MLP $g_1$ |
-# | `[I("X1")]` | $h_{\boldsymbol{\vartheta}(x_1)}(x_3)$ | `ComplexIntercept` — **no shift term**; $\boldsymbol{\vartheta}$ (the whole shape) bends with $x_1$ |
 # | `LS("X1") + CS("X2")` | $h_{\boldsymbol{\vartheta}}(x_3) + \beta x_1 + g_2(x_2)$ | one `LinearShift` + one `ComplexShift` (the model fitted below) |
 # | `[CS("X1", "X2")]` | $h_{\boldsymbol{\vartheta}}(x_3) + g_{1,2}(x_1, x_2)$ | **one joint** `ComplexShift` — an interaction in the shift |
 # | `CS("X1") + CS("X2")` | $h_{\boldsymbol{\vartheta}}(x_3) + g_1(x_1) + g_2(x_2)$ | two **additive** `ComplexShift`s |
@@ -151,17 +154,13 @@
 # parent.
 
 # %%
-import logging
-
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import torch
 
 from tramdag import CS, LS, CausalFlowDAG, ContinuousNode, OrdinalNode
-
-# tramdag reports fit() progress on its module logger
-logging.basicConfig(level=logging.INFO, format="%(message)s")
+from tramdag.callbacks import Logger
 
 plt.rcParams["figure.dpi"] = 110
 
@@ -311,8 +310,9 @@ plt.show()
 # Fitting maximizes the joint likelihood. Because the flow is triangular, the
 # negative log-likelihood **decomposes per node**
 # ($\log p(x) = \sum_i \log p(x_i \mid \mathrm{pa}(x_i))$). Thus one Adam
-# optimizer trains all nodes at once. With `restore_best=False` (the default) we
-# keep the final converged weights. These weights are the exact MLE.
+# optimizer trains all nodes at once. `fit` keeps the final weights — for
+# this unconfounded DGP the MLE is the right target. Progress printing is a
+# shipped callback (`tramdag.callbacks.Logger`).
 
 # %%
 spec = {
@@ -326,11 +326,13 @@ flow = CausalFlowDAG(
     spec, seed=1
 )  # seed here too, for the Bernsteins' initial uniform knots
 flow.fit(
-    train_df, val_df, epochs=800, learning_rate=1e-2, batch_size=20000, verbose=200
+    train_df,
+    epochs=800,
+    learning_rate=1e-2,
+    batch_size=20000,
+    after_epoch_callbacks=Logger(every=200),
 )
-flow.fit(
-    train_df, val_df, epochs=300, learning_rate=1e-3, batch_size=512, verbose=300
-)  # polish
+flow.fit(train_df, epochs=300, learning_rate=1e-3, batch_size=512)  # polish
 flow.nll(val_df)
 
 # %% [markdown]
@@ -382,6 +384,9 @@ def describe_node(flow, name):
 def decompose_row(flow, name, row_df):
     """Numeric view: print u = intercept + sum(shifts) for one row and check it
     reproduces flow.node_log_prob exactly.
+
+    Anatomy on purpose: ``_tensorize``/``_features`` are library internals,
+    used here to open the model up — user code never needs them.
     """
     node = flow.nodes[name]
     vals = flow._tensorize(row_df)
@@ -481,6 +486,8 @@ plt.show()
 # compare them with the DGP constants:
 
 # %%
+# raw parameter access, to make the point; flow.ls_coefficients() is the
+# one-call read-out for all of them
 b21_hat = float(flow.nodes["X2"].shifts["X1"].weight.detach())
 b31_hat = float(flow.nodes["X3"].shifts["X1"].weight.detach())
 bY_hat = float(flow.nodes["Y"].shifts["X3"].weight.detach())
@@ -555,10 +562,10 @@ spec_ls = {
     "X3": ContinuousNode(LS("X1") + LS("X2")),  # <- CS replaced by LS
     "Y": OrdinalNode(4, LS("X3")),
 }
-torch.manual_seed(7)
-flow_ls = CausalFlowDAG(spec_ls)
-flow_ls.fit(train_df, val_df, epochs=800, learning_rate=1e-2, batch_size=512, verbose=0)
-flow_ls.fit(train_df, val_df, epochs=300, learning_rate=1e-3, batch_size=512, verbose=0)
+flow_ls = CausalFlowDAG(spec_ls, seed=7)
+# the same schedule as the cs model above, so the NLL comparison is fair
+flow_ls.fit(train_df, epochs=800, learning_rate=1e-2, batch_size=20000)
+flow_ls.fit(train_df, epochs=300, learning_rate=1e-3, batch_size=512)
 
 print(
     f"misspecified beta_32 (X2 -> X3): "
@@ -630,6 +637,29 @@ print("P(Y = k | do(X3 = 1)):")
 print("  true:", pmf_true.round(4), "\n  flow:", pmf_flow.round(4))
 
 # %% [markdown]
+# For a **continuous** node the same closed form exists: `flow.density` gives
+# $p(x_3 \mid do(X_1 = a), x_2)$ on a grid from the fitted transform, no sampling.
+# The DGP tells us the truth: $u_3 = \sinh(x_3) + 0.8\,x_1 + \tfrac12 x_2^2$, so
+# $p(x_3) = f_U\!\big(u_3\big)\cosh(x_3)$ with $f_U$ the standard-logistic density.
+
+# %%
+grid = np.linspace(-3.5, 3.5, 301)
+row = pd.DataFrame({"X2": [0.0]})  # the parent we keep; X1 is set by do=
+fig, ax = plt.subplots(figsize=(7, 3.2))
+for a, color in ((-1.0, "C0"), (1.0, "C3")):
+    dens = flow.density(row, "X3", grid, do={"X1": a})[0]
+    u3 = np.sinh(grid) + 0.8 * a + 0.5 * 0.0**2
+    truth_pdf = np.exp(-u3) / (1 + np.exp(-u3)) ** 2 * np.cosh(grid)
+    ax.plot(
+        grid, truth_pdf, color=color, lw=2.5, alpha=0.4, label=f"truth, $a={a:+.0f}$"
+    )
+    ax.plot(grid, dens, color=color, lw=1.2, label=f"flow.density, $a={a:+.0f}$")
+ax.set_xlabel("$x_3$"), ax.set_ylabel("$p(x_3 \\mid do(X_1=a), x_2=0)$")
+ax.legend()
+fig.tight_layout()
+plt.show()
+
+# %% [markdown]
 # ## 8. Rung 3 — counterfactuals: abduction → action → prediction
 #
 # Because the flow is **bijective in the continuous variables**, Pearl's three
@@ -691,10 +721,11 @@ plt.show()
 #   `uv run python -m paper.vaca flexible` (from `experiments/`) for an all-intercept flow on a
 #   bimodal benchmark with analytic interventional truth.
 # * **Early stopping vs. exact MLE** — this notebook's DGP has no unobserved
-#   confounding, so the MLE (`restore_best=False`, the default) is the right
+#   confounding, so the MLE (the final weights `fit` keeps) is the right
 #   target. Under observational confounding, flexible (`I`/`CS`) models can
-#   *overfit the confounding* at the MLE and need `restore_best=True` to recover
-#   the causal effect. See `CHANGELOG.md`.
+#   *overfit the confounding* at the MLE and need best-validation weights
+#   (`tramdag.callbacks.RestoreBest`) to recover
+#   the causal effect. See `docs/fitting.md`.
 # * **Validation against classical models** — an all-`LS` flow trained to
 #   convergence *is* the classical proportional-odds MLE
 #   (`experiments/misc/validate_ls.py` pins flow ≡ `statsmodels` ≡ R `polr`, and the

@@ -14,12 +14,11 @@ standard-logistic latents (paper Section 6; original code
 ``f`` selects the x2 -> x3 effect (paper / R-script variants)::
 
     linear  -0.3 x                  (=> +0.3 coefficient on x2 in h3)
-    cubic   2 x^3 + x
     exp     0.5 exp(x)
     atan    0.75 atan(5 (x + 0.12))  (complex-shift experiment, Fig. 7)
     sin     2 sin(3 x) + x           (non-monotone, App. C.3.4)
 
-Convention mapping to ``CausalFlowDAG`` fits (see ``zuko_expectations``):
+Convention mapping to ``CausalFlowDAG`` fits (see ``flow_expectations``):
 continuous nodes share the paper's sign (``z = h(x) + shift``), so the fitted
 ``ls`` weights converge to +2 (x1->x2) and -0.2 (x1->x3) and a ``cs`` module
 learns ``-f(x2)`` up to an additive constant. The ordinal node flips the sign
@@ -43,12 +42,11 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from ._common import DatasetDraws, logistic, resolve_latents, sigmoid
+from ._common import DatasetDraws, resolve_latents, sigmoid
 
 # %% global variables ------------------------------------------------------------------
 F_VARIANTS = {
     "linear": (lambda x: -0.3 * x, "-0.3*x"),
-    "cubic": (lambda x: 2.0 * x**3 + x, "2*x^3 + x"),
     "exp": (lambda x: 0.5 * np.exp(x), "0.5*exp(x)"),
     "atan": (lambda x: 0.75 * np.arctan(5.0 * (x + 0.12)), "0.75*atan(5*(x+0.12))"),
     "sin": (lambda x: 2.0 * np.sin(3.0 * x) + x, "2*sin(3*x) + x"),
@@ -88,7 +86,7 @@ def _write_variant(cls, out_dir: Path, f: str, seed: int, n_obs: int) -> None:
         "seed": seed,
         "n_obs": n_obs,
         "paper": gen.paper_truth(),
-        "zuko": gen.zuko_expectations(),
+        "zuko": gen.flow_expectations(),
     }
     (vdir / "truth.json").write_text(json.dumps(truth, indent=2) + "\n")
     if gen.family == "mixed":
@@ -111,7 +109,13 @@ def main(argv: list[str] | None = None) -> None:
     p.add_argument("--out", type=Path, default=Path("paper/data"))
     p.add_argument("--seed", type=int, default=42)
     p.add_argument("--n-obs", type=int, default=5000)
+    p.add_argument("--force", action="store_true", help="overwrite an existing folder")
     args = p.parse_args(argv)
+    if args.out.exists() and not args.force:
+        raise SystemExit(
+            f"{args.out} exists: the frozen data is a contract. A new seed or new "
+            "equations belong in a NEW folder (--out); pass --force to overwrite."
+        )
 
     for f in PAPER_VARIANTS["continuous"]:
         _write_variant(
@@ -146,7 +150,6 @@ class _TriangleBase(DatasetDraws):
             raise ValueError(f"f must be one of {sorted(F_VARIANTS)}, got {self.f!r}")
         self.f_callable = F_VARIANTS[self.f][0]
 
-    # ------------------------------------------------------------------ latents
     def draw_latents(self, n: int, rng: np.random.Generator) -> dict[str, np.ndarray]:
         """Draw all noise of the SCM, ``n`` rows each.
 
@@ -157,11 +160,10 @@ class _TriangleBase(DatasetDraws):
             "x1_mix": rng.uniform(size=n),  # component indicator
             "x1_a": rng.normal(size=n),  # N(0.25, 0.1) branch
             "x1_b": rng.normal(size=n),  # N(0.73, 0.05) branch
-            "x2": logistic(rng, n),
-            "x3": logistic(rng, n),
+            "x2": rng.logistic(size=n),
+            "x3": rng.logistic(size=n),
         }
 
-    # --------------------------------------------------------------------- SCM
     def _x1_x2(self, do: dict, latents: dict) -> tuple[np.ndarray, np.ndarray]:
         n = len(latents["x2"])
         if "x1" in do:
@@ -221,7 +223,6 @@ class _TriangleBase(DatasetDraws):
     def _x3(self, x1, x2, do, latents):  # pragma: no cover - abstract
         raise NotImplementedError
 
-    # -------------------------------------------------------------- ground truth
     def true_shift_curve(self, x2_grid: np.ndarray) -> np.ndarray:
         """Give the limit of a fitted ``cs`` module on the x2 to x3 edge.
 
@@ -240,7 +241,7 @@ class _TriangleBase(DatasetDraws):
         """
         return -self.f_callable(np.asarray(x2_grid, dtype=float))
 
-    def zuko_expectations(self) -> dict:
+    def flow_expectations(self) -> dict:
         """Give the expected parameter values in the conventions of the flow.
 
         Returns
@@ -419,7 +420,7 @@ class TriangleMixed(_TriangleBase):
             t["beta23"] = -0.3
         return t
 
-    def zuko_expectations(self) -> dict:
+    def flow_expectations(self) -> dict:
         """Give the same truth in the conventions of ``CausalFlowDAG``.
 
         The ordinal shift is subtracted here and added in the paper, so the
