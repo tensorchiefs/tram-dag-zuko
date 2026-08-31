@@ -21,5 +21,9 @@
   },
   "mean_x3_abs_err_do_x1": {
     "max": 0.3028
+  },
+  "fit_seconds": {
+    "max": 1765,
+    "why": "3x the 2-core CI runner measurement (588 s, 2026-08-31): shared-runner wall clock is noisy, so this is a gross-regression tripwire (a lost no_grad, an accidental O(n^2)), not a benchmark"
   }
 }

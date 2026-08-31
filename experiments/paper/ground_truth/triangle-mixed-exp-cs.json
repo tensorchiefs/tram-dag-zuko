@@ -44,5 +44,9 @@
   "cf_prob_true_level_mode_bound": {
     "value": 0.9543207588397901,
     "atol": 1e-09
+  },
+  "fit_seconds": {
+    "max": 1402,
+    "why": "3x the 2-core CI runner measurement (467 s, 2026-08-31): shared-runner wall clock is noisy, so this is a gross-regression tripwire (a lost no_grad, an accidental O(n^2)), not a benchmark"
   }
 }

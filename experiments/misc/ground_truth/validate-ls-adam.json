@@ -63,5 +63,9 @@
   "max_abs_diff_named_coefs": {
     "max": 0.001,
     "why": "a floor, not a multiple: this Adam fit agrees to 1.8e-05, far below the 1e-3 that any comparison in this repo claims, and nothing has measured its cross-machine spread. Tightening to 2.5x a 1e-5 measurement would fail on another machine for no reason"
+  },
+  "fit_seconds": {
+    "max": 590,
+    "why": "3x the 2-core CI runner measurement (197 s, 2026-08-31): shared-runner wall clock is noisy, so this is a gross-regression tripwire (a lost no_grad, an accidental O(n^2)), not a benchmark"
   }
 }
