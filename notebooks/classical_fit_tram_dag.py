@@ -46,6 +46,7 @@ import torch
 from statsmodels.miscmodels.ordinal_model import OrderedModel
 
 from tramdag import LS, SI, CausalFlowDAG, ContinuousNode, OrdinalNode
+from tramdag.callbacks import PerNodePlateau, per_node_adam
 
 warnings.filterwarnings("ignore")
 # so fit_classical reports its iters / NLL / time
@@ -246,7 +247,7 @@ spec_bwt = {
 }
 
 flow_bwt = CausalFlowDAG(spec_bwt, seed=0)
-flow_bwt.fit_classical(bw, max_iter=800, verbose=False)
+flow_bwt.fit_classical(bw, max_iter=800)
 
 w = flow_bwt.ls_coefficients()["bwt"]
 fitted = {
@@ -521,15 +522,14 @@ for node, parents in flow_c.ls_coefficients().items():
 # %%
 flow_a = CausalFlowDAG(spec_vaca, seed=0)
 t0 = time.perf_counter()
+# the pre-0.4 fit(schedule="plateau", freeze_patience=) recipe, now a callback
+sched = PerNodePlateau(df, patience=15, freeze=60)
 flow_a.fit(
     df,
     epochs=2000,
-    learning_rate=1e-1,
     batch_size=4096,
-    verbose=0,
-    schedule="plateau",
-    plateau_patience=15,
-    freeze_patience=60,
+    optimizer=per_node_adam(flow_a, lr=1e-1),
+    after_epoch_callbacks=sched,
 )
 t_adam = time.perf_counter() - t0
 
@@ -669,9 +669,7 @@ for level in range(1, 6):
 before = {k: v.copy() for k, v in flow_s.ls_coefficients()["mRS_3m"].items()}
 
 # continue training from the classical solution with a gentle Adam phase
-flow_s.fit(
-    obs, epochs=300, learning_rate=1e-3, batch_size=256, verbose=0, restore_best=False
-)
+flow_s.fit(obs, epochs=300, learning_rate=1e-3, batch_size=256)
 after = flow_s.ls_coefficients()["mRS_3m"]
 
 print("coefficient drift after 300 more Adam epochs from the classical MLE:")
