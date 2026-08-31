@@ -51,7 +51,7 @@
             <ul>
   <li><a href="#how-fast-can-a-causalflowdag-train">How fast can a CausalFlowDAG train?</a>
   <ul>
-    <li><a href="#the-options-and-how-to-use-them">The options, and how to use them</a></li>
+    <li><a href="#the-recipes-and-where-they-live-now">The recipes, and where they live now</a></li>
     <li><a href="#method-time-to-target-not-loss-go-down">Method: time-to-target, not loss-go-down</a></li>
     <li><a href="#results">Results</a></li>
     <li><a href="#findings">Findings</a></li>
@@ -89,25 +89,36 @@ It runs fixed 200-epoch workloads on all available devices and writes a machine
 fingerprint to JSON, and it needs nothing but <code>pip install tramdag</code>. The raw CSV
 is a local run artifact and is not committed.</p>
 
-<h2 id="the-options-and-how-to-use-them">The options, and how to use them</h2>
+<h2 id="the-recipes-and-where-they-live-now">The recipes, and where they live now</h2>
 
-<p><strong>Schedules</strong> (<code>fit(..., schedule=...)</code>) control the learning rate over training:</p>
+<p>The recipes this benchmark compares were <code>fit()</code> options in 0.3
+(<code>schedule="plateau"</code>, <code>freeze_patience=</code>, <code>restore_best=</code>). In 0.4 <code>fit</code> is
+one minibatch Adam loop and the recipes are <strong>callbacks</strong> — training
+strategies, not part of the model (see <a href="../guides/fitting.html">fitting.md</a>):</p>
 
 <table>
 <thead>
 <tr>
-  <th>value</th>
+  <th>recipe</th>
   <th>behavior</th>
+  <th>today</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-  <td><code>None</code> (default)</td>
-  <td>constant lr — the classic behavior, exactly as before this PR</td>
+  <td>constant</td>
+  <td>one lr for the whole run</td>
+  <td><code>flow.fit(train, epochs=, learning_rate=)</code></td>
 </tr>
 <tr>
-  <td><code>"plateau"</code></td>
-  <td><strong>per-node</strong>: a node whose own validation NLL hasn't improved by <code>min_delta</code> (default 1e-4) for <code>plateau_patience</code> epochs (default 30) gets its lr × 0.3, floored at 1e-3 × the initial lr. Each node decays independently — valid because the per-node losses have independent gradients.</td>
+  <td>plateau+freeze</td>
+  <td><strong>per-node</strong>: a node whose own validation NLL hasn't improved by <code>min_delta</code> (1e-4 default; the stroke run uses 1e-5, see the benchmark) for <code>patience</code> epochs gets its lr × 0.3, floored at 1e-3 × the start; once decayed ≥ 100× and flat for <code>freeze</code> epochs it leaves training (rate 0). Valid because the per-node losses have independent gradients.</td>
+  <td><code>tramdag.callbacks.PerNodePlateau</code>, a callback over one parameter group per node (<code>per_node_adam</code>), measured in <code>experiments/benchmarks/bench_training.py</code></td>
+</tr>
+<tr>
+  <td>global plateau</td>
+  <td>torch's <code>ReduceLROnPlateau</code> on the summed validation NLL — the paper reference's rule</td>
+  <td><code>experiments/paper/helpers.py::fit_paper</code></td>
 </tr>
 </tbody>
 </table>
@@ -116,17 +127,8 @@ is a local run artifact and is not committed.</p>
 <code>"plateau"</code> on every workload; 0.4.0 removed both. The result tables below
 keep their measured rows as the record of that decision.</p>
 
-<p><strong>Early stopping / freezing</strong> (<code>fit(..., freeze_patience=N)</code>): if the validation NLL of a
-node does not improve for <code>N</code> epochs, the fit <em>freezes</em> that node. A frozen node leaves
-the loss and the backward pass, which saves real compute. Its weights stay fixed from then
-on. When all nodes are frozen, the fit returns early. The fit records the freeze epochs in
-<code>flow.history["frozen"]</code>. Under <code>schedule="plateau"</code>, freezing also waits until the lr of
-the node is decayed ≥ 100×. This delay prevents a freeze while a smaller step size can
-still make progress. Freezing state is per-<code>fit()</code>-call: a second <code>fit</code> call trains all
-nodes again.</p>
-
-<p><strong>Switching it all off</strong>: for an exact comparison with classical methods (<code>statsmodels</code>,
-R <code>polr</code>/<code>tram</code>), omit both arguments. The benchmark changed no defaults, so</p>
+<p><strong>The exact-MLE path</strong>: for an exact comparison with classical methods
+(<code>statsmodels</code>, R <code>polr</code>/<code>tram</code>) no recipe is needed —</p>
 
 <div class="pdoc-code codehilite">
 <pre><span></span><code><span class="n">flow</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">train_df</span><span class="p">,</span> <span class="n">epochs</span><span class="o">=</span><span class="mi">4000</span><span class="p">,</span> <span class="n">learning_rate</span><span class="o">=</span><span class="mf">1e-2</span><span class="p">,</span> <span class="n">batch_size</span><span class="o">=</span><span class="mi">512</span><span class="p">)</span>  <span class="c1"># constant lr</span>
@@ -134,11 +136,12 @@ R <code>polr</code>/<code>tram</code>), omit both arguments. The benchmark chang
 </code></pre>
 </div>
 
-<p>is still the exact-MLE path that <code>experiments/misc/validate_ls.py</code> uses. Independent of all
-this, <code>restore_best=False</code> remains the default (see CHANGELOG). The guard test
-<code>tests/test_fit_schedules.py::test_plateau_freeze_preserves_exact_mle</code> also shows that
-even <em>with</em> plateau+freezing the all-<code>ls</code> fit lands on the classical MLE within the usual
-tolerances.</p>
+<p>is still the exact-MLE path (<code>experiments/misc/validate_ls.py</code> runs a three-phase variant
+of it, 4000/2000/1000 epochs at 1e-2/1e-3/1e-4, batch 256). <code>fit</code> keeps the
+final weights. The guard test
+<code>tests/test_fit_hooks.py::test_torch_plateau_scheduler_preserves_exact_mle</code> shows
+that a schedule through the hooks still lands the all-<code>ls</code> fit on the classical
+MLE within the usual tolerances.</p>
 
 <p><strong>LBFGS</strong> is <em>not</em> a <code>fit()</code> option — it ships as its own method.
 <a href="../guides/fitting.html"><code>fit_classical</code></a> runs float64 full-batch L-BFGS with a strong-Wolfe
@@ -156,7 +159,7 @@ float64 upcast is what fixed that.</p>
 
 <h2 id="method-time-to-target-not-loss-go-down">Method: time-to-target, not loss-go-down</h2>
 
-<p>Each config runs once. <code>fit()</code> records per-epoch validation NLL <em>and</em> wall-clock time.
+<p>Each config runs once. The benchmark's callback records per-epoch validation NLL <em>and</em> wall-clock time.
 From these records, we measure the seconds until the fit is within a fixed gap of a cached
 long-run reference (3 torch seeds, medians):</p>
 
@@ -193,7 +196,7 @@ coefficient-equivalent: a fit with gap ≈ 3e-3 already matches the R reference
 coefficients within the tolerances of
 <a href="https://github.com/tensorchiefs/tramdag/blob/dev-marcel/docs/../experiments/misc/validate_ls.py"><code>experiments/misc/validate_ls.py</code></a>. The same
 exact-MLE-under-plateau-and-freezing property is pinned on an inline DGP by
-<code>tests/test_fit_schedules.py::test_plateau_freeze_preserves_exact_mle</code>.</p>
+<code>tests/test_fit_hooks.py::test_torch_plateau_scheduler_preserves_exact_mle</code>.</p>
 
 <p>These numbers were measured before the experiment code moved into
 <code>experiments/benchmarks/</code>; the workloads are unchanged (same frozen data, same
@@ -312,7 +315,7 @@ Very large batches (16k) only improved raw throughput at n=50k.</li>
 <li><strong>MPS (Apple GPU) is 3–4× slower than the M-series CPU</strong> at these model sizes
 (verified correct: identical reconstruction). Kernel-launch overhead dominates
 sub-millisecond ops. Stay on CPU locally. CUDA on Colab-class GPUs is a different
-regime (see the GPU-vs-CPU race in the demo notebook).</li>
+regime.</li>
 <li><strong>The old defaults waste or under-spend.</strong> Stroke: 4000 epochs budgeted, converged
 work done after ~1500 (freezing recovers the difference automatically). Vaca: 520
 epochs budgeted, ~0.03 nats short of converged. Fixed budgets are wrong in both
@@ -324,29 +327,26 @@ directions. Adaptive stopping fixes both.</li>
 <p>For everyday fits:</p>
 
 <div class="pdoc-code codehilite">
-<pre><span></span><code><span class="n">flow</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span>
-    <span class="n">train</span><span class="p">,</span>
-    <span class="n">val</span><span class="p">,</span>
-    <span class="n">epochs</span><span class="o">=</span><span class="mi">4000</span><span class="p">,</span>
-    <span class="n">learning_rate</span><span class="o">=</span><span class="mf">1e-2</span><span class="p">,</span>
-    <span class="n">batch_size</span><span class="o">=</span><span class="mi">512</span><span class="p">,</span>
-    <span class="n">schedule</span><span class="o">=</span><span class="s2">"plateau"</span><span class="p">,</span>
-    <span class="n">plateau_patience</span><span class="o">=</span><span class="mi">30</span><span class="p">,</span>
-    <span class="n">freeze_patience</span><span class="o">=</span><span class="mi">120</span><span class="p">,</span>
-<span class="p">)</span>
+<pre><span></span><code><span class="n">opt</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">optim</span><span class="o">.</span><span class="n">Adam</span><span class="p">(</span><span class="n">flow</span><span class="o">.</span><span class="n">parameters</span><span class="p">(),</span> <span class="n">lr</span><span class="o">=</span><span class="mf">1e-2</span><span class="p">)</span>
+<span class="n">plateau</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">optim</span><span class="o">.</span><span class="n">lr_scheduler</span><span class="o">.</span><span class="n">ReduceLROnPlateau</span><span class="p">(</span><span class="n">opt</span><span class="p">,</span> <span class="n">factor</span><span class="o">=</span><span class="mf">0.3</span><span class="p">,</span> <span class="n">patience</span><span class="o">=</span><span class="mi">30</span><span class="p">)</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">on_epoch</span><span class="p">(</span><span class="n">flow</span><span class="p">,</span> <span class="n">epoch</span><span class="p">,</span> <span class="n">opt</span><span class="p">):</span>
+    <span class="n">plateau</span><span class="o">.</span><span class="n">step</span><span class="p">(</span><span class="nb">sum</span><span class="p">(</span><span class="n">flow</span><span class="o">.</span><span class="n">nll</span><span class="p">(</span><span class="n">val</span><span class="p">)</span><span class="o">.</span><span class="n">values</span><span class="p">()))</span>
+    <span class="k">return</span> <span class="n">opt</span><span class="o">.</span><span class="n">param_groups</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="s2">"lr"</span><span class="p">]</span> <span class="o">&lt;</span> <span class="mf">1e-5</span>
+
+<span class="n">flow</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">train</span><span class="p">,</span> <span class="n">epochs</span><span class="o">=</span><span class="mi">4000</span><span class="p">,</span> <span class="n">batch_size</span><span class="o">=</span><span class="mi">512</span><span class="p">,</span> <span class="n">optimizer</span><span class="o">=</span><span class="n">opt</span><span class="p">,</span> <span class="n">after_epoch_callbacks</span><span class="o">=</span><span class="n">on_epoch</span><span class="p">)</span>
 </code></pre>
 </div>
 
-<p>The generous <code>epochs</code> value is only a ceiling. The fit stops itself. For exact classical
-comparisons where the last 1e-3 matters, append a short constant-lr polish phase
-(<code>epochs=500, learning_rate=1e-3</code>) after the plateau fit. Or run the old two-phase recipe.</p>
+<p>The generous <code>epochs</code> value is only a ceiling; the callback stops the fit. For exact
+classical comparisons where the last 1e-3 matters, append a short constant-lr polish
+phase (<code>epochs=500, learning_rate=1e-3</code>). The per-node variant with freezing is the
+shipped <code>tramdag.callbacks.PerNodePlateau</code>.</p>
 
-<p>The benchmark itself changed no defaults — that is its own reviewed decision (see
-the <code>restore_best</code> episode in CHANGELOG.md). Two of its findings have since been
-adopted: <code>plateau_patience</code> defaults to the 30 recommended here, and <code>epochs</code> has no
-default at all, because finding 6 is precisely that a fixed budget cannot be right for
-every workload. The experiment scripts still run the two-phase constant-lr recipe,
-which each states in its own YAML.</p>
+<p>One finding is a package default: <code>epochs</code> has no default at all, because
+finding 6 is precisely that a fixed budget cannot be right for every workload. The paper scripts follow the paper's own protocol (one constant-lr
+run, or the reference's ReduceLROnPlateau for VACA/CAREFL); <code>validate_ls</code> runs a
+three-phase constant-lr descent. Each states its recipe in its own YAML.</p>
 </div>
 
                         <input id="mod-training_speed-view-source" class="view-source-toggle-state" type="checkbox" aria-hidden="true" tabindex="-1">

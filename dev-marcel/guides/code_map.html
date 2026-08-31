@@ -56,7 +56,7 @@
     <li><a href="#conditionerspy-the-networks-behind-the-terms"><code>conditioners.py</code> — the networks behind the terms</a></li>
     <li><a href="#flowpy-the-model"><code>flow.py</code> — the model</a></li>
     <li><a href="#scorespy-effect-modifier-detection-issue-29"><code>scores.py</code> — effect-modifier detection (issue #29)</a></li>
-    <li><a href="#utilspy-helpers-that-are-not-about-modelling"><code>utils.py</code> — helpers that are not about modelling</a></li>
+    <li><a href="#callbackspy-the-shipped-fit-callbacks"><code>callbacks.py</code> — the shipped <code>fit</code> callbacks</a></li>
     <li><a href="#what-is-not-in-the-package">What is <em>not</em> in the package</a></li>
     <li><a href="#where-every-training-hyperparameter-lives">Where every training hyperparameter lives</a></li>
   </ul></li>
@@ -143,7 +143,7 @@ are the same object, so <code>LS is linear_shift</code>.</p>
 </tr>
 <tr>
   <td><code>spec_to_dict()</code> / <code>spec_from_dict()</code></td>
-  <td>Checkpoint (de)serialization. A term serializes as <code>{effect, parents, options}</code> and nothing else, since <code>options</code> is already canonical. No compatibility shims, and <code>spec_from_dict</code> builds <code>Term</code> directly — so <code>validate_and_sort</code> is the only guard on that path.</td>
+  <td>Checkpoint (de)serialization. A term serializes as <code>{effect, parents, options}</code> and nothing else, since <code>options</code> is already canonical. No compatibility shims: <code>spec_from_dict</code> rejects a term without <code>options</code>, the node constructors normalize the formula, and <code>validate_and_sort</code> checks the DAG.</td>
 </tr>
 <tr>
   <td>(<code>_normalize_terms</code>, <code>_as_term</code>, <code>_intercept_basis</code>, <code>_options</code>, <code>_OPTION_DEFAULTS</code>)</td>
@@ -172,7 +172,7 @@ are the same object, so <code>LS is linear_shift</code>.</p>
 </tr>
 <tr>
   <td><code>BernsteinUT</code></td>
-  <td>Bernstein-polynomial transform (default basis, <code>n_coeffs=20</code>). Linear tail extrapolation follows the boundary derivative. <code>marginal_init_theta()</code> gives the calibrated start used by <code>fit(marginal_init=True)</code>.</td>
+  <td>Bernstein-polynomial transform (default basis, <code>n_coeffs=20</code>). Linear tail extrapolation follows the boundary derivative. <code>marginal_init_theta()</code> gives the calibrated start used by <code>calibrate(marginal_init=True)</code>.</td>
 </tr>
 <tr>
   <td><code>SplineUT</code></td>
@@ -200,11 +200,11 @@ are the same object, so <code>LS is linear_shift</code>.</p>
 </tr>
 <tr>
   <td><code>ordinal_marginal_init_theta()</code></td>
-  <td>Cutpoint start that matches the empirical class frequencies (<code>marginal_init</code>).</td>
+  <td>Cutpoint start that matches the empirical class frequencies (<code>calibrate(marginal_init=True)</code>).</td>
 </tr>
 <tr>
-  <td>(<code>_ScaledUT</code>, <code>_expanding_bisection</code>, <code>_bounds</code>, <code>_log1mexp</code>)</td>
-  <td>Quantile pre-scaling base class; tail-safe inverse; per-level cutpoint intervals; stable <code>log(1-exp(x))</code>.</td>
+  <td>(<code>_ScaledUT</code>, <code>_bounds</code>, <code>_log1mexp</code>)</td>
+  <td>Quantile pre-scaling base class (the inverse is zuko's, with its closed-form tail); per-level cutpoint intervals; stable <code>log(1-exp(x))</code>.</td>
 </tr>
 </tbody>
 </table>
@@ -255,7 +255,7 @@ config in <code>experiments/paper/</code> states <code>units=</code> and <code>a
 <tr>
   <td>(<code>_mlp</code>)</td>
   <td>—</td>
-  <td>The one MLP builder: a ReLU stack of the given <code>units</code>, then a bias-free output layer.</td>
+  <td>The one MLP builder: a stack of the given <code>units</code> with the term's <code>activation</code> (relu by default), then a bias-free output layer.</td>
 </tr>
 </tbody>
 </table>
@@ -275,8 +275,16 @@ config in <code>experiments/paper/</code> states <code>units=</code> and <code>a
   <td>The flow: one <code>_Node</code> per variable in topological order. Construction seeds the weights (<code>seed=</code> is the reproducibility knob).</td>
 </tr>
 <tr>
+  <td><code>calibrate()</code></td>
+  <td>Once, from the training rows: transform ranges (train 5%/95% quantiles onto the domain), network-input min-max, the calibrated start (<code>marginal_init=True</code>). Called by the first fit; a checkpoint carries the flag.</td>
+</tr>
+<tr>
+  <td><code>init_marginals()</code></td>
+  <td>The calibrated start as an explicit step, callable any time: resets every simple intercept to its column's marginal (Bernstein map / ordinal class log-odds; spline and affine have no calibrated start). Not once-guarded — on a trained flow it restarts those intercepts. Calibrates a fresh flow's ranges itself.</td>
+</tr>
+<tr>
   <td><code>fit()</code></td>
-  <td>Joint maximum likelihood with Adam, one parameter group per node (exact, because the NLL decomposes per node). Options: <code>schedule="plateau"</code> (per-node decay), per-node freezing, <code>restore_best</code>, <code>marginal_init</code>, <code>vc_warm_start</code>, <code>plateau_factor</code>, <code>vc_oof_fit</code>. A second call continues training. Progress goes to the <code>tramdag.flow</code> logger.</td>
+  <td>Joint maximum likelihood: one minibatch Adam loop over all parameters (exact per node, because the NLL decomposes), final weights kept. Hooks: <code>optimizer=</code> (any torch optimizer, for schedulers), <code>after_epoch_callbacks=</code> (one callable or a list, <code>cb(flow, epoch, opt)</code> after every epoch, any <code>True</code> stops) and <code>before_fit_callbacks=</code>/<code>after_fit_callbacks=</code> around the loop — validation, schedules, early stopping and logging attach here; the common recipes ship in <code>callbacks.py</code>. <code>vc_ehat=</code> carries the out-of-fold propensities of centered VC terms. A second call continues training.</td>
 </tr>
 <tr>
   <td><code>fit_classical()</code></td>
@@ -293,6 +301,10 @@ config in <code>experiments/paper/</code> states <code>units=</code> and <code>a
 <tr>
   <td><code>pmf()</code></td>
   <td>Analytic class probabilities of an ordinal node, with <code>do=</code> overrides.</td>
+</tr>
+<tr>
+  <td><code>density()</code></td>
+  <td>Analytic conditional density of a continuous node on a grid, with <code>do=</code> overrides — the continuous counterpart of <code>pmf</code>.</td>
 </tr>
 <tr>
   <td><code>log_prob()</code> / <code>nll()</code></td>
@@ -328,27 +340,23 @@ config in <code>experiments/paper/</code> states <code>units=</code> and <code>a
 </tr>
 <tr>
   <td><code>save()</code> / <code>load()</code></td>
-  <td>Checkpoints with history and machine provenance. <code>load</code> requires a complete checkpoint and fails loudly otherwise.</td>
+  <td>Checkpoints with history and provenance (version, time, device). <code>load</code> requires a complete checkpoint and fails loudly otherwise.</td>
 </tr>
 <tr>
   <td>(<code>_Node</code>, <code>_VCGroup</code>)</td>
   <td>Per-node module (intercept + shift <code>ModuleDict</code> + VC bookkeeping); construction is <code>_build_intercept</code>/<code>_build_shifts</code>, and <code>theta_shift()</code> computes <code>(theta, shift)</code> through <code>_theta</code>/<code>_vc_shift</code>/<code>vc_column</code>.</td>
 </tr>
 <tr>
-  <td>(<code>_FitSchedule</code>, <code>_fit_epoch</code>, <code>_end_epoch</code>, <code>_make_optimizer</code>, <code>_val_nll</code>, <code>_vc_penalized</code>, <code>_log_epoch</code>, <code>_snapshot_best</code>, <code>_load_best_weights</code>, <code>_best_store</code>)</td>
-  <td>The fit loop, decomposed: per-node plateau/freeze bookkeeping, one minibatch epoch (with the frozen carry-forward), the per-epoch record/schedule/snapshot/log step, and the restore-best store that persists across <code>fit</code> calls.</td>
-</tr>
-<tr>
   <td>(<code>_node</code>, <code>_encode_parent</code>, <code>_features</code>, <code>_tensorize</code>, <code>_generator</code>, <code>_dtype</code>, <code>_np_dtype</code>, <code>_feat_width</code>, <code>_slice_ehat</code>, <code>_term_cells</code>)</td>
   <td>Node lookup with one shared error; parent encoding (continuous raw, ordinal one-hot); <code>_tensorize(df, cols=None)</code> for any column subset; seeded-generator, dtype, feature-width and adjacency-cell plumbing.</td>
 </tr>
 <tr>
-  <td>(<code>_set_ranges</code>)</td>
-  <td>Train 5%/95% quantiles onto the transform domain, plus the optional marginal initialization. First fit only.</td>
+  <td>(<code>_fit_epoch</code>)</td>
+  <td>One shuffled pass over the rows; the epoch-mean train NLL per node goes to <code>history["train"]</code>.</td>
 </tr>
 <tr>
-  <td>(<code>_vc_warm_start</code>, <code>_ls_proxy_spec</code>, <code>_vc_oof_stage</code>, <code>_vc_oof_propensity</code>, <code>_predict_p1</code>, <code>_binary_p1</code>, <code>_vc_ehat_live</code>, <code>_vc_ehat_columns</code>, <code>_recenter_vc</code>, <code>_source_proxies</code>)</td>
-  <td>The VC machinery: classical <code>beta0</code> warm start; frozen out-of-fold propensities for training (DML); live full-fit propensities for inference (recomputed under <code>do</code>, never cached); post-fit re-centering.</td>
+  <td>(<code>_vc_ehat_train</code>, <code>_binary_p1</code>, <code>_vc_ehat_live</code>, <code>_vc_ehat_columns</code>, <code>_recenter_vc</code>)</td>
+  <td>The VC machinery: the caller's out-of-fold propensities as frozen training tensors (DML); live full-fit propensities for inference (recomputed under <code>do</code>, never cached); post-fit re-centering.</td>
 </tr>
 <tr>
   <td>(<code>_is_all_ls</code>, <code>_covered_by_classical</code>)</td>
@@ -390,10 +398,7 @@ config in <code>experiments/paper/</code> states <code>units=</code> and <code>a
 </tbody>
 </table>
 
-<h2 id="utilspy-helpers-that-are-not-about-modelling"><code>utils.py</code> — helpers that are not about modelling</h2>
-
-<p>Nothing is imported at module level here: <code>config_section</code> needs no
-dependency, and <code>machine_info</code> pulls in torch and platform only when called.</p>
+<h2 id="callbackspy-the-shipped-fit-callbacks"><code>callbacks.py</code> — the shipped <code>fit</code> callbacks</h2>
 
 <table>
 <thead>
@@ -404,12 +409,20 @@ dependency, and <code>machine_info</code> pulls in torch and platform only when 
 </thead>
 <tbody>
 <tr>
-  <td><code>config_section()</code></td>
-  <td>Pick a mapping out of an <strong>already-parsed</strong> configuration (descending through any number of keys) and require an exact key set, so a missing key cannot become a hidden default and an extra one cannot look effective. Parsing stays with the caller, so the package depends on no config parser.</td>
+  <td><code>Logger</code></td>
+  <td>Prints one line per <code>every</code> epochs: summed train NLL, plus validation NLL when <code>val_df</code> is given.</td>
 </tr>
 <tr>
-  <td><code>machine_info()</code></td>
-  <td>Machine/software snapshot stored by <code>save()</code>, so timings stay comparable across machines. Never raises. Exported top-level as <code><a href="../tramdag.html#machine_info">tramdag.machine_info</a></code>.</td>
+  <td><code>RestoreBest</code></td>
+  <td>Snapshots the weights of the best summed validation NLL per epoch; <code>restore</code> (registered in <code>after_fit_callbacks</code>) loads them back before the VC re-centering.</td>
+</tr>
+<tr>
+  <td><code>PerNodePlateau</code></td>
+  <td>Per-node lr decay and freezing on each node's own validation NLL; stops the fit once every node froze. The pre-0.4 <code>fit(schedule="plateau")</code> recipe, opt-in. <code>step(nll, opt)</code> for a hand-computed NLL.</td>
+</tr>
+<tr>
+  <td><code>per_node_adam()</code></td>
+  <td>Adam with one <code>node</code>-tagged parameter group per node — the optimizer <code>PerNodePlateau</code> needs.</td>
 </tr>
 </tbody>
 </table>
@@ -443,44 +456,29 @@ default you can read at the call site. Nothing numeric is buried.</p>
   <td>1e-2 / 512 (in-repo callers state them explicitly anyway)</td>
 </tr>
 <tr>
-  <td>schedule, plateau patience, plateau decay factor</td>
-  <td><code>fit(schedule=, plateau_patience=, plateau_factor=)</code></td>
-  <td>None / 30 / 0.3 (lr floor <code>1e-3 * learning_rate</code>, stated in the docstring)</td>
-</tr>
-<tr>
-  <td>per-node freezing</td>
-  <td><code>fit(freeze_patience=, min_delta=)</code></td>
-  <td>off / 1e-4 (freeze guard <code>1e-2 * learning_rate</code>)</td>
-</tr>
-<tr>
-  <td>early stopping</td>
-  <td><code>fit(restore_best=)</code></td>
-  <td>False = exact MLE</td>
+  <td>schedules, early stopping, logging</td>
+  <td><code>fit(optimizer=, after_epoch_callbacks=)</code></td>
+  <td><code>tramdag.callbacks</code> ships <code>Logger</code>, <code>RestoreBest</code>, <code>PerNodePlateau</code>; anything else is torch's <code>lr_scheduler</code> and a few lines of callback (<a href="../guides/fitting.html">fitting.md</a>)</td>
 </tr>
 <tr>
   <td>calibrated init</td>
-  <td><code>fit(marginal_init=)</code></td>
-  <td>False (pure init, MLE unchanged)</td>
+  <td><code>calibrate(marginal_init=)</code></td>
+  <td>True (pure init, MLE unchanged; <code>False</code> = zuko's zero start; called by the first fit)</td>
 </tr>
 <tr>
-  <td>VC warm start</td>
-  <td><code>fit(vc_warm_start=)</code></td>
-  <td>True (classical <code>beta0</code> start)</td>
-</tr>
-<tr>
-  <td>VC stage-1 proxy fits</td>
-  <td><code>fit(vc_oof_fit=)</code></td>
-  <td><code>{"epochs": 300, "learning_rate": 1e-2, "batch_size": 512}</code></td>
+  <td>VC stage-1 propensities</td>
+  <td><code>fit(vc_ehat=)</code></td>
+  <td>required for a centered VC term, out of fold, computed by the caller</td>
 </tr>
 <tr>
   <td>VC penalty and centering</td>
-  <td><code>VC(penalty=, center=, center_folds=)</code></td>
-  <td>1.0 / False / 5</td>
+  <td><code>VC(penalty=, center=)</code></td>
+  <td>1.0 / False (centering needs <code>fit(vc_ehat=)</code>)</td>
 </tr>
 <tr>
   <td>L-BFGS budget</td>
-  <td><code>fit_classical(max_iter=, tol=, chunk=, history_size=)</code></td>
-  <td>400 / 1e-6 / 25 / 50</td>
+  <td><code>fit_classical(max_iter=, tol=, history_size=)</code></td>
+  <td>400 / 1e-9 (torch <code>tolerance_change</code>; <code>tolerance_grad</code> is off) / 50 — one full-batch run, no chunks</td>
 </tr>
 <tr>
   <td>training budget</td>
@@ -506,6 +504,16 @@ default you can read at the call site. Nothing numeric is buried.</p>
   <td>shuffling / weight init</td>
   <td><code>fit(seed=)</code> / <code>CausalFlowDAG(seed=)</code></td>
   <td>init happens at construction — the constructor seed is the reproducibility knob</td>
+</tr>
+<tr>
+  <td>weight init</td>
+  <td><code>CausalFlowDAG(init=)</code></td>
+  <td><code>"torch"</code> (<code>nn.Linear</code> Kaiming-uniform); <code>"glorot"</code> = Keras <code>Dense</code> default, glorot-uniform weights and zero biases — the paper's reference; decisive under its full-batch protocol</td>
+</tr>
+<tr>
+  <td>network inputs</td>
+  <td><code>CausalFlowDAG(net_input_scaling=)</code></td>
+  <td><code>None</code> (raw parents); <code>"minmax"</code> scales the continuous parents of every net (CI/CS/VC modifiers) to [0, 1] by the training min–max, the reference's <code>scale_df</code> — LS and the VC treatment stay raw</td>
 </tr>
 </tbody>
 </table>
