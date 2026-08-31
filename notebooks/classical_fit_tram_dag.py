@@ -316,6 +316,8 @@ print(
 # delicate here: the eigenvalues split into 13 below $4.4\times10^{-8}$ and 11
 # above $0.27$, a gap of seven orders of magnitude, so any threshold in between
 # gives the same answer.
+
+# %%
 from scipy.stats import norm  # noqa: E402
 
 
