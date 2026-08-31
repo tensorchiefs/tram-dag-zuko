@@ -2,7 +2,8 @@
   "_note": "Same comparison through float64 L-BFGS. It agrees on the well-identified coefficients and the ATE, but drifts on rare one-hot levels along near-zero-curvature directions, hence the looser tolerances. max_abs_diff_named_coefs is the precision claim (Age, NIHSSa, treatment contrast, ~1e-3). max_abs_diff_flow_vs_statsmodels also spans the mRS_pre level contrasts, and level 5 has 7 of 1275 rows -- where two optimizers stop on it differs by ~0.1 between machines (0.028 here, 0.113 on the CI runner), so its bound is a sanity check. The flow's L-BFGS lands on a flat ridge (mRS_pre level 5 has 7 of 1275 rows), so its coefficients move by ~0.02 across machines while statsmodels and R do not; the {max} entries with a \"why\" carry that spread.",
   "coef_Age_flow": {
     "value": 0.053949128836393356,
-    "atol": 0.05
+    "atol": 0.03,
+    "why": "1.5x the ~0.02 cross-machine spread the _note records \u2014 0.05 would let a near-zero Age coefficient pass"
   },
   "coef_Age_statsmodels": {
     "value": 0.05255252284332864,

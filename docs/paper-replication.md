@@ -230,7 +230,7 @@ committed ground-truth bands (glorot init, cs max err unless noted):
 | 256 / 0.008 / 500 | −0.181 | 0.163 | 0.113 | 0.073 (0.017) | 1/8 |
 | 512 / 0.010 / 500 | −0.169 | 0.183 | 0.104 | 0.119 (0.015) | 1/16 |
 
-Batch 256 / lr 0.004 is the only row that keeps every cs error within 0.02 of the
+Batch 256 / lr 0.004 is the only row that keeps every cs error within ~0.02 (linear-cs: 0.022) of the
 paper protocol; larger batches or rates bend the misspecified linear-cs curve
 (0.16–0.18) and lr 0.008 hurts atan-cs. On CI (run 32974872751) the triangle
 jobs take 7–11 min instead of 42–69, the workflow about 12 min wall instead of

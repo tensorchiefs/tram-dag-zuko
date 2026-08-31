@@ -13,7 +13,8 @@ benchmark TRAM-DAG against Causal Normalizing Flows (Javaloy et al. 2024) on L1
 
 Gaussian noise, so this DGP is deliberately *outside* the flow's logistic-latent
 family — a flexible (all-``ci``) TRAM-DAG still has to fit it. Interventional
-queries in the paper: p(x3 | do(x2 = a)) for a in {-3, -2, 0}.
+queries: the paper's text says a in {-3, -2, 0}, but its Fig. 5 and the R
+code use {-3, -1, 0} — the grid this repo follows (docs/paper-replication.md).
 
 CLI::
 

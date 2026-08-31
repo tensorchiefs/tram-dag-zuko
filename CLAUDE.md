@@ -140,8 +140,8 @@ Framework tests (inline DGPs, `tests/conftest.py`):
   propensity centering must cut the bias of `beta_hat` by ≥ 2× (measured 5–10×).
 
 Experiments (`experiments/`, seed 42 unless stated, arXiv:2503.16206). The
-paper states only four training numbers — n=40000, 500 epochs, Adam lr 1e-3,
-Bernstein order 20. The configs follow the paper's own R code 1:1 where the
+paper states only three training numbers — n=40000, 500 epochs, Bernstein
+order 20; the Adam lr 1e-3 is the R code's `optimizer_adam()` default. The configs follow the paper's own R code 1:1 where the
 framework allows: the triangle scripts train one continuous Adam run with a
 separate validation draw (40k / 10k mixed) and read the coefficients after
 every epoch (`fit(after_epoch_callbacks=)`) — at batch 256 / lr 0.004 instead of the
@@ -158,7 +158,8 @@ torch), so every seed here is a repo choice. Init follows each reference:
 layers) and `init: glorot` (Keras `Dense`, `make_model`) — under the
 full-batch protocol the init decides the fit (VACA do(x2) errors
 0.52/0.33/0.13 with torch's default init, 0.098/0.159/0.026 with glorot at
-the config's seed). Known, documented deviations: the triangle scripts also
+the config's seed — both measured on the earlier −3/−2/0 grid; the shipped
+−3/−1/0 grid scores 0.097/0.088/0.019 with glorot). Known, documented deviations: the triangle scripts also
 use 5%/95% quantiles for the Bernstein domain (a match), the comparison
 scripts min-max (`scale_df`) — we keep the quantiles there and scale the
 *network inputs* min-max (`net_input_scaling: minmax`; raw parents saturate
@@ -177,8 +178,8 @@ commented out), `len_theta = 20`. The VACA/CAREFL comparisons
 (`comparison/utils.R::make_model`): one net per node, `dense(10, tanh) ->
 dense(100, tanh) -> dense(len_theta)`, `M = 30`. Applying the triangle net to
 CAREFL — which an earlier revision did — cost an order of magnitude on the
-counterfactual MAE (x4, measured: 0.968 / 0.515 / 0.986 against 0.078 / 0.059 /
-0.086, though that run also used M = 20 rather than the comparison scripts'
+counterfactual MAE (x4, measured on the old 18k-row protocol: 0.968 / 0.515 /
+0.986 against 0.078 / 0.059 / 0.086, though that run also used M = 20 rather than the comparison scripts'
 M = 30); the 2-unit bottleneck cannot carry it. On `sin-cs` that same
 bottleneck saturates at both ends of the grid, which is the reference
 architecture's capacity and not a fit failure (see the ground-truth note).
