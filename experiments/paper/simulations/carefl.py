@@ -10,8 +10,14 @@ benchmark TRAM-DAG's L3 (counterfactual) queries (Fig. 6)::
 All-continuous additive-noise SCM, so individual counterfactuals are **analytic**
 via noise abduction (no Monte Carlo): eps3 = x3 - x1 - 0.5 x2^3 and
 eps4 = x4 + x2 - 0.5 x1^2 are recovered exactly, then the mutilated SCM is
-re-evaluated. The paper picks the observation ``X_OBS = (2.00, 1.50, 0.81, -0.28)``
-and sweeps two queries for alpha in [-3, 3]:
+re-evaluated. The paper's observation is the point with noise
+``(2, 1.5, 1.4, -1)``; CAREFL's runner divides x3 and x4 by their sample
+standard deviations (6.0104, 1.9114): the R code's ``xObs.csv`` is
+``(2, 1.5, 0.8465, -0.2616)``, and in the SCM's own units that point is
+``X_OBS = (2.00, 1.50, 5.0875, -0.5)``. The paper prints (2.00, 1.50, 0.81,
+-0.28), slightly off that point — CAREFL's own text, not recomputed here.
+Two queries are swept for
+alpha in [-3, 3]:
 
     (i)  x3^cf  given do(x2 = alpha):  x1 + 0.5 alpha^3 + eps3
     (ii) x4^cf  given do(x1 = alpha): -x2 + 0.5 alpha^2 + eps4
@@ -35,7 +41,9 @@ import pandas as pd
 from ._common import DatasetDraws, resolve_latents
 
 # %% global variables ------------------------------------------------------------------
-X_OBS = {"x1": 2.00, "x2": 1.50, "x3": 0.81, "x4": -0.28}  # the paper's observation
+# the paper's observation in raw units: noise (2, 1.5, 1.4, -1) pushed through the
+# SCM; the paper prints x3/x4 divided by CAREFL's sample sds (6.01, 1.91)
+X_OBS = {"x1": 2.00, "x2": 1.50, "x3": 5.0875, "x4": -0.5}
 ALPHA_GRID = np.round(np.linspace(-3.0, 3.0, 61), 4)
 _SCALE = 1.0 / np.sqrt(2.0)
 
@@ -47,7 +55,13 @@ def main(argv: list[str] | None = None) -> None:
     p.add_argument("--out", type=Path, default=Path("paper/data/carefl"))
     p.add_argument("--seed", type=int, default=42)
     p.add_argument("--n-obs", type=int, default=5000)
+    p.add_argument("--force", action="store_true", help="overwrite an existing folder")
     args = p.parse_args(argv)
+    if args.out.exists() and not args.force:
+        raise SystemExit(
+            f"{args.out} exists: the frozen data is a contract. A new seed or new "
+            "equations belong in a NEW folder (--out); pass --force to overwrite."
+        )
 
     gen = Carefl4(seed=args.seed)
     args.out.mkdir(parents=True, exist_ok=True)
@@ -141,7 +155,6 @@ class Carefl4(DatasetDraws):
 
         return pd.DataFrame({"x1": x1, "x2": x2, "x3": x3, "x4": x4})
 
-    # -------------------------------------------------------------- ground truth
     @staticmethod
     def abduct_noise(obs: dict[str, float] | pd.DataFrame) -> dict[str, np.ndarray]:
         """Give the exact noise values consistent with an observation.
@@ -188,17 +201,8 @@ class Carefl4(DatasetDraws):
         cf = self.simulate(do=do, latents=eps)
         return {k: float(cf[k].iloc[0]) for k in cf}
 
-    def true_cf_curves(
-        self, obs: dict[str, float] = X_OBS, alphas: np.ndarray = ALPHA_GRID
-    ) -> dict:
+    def true_cf_curves(self) -> dict:
         """Compute the two analytic counterfactual curves of paper Fig. 6.
-
-        Parameters
-        ----------
-        obs : dict[str, float], optional
-            The factual observation, by default the paper's ``X_OBS``.
-        alphas : np.ndarray, optional
-            Intervention grid, by default ``ALPHA_GRID``.
 
         Returns
         -------
@@ -206,11 +210,11 @@ class Carefl4(DatasetDraws):
             The observation, the intervention grid, and the counterfactual
             values of x3 under do(x2) and of x4 under do(x1).
         """
-        x3_cf = [self.true_counterfactual(obs, {"x2": a})["x3"] for a in alphas]
-        x4_cf = [self.true_counterfactual(obs, {"x1": a})["x4"] for a in alphas]
+        x3_cf = [self.true_counterfactual(X_OBS, {"x2": a})["x3"] for a in ALPHA_GRID]
+        x4_cf = [self.true_counterfactual(X_OBS, {"x1": a})["x4"] for a in ALPHA_GRID]
         return {
-            "x_obs": dict(obs),
-            "alphas": [float(a) for a in alphas],
+            "x_obs": dict(X_OBS),
+            "alphas": [float(a) for a in ALPHA_GRID],
             "x3_cf_do_x2": x3_cf,
             "x4_cf_do_x1": x4_cf,
         }

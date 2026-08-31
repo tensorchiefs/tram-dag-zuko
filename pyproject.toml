@@ -39,9 +39,11 @@ test = [
   "pytest-cov",  # the CI coverage gate ([tool.coverage] + `pytest --cov`)
   "pytest-xdist",
   # testpaths covers experiments/ too, so this group must be able to import
-  # what those tests import: the generators (scipy) and, through the benchmark
-  # modules, matplotlib. No collected test reads a config file.
+  # what those tests import: the generators (scipy), matplotlib through the
+  # benchmark modules, and pyyaml for paper/tests/test_configs.py, which reads
+  # the four hyperparameter files.
   "matplotlib",
+  "pyyaml",
   "scipy",
   "statsmodels"  # exact-MLE agreement tests
 ]
@@ -174,19 +176,17 @@ ignore = [
 max-complexity = 12
 
 [tool.ruff.lint.per-file-ignores]
-# D1xx: scripts, notebooks and tests document themselves in prose and in
-# tests/README.md. A docstring per test function adds noise, not clarity.
-"experiments/*" = ["D100", "D101", "D102", "D103", "D104"]
+# D103: scripts and tests document themselves in prose and in tests/README.md.
+# A docstring per function adds noise, not clarity. (Measured 2026-08-27: these
+# are the only rules the directories actually raise.)
+"experiments/*" = ["D103"]
 # Notebook prose lives in `# %% [markdown]` cells, where a line is a
 # paragraph: E501 would force hard wraps into rendered markdown. Their
 # docstrings are narrative, so the numpydoc summary rules do not apply.
-"notebooks/*" = ["D100", "D101", "D102", "D103", "D104", "D205", "D401", "E501"]
-# the pdoc include directive makes README.md the docs landing page; a
-# trailing period would break the file name
-"src/*/__init__.py" = ["D400"]
+"notebooks/*" = ["D100", "D103", "D205", "D401", "E501"]
 # Test docstrings state what a test guarantees, in prose. They are not API
 # documentation, and tests/ is the measurement -- reformatting it is churn.
-"tests/*" = ["D100", "D101", "D102", "D103", "D104", "D205", "D400", "D401"]
+"tests/*" = ["D103", "D205", "D401"]
 
 [tool.ruff.lint.pydocstyle]
 convention = "numpy"

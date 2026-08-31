@@ -32,7 +32,7 @@
 # The additive form is the interpretable one: you can ask "what does `x1`
 # *alone* do?". The catch (issue #20) is that the additive sum is identified only
 # up to a constant moving between the nets, so the **raw** per-parent outputs are
-# not comparable. `flow.intercept_contributions(node, data)` resolves this with a
+# not comparable. `flow.intercept_contributions(data, node)` resolves this with a
 # sum-to-zero (mean-centering) constraint and returns each parent's centered
 # contribution.
 
@@ -45,9 +45,9 @@
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import torch
 
 from tramdag import CI, CausalFlowDAG, ContinuousNode
+from tramdag.callbacks import RestoreBest
 
 # %% [markdown]
 # ## The data
@@ -95,7 +95,14 @@ flow_joint = make_flow(joint=True)
 flow_add = make_flow(joint=False)
 
 for f in (flow_joint, flow_add):
-    f.fit(train, val, epochs=1200, learning_rate=1e-2, verbose=0, restore_best=True)
+    best = RestoreBest(val)
+    f.fit(
+        train,
+        epochs=1200,
+        learning_rate=1e-2,
+        after_epoch_callbacks=best,
+        after_fit_callbacks=best.restore,
+    )
 
 # Both fit the data well; the joint model is only marginally better on held-out
 # likelihood. A flexible additive Bernstein intercept can *mimic* a lot of
@@ -109,27 +116,17 @@ print("val NLL  additive:", round(sum(flow_add.nll(val).values()), 4))
 #
 # It returns each `I`-term's mean-centered (sum-to-zero) contribution to the
 # transform parameters `theta`, plus the absorbed `baseline`. The centering is
-# over the rows of the `data` you pass, and the decomposition is exact.
+# over the rows of the `df` you pass, and the decomposition is exact.
 
 # %%
-res_add = flow_add.intercept_contributions("x3", train)
-res_joint = flow_joint.intercept_contributions("x3", train)
+res_add = flow_add.intercept_contributions(train, "x3")
+res_joint = flow_joint.intercept_contributions(train, "x3")
 
 print("additive terms :", list(res_add["contributions"]))  # 'x1', 'x2' — separable
 print("joint terms    :", list(res_joint["contributions"]))  # 'x1+x2' — inseparable
 
-# exactness: baseline + sum of contributions reproduces theta; centering: ~0 means
-nd = flow_add.nodes["x3"]
-feats = flow_add._features(flow_add._tensorize(train))
-with torch.no_grad():
-    theta = sum(
-        net(torch.cat([feats[p] for p in g], 1))
-        for net, g in zip(
-            nd.intercept_nets, nd._intercept_groups, strict=False
-        )  # library internals: one net per group by construction, not checked here
-    ).numpy()
-recon = res_add["baseline"][None] + sum(res_add["contributions"].values())
-print("max |reconstruction - theta| :", np.abs(recon - theta).max())
+# the decomposition is exact (baseline + contributions == theta, pinned by the
+# test suite); the centering is easy to see here: every column mean is ~0
 print(
     "per-term column means (≈0)   :",
     {k: float(np.abs(v.mean(0)).max()) for k, v in res_add["contributions"].items()},
@@ -194,5 +191,3 @@ plt.show()
 # space (where the additive terms are summed, before the monotonicity
 # constraint), so they are exact partial effects on the parameters but not, in
 # general, an additive split of the curve `h` itself.
-
-# %%

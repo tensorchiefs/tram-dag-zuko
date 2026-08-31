@@ -32,7 +32,6 @@ def _terms_spec():
 
 
 # %% public functions ------------------------------------------------------------------
-# --------------------------------------------------------------- construction
 def test_terms_spec_builds_and_scores():
     """A term spec builds a flow whose per-node log-likelihood is finite."""
     flow = CausalFlowDAG(_terms_spec(), seed=0)
@@ -49,7 +48,6 @@ def test_node_internal_structure_matches():
     assert flow.nodes["X3"].parents == ("X1", "X2")  # ordered parent names
 
 
-# ---------------------------------------------------------------- validation
 def test_ls_requires_exactly_one_parent():
     with pytest.raises(ValueError, match=r"LS\(\) takes exactly one parent"):
         LS("X1", "X2")
@@ -82,7 +80,6 @@ def test_cycle_detected():
         CausalFlowDAG(spec)
 
 
-# ------------------------------------------------------------- serialization
 def test_serialization_roundtrip_terms():
     flow = CausalFlowDAG(_terms_spec(), seed=0)
     spec2 = spec_from_dict(spec_to_dict(flow.spec))
@@ -94,7 +91,6 @@ def test_serialization_roundtrip_terms():
         assert torch.allclose(a[k], b[k]), k
 
 
-# ------------------------------------------------------- meta-adjacency view
 def test_to_matrix_labels_every_effect_and_leaves_non_edges_empty():
     """The paper's meta-adjacency view: rows are parents, columns children."""
     spec = {
@@ -115,7 +111,6 @@ def test_to_matrix_labels_every_effect_and_leaves_non_edges_empty():
     assert joint.loc["a", "y"] == "CS['a', 'b']"  # a joint term names its group
 
 
-# --------------------------------------------------- the coefficient read-out
 def test_ls_coefficients_shape_and_agreement_with_the_modules():
     """ls_coefficients is the public spelling of the LS weights.
 

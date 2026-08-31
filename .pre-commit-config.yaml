@@ -1,6 +1,6 @@
-# Activate in a fresh clone with (all three stages — plain `install` wires
-# up the pre-commit stage only and leaves commitizen dormant):
-#   pre-commit install --install-hooks -t pre-commit -t commit-msg -t pre-push
+# Activate in a fresh clone with (plain `install` wires up the pre-commit
+# stage only and leaves commitizen dormant):
+#   pre-commit install --install-hooks -t pre-commit -t commit-msg
 repos:
 - repo: https://github.com/astral-sh/ruff-pre-commit
   rev: v0.16.3
@@ -79,7 +79,10 @@ repos:
 - repo: https://github.com/commitizen-tools/commitizen
   rev: v4.17.1
   hooks:
-  - id: commitizen   # conventional-commit message check
+  - id: commitizen   # conventional-commit message check, per message
     stages: [commit-msg]
-  - id: commitizen-branch   # checks every message about to be pushed
-    stages: [pre-push]
+    # `commitizen-branch` (pre-push) is deliberately not wired up: pre-commit
+    # exports PRE_COMMIT_FROM_REF/TO_REF only when both refs exist, so the
+    # first push of a new branch hands commitizen the literal
+    # "$PRE_COMMIT_FROM_REF..$PRE_COMMIT_TO_REF" and it aborts. The commit-msg
+    # hook above already checks every message as it is written.

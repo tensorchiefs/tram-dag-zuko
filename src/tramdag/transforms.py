@@ -20,8 +20,8 @@ Conventions follow the original TRAM-DAG implementation
 from __future__ import annotations
 
 import math
-import warnings
 
+import numpy as np
 import torch
 from torch import Tensor
 from zuko.transforms import (
@@ -49,7 +49,7 @@ __all__ = [
 # and the quantile pre-map makes one canonical domain work for any data scale.
 BOUND = 5.0
 
-# quantile level of the range pre-map. ``CausalFlowDAG._set_ranges`` scales the
+# quantile level of the range pre-map. ``CausalFlowDAG.calibrate`` scales the
 # train q/1-q quantiles onto [-BOUND, BOUND], and ``marginal_init_theta`` maps
 # that domain onto the latent's q/1-q quantiles -- one constant, because the two
 # only calibrate each other if they use the same level.
@@ -67,72 +67,6 @@ _U_EPS = 1e-7
 
 
 # %% private functions -----------------------------------------------------------------
-def _expanding_bisection(
-    f, z: Tensor, lo: Tensor, hi: Tensor, max_expand: int = 20, iters: int = 40
-) -> Tensor:
-    """Solve ``f(t) = z`` element-wise for a monotone increasing ``f``.
-
-    The search starts from the bracket ``[lo, hi]`` and doubles it outward
-    until the root is bracketed. This handles latent samples far in the
-    tails, where zuko's built-in bisection bound clips.
-
-    Parameters
-    ----------
-    f : callable
-        Monotone increasing function of one tensor.
-    z : Tensor
-        Target values.
-    lo, hi : Tensor
-        Initial bracket, same shape as ``z``.
-    max_expand : int, optional
-        Upper limit on bracket doublings, by default 20 — 2^20 times the
-        initial width, far past any latent a logistic shift can reach.
-    iters : int, optional
-        Bisection iterations after bracketing, by default 40 — beyond
-        float32's 24-bit mantissa with margin.
-
-    Returns
-    -------
-    Tensor
-        The roots, same shape as ``z``.
-
-    Warns
-    -----
-    RuntimeWarning
-        If a root is still outside the bracket after ``max_expand``
-        doublings. That element then ends at the bracket edge, not at the
-        root. A near-zero boundary slope with a large shift can cause it.
-    """
-    width = hi - lo
-    for _ in range(max_expand):
-        too_high = f(lo) > z
-        too_low = f(hi) < z
-        if not (too_high.any() or too_low.any()):
-            break
-        lo = torch.where(too_high, lo - width, lo)
-        hi = torch.where(too_low, hi + width, hi)
-        width = hi - lo
-    else:  # only reached when the doublings ran out
-        stuck = (f(lo) > z) | (f(hi) < z)
-        if stuck.any():
-            warnings.warn(
-                f"{int(stuck.sum())} latent value(s) lie outside the search "
-                f"bracket after {max_expand} doublings; their inverse is "
-                "clipped to the bracket edge",
-                RuntimeWarning,
-                stacklevel=2,
-            )
-    for _ in range(iters):
-        mid = 0.5 * (lo + hi)
-        below = f(mid) < z
-        new_lo = torch.where(below, mid, lo)
-        new_hi = torch.where(below, hi, mid)
-        if torch.equal(new_lo, lo) and torch.equal(new_hi, hi):
-            break  # the bracket stopped moving: further halvings are noise
-        lo, hi = new_lo, new_hi
-    return 0.5 * (lo + hi)
-
-
 def _bounds(theta_tilde: Tensor, shift: Tensor, y: Tensor) -> tuple[Tensor, Tensor]:
     """Give the shifted cutpoint interval of each observed level."""
     cut = ordinal_cutpoints(theta_tilde) - shift.view(-1, 1)
@@ -180,11 +114,6 @@ def make_univariate_transform(name: str, **kwargs) -> _ScaledUT:
             f"unknown transform {name!r}; choose one of {sorted(_TRANSFORMS)}"
         ) from None
     return cls(**kwargs)
-
-
-# ---------------------------------------------------------------------------
-# Ordinal ("ordered logit") transform — exact port of the original parametrization
-# ---------------------------------------------------------------------------
 
 
 def ordinal_cutpoints(theta_tilde: Tensor) -> Tensor:
@@ -244,8 +173,6 @@ def ordinal_marginal_init_theta(counts) -> Tensor:
     Bernstein marginal-init, this is a pure initialization: the converged
     MLE is unchanged.
     """
-    import numpy as np
-
     counts = np.asarray(counts, dtype=np.float64)
     p = counts / counts.sum()
     F = np.clip(np.cumsum(p)[:-1], _CDF_EPS, 1 - _CDF_EPS)  # P(Y<=k), k=0..K-2
@@ -398,7 +325,6 @@ class _ScaledUT(torch.nn.Module):
         self.bound = BOUND
         self.register_buffer("xmin", torch.tensor(0.0))
         self.register_buffer("xmax", torch.tensor(1.0))
-        self._fitted = False
 
     @property
     def n_params(self) -> int:  # pragma: no cover - abstract
@@ -410,8 +336,8 @@ class _ScaledUT(torch.nn.Module):
     def set_range(self, xmin: float, xmax: float) -> None:
         """Set the data range that maps onto the pre-scaled domain.
 
-        ``fit`` calls this once with the train 5%/95% quantiles. The call
-        marks the transform as fitted.
+        ``CausalFlowDAG.calibrate`` calls this once with the train 5%/95%
+        quantiles.
 
         Parameters
         ----------
@@ -420,7 +346,6 @@ class _ScaledUT(torch.nn.Module):
         """
         self.xmin.fill_(float(xmin))
         self.xmax.fill_(float(xmax))
-        self._fitted = True
 
     def _scale(self, x: Tensor) -> Tensor:
         return (x - self.xmin) / (self.xmax - self.xmin) * (2 * self.bound) - self.bound
@@ -461,8 +386,8 @@ class _ScaledUT(torch.nn.Module):
     def inverse(self, theta: Tensor, z0: Tensor) -> Tensor:
         """Map pre-shift latents back to original units.
 
-        The inverse uses expanding-bracket bisection, so it also covers
-        latents far outside the pre-scaled domain.
+        The inverse is zuko's own: bisection inside the bound, closed form
+        (linear or identity, per transform) outside it.
 
         Parameters
         ----------
@@ -476,11 +401,9 @@ class _ScaledUT(torch.nn.Module):
         Tensor
             The values in original units, shape ``(n,)``.
         """
-        T = self._build(theta)
-        B = torch.tensor(self.bound, dtype=z0.dtype, device=z0.device)
         with torch.no_grad():
-            t = _expanding_bisection(T, z0, -B.expand_as(z0), B.expand_as(z0))
-        return self._unscale(t)
+            t = self._build(theta).inv(z0)  # zuko: bisection inside the bound,
+        return self._unscale(t)  # closed-form (linear / identity) outside
 
 
 # %% public classes --------------------------------------------------------------------
@@ -538,8 +461,7 @@ class StandardLogistic:
         Tensor
             The quantiles, same shape as ``u``.
         """
-        u = u.clamp(_U_EPS, 1.0 - _U_EPS)
-        return torch.log(u) - torch.log1p(-u)
+        return torch.logit(u, eps=_U_EPS)
 
 
 class BernsteinUT(_ScaledUT):

@@ -28,7 +28,7 @@ exactly as in classical proportional-odds models.
 > replicated here with pinned tests.
 
 **5-minute showcase**: the [Colab badge above](https://colab.research.google.com/github/tensorchiefs/tramdag/blob/main/notebooks/demo_tram_dag_colab.ipynb) fits the paper's bimodal benchmark
-live (GPU-ready) and walks L1 → L2 → L3, every answer checked against analytic
+live and walks L1 → L2 → L3, every answer checked against analytic
 ground truth. Further notebooks are available at [`notebooks/`](notebooks/) like the didactic walkthrough of the model:
 [`notebooks/intro_tram_dag.py`](notebooks/intro_tram_dag.py).
 
@@ -50,45 +50,47 @@ from tramdag import CausalFlowDAG, ContinuousNode, OrdinalNode, I, LS, CS
 spec = {  # the spec IS the labelled DAG
     "X1": ContinuousNode(),
     "X2": ContinuousNode(I("X1")),
-    "T": OrdinalNode(2, LS("X1") + CS("X2")),
+    "T": OrdinalNode(2, LS("X1") + CS("X2")),  # 2 levels, column coded 0..1
     "Y": OrdinalNode(4, I("X1") + CS("X2") + LS("T")),
 }
+# train_df / val_df: DataFrames with one column per node
 flow = CausalFlowDAG(spec)  # validates acyclicity, builds the flow
 
-# self-stopping training: per-node plateau lr decay + freezing of converged
-# nodes (exact, since the per-node NLLs have independent gradients);
-# see docs/training-speed.md for benchmarks and the classic two-phase recipe
+# fit() is one minibatch Adam loop; validation, schedules and early stopping
+# attach through optimizer= and the callback hooks — the common recipes ship
+# in tramdag.callbacks (docs/fitting.md)
+from tramdag.callbacks import Logger, RestoreBest
+
+best = RestoreBest(val_df)  # keep the best-validation weights
 flow.fit(
     train_df,
-    val_df,
     epochs=4000,
-    learning_rate=1e-2,
     batch_size=512,
-    schedule="plateau",
-    plateau_patience=30,
-    freeze_patience=120,
+    after_epoch_callbacks=[Logger(val_df, every=100), best],
+    after_fit_callbacks=[best.restore],
 )
 
 # all-`ls` model? fit it classically instead: deterministic float64 L-BFGS,
 # exact MLE matching statsmodels/R (see docs/fitting.md)
-flow.fit_classical(train_df)  # raises on cs/ci specs
+flow.fit_classical(train_df)  # raises on cs/ci/vc specs
 
 flow.log_prob(df)  # L1: joint log-likelihood per row
 flow.sample(1000)  # L1: observational sampling
 flow.sample(1000, do={"T": 1})  # L2: interventional (graph mutilation)
 flow.pmf(df, node="Y", do={"T": 1})  # L2: analytic interventional PMF
+flow.density(df, node="X2", grid=grid, do={"X1": 0.5})  # ... and density, continuous nodes
 
 u = flow.abduct(df)  # L3 step 1: latents from observations
 cf = flow.sample(do={"T": 1}, u=u)  # L3 steps 2+3: counterfactuals
 
 flow.ls_coefficients()  # interpret: per-edge log-odds-ratios (LS terms)
-flow.intercept_contributions("Y", df)  # interpret: per-parent partial effects
-# of an additive complex intercept (centered)
+# per-parent partial effects of an additive complex intercept (centered):
+# flow.intercept_contributions(df, "Y") on a CI("A", "B", allow_interaction=False)
 
 # heterogeneous treatment effects: a small, penalized effect head beta(x)*T
 # (VC term) with a first-class read-out — see docs/varying-coefficients.md
 # e.g. CS("X1", "X2") + VC("X1", t="T") ->
-# flow.varying_coef("Y", df)               # beta(x): deterministic, y-free
+# flow.varying_coef(df, "Y")               # beta(x): deterministic, y-free
 
 flow.scores(df, node="Y")  # per-observation scores dl_i/dtheta
 flow.effect_modifier_scan(df, "Y", t="T")  # which VC modifiers? (CUSUM
@@ -112,7 +114,7 @@ intercept term `I` plus any number of shifts (notation:
 | `I("A")` | `h_ϑ(a)(x)` — ϑ bends with the parent | `ComplexIntercept`: MLP `[8, 8] → n_params` | the parent reshapes the whole distribution; no single coefficient |
 | `I("A","B")` (default `allow_interaction=True`) | `h_ϑ(a,b)(x)` | **one joint** MLP over both parents — they interact in ϑ | maximal flexibility |
 | `I("A","B", allow_interaction=False)` | `h_ϑ(a)+ϑ(b)(x)` | one MLP **per parent**, parameter vectors summed in coefficient space | per-parent partial effects via `flow.intercept_contributions` |
-| `LS("A")` | `β·a` | `Linear(width, 1)`, no bias — **one parameter** | `exp(β)` is an odds ratio |
+| `LS("A")` | `β·a` | `Linear(width, 1)`, no bias — **one parameter per feature column** (one for a continuous parent, `levels` for a one-hot ordinal) | `exp(β)` is an odds ratio |
 | `CS("A")` | `g(a)`, additive | `ComplexShift`: MLP `[64, 128, 64] → 1` | plot `g` |
 | `CS("A","B")` | `g(a,b)` — joint | one MLP over the concatenated features | interaction *in the shift* |
 | `CS("A") + CS("B")` | `g₁(a) + g₂(b)` | two MLPs, scalars added | GAM-style, each effect plottable |
@@ -180,6 +182,11 @@ and what is not (the competing CNF/NSF baselines), is in
 **Training speed** — schedules, per-node freezing, L-BFGS and device benchmarks:
 [`docs/training-speed.md`](docs/training-speed.md).
 
+**Paper replication** — every hyperparameter of the eight `experiments/paper`
+variants with its source in the paper's R code, the deviations, and the
+numbers (paper / previous protocol / now):
+[`docs/paper-replication.md`](docs/paper-replication.md).
+
 ## Testing policy
 See the [`tests/README.md`](tests/README.md) file for more details.
 
@@ -187,7 +194,7 @@ See the [`tests/README.md`](tests/README.md) file for more details.
 
 ```
 src/tramdag/            spec.py transforms.py conditioners.py flow.py
-                        scores.py utils.py        <- the framework, and nothing else
+                        scores.py                 <- the framework, and nothing else
 tests/                  unit tests, identities, acceptance bars, three inline DGPs
 experiments/            research code, one directory per area, each self-contained:
                           paper/       the replications + generators + frozen data
@@ -200,7 +207,8 @@ notebooks/              four executed examples: didactic intro, Colab demo,
                         additive-vs-joint intercepts, varying coefficients
 docs/                   code-map.md (every class/function + all knobs),
                         fitting.md, notation.md, training-speed.md,
-                        varying-coefficients.md, scores.md
+                        paper-replication.md, varying-coefficients.md,
+                        scores.md
 ```
 
 Implementation conventions (latent-scale signs, raw/one-hot parent encoding,

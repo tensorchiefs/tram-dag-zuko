@@ -31,13 +31,11 @@
 # fails (paper, Fig. 4) and TRAM-DAG does not. The ground truth is known
 # analytically. Thus every claim below is *checked*, not asserted.
 #
-# The demo runs on CPU. On a Colab **GPU runtime** (Runtime → Change runtime
-# type → any GPU, for example the free T4), the final section compares the
-# speed of the two devices.
+# The demo runs on CPU; a Colab **GPU runtime** (Runtime → Change runtime
+# type → any GPU, for example the free T4) speeds up training.
 
 # %%
 import importlib.util
-import logging
 import subprocess
 import sys
 import time
@@ -54,9 +52,6 @@ import scipy.stats as st  # for KDE plots only (preinstalled on Colab)
 import torch
 
 from tramdag import CausalFlowDAG, ContinuousNode, I
-
-# tramdag reports fit() progress on its module logger
-logging.basicConfig(level=logging.INFO, format="%(message)s")
 
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 plt.rcParams["figure.dpi"] = 110
@@ -145,9 +140,11 @@ plt.show()
 # Each node gets a monotone Bernstein transform. The terms say how parents
 # enter (`I(...)` = the parents control the transform parameters, for maximal
 # flexibility). Training maximizes the exact joint likelihood with one Adam.
-# `schedule="plateau"` + `freeze_patience` lets each node decay its
-# learning rate **independently** and leave training after it converges.
-# The fit stops itself.
+# `fit` is a plain loop; validation, the learning-rate schedule and early
+# stopping are a few lines of your own through `after_epoch_callbacks=` — here torch's
+# `ReduceLROnPlateau` on the validation NLL, and a stop after 30 flat epochs.
+# (Predefined callbacks live in `tramdag.callbacks`; we roll our own to show
+# the hook.)
 
 # %%
 spec = {
@@ -156,55 +153,55 @@ spec = {
     "x3": ContinuousNode(I("x1", "x2")),
 }
 
+
+def early_stopping(val, patience):
+    """Validation NLL per epoch, ReduceLROnPlateau, stop after `patience` flat epochs."""
+    log = {"val": [], "lr": []}
+
+    def cb(f, epoch, opt):
+        if not log["lr"]:
+            # built lazily: the optimizer only exists once fit() runs
+            log["sched"] = torch.optim.lr_scheduler.ReduceLROnPlateau(
+                opt, factor=0.3, patience=patience // 3
+            )
+        nll = sum(f.nll(val).values())
+        log["val"].append(nll)
+        log["lr"].append(opt.param_groups[0]["lr"])
+        log["sched"].step(nll)
+        return len(log["val"]) - int(np.argmin(log["val"])) > patience
+
+    return log, cb
+
+
 torch.manual_seed(0)
 flow = CausalFlowDAG(spec, device=DEVICE)
+log, cb = early_stopping(val, patience=30)
 t0 = time.perf_counter()
 flow.fit(
-    train,
-    val,
-    epochs=400,
-    learning_rate=1e-1,
-    batch_size=4096,
-    verbose=50,
-    schedule="plateau",
-    plateau_patience=10,
-    freeze_patience=30,
-    marginal_init=True,
+    train, epochs=400, learning_rate=1e-1, batch_size=4096, after_epoch_callbacks=cb
 )
 t_fit = time.perf_counter() - t0
 print(
     f"\nfitted on {DEVICE} in {t_fit:.1f}s "
-    f"({len(flow.history['val'])} epochs, then froze itself)"
+    f"({len(log['val'])} epochs, then the callback stopped it)"
 )
 
 # %% [markdown]
-# Training diagnostics come for free. `fit` records per-node train/val NLL,
-# learning rates, wall-clock time, and the freeze epochs. Watch the nodes leave
-# training one by one:
+# `fit` records the per-node train NLL; the callback recorded the validation
+# NLL and the learning rate. Watch the plateau rule step the rate down:
 
 # %%
-hist = flow.history
-ep = np.arange(1, len(hist["val"]) + 1)
-tot_tr = np.array([sum(d.values()) for d in hist["train"]])
-tot_va = np.array([sum(d.values()) for d in hist["val"]])
+ep = np.arange(1, len(log["val"]) + 1)
+tot_tr = np.array([sum(d.values()) for d in flow.history["train"]])
+tot_va = np.array(log["val"])
 fig, ax = plt.subplots(figsize=(7.5, 3.6))
 ax.plot(ep, tot_tr, label="train NLL (total)")
 ax.plot(ep, tot_va, label="val NLL (total)")
-for _, (name, e) in enumerate(
-    sorted(hist.get("frozen", {}).items(), key=lambda kv: kv[1])
-):
+for e in np.nonzero(np.diff(log["lr"]) < 0)[0] + 1:
     ax.axvline(e, ls="--", lw=1, color="gray")
-    ax.annotate(
-        f" {name} frozen",
-        (e, ax.get_ylim()[1]),
-        rotation=90,
-        va="top",
-        fontsize=8,
-        color="gray",
-    )
 ax.set_ylim(tot_va.min() - 0.02, tot_va.min() + 0.6)  # zoom past the initial drop
 ax.set_xlabel("epoch"), ax.set_ylabel("NLL"), ax.legend()
-ax.set_title("training curve — per-node plateau decay, then self-freezing")
+ax.set_title("training curve — dashed: the plateau rule lowered the learning rate")
 fig.tight_layout()
 plt.show()
 
@@ -212,7 +209,7 @@ plt.show()
 # ## 3. Rung 1 — does it actually fit? (the plot the CNF baseline fails)
 
 # %%
-samp = flow.sample(5 * len(df), seed=1)
+samp = flow.sample(len(df), seed=1)
 cols = list(df.columns)
 fig, axes = plt.subplots(3, 3, figsize=(9, 8.5))
 for i, ci in enumerate(cols):
@@ -223,7 +220,7 @@ for i, ci in enumerate(cols):
             # Plot DGP histogram
             ax.hist(df[ci], bins=bins, density=True, alpha=0.5, label="DGP")
             # KDE for TRAM-DAG samples
-            kde = st.gaussian_kde(samp[ci][:50_000])
+            kde = st.gaussian_kde(samp[ci])
             x_eval = np.linspace(bins[0], bins[-1], 300)
             ax.plot(x_eval, kde(x_eval), color="C3", lw=1.8, label="TRAM-DAG KDE")
         else:
@@ -256,7 +253,7 @@ for ax, a in zip(axes, (-3.0, -1.0, 0.0), strict=True):
     # DGP histogram
     ax.hist(truth["x3"], bins=bins, density=True, alpha=0.5, label="DGP")
     # Flow density: KDE for a smoother estimate
-    kde = st.gaussian_kde(fl["x3"].iloc[:50_000])
+    kde = st.gaussian_kde(fl["x3"])
     x_eval = np.linspace(bins[0], bins[-1], 300)
     ax.plot(x_eval, kde(x_eval), color="C3", lw=1.8, label="TRAM-DAG density")
     ax.set_title(f"$p(x_3 \\mid do(x_2={a:+.0f}))$")
@@ -315,7 +312,8 @@ plt.show()
 # `"bernstein"` (default, TRAM-faithful polynomial), `"spline"` (monotone
 # rational-quadratic, the neural-spline-flow building block), or `"affine"`
 # (location–scale only, which forces every node-conditional to be a logistic,
-# in effect a classical GLM). Same DAG, same training, three model families:
+# in effect a classical GLM). Same DAG, same protocol (the learning rate is
+# tuned per family), three model families:
 
 
 # %%
@@ -331,16 +329,9 @@ fits = {"bernstein": flow}  # already trained above
 for tr in ["spline", "affine"]:
     torch.manual_seed(0)
     f = CausalFlowDAG(make_spec(tr), device=DEVICE)
+    _, cb = early_stopping(val, patience=30)
     f.fit(
-        train,
-        val,
-        epochs=400,
-        learning_rate=1e-2,
-        batch_size=4096,
-        verbose=0,
-        schedule="plateau",
-        plateau_patience=10,
-        freeze_patience=30,
+        train, epochs=400, learning_rate=1e-2, batch_size=4096, after_epoch_callbacks=cb
     )
     fits[tr] = f
 print("held-out NLL (lower is better):")
@@ -370,79 +361,15 @@ plt.show()
 # Reading the table: **affine** pays exactly where you expect it to pay. A
 # location–scale transform *cannot* produce a bimodal $x_1$ (the same failure
 # mode as the inflexible CNF in Fig. 4 of the paper). The **RQ-spline** is
-# expressive enough *in principle*. But with the small TRAM-DAG parameter heads,
-# it consistently trains to a worse optimum on this target (same result for
-# 8–32 bins, lr 0.01–0.1, up to 2000 epochs). This is an honest empirical reason
-# why **Bernstein** is the TRAM-faithful default: its monotone softplus-cumsum
-# parametrization is easier to optimize. You can swap the transform per node at
-# any time with `I(..., transform="spline", bins=16)`.
-
-# %% [markdown]
-# ### Misspecification bends causal answers, not just the likelihood
-#
-# The transform choice propagates into the *interventional* distribution — and
-# the **mean** is forgiving. All three models get
-# $\mathbb{E}[x_3 \mid do(x_2)]$ right to a few hundredths, because the shifts
-# are right in each. What differs is the **shape**, so every query that reads the
-# shape — tail probabilities, quantiles, the spread of individual effects —
-# inherits the misfit. Compare a tail probability against the DGP:
-
-# %%
-truth_do = sample_dgp(50_000, seed=543, do={"x2": 0.0})["x3"]
-print("under do(x2=0):        E[x3]     P(x3 < -3)")
-print(
-    f"  DGP                  {truth_do.mean():+.3f}      "
-    f"{float((truth_do < -3).mean()):.4f}"
-)
-for tr in ("bernstein", "spline", "affine"):
-    drawn = fits[tr].sample(50_000, do={"x2": 0.0}, seed=4)["x3"]
-    print(
-        f"  {tr:9s}            {drawn.mean():+.3f}      "
-        f"{float((drawn < -3).mean()):.4f}"
-    )
-
-# %% [markdown]
-# The means agree while the tails do not, and the ranking changes: the
-# under-trained spline misses $P(x_3 < -3)$ by about two thirds and affine by
-# roughly a sixth, though both looked fine on the mean. A model can be "close
-# enough" on average and still be wrong about the question you actually asked —
-# which is why the transform is a modelling decision, not a default to inherit.
-
-# %% [markdown]
-# ## 7. GPU vs CPU
-#
-# The whole flow is plain PyTorch, so it runs anywhere. Same 60-epoch fit, both
-# devices (a CPU-only runtime reports only CPU):
-
-
-# %%
-def timed_fit(device, epochs=60):
-    torch.manual_seed(0)
-    f = CausalFlowDAG(
-        {
-            "x1": ContinuousNode(),
-            "x2": ContinuousNode(I("x1")),
-            "x3": ContinuousNode(I("x1", "x2")),
-        },
-        device=device,
-    )
-    t0 = time.perf_counter()
-    f.fit(train, val, epochs=epochs, learning_rate=1e-2, batch_size=4096, verbose=0)
-    return time.perf_counter() - t0
-
-
-timings = {"cpu": timed_fit("cpu")}
-if torch.cuda.is_available():
-    timed_fit("cuda", epochs=5)  # warm-up (cuda kernel compilation)
-    timings["cuda"] = timed_fit("cuda")
-for dev, t in timings.items():
-    print(f"{dev:5s}: {t:6.1f}s for 60 epochs @ n=45,000")
-if len(timings) > 1:
-    fig, ax = plt.subplots(figsize=(4, 2.8))
-    ax.barh(list(timings), list(timings.values()), color=["C0", "C2"])
-    ax.set_xlabel("seconds (60 epochs)"), ax.set_title("same model, same data")
-    fig.tight_layout()
-    plt.show()
+# expressive enough *in principle*, and its gap is **structural, not an
+# optimization failure** (same result for 8–32 bins, lr 0.01–0.1, up to 2000
+# epochs): zuko's spline extrapolates outside its `[-5, 5]` domain with a
+# *fixed* slope regardless of the fitted parameters, so the ~10% of data
+# beyond the 5%/95% pre-scaling range is misweighted whenever the true tail
+# slope differs. Bernstein's linear extrapolation follows the boundary
+# derivative instead — which is why it is the TRAM-faithful default. You can
+# swap the transform per node at any time with `I(..., transform="spline",
+# bins=16)`.
 
 # %% [markdown]
 # ## What you just saw

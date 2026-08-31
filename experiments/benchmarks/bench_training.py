@@ -12,9 +12,10 @@ exact targets:
   (experiments/paper/data/vaca/obs.csv, n=5000, 90/10 split); target = val NLL
   within 2e-3 of a cached reference.
 
-Because ``fit`` records per-epoch val NLL *and* wall-clock time in
-``flow.history``, every config runs once and time-to-target is read off the
-history post hoc — no instrumentation overhead.
+The benchmark's per-epoch callback records validation NLL *and* wall-clock
+time (``fit`` itself records only the per-node train NLL), so every config
+runs once and time-to-target is read off that record post hoc — no
+instrumentation overhead.
 
 Usage (from experiments/)::
 
@@ -43,6 +44,7 @@ import pandas as pd
 import torch
 
 from tramdag import LS, CausalFlowDAG, ContinuousNode, I, OrdinalNode
+from tramdag.callbacks import PerNodePlateau, per_node_adam
 
 # %% global variables ------------------------------------------------------------------
 HERE = Path(__file__).resolve().parent
@@ -51,14 +53,17 @@ OUT = HERE / "results" / "bench-training"
 # two target tiers (NLL gap vs the long-run reference):
 # tight = exact-MLE equivalence; practical = coefficient-/density-equivalent
 # (a stroke-ls fit with gap ~3e-3 already matches the R coefficients within
-# the test tolerances, see tests/test_fit_schedules.py)
+# the test tolerances, see tests/test_fit_hooks.py)
 TOL_TIGHT = {"stroke-ls": 1e-3, "vaca-ci": 2e-3}
 TOL_PRACT = {"stroke-ls": 5e-3, "vaca-ci": 1e-2}
 
-# (schedule label, list of fit-phases, extra fit kwargs); budgets per workload
-# 'onecycle' and 'cosine' were measured in the June 2026 grid and are still in
-# the table of docs/training-speed.md, but fit() dropped both schedules in 0.4
-# (they lost to plateau on every workload), so they cannot be run again here.
+# (schedule label, list of fit-phases, plateau+freeze settings); budgets per
+# workload. 'onecycle' and 'cosine' were measured in the June 2026 grid and are
+# still in the table of docs/training-speed.md, but were dropped in 0.4 (they
+# lost to plateau on every workload), so they cannot be run again here. The
+# plateau+freeze recipe itself left fit() in 0.4 as well — it is
+# tramdag.callbacks.PerNodePlateau, a callback, which is what the benchmark
+# measures.
 CONFIGS = {
     "stroke-ls": [
         ("baseline-2phase", [(3000, 1e-2), (1000, 1e-3)], {}),
@@ -69,12 +74,7 @@ CONFIGS = {
         (
             "plateau+freeze",
             [(4000, 1e-2)],
-            {
-                "schedule": "plateau",
-                "plateau_patience": 30,
-                "freeze_patience": 120,
-                "min_delta": 1e-5,
-            },
+            {"patience": 30, "freeze": 120, "min_delta": 1e-5},
         ),
     ],
     "vaca-ci": [
@@ -83,7 +83,7 @@ CONFIGS = {
         (
             "plateau+freeze",
             [(1500, 1e-2)],
-            {"schedule": "plateau", "plateau_patience": 15, "freeze_patience": 50},
+            {"patience": 15, "freeze": 50},
         ),
     ],
 }
@@ -130,10 +130,10 @@ def _run_one(workload, ref, label, phases, extra, batch, device, seed):
     Gives the result row plus the (times, nll) history the curves need.
     """
     t0 = time.perf_counter()
-    flow = run_config(workload, phases, extra, batch, device, seed)
+    _, hist = run_config(workload, phases, extra, batch, device, seed)
     wall = time.perf_counter() - t0
-    nll = total_monitored_nll(flow.history)
-    times = np.array(flow.history["time"])
+    nll = total_monitored_nll(hist)
+    times = np.array(hist["time"])
     hit_t = np.nonzero(nll <= ref + TOL_TIGHT[workload])[0]
     hit_p = np.nonzero(nll <= ref + TOL_PRACT[workload])[0]
     t_tight = float(times[hit_t[0]]) if len(hit_t) else None
@@ -256,7 +256,6 @@ def _plot_curves(curves, seed) -> None:
 
 
 # %% public functions ------------------------------------------------------------------
-# ----------------------------------------------------------------- workloads
 def all_ls_spec():
     """Give the 5-node all-``ls`` spec of the frozen cohort.
 
@@ -309,24 +308,35 @@ def total_monitored_nll(history) -> np.ndarray:
 
 
 def run_config(workload, phases, extra, batch, device, seed):
+    """Run the phases of one recipe; give the flow and its (val, time) record."""
     train, val = WORKLOADS[workload]["data"]()
+    val = train if val is None else val  # stroke-ls: the full-data MLE fit
     torch.manual_seed(seed)
     flow = CausalFlowDAG(WORKLOADS[workload]["spec"](), device=device)
     bs = len(train) if batch == "full" else int(batch)
-    for epochs, lr in phases:
+    hist = {"val": [], "time": []}
+    t0 = time.perf_counter()
+    extras = extra if isinstance(extra, list) else [extra] * len(phases)
+    for (epochs, lr), phase_extra in zip(phases, extras, strict=True):
+        opt = per_node_adam(flow, lr)
+        sched = PerNodePlateau(**phase_extra) if phase_extra else None
+
+        def monitor(f, epoch, opt, sched=sched):
+            nll = f.nll(val)  # computed once, shared with the schedule
+            hist["val"].append(nll)
+            hist["time"].append(time.perf_counter() - t0)
+            return sched is not None and sched.step(nll, opt)
+
         flow.fit(
             train,
-            val,
             epochs=epochs,
-            learning_rate=lr,
             batch_size=bs,
-            verbose=0,
-            **extra,
+            optimizer=opt,
+            after_epoch_callbacks=monitor,
         )
-    return flow
+    return flow, hist
 
 
-# ----------------------------------------------------------------- reference
 def reference_nll(workload: str) -> float:
     """Long-run reference NLL per workload, cached to reference.json."""
     cache = OUT / "reference.json"
@@ -334,34 +344,25 @@ def reference_nll(workload: str) -> float:
     if workload in refs:
         return refs[workload]
     print(f"[ref] computing long-run reference for {workload} ...")
-    train, val = WORKLOADS[workload]["data"]()
-    torch.manual_seed(123)
-    flow = CausalFlowDAG(WORKLOADS[workload]["spec"]())
     if workload == "stroke-ls":  # the tests' full-MLE recipe
-        for epochs, lr in [(4000, 1e-2), (2000, 1e-3), (1000, 1e-4)]:
-            flow.fit(
-                train, val, epochs=epochs, learning_rate=lr, batch_size=512, verbose=0
-            )
-    else:
-        flow.fit(
-            train,
-            val,
-            epochs=3000,
-            learning_rate=1e-2,
-            batch_size=512,
-            verbose=0,
-            schedule="plateau",
-            plateau_patience=25,
-            freeze_patience=120,
+        _, hist = run_config(
+            workload, [(4000, 1e-2), (2000, 1e-3), (1000, 1e-4)], {}, 512, "cpu", 123
         )
-        flow.fit(train, val, epochs=300, learning_rate=1e-3, batch_size=512, verbose=0)
-    refs[workload] = float(total_monitored_nll(flow.history).min())
+    else:
+        _, hist = run_config(  # plateau+freeze, then the constant-lr polish
+            workload,
+            [(3000, 1e-2), (300, 1e-3)],
+            [{"patience": 25, "freeze": 120}, {}],
+            512,
+            "cpu",
+            123,
+        )
+    refs[workload] = float(total_monitored_nll(hist).min())
     OUT.mkdir(parents=True, exist_ok=True)
     cache.write_text(json.dumps(refs, indent=2) + "\n")
     return refs[workload]
 
 
-# --------------------------------------------------------------------- LBFGS
 def run_lbfgs(seed: int, warm_epochs: int = 0) -> dict:
     """Run full-batch LBFGS on the stroke all-ls workload.
 
@@ -374,10 +375,11 @@ def run_lbfgs(seed: int, warm_epochs: int = 0) -> dict:
     ref = reference_nll("stroke-ls")
     t0 = time.perf_counter()
     if warm_epochs:
-        flow.fit(
-            train, epochs=warm_epochs, learning_rate=1e-2, batch_size=512, verbose=0
-        )
-    flow._set_ranges(train)
+        flow.fit(train, epochs=warm_epochs, learning_rate=1e-2, batch_size=512)
+    # cold start: the same calibrated start a fit would take (no-op when warm).
+    # Not fit_classical: this loop needs per-chunk time-to-target readings and
+    # float32, and node_log_prob (not the no-grad log_prob) keeps the graph.
+    flow.calibrate(train)
     vals = flow._tensorize(train)
     flow.train()
     opt = torch.optim.LBFGS(
@@ -424,7 +426,7 @@ def run_lbfgs(seed: int, warm_epochs: int = 0) -> dict:
     }
 
 
-# ----------------------------------------------------------------------- main
+# %% main ------------------------------------------------------------------------------
 def main():
     args = _parse_args()
     seeds = args.seeds[:1] if (args.quick or args.figures_only) else args.seeds
@@ -441,6 +443,5 @@ def main():
     print(f"\n-> {OUT}")
 
 
-# %% main ------------------------------------------------------------------------------
 if __name__ == "__main__":
     main()

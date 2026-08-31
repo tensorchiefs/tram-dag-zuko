@@ -92,7 +92,12 @@ def _mlp(
     KeyError
         From :data:`ACTIVATIONS` if the name is not one of its keys.
     """
-    make_activation = ACTIVATIONS[activation or DEFAULT_ACTIVATION]
+    name = activation or DEFAULT_ACTIVATION
+    if name not in ACTIVATIONS:
+        raise ValueError(
+            f"unknown activation {name!r}; choose one of {sorted(ACTIVATIONS)}"
+        )
+    make_activation = ACTIVATIONS[name]
     layers: list[nn.Module] = []
     width = n_in
     for u in units:
@@ -311,7 +316,6 @@ class VaryingCoef(nn.Module):
         self.penalty = float(penalty)
         self.beta0 = nn.Parameter(torch.zeros(()))
         self.register_buffer("center", torch.zeros(()))
-        self.register_buffer("warm_started", torch.tensor(False))
         if n_features > 0:
             # zero-initialised output: beta(x) == beta0 at init
             self.net = _mlp(

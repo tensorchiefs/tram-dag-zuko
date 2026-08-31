@@ -75,79 +75,98 @@ def _load_json_pair(area: str, name: str) -> tuple[dict, dict]:
     return json.loads(metrics_path.read_text()), json.loads(truth_path.read_text())
 
 
-def _check_metric(area, name, metric, metrics, expected, failures, notes, loose):
-    """Check one ground-truth entry against the run's metrics."""
+def _check_metric(name: str, metric: str, metrics: dict, expected: dict) -> list:
+    """Check one ground-truth entry; give ``(kind, message)`` pairs.
+
+    ``kind`` is ``"fail"``, ``"ok"`` or ``"note"`` (a bound outside the useful
+    band, or a center past half its tolerance).
+    """
     if metric not in metrics:
-        failures.append(
-            f"{metric}: the run produced no such metric. Either the "
-            f"experiment stopped computing it, or the entry belongs in "
-            f"neither {area}/ground_truth/{name}.json nor the run."
-        )
-        return
+        return [
+            (
+                "fail",
+                (
+                    f"{metric}: the run produced no such metric. Either the "
+                    f"experiment stopped computing it, or the entry belongs in "
+                    f"neither ground_truth/{name}.json nor the run."
+                ),
+            )
+        ]
     measured = metrics[metric]
     if "max" in expected:
-        _check_bound(metric, measured, expected, failures, notes, loose)
-    else:
-        _check_center(metric, measured, expected, failures, notes, loose)
+        return _check_bound(metric, measured, expected)
+    return _check_center(metric, measured, expected)
 
 
-def _check_bound(metric, measured, expected, failures, notes, loose) -> None:
+def _check_bound(metric: str, measured: float, expected: dict) -> list:
     """Check one ``{max}`` entry: an upper bound on an error measure.
 
     Only exceeding the bound is a regression, because a smaller error is a
     better fit, not a drifted one. A passing bound outside the useful band
-    (1.5x to 4x the measurement) goes to ``loose``, unless a ``"why"``
-    excuses its width.
+    (1.5x to 4x the measurement) is noted, unless a ``"why"`` excuses its
+    width; a bound below 1.5x is always noted.
     """
-    if measured > expected["max"]:
-        failures.append(
-            f"{metric}: {measured:+.4f} exceeds its bound {expected['max']:+.4f}"
-        )
-        return
-    bound = f"bound {expected['max']}"
-    if "why" in expected:
-        bound += f", deliberately wide: {expected['why']}"
-    notes.append(f"{metric}: {measured:+.4f} ({bound})")
-    if measured <= 0:
-        return
-    ratio = expected["max"] / abs(measured)
-    if ratio > 4.0 and "why" not in expected:
-        loose.append(
-            f"{metric}: bound {expected['max']} is {ratio:.1f}x the "
-            f"measurement — too loose to catch a regression"
-        )
-    elif ratio < 1.5:
-        loose.append(
-            f"{metric}: bound {expected['max']} is only {ratio:.2f}x "
-            f"the measurement — will fail on another machine"
-        )
+    bound = expected["max"]
+    if measured > bound:
+        return [("fail", f"{metric}: {measured:+.4f} exceeds its bound {bound:+.4f}")]
+    label = f"bound {bound}" + (
+        f", deliberately wide: {expected['why']}" if "why" in expected else ""
+    )
+    out = [("ok", f"{metric}: {measured:+.4f} ({label})")]
+    if measured > 0:
+        ratio = bound / abs(measured)
+        if ratio > 4.0 and "why" not in expected:
+            out.append(
+                (
+                    "note",
+                    (
+                        f"{metric}: bound {bound} is {ratio:.1f}x the measurement — "
+                        "too loose to catch a regression"
+                    ),
+                )
+            )
+        elif ratio < 1.5:
+            out.append(
+                (
+                    "note",
+                    (
+                        f"{metric}: bound {bound} is {ratio:.2f}x its measurement — "
+                        "will fail on another machine"
+                    ),
+                )
+            )
+    return out
 
 
-def _check_center(metric, measured, expected, failures, notes, loose) -> None:
-    """Check one ``{value, atol}`` entry: a two-sided tolerance.
-
-    A measurement past half its ``atol`` goes to ``loose``, so the center
-    gets re-pinned while it still passes.
-    """
+def _check_center(metric: str, measured: float, expected: dict) -> list:
+    """Check one ``{value, atol}`` entry, two-sided; note a decayed center."""
     deviation = abs(measured - expected["value"])
     if deviation > expected["atol"]:
-        failures.append(
-            f"{metric}: {measured:+.4f} vs expected "
-            f"{expected['value']:+.4f} (deviation {deviation:.4f} > "
-            f"atol {expected['atol']})"
-        )
-        return
-    notes.append(f"{metric}: {measured:+.4f} (within {expected['atol']})")
+        return [
+            (
+                "fail",
+                (
+                    f"{metric}: {measured:+.4f} vs expected {expected['value']:+.4f} "
+                    f"(deviation {deviation:.4f} > atol {expected['atol']})"
+                ),
+            )
+        ]
+    out = [("ok", f"{metric}: {measured:+.4f} (within {expected['atol']})")]
     if deviation > 0.5 * expected["atol"]:
         share = deviation / expected["atol"]
-        loose.append(
-            f"{metric}: {measured:+.6f} sits {share:.0%} of the way to "
-            f"its tolerance — the center describes an older run, "
-            f"re-pin it from this one"
+        out.append(
+            (
+                "note",
+                (
+                    f"{metric}: {measured:+.6f} sits {share:.0%} of the way to its "
+                    "tolerance — the center describes an older run, re-pin it from "
+                    "this one"
+                ),
+            )
         )
+    return out
 
 
-# %% public functions ------------------------------------------------------------------
 def compare(area: str, name: str) -> tuple[list[str], list[str], list[str], list[str]]:
     """Compare one result directory against its ground truth.
 
@@ -163,34 +182,44 @@ def compare(area: str, name: str) -> tuple[list[str], list[str], list[str], list
     -------
     tuple[list[str], list[str], list[str], list[str]]
         The failures, the metrics that passed, the metrics with no
-        ground-truth entry, and the bounds outside the useful band.
+        ground-truth entry, and the notes (a bound outside the useful
+        band, a decayed center).
 
     Raises
     ------
     FileNotFoundError
         If the metrics or the ground-truth file is missing.
+    ValueError
+        If the ground-truth file has no metric entry, so nothing was checked.
     """
     metrics, truth = _load_json_pair(area, name)
 
-    failures, notes, unchecked, loose = [], [], [], []
-    for metric, expected in truth.items():
-        if metric.startswith("_"):
-            continue  # a note for the reader, not a metric
-        _check_metric(area, name, metric, metrics, expected, failures, notes, loose)
-    unchecked.extend(
+    results = [
+        pair
+        for metric, expected in truth.items()
+        if not metric.startswith("_")  # a note for the reader, not a metric
+        for pair in _check_metric(name, metric, metrics, expected)
+    ]
+    if not results:
+        raise ValueError(f"ground_truth/{name}.json checks nothing: no metric entries")
+    by_kind = {
+        k: [m for kind, m in results if kind == k] for k in ("fail", "ok", "note")
+    }
+    failures, passed, notes = by_kind["fail"], by_kind["ok"], by_kind["note"]
+    unchecked = [
         f"{metric}: {metrics[metric]}" for metric in metrics if metric not in truth
-    )
-    return failures, notes, unchecked, loose
+    ]
+    return failures, passed, unchecked, notes
 
 
 def main(area: str, name: str) -> int:
     """Print the comparison and give the process exit code."""
-    failures, notes, unchecked, loose = compare(area, name)
-    for note in notes:
-        print(f"  ok   {note}")
+    failures, passed, unchecked, notes = compare(area, name)
+    for item in passed:
+        print(f"  ok   {item}")
     for item in unchecked:
         print(f"  --   {item} (no ground-truth entry)")
-    for item in loose:
+    for item in notes:
         print(f"  note {item}")
     for failure in failures:
         print(f"  FAIL {failure}")

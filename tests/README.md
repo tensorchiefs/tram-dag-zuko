@@ -43,7 +43,7 @@ Five kinds of test, in rough order of how much trust they carry:
    software written by other people in other languages.
    - vs. **`statsmodels`** `OrderedModel` (computed at test time):
      `test_ls_node_equals_proportional_odds`, `test_matches_statsmodels_mle`,
-     `test_plateau_freeze_preserves_exact_mle`;
+     `test_torch_plateau_scheduler_preserves_exact_mle`;
    - the two optimizers agree on the same optimum: `test_agrees_with_adam_mle`.
 
 3. **Known-truth recovery** — because the inline DGPs (see `conftest.py`) *are*
@@ -68,8 +68,8 @@ Five kinds of test, in rough order of how much trust they carry:
    - cutpoints stay increasing and PMFs sum to one
      (`test_ordinal_cutpoints_increasing_and_pmf_sums_to_one`);
    - `save`/`load` round-trips a fitted model (`test_save_load_roundtrip`);
-   - schedules/freezing don't break the exact-MLE property
-     (`test_plateau_freeze_preserves_exact_mle`);
+   - a schedule through the hooks doesn't break the exact-MLE property
+     (`test_torch_plateau_scheduler_preserves_exact_mle`);
    - DAG validation catches cycles and orders correctly
      (`test_cycle_detected`, `test_topological_order`).
 
@@ -97,19 +97,20 @@ unrelated acceptance bars.
 | file | what it covers |
 |---|---|
 | [`test_flow.py`](test_flow.py) | core unit tests — transforms, ordinal log-prob, DAG validation, abduction/counterfactual mechanics, `save`/`load`, the proportional-odds identity |
-| [`test_fit_schedules.py`](test_fit_schedules.py) | lr schedules and per-node freezing, incl. the guard that plateau+freeze still lands on the MLE |
+| [`test_fit_hooks.py`](test_fit_hooks.py) | `fit(optimizer=, after_epoch_callbacks=)` and the shipped `tramdag.callbacks` — stop, lists, `RestoreBest`, `Logger`, `PerNodePlateau`, a torch scheduler; the guard that it still lands on the MLE |
+| [`test_density.py`](test_density.py) | `density()` integrates to one and matches sampling |
+| [`test_net_input_scaling.py`](test_net_input_scaling.py) | `net_input_scaling="minmax"` — nets scaled, LS raw, read-outs consistent, checkpoint |
 | [`test_fit_classical.py`](test_fit_classical.py) | `fit_classical` — guard on non-`ls` specs, determinism, float64 round-trip, agreement with `statsmodels` and Adam |
 | [`test_spec_terms.py`](test_spec_terms.py) | term constructors, edge ownership, the meta-adjacency view |
 | [`test_transformation_syntax.py`](test_transformation_syntax.py) | the formula syntax — every spelling normalizes identically, the constructor aliases, `units=`, round-trips, and rejection of a malformed serialized spec |
 | [`test_joint_terms.py`](test_joint_terms.py) | joint multi-parent CS/I terms |
 | [`test_additive_ci.py`](test_additive_ci.py) | the additive intercept (`allow_interaction=False`) |
 | [`test_intercept_contributions.py`](test_intercept_contributions.py) | the post-hoc GAM decomposition of complex intercepts |
-| [`test_vc_term.py`](test_vc_term.py) | the VC effect head — spec, penalty, warm start, recovery of `beta(x)` |
+| [`test_vc_term.py`](test_vc_term.py) | the VC effect head — spec, penalty, recovery of `beta(x)` |
 | [`test_vc_centered.py`](test_vc_centered.py) | propensity-centered VC — out-of-fold structure, zero-gradient freeze, bias reduction |
 | [`test_scores.py`](test_scores.py) | analytic scores vs finite differences, the effect-modifier scan |
 | [`test_marginal_init.py`](test_marginal_init.py) | calibrated marginal initialization — pure-init property |
 | [`test_api_papercuts.py`](test_api_papercuts.py) | error messages, `save`/`load` meta, small API contracts |
-| [`test_utils.py`](test_utils.py) | `config_section`'s exact-key-set contract and `machine_info` |
 
 ## Adding tests
 

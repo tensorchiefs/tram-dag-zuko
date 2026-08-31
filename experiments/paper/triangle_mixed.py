@@ -21,62 +21,26 @@ Usage (from experiments/)::
 # %% imports ---------------------------------------------------------------------------
 from __future__ import annotations
 
-import argparse
+from functools import partial
 
 import matplotlib.pyplot as plt
 import numpy as np
-from common import (
-    load_variant,
-    make_output_dir,
-    save_metrics,
-    variants_of,
-    write_report,
-)
+import pandas as pd
+from common import cli, load_variant, make_output_dir, save_metrics, write_report
 
 from paper.helpers import (
-    cs_curve,
+    compare_do_x1,
+    cs_curve_error,
     finish,
-    fit_with_snapshots,
-    ls_weight,
-    plot_cs_curve,
-    plot_hist_grid,
+    fit_paper,
+    level_bars,
     plot_trajectories,
-    split_train_val,
+    shift_term,
+    snapshot,
+    true_coefficients,
 )
 from paper.simulations.triangle import TriangleMixed
-from tramdag import CS, LS, SI, ContinuousNode, OrdinalNode
-
-# %% global variables ------------------------------------------------------------------
-CONFIG_KEYS = {
-    "f",
-    "shift",
-    "transform",
-    "n_coeffs",
-    "n_train",
-    "n_val",
-    "epochs",
-    "learning_rate",
-    "batch_size",
-    "chunk_epochs",
-    "dgp_seed",
-    "init_seed",
-    "shuffle_seed",
-    "sample_seed",
-    "n_compare",
-    "do_x1",
-    "grid_low",
-    "grid_high",
-    "grid_points",
-    "levels",
-    "odds_ratio_threshold",
-    "odds_ratio_n",
-    "odds_ratio_seed",
-    "cf_n",
-    "cf_draws",
-    "cf_seed",
-}
-# only a complex shift has a network to configure
-MLP_KEYS = {"shift_units", "activation"}
+from tramdag import LS, SI, ContinuousNode, OrdinalNode
 
 
 # %% public functions ------------------------------------------------------------------
@@ -86,46 +50,13 @@ def build_spec(config: dict) -> dict:
     Every network and transform setting comes from the config, so the
     architecture is visible in one file. The ordinal node has no monotone
     basis — its intercept is the cutpoint vector.
-
-    Raises
-    ------
-    ValueError
-        If ``shift`` is neither ``"ls"`` nor ``"cs"``.
     """
-    shift = config["shift"]
-    if shift == "ls":
-        x2_to_x3 = LS("x2")
-    elif shift == "cs":
-        x2_to_x3 = CS(
-            "x2", units=config["shift_units"], activation=config["activation"]
-        )
-    else:
-        raise ValueError(f"shift must be 'ls' or 'cs', got '{shift}'")
     basis = dict(transform=config["transform"], n_coeffs=config["n_coeffs"])
     return {
         "x1": ContinuousNode([SI(**basis)]),
         "x2": ContinuousNode([SI(**basis), LS("x1")]),
-        "x3": OrdinalNode(config["levels"], [LS("x1"), x2_to_x3]),
+        "x3": OrdinalNode(config["levels"], [LS("x1"), shift_term(config)]),
     }
-
-
-def flow_convention_truths(f: str, shift: str) -> dict:
-    """Give the expected fitted weights in the flow's sign convention."""
-    truths = {"beta12": 2.0, "beta13_flow": -0.2}
-    if shift == "ls" and f == "linear":
-        truths["beta23_flow"] = 0.3
-    return truths
-
-
-def snapshot(flow, shift: str) -> dict:
-    """Read the linear-shift coefficients out of a flow mid-training."""
-    values = {
-        "beta12": ls_weight(flow, "x2", "x1"),
-        "beta13_flow": ls_weight(flow, "x3", "x1"),
-    }
-    if shift == "ls":
-        values["beta23_flow"] = ls_weight(flow, "x3", "x2")
-    return values
 
 
 def odds_below(values, threshold: float) -> float:
@@ -156,12 +87,14 @@ def counterfactual_pmf_from_flow(flow, factual, do, draws, seed, levels):
     the truncated logistic and one pass gives one *sample* of the
     counterfactual level. Averaging many passes turns that into the per-row
     distribution, which is the object the analytic truth can be compared to.
+    The rows are tiled ``draws`` times, so it is one abduction and one sample.
     """
-    counts = np.zeros((len(factual), levels))
-    for draw in range(draws):
-        latents = flow.abduct(factual, seed=seed + draw)
-        sampled = flow.sample(do=do, u=latents)["x3"].to_numpy().astype(int)
-        counts[np.arange(len(factual)), sampled] += 1.0
+    n = len(factual)
+    tiled = pd.concat([factual] * draws, ignore_index=True)
+    latents = flow.abduct(tiled, seed=seed)
+    sampled = flow.sample(do=do, u=latents)["x3"].to_numpy().astype(int)
+    counts = np.zeros((n, levels))
+    np.add.at(counts, (np.tile(np.arange(n), draws), sampled), 1.0)
     return counts / draws
 
 
@@ -228,24 +161,13 @@ def score_counterfactuals(
 
 def plot_counterfactual_pmfs(flow_pmf, analytic, path, title):
     """Compare the two counterfactual distributions, averaged per level."""
-    levels = np.arange(flow_pmf.shape[1])
     fig, ax = plt.subplots(figsize=(6.4, 3.8))
-    ax.bar(
-        levels - 0.18,
+    level_bars(
+        ax,
         analytic.mean(0),
-        width=0.36,
-        alpha=0.6,
-        label="identifiable truth",
-    )
-    ax.bar(
-        levels + 0.18,
         flow_pmf.mean(0),
-        width=0.36,
-        alpha=0.85,
-        color="C3",
-        label="flow (averaged abductions)",
+        labels=("identifiable truth", "flow (averaged abductions)"),
     )
-    ax.set_xticks(levels)
     ax.set_xlabel("counterfactual $x_3$")
     ax.set_ylabel("probability")
     ax.set_title(title)
@@ -255,36 +177,24 @@ def plot_counterfactual_pmfs(flow_pmf, analytic, path, title):
 
 def run(variant: str) -> dict:
     """Run one variant end to end and give its metrics."""
-    # an ls variant has no network, so its key set is smaller: read, then check
     config = load_variant(__file__, variant)
-    keys = CONFIG_KEYS | (MLP_KEYS if config["shift"] == "cs" else set())
-    config = load_variant(__file__, variant, keys)
     out = make_output_dir(__file__, f"triangle-mixed-{variant}")
-    figures = []
+    figures = ["coefficients.png"]
 
     generator = TriangleMixed(f=config["f"], seed=config["dgp_seed"])
-    sample = generator.observational(config["n_train"] + config["n_val"])
-    train, val = split_train_val(sample, config["n_train"], config["n_val"])
-
     print(
         f"fitting triangle-mixed/{config['f']} with a {config['shift']} shift "
-        f"on n={len(train)} for {config['epochs']} epochs ..."
+        f"on n={config['n_train']} for {config['epochs']} epochs ..."
     )
-    flow, trajectory = fit_with_snapshots(
+    flow, _, val, trajectory = fit_paper(
+        generator,
         build_spec(config),
-        train,
-        val,
-        epochs=config["epochs"],
-        learning_rate=config["learning_rate"],
-        batch_size=config["batch_size"],
-        init_seed=config["init_seed"],
-        shuffle_seed=config["shuffle_seed"],
-        chunk_epochs=config["chunk_epochs"],
-        record=lambda flow: snapshot(flow, config["shift"]),
+        config,
+        out,
+        record=partial(snapshot, shift=config["shift"]),
     )
-    flow.save(out / "flow.pt")
 
-    truths = flow_convention_truths(config["f"], config["shift"])
+    truths = true_coefficients(config)
     plot_trajectories(
         trajectory,
         truths,
@@ -292,46 +202,30 @@ def run(variant: str) -> dict:
         f"triangle-mixed/{config['f']}, {config['shift']} model — "
         "coefficients in the flow's sign convention (Fig. 19)",
     )
-    figures.append("coefficients.png")
 
     metrics = {key: value for key, value in trajectory[-1].items() if key != "epoch"}
     metrics["val_nll_x3"] = float(flow.nll(val)["x3"])
 
     if config["shift"] == "cs":
-        grid = np.linspace(
-            config["grid_low"], config["grid_high"], config["grid_points"]
-        )
-        metrics["cs_curve_max_abs_err"] = plot_cs_curve(
-            grid,
-            fitted=cs_curve(flow, "x3", "x2", grid).ravel(),
-            true=generator.true_shift_curve(grid),
-            path=out / "plots" / "cs_curve.png",
-            title=f"complex shift on an ordinal node, DGP f = {config['f']}",
+        metrics["cs_curve_max_abs_err"] = cs_curve_error(
+            flow,
+            generator,
+            config,
+            out,
+            f"complex shift on an ordinal node, DGP f = {config['f']}",
         )
         figures.append("cs_curve.png")
 
-    do_query = f"do(x1={config['do_x1']:+.0f})"
-    dgp_samples = {
-        "Obs": generator.observational(config["n_compare"], seed_offset=5),
-        do_query: generator.interventional(
-            config["n_compare"], {"x1": config["do_x1"]}
-        ),
-    }
-    flow_samples = {
-        "Obs": flow.sample(config["n_compare"], seed=config["sample_seed"]),
-        do_query: flow.sample(
-            config["n_compare"],
-            do={"x1": config["do_x1"]},
-            seed=config["sample_seed"],
-        ),
-    }
-    plot_hist_grid(
-        dgp_samples,
-        flow_samples,
-        ["x1", "x2", "x3"],
-        out / "plots" / "distributions.png",
-        f"triangle-mixed/{config['f']}, {config['shift']} model — L1/L2 (Fig. 9/20)",
-        ordinal_levels={"x3": config["levels"]},
+    metrics.update(
+        compare_do_x1(
+            generator,
+            flow,
+            config,
+            out,
+            ordinal_levels={"x3": config["levels"]},
+            title=f"triangle-mixed/{config['f']}, {config['shift']} model — "
+            "L1/L2 (Fig. 9/20)",
+        )
     )
     figures.append("distributions.png")
 
@@ -374,10 +268,4 @@ def run(variant: str) -> dict:
 
 # %% main ------------------------------------------------------------------------------
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument(
-        "variant",
-        choices=variants_of(__file__),
-        help="which DGP and model to run; hyperparameters live in triangle_mixed.yaml",
-    )
-    run(parser.parse_args().variant)
+    run(cli(__file__, __doc__))

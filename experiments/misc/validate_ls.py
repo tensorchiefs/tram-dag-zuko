@@ -6,7 +6,7 @@ classical maximum-likelihood estimate — not approximately, but to the
 precision of the optimizer. This experiment is the framework's external
 correctness anchor: it fits the same data three ways and compares.
 
-1. the flow, on the full dataset with ``restore_best=False`` so it sits at
+1. the flow, on the full dataset with its final weights, so it sits at
    the training-data maximum likelihood;
 2. ``statsmodels`` ``OrderedModel``, on the design matrix the flow builds;
 3. R's ``MASS::polr`` / ``tram``, whose committed output is read from
@@ -25,38 +25,20 @@ Usage (from experiments/)::
 # %% imports ---------------------------------------------------------------------------
 from __future__ import annotations
 
-import argparse
 import json
 from pathlib import Path
 
 import pandas as pd
 from common import (
+    cli,
     load_variant,
     make_output_dir,
     save_metrics,
-    variants_of,
     write_report,
 )
 from statsmodels.miscmodels.ordinal_model import OrderedModel
 
 from tramdag import LS, SI, CausalFlowDAG, ContinuousNode, OrdinalNode
-
-# %% global variables ------------------------------------------------------------------
-CONFIG_KEYS = {
-    "cohort",
-    "fitter",
-    "phases",
-    "batch_size",
-    "init_seed",
-    "shuffle_seed",
-    "classical_max_iter",
-    "good_outcome_levels",
-    "transform",
-    "n_coeffs",
-    "levels_mrs_pre",
-    "levels_treatment",
-    "levels_outcome",
-}
 
 
 # %% public functions ------------------------------------------------------------------
@@ -107,9 +89,7 @@ def fit_flow(spec: dict, observed: pd.DataFrame, config: dict) -> CausalFlowDAG:
     """
     flow = CausalFlowDAG(spec, seed=config["init_seed"])
     if config["fitter"] == "classical":
-        flow.fit_classical(
-            observed, max_iter=config["classical_max_iter"], verbose=False
-        )
+        flow.fit_classical(observed, max_iter=config["classical_max_iter"])
     elif config["fitter"] == "adam":
         for phase, (epochs, learning_rate) in enumerate(config["phases"]):
             flow.fit(
@@ -117,8 +97,6 @@ def fit_flow(spec: dict, observed: pd.DataFrame, config: dict) -> CausalFlowDAG:
                 epochs=epochs,
                 learning_rate=learning_rate,
                 batch_size=config["batch_size"],
-                verbose=0,
-                restore_best=False,  # stay at the training-data MLE
                 seed=config["shuffle_seed"] if phase == 0 else None,
             )
     else:
@@ -222,7 +200,7 @@ def treatment_effect(flow, statsmodels_result, trial, good_levels: int) -> dict:
 
 def run(variant: str) -> dict:
     """Run one variant end to end and give its metrics."""
-    config = load_variant(__file__, variant, CONFIG_KEYS)
+    config = load_variant(__file__, variant)
     out = make_output_dir(__file__, f"validate-ls-{variant}")
 
     observed, trial, truth, reference = load_cohort(config["cohort"])
@@ -280,10 +258,4 @@ def run(variant: str) -> dict:
 
 # %% main ------------------------------------------------------------------------------
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument(
-        "variant",
-        choices=variants_of(__file__),
-        help="which fitting route to use; hyperparameters live in validate_ls.yaml",
-    )
-    run(parser.parse_args().variant)
+    run(cli(__file__, __doc__))
