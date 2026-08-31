@@ -16,7 +16,7 @@ uv run pytest tests/test_flow.py -q     # one file
   acceptance number (the `VC` recovery bar, the centering bias reduction) trains
   one deliberately in the fast subset, so every run measures it.
 - **CI** ([`.github/workflows/ci.yml`](../.github/workflows/ci.yml)) runs the fast
-  subset on every pull request and push to `main`, and the **full** suite
+  subset on every pull request and on pushes to `main` and `dev-*` (a feature-branch push with no open PR runs `pre-commit` and `experiments`, not `ci`), and the **full** suite
   nightly and on demand (Actions → CI → *Run workflow*). The split exists
   because the full suite is ~25–40 min on the 2-core runners. (No count here:
   `pytest --collect-only -q | tail -1` is always right, a number in prose goes

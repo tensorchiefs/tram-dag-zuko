@@ -57,6 +57,7 @@ plugins:
           separate_signature: true
 - mkdocs-jupyter:
     include: ['*.py']
+    ignore: [hooks.py]    # the link hook is not a notebook
     execute: false  # docs/hooks.py turns this on when DOCS_EXECUTE=true (CI)
     allow_errors: false
     include_source: true

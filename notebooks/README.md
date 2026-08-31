@@ -21,8 +21,8 @@ needs `tram`, which CI does not install, so it is run by hand:
 
 Every notebook here is executed by the docs workflow — on pushes to `main` and
 `dev-*` branches — which is what keeps them working against the current API. A
-notebook that is not in that workflow's `NOTEBOOKS` list does not belong in this
-directory. On a feature branch, run one by hand:
+notebook that is not in that workflow's executed-notebook loop does not belong
+in this directory. On a feature branch, run one by hand:
 `MPLBACKEND=Agg uv run python notebooks/<name>.py`.
 
 Data a notebook reads lives in `notebooks/data/` — see its README for

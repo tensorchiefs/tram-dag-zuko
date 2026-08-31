@@ -44,7 +44,8 @@ default the paper replication or the tests had to switch off.
 - **`tramdag.utils` is gone.** `config_section` moved to
   `experiments/common.py::_config_section`, its only caller; `machine_info`
   had already left for the benchmark. The installed package is modelling
-  code only: `spec`, `transforms`, `conditioners`, `flow`, `scores`.
+  code only: `spec`, `transforms`, `conditioners`, `flow`, `scores` — plus
+  the opt-in `callbacks` recipes added below.
 - **Degenerate columns fail loudly instead of training into NaN.**
   `calibrate` raises when a continuous node's 5%/95% quantiles coincide (a
   constant or 95%-constant column: the transform has no domain) and when an

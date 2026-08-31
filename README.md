@@ -145,7 +145,7 @@ one-hot (`levels` columns). Abduction is exact for continuous nodes and
 truncated-logistic for ordinal ones, so `flow.sample(u=flow.abduct(df))`
 reproduces `df` exactly / level-exactly.
 
-There are two ways to fit the model: a stochastic optimizer (`fit`) and the classical route (`fit_classical`). For all-`ls` models — where each node-conditional is a classical transformation model — the classical fit is deterministic and takes seconds (measured < 2 s vs ~9 s for Adam on the stroke workload); see [`docs/fitting.md`](docs/fitting.md).
+There are two ways to fit the model: a stochastic optimizer (`fit`) and the classical route (`fit_classical`). For all-`ls` models — where each node-conditional is a classical transformation model — the classical fit is deterministic and takes seconds (measured ~10 s vs ~200 s for Adam on the CI runner); see [`docs/fitting.md`](docs/fitting.md).
 
 ## Validation
 

@@ -60,6 +60,9 @@ jobs:
       # capped run does the whole not-slow suite in under a minute
       env:
         OMP_NUM_THREADS: '1'
+        # uv run would otherwise re-sync the default dev group the sync
+        # step above deliberately skipped
+        UV_NO_DEFAULT_GROUPS: '1'
       # --cov gate: [tool.coverage] in pyproject sets source and fail_under
       run: >-
         uv run pytest -q -n auto --cov

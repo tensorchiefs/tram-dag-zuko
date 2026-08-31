@@ -19,6 +19,7 @@ dev = [
 ]
 docs = [
   "mkdocs-material",
+  "mkdocs-autorefs",  # the code map's symbol links
   "mkdocstrings[python]",  # API pages from the numpy docstrings
   "mkdocs-jupyter",  # executes and renders the jupytext notebooks
   "mike",  # one site version per branch on gh-pages

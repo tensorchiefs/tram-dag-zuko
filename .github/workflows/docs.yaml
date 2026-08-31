@@ -27,7 +27,7 @@ jobs:
     - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d   # v10.0.1
       with:
         enable-cache: true
-    - run: uv sync --group docs --group notebooks
+    - run: uv sync --no-default-groups --group docs --group notebooks
 
     - name: PDF — README, guides and executed notebooks through pandoc + XeLaTeX
       continue-on-error: true
@@ -39,19 +39,19 @@ jobs:
         curl -sSL --max-time 120 --retry 2 -o /tmp/pandoc.deb \
           https://github.com/jgm/pandoc/releases/download/3.5/pandoc-3.5-1-amd64.deb
         sudo dpkg -i /tmp/pandoc.deb
-        mkdir -p build/pdf
+        mkdir -p build/pdf/nb
         # badges are noise in a PDF, and remote images stall the build
         sed -E -e 's#\[!\[[^]]*\]\([^)]*\)\]\([^)]*\)##g' -e 's#!\[[^]]*\]\(https?://[^)]*\)##g' \
           README.md > build/pdf/README.md
         for n in demo_tram_dag_colab intro_tram_dag additive_vs_joint_ci varying_coefficients classical_fit_tram_dag; do
-          uv run jupytext --to notebook --execute --output "build/pdf/$n.ipynb" "notebooks/$n.py"
-          uv run jupyter nbconvert --to markdown "build/pdf/$n.ipynb" --output "$n" --output-dir build/pdf
+          uv run jupytext --to notebook --execute --output "build/pdf/nb/$n.ipynb" "notebooks/$n.py"
+          uv run jupyter nbconvert --to markdown "build/pdf/nb/$n.ipynb" --output "$n" --output-dir build/pdf/nb
         done
         pandoc -f gfm+tex_math_dollars --pdf-engine=xelatex \
-          --resource-path=.:docs:build/pdf -V mainfont="DejaVu Serif" -V monofont="DejaVu Sans Mono" \
+          --resource-path=.:docs:build/pdf:build/pdf/nb -V mainfont="DejaVu Serif" -V monofont="DejaVu Sans Mono" \
           -V geometry:margin=2.2cm --toc --toc-depth=2 --metadata title="tramdag documentation" \
           build/pdf/README.md docs/notation.md docs/fitting.md docs/training-speed.md docs/scores.md \
-          docs/varying-coefficients.md docs/paper-replication.md docs/code-map.md docs/zuko-upstream.md build/pdf/*.md \
+          docs/varying-coefficients.md docs/paper-replication.md docs/code-map.md docs/zuko-upstream.md build/pdf/nb/*.md \
           -o docs/tramdag-docs.pdf
 
     - name: keep the previous PDF when this build produced none

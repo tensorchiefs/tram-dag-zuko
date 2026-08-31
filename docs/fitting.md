@@ -154,7 +154,7 @@ node's batched BLAS ops already saturate — measured as contention, not speedup
 Only when per-node kernels under-utilize the hardware (tiny nodes on a big GPU)
 could overlap pay, and there the tool is fusing same-shaped nodes, not threads.
 
-Benchmarks, schedule trade-offs, and the recommended self-stopping recipe are in
+Benchmarks and schedule trade-offs are in
 [training-speed.md](training-speed.md). The worked walkthrough is
 [`notebooks/intro_tram_dag.py`](../notebooks/intro_tram_dag.py).
 
