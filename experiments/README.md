@@ -60,27 +60,17 @@ carries its own copy of the bimodal DGP. `benchmarks/tests/` pins that copy to
 the maintained generator, because a drifted copy would silently make the
 collected `final_val_nll` values incomparable.
 
-Runtime: at the paper's batch 32 a triangle variant is 500 epochs × 1250
-steps over 40 000 rows, about 3.2 s per epoch single-process at 2–4 torch
-threads (27 min; 42–69 min on the 2-core CI runners). The step is
-overhead-bound — 32 threads make it *slower* (5.5 s per epoch), and eight
-variants side by side on one box take 78 min each. Run them one or two at a
-time, or with `OMP_NUM_THREADS=2`.
+Runtime and the one CI deviation: the triangle configs run the paper's 500
+epochs at batch 256 / lr 0.004 instead of batch 32 / lr 0.001 — 8× fewer
+steps, every metric kept; the selection grid, per-job timings and the
+epoch-cut measurement are in `docs/paper-replication.md`. Locally, run
+variants one or two at a time (`OMP_NUM_THREADS=2`; the step is
+overhead-bound).
 
-The configs therefore take one documented deviation for CI runtime: batch 256
-at lr 0.004 instead of the paper's batch 32 at lr 0.001 — the same 500 epochs
-in 8× fewer steps, every ground-truth metric kept (the grid that chose it is
-in `docs/paper-replication.md`). Measured on CI (run 32974872751): triangle
-jobs 7–11 min instead of 42–69, the whole workflow about 12 min wall. The 500 epochs stay: the linear-shift
-coefficients settle after ~40 epochs, the complex shift does not (at 100
-epochs the cs-curve error doubles to triples; at 250 mixed exp-cs is still
-+60 %).
-
-`vaca.py` and `carefl.py` set `net_input_scaling: minmax`, because the
-reference's comparison scripts train in min-max scaled space
-(`comparison/utils.R::scale_df`) and their tanh nets saturate on the raw
-parents (40% of the VACA rows have `|x| > 2`); the triangle scripts fit
-`df_orig`, so those configs leave it `null`.
+`vaca.py` and `carefl.py` set `net_input_scaling: minmax` because the
+reference trains in `scale_df` space; why it matters is measured in
+`docs/paper-replication.md`. The triangle scripts fit raw parents, so those
+configs leave it `null`.
 
 Which paper figure each variant reproduces — and what is deliberately not
 reproduced — is listed in [`paper/PAPER_COVERAGE.md`](paper/PAPER_COVERAGE.md);

@@ -145,7 +145,7 @@ one-hot (`levels` columns). Abduction is exact for continuous nodes and
 truncated-logistic for ordinal ones, so `flow.sample(u=flow.abduct(df))`
 reproduces `df` exactly / level-exactly.
 
-There are two ways to fit the model: a stochastic deep learning optimizer (`fit`) and a 2nd order optimization like in the classical statistical models (`fit_classical`). The latter is more efficient for all-`ls` models (each node-conditional is then a classical transformation model). For more details, see the [`docs/fitting.md`](docs/fitting.md) file.
+There are two ways to fit the model: a stochastic optimizer (`fit`) and the classical route (`fit_classical`). For all-`ls` models — where each node-conditional is a classical transformation model — the classical fit is deterministic and takes seconds (measured < 2 s vs ~9 s for Adam on the stroke workload); see [`docs/fitting.md`](docs/fitting.md).
 
 ## Validation
 
@@ -171,7 +171,7 @@ dedicated workflow runs them and compares.
 | `triangle_mixed.py` (`linear-ls`, `exp-cs`) | §6.2 | mixed data L1/L2 + the C.4 odds-ratio check (OR ≈ 7.4) |
 | `vaca.py` | §5.1–5.2 | the bimodal L1 case a default CNF misses; L2 `p(x₃ \| do(x₂))` against analytic means |
 | `carefl.py` | §5.3 | L3 counterfactual curves vs **analytic** truth |
-| `validate_ls.py` | — | flow ≡ `statsmodels` ≡ R `MASS::polr` to ~4 decimals, on a frozen synthetic cohort with a known true effect |
+| `validate_ls.py` | — | flow ≡ `statsmodels` ≡ R `MASS::polr` to ~4 decimals with `fit_classical` (a converged Adam `fit` gets ~1e-3), on a frozen synthetic cohort with a known true effect |
 
 Sign note: ordinal shifts are *subtracted* here but *added* in the paper, so
 fitted ordinal weights are the paper's with flipped sign (each `truth.json`

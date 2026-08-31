@@ -14,9 +14,7 @@ is a local run artifact and is not committed.
 
 ## The recipes, and where they live now
 
-The recipes this benchmark compares were `fit()` options in 0.3
-(`schedule="plateau"`, `freeze_patience=`, `restore_best=`). In 0.4 `fit` is
-one minibatch Adam loop and the recipes are **callbacks** — training
+The recipes this benchmark compares are **callbacks** since 0.4 — training
 strategies, not part of the model (see [fitting.md](fitting.md)):
 
 | recipe | behavior | today |
@@ -25,9 +23,8 @@ strategies, not part of the model (see [fitting.md](fitting.md)):
 | plateau+freeze | **per-node**: a node whose own validation NLL hasn't improved by `min_delta` (1e-4 default; the stroke run uses 1e-5, see the benchmark) for `patience` epochs gets its lr × 0.3, floored at 1e-3 × the start; once decayed ≥ 100× and flat for `freeze` epochs it leaves training (rate 0). Valid because the per-node losses have independent gradients. | `tramdag.callbacks.PerNodePlateau`, a callback over one parameter group per node (`per_node_adam`), measured in `experiments/benchmarks/bench_training.py` |
 | global plateau | torch's `ReduceLROnPlateau` on the summed validation NLL — the paper reference's rule | `experiments/paper/helpers.py::fit_paper` |
 
-`"onecycle"` and `"cosine"` were part of this benchmark and lost to
-`"plateau"` on every workload; 0.4.0 removed both. The result tables below
-keep their measured rows as the record of that decision.
+`"onecycle"` and `"cosine"` lost to `"plateau"` on every workload and were
+removed in 0.4; their measured rows below stay as the record.
 
 **The exact-MLE path**: for an exact comparison with classical methods
 (`statsmodels`, R `polr`/`tram`) no recipe is needed —
@@ -44,18 +41,10 @@ final weights. The guard test
 that a schedule through the hooks still lands the all-`ls` fit on the classical
 MLE within the usual tolerances.
 
-**LBFGS** is *not* a `fit()` option — it ships as its own method.
-[`fit_classical`](fitting.md) runs float64 full-batch L-BFGS with a strong-Wolfe
-line search and supersedes the hand-rolled recipe this report benchmarked: it is
-deterministic, lands on the exact MLE, matches `statsmodels`/R `polr`, and
-refuses non-`ls` specs (minibatch noise also regularizes the MLPs, so flexible
-models belong in `fit`). The float32 single-precision variant measured here was
-fast (< 2 s) but not robust across seeds (Findings #2) — `fit_classical`'s
-float64 upcast is what fixed that.
-
-```python
-report = flow.fit_classical(train_df)  # exact classical MLE, seconds
-```
+**LBFGS** ships as its own method, [`fit_classical`](fitting.md), which
+supersedes the hand-rolled recipe this report benchmarked. The float32 variant
+measured here was fast (< 2 s) but seed-fragile (Finding #2); `fit_classical`'s
+float64 upcast fixed that.
 
 ## Method: time-to-target, not loss-go-down
 
@@ -71,14 +60,10 @@ long-run reference (3 torch seeds, medians):
 *Tight* ≈ exact-MLE equivalence (statsmodels/R-polr match). *Practical* ≈
 coefficient-equivalent: a fit with gap ≈ 3e-3 already matches the R reference
 coefficients within the tolerances of
-[`experiments/misc/validate_ls.py`](../experiments/misc/validate_ls.py). The same
-exact-MLE-under-plateau-and-freezing property is pinned on an inline DGP by
-`tests/test_fit_hooks.py::test_torch_plateau_scheduler_preserves_exact_mle`.
-
-These numbers were measured before the experiment code moved into
-`experiments/benchmarks/`; the workloads are unchanged (same frozen data, same
-specs), so the timings still stand. Re-running the benchmark reproduces the
-machine-independent part exactly: the stroke-ls reference NLL 10.3042.
+[`experiments/misc/validate_ls.py`](../experiments/misc/validate_ls.py).
+The workloads are unchanged since the measurement (same frozen data, same
+specs); re-running reproduces the machine-independent stroke-ls reference NLL
+10.3042 exactly.
 
 ## Results
 
@@ -138,25 +123,10 @@ decade. This is why the two-phase recipe existed.
 
 ## Recommendation
 
-For everyday fits:
-
-```python
-opt = torch.optim.Adam(flow.parameters(), lr=1e-2)
-plateau = torch.optim.lr_scheduler.ReduceLROnPlateau(opt, factor=0.3, patience=30)
-
-def on_epoch(flow, epoch, opt):
-    plateau.step(sum(flow.nll(val).values()))
-    return opt.param_groups[0]["lr"] < 1e-5
-
-flow.fit(train, epochs=4000, batch_size=512, optimizer=opt, after_epoch_callbacks=on_epoch)
-```
-
-The generous `epochs` value is only a ceiling; the callback stops the fit. For exact
-classical comparisons where the last 1e-3 matters, append a short constant-lr polish
-phase (`epochs=500, learning_rate=1e-3`). The per-node variant with freezing is the
-shipped `tramdag.callbacks.PerNodePlateau`.
-
-One finding is a package default: `epochs` has no default at all, because
-finding 6 is precisely that a fixed budget cannot be right for every workload. The paper scripts follow the paper's own protocol (one constant-lr
-run, or the reference's ReduceLROnPlateau for VACA/CAREFL); `validate_ls` runs a
-three-phase constant-lr descent. Each states its recipe in its own YAML.
+The everyday recipe is the global-plateau callback in
+[fitting.md](fitting.md#the-recipes-as-callbacks) with a generous `epochs`
+ceiling; the per-node self-stopping variant is
+`tramdag.callbacks.PerNodePlateau`. One finding became a package default:
+`epochs` has no default, because Finding 6 is precisely that a fixed budget
+cannot be right for every workload — every in-repo caller states its recipe in
+its own YAML.

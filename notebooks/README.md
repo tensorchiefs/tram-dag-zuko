@@ -57,16 +57,8 @@ paired to the `.py` so your interactive edits flow back into the tracked `.py`.
 
 The cleanest way needs no `.ipynb` at all — in JupyterLab/Jupyter Notebook,
 right-click the `.py` → *Open With* → *Notebook*. Edits save straight back to the
-`.py`; there is nothing to clean up.
-
-If you'd rather click around in a real `.ipynb`, pair the two and sync edits back:
-
-```bash
-# one-time: create intro_tram_dag.ipynb paired to the .py
-uv run jupytext --set-formats ipynb,py:percent notebooks/intro_tram_dag.py
-# ...edit the .ipynb in Jupyter, then push changes into the .py:
-uv run jupytext --sync notebooks/intro_tram_dag.ipynb
-```
+`.py`; there is nothing to clean up. (jupytext can also pair a real `.ipynb` to
+the `.py` — `--set-formats ipynb,py:percent`, then `--sync` — if you prefer.)
 
 The paired `.ipynb` stays git-ignored. Note that `--set-formats` adds `ipynb` to
 the `.py` header — revert that one-line header change before committing (the

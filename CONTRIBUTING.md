@@ -19,17 +19,9 @@ uv run pytest tests/test_flow.py -q     # one file
 Run `pytest` with no path: `testpaths` in `pyproject.toml` then picks up both
 `tests/` and the per-area `experiments/*/tests/`.
 
-`@pytest.mark.slow` marks the five longest fits, not every test that trains a
-flow — some acceptance criteria (the `VC` recovery bar, the centering bias
-reduction) train a flow deliberately in the fast subset, because a feature's
-acceptance number is worth measuring on every run.
-
-CI runs the fast subset on every pull request and on pushes to `main` and
-`dev-*`, and the full suite nightly. A push to a feature branch with no open PR
-runs `pre-commit` and `experiments` but not `ci`.
-
-What the suite guarantees, and where each reference number comes from, is
-documented in [`tests/README.md`](tests/README.md). Two rules matter most:
+What the suite guarantees, what `slow` marks, how CI splits the runs, and
+where each reference number comes from is documented in
+[`tests/README.md`](tests/README.md). Two rules matter most:
 
 - `data/` is a **contract**. A new seed or changed equations means a new
   folder, never an edit in place.
