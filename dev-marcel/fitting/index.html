@@ -1450,7 +1450,7 @@ whole epochs, while node-level overlap only time-slices the cores that each
 node's batched BLAS ops already saturate — measured as contention, not speedup.
 Only when per-node kernels under-utilize the hardware (tiny nodes on a big GPU)
 could overlap pay, and there the tool is fusing same-shaped nodes, not threads.</p>
-<p>Benchmarks, schedule trade-offs, and the recommended self-stopping recipe are in
+<p>Benchmarks and schedule trade-offs are in
 <a href="../training-speed/">training-speed.md</a>. The worked walkthrough is
 <a href="../notebooks/intro_tram_dag/"><code>notebooks/intro_tram_dag.py</code></a>.</p>
 <h2 id="path-b-classical-optimization-fit_classical">Path B — classical optimization (<code>fit_classical</code>)<a class="headerlink" href="#path-b-classical-optimization-fit_classical" title="Permanent link">&para;</a></h2>

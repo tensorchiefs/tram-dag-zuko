@@ -1456,7 +1456,7 @@ always purely additive on the latent scale, and interactions exist only
 one-hot (<code>levels</code> columns). Abduction is exact for continuous nodes and
 truncated-logistic for ordinal ones, so <code>flow.sample(u=flow.abduct(df))</code>
 reproduces <code>df</code> exactly / level-exactly.</p>
-<p>There are two ways to fit the model: a stochastic optimizer (<code>fit</code>) and the classical route (<code>fit_classical</code>). For all-<code>ls</code> models — where each node-conditional is a classical transformation model — the classical fit is deterministic and takes seconds (measured &lt; 2 s vs ~9 s for Adam on the stroke workload); see <a href="fitting/"><code>docs/fitting.md</code></a>.</p>
+<p>There are two ways to fit the model: a stochastic optimizer (<code>fit</code>) and the classical route (<code>fit_classical</code>). For all-<code>ls</code> models — where each node-conditional is a classical transformation model — the classical fit is deterministic and takes seconds (measured ~10 s vs ~200 s for Adam on the CI runner); see <a href="fitting/"><code>docs/fitting.md</code></a>.</p>
 <h2 id="validation">Validation<a class="headerlink" href="#validation" title="Permanent link">&para;</a></h2>
 <p>Two layers, deliberately separate.</p>
 <p><strong>The framework's own test suite</strong> (<a href="https://github.com/tensorchiefs/tramdag/tree/dev-marcel/tests"><code>tests/</code></a>) measures the library
