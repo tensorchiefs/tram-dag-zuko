@@ -29,7 +29,7 @@ jobs:
       UV_NO_DEFAULT_GROUPS: '1'   # dev drags in editor tooling; name groups
       # the notebooks to execute and publish; add a name to add a notebook
       # (and mirror it in .github/pdoc-templates/module.html.jinja2)
-      NOTEBOOKS: demo_tram_dag_colab intro_tram_dag additive_vs_joint_ci varying_coefficients
+      NOTEBOOKS: demo_tram_dag_colab intro_tram_dag additive_vs_joint_ci varying_coefficients classical_fit_tram_dag
     steps:
     - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1
     - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d   # v10.0.1
@@ -72,7 +72,7 @@ jobs:
     - name: build the site with pdoc
       run: |
         uv run --group notebooks --group docs env PYTHONPATH=build/stubs \
-          pdoc -d numpy --template-directory .github/pdoc-templates \
+          pdoc -d numpy --math --template-directory .github/pdoc-templates \
             -o site tramdag guides examples
 
     - name: rewrite repo-relative links

@@ -11,12 +11,22 @@ truth**.
 | `demo_tram_dag_colab.py` | 5-minute showcase on the paper's bimodal VACA benchmark ([open in Colab](https://colab.research.google.com/github/tensorchiefs/tramdag/blob/main/notebooks/demo_tram_dag_colab.ipynb)) |
 | `additive_vs_joint_ci.py` | joint vs additive complex intercept, and reading per-parent effects out of the additive one with `intercept_contributions` |
 | `varying_coefficients.py` | heterogeneous treatment effects: the `VC` head, `varying_coef`, the modifier scan and propensity centering, all scored against a known `beta(x)` |
+| `classical_fit_tram_dag.py` | `fit_classical` on all-`ls` models, opening with plain logistic regression on `MASS::birthwt` (a 2-level ordinal node) checked against R `glm`: determinism, the exact MLE against `statsmodels` / R, and the classical-fit-then-keep-training warm start |
+
+`classical_fit_tram_dag.R` is not a notebook. It is the R half of
+`classical_fit_tram_dag.py` — every classical reference that notebook hard-codes,
+fitted in one script so the numbers can be re-checked instead of trusted. It
+needs `tram`, which CI does not install, so it is run by hand:
+`Rscript notebooks/classical_fit_tram_dag.R` from the repo root.
 
 Every notebook here is executed by the docs workflow — on pushes to `main` and
 `dev-*` branches — which is what keeps them working against the current API. A
 notebook that is not in that workflow's `NOTEBOOKS` list does not belong in this
 directory. On a feature branch, run one by hand:
 `MPLBACKEND=Agg uv run python notebooks/<name>.py`.
+
+Data a notebook reads lives in `notebooks/data/` — see its README for
+provenance.
 
 ## Rules
 

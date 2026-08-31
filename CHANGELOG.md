@@ -91,6 +91,75 @@ default the paper replication or the tests had to switch off.
 
 ### Added
 
+- **`notebooks/classical_fit_tram_dag.py` is back**, ported to the 0.4 term
+  syntax. It had been deleted along with `notebooks/stale/`; the deletion
+  moved its ordinal half to `experiments/misc/validate_ls.py` and its
+  warm-start lesson to `docs/fitting.md`, but the notebook itself is the only
+  place `fit_classical` is walked through end to end. The port drops the
+  `tramdag.simulations` import (the VACA triangle is simulated inline, as the
+  other notebooks do), reads the stroke cohort from `experiments/misc/data/`,
+  and replaces the hand-rolled one-hot design with
+  `flow.design_matrix(..., drop_first=True)`. It joins the docs workflow's
+  `NOTEBOOKS` list, so it is executed on every push to `main` and `dev-*`.
+
+- **Section 1 opens on a real continuous outcome.** `birthwt.csv` gains `bwt`,
+  the birth weight in grams that Section 0's binary `low` is cut from, so the
+  same three predictors are fitted continuously and checked against R
+  `tram::Colr` at matched degree. The `smoke` log-odds ratio comes out at +0.664
+  (flow), +0.669 (`Colr`) and +0.671 (Section 0's `glm` on the dichotomized
+  outcome) — the proportional-odds property made concrete: a linear shift moves
+  the whole latent distribution, so cutting the outcome at 2500 g discards
+  information about `h` but leaves the shift alone.
+
+- **Section 1 now reproduces the continuous fit outside the flow too.** R
+  `tram::Colr` is shown with its real output rather than as untested code,
+  and `statsmodels` gets a route it was previously said to lack: a continuous
+  transformation model is the limit of an ordered logit, so cutting the
+  outcome into `K` quantile bins and fitting `OrderedModel` converges to the
+  flow's shift coefficients. Neither is an exact-MLE check, unlike Sections 0
+  and 2: the two libraries implement `h` differently, so the log-likelihoods
+  differ by ~0.7-0.9 nats and in **opposite directions** on the two VACA nodes,
+  which proves neither function class contains the other. The cause is the
+  basis range — the flow pre-scales onto [-5, 5] and leaves 10% of the rows in
+  linear extrapolation tails, while `Colr` uses the full support. The section
+  also writes its 1000-row sample to `notebooks/data/vaca.csv` and reads it
+  back, so the R snippet runs on the identical rows the flow was fitted on, and
+  it makes the per-node-kind sign convention explicit: a continuous node adds
+  its shift, so `OrderedModel`'s coefficients need negating, while an ordinal
+  node's do not.
+
+- **Standard errors and confidence intervals, as a notebook prototype.**
+  `fit_classical` leaves the model at the MLE in float64, which is what a
+  Hessian-based standard error needs, so the notebook computes the observed
+  Fisher information by double backward and inverts it. Sections 1 and 2 both
+  reproduce their classical reference: `Colr`'s standard errors to three
+  decimals on `bwt`, `statsmodels`' to four on the stroke outcome. The
+  information matrix is **singular** in both — 13 of 24 parameters on `bwt`,
+  and one flat direction per one-hot parent on the stroke node — so the helper
+  uses a pseudo-inverse and reports how far each contrast leaks into the flat
+  subspace. A contrast with a non-zero leak still gets a finite, plausible
+  number that means nothing, which is why `flow.conf_int` is still not API: one
+  row per parameter would be mostly nonsense.
+
+- **Section 2 now says which coefficient is weakly identified, and it is not
+  the treatment.** `T` sits 6.6 standard errors from zero. The weak one is
+  `mRS_pre` level 5, carried by 7 of 1275 rows, with a standard error six times
+  level 1's — matching what `validate_ls.py`'s docstring already recorded. The
+  flow-vs-`statsmodels` coefficient gaps turn out to measure something else
+  entirely: the optimizer stopping while the likelihood is still flat. The
+  displacement `c' I+ grad` predicts them exactly, +1.4e-03 for `Age` and
+  +7.4e-03 for `T`.
+
+- **Logistic regression is the zeroth example**, opening
+  `classical_fit_tram_dag.py`: a two-level `OrdinalNode` with `LS` terms *is*
+  logistic regression, `logit P(Y=1) = -theta_0 + w_0 + sum_p w_p x_p`. It
+  runs on `MASS::birthwt` (new `notebooks/data/`, exported verbatim from
+  MASS, with a pasteable `glm` snippet that needs no file because the data
+  ships with MASS) and agrees with `statsmodels.Logit` and R `glm` on all
+  four coefficients to ~1e-8, on the log-likelihood to 1e-5, and on the
+  fitted probabilities to 9e-8. It makes two conventions concrete on the simplest
+  possible model: an ordinal node *subtracts* its shift, and an ordinal
+  parent's one-hot level-0 column is part of the intercept.
 - **`tramdag.callbacks`** — the common training recipes as shipped, opt-in
   callbacks: `Logger` (epoch lines: train and validation NLL, `every=`),
   `RestoreBest` (best-validation weights, restored through
@@ -201,6 +270,12 @@ default the paper replication or the tests had to switch off.
   networks now build through one `_mlp()` helper.
 
 ### Fixed
+
+- **The docs site published every formula as raw LaTeX.** `pdoc` renders maths
+  only with `--math`, which defaults to false and the docs workflow never
+  passed. Every `$...$` in the notebooks and guides — around 110 of them, plus
+  122 in the new `classical_fit_tram_dag.py` — reached the site as literal
+  source. One word in `.github/workflows/docs.yaml`.
 
 - **`check.py` had no test, and the escape hatch it grew hid the thing it was
   meant to expose.** A `"why"` on a `{max}` entry silenced *both* edges of the
