@@ -12,9 +12,10 @@ exact targets:
   (experiments/paper/data/vaca/obs.csv, n=5000, 90/10 split); target = val NLL
   within 2e-3 of a cached reference.
 
-Because ``fit`` records per-epoch val NLL *and* wall-clock time in
-a per-epoch callback (validation NLL, wall clock), every config runs once and
-time-to-target is read off that record post hoc — no instrumentation overhead.
+The benchmark's per-epoch callback records validation NLL *and* wall-clock
+time (``fit`` itself records only the per-node train NLL), so every config
+runs once and time-to-target is read off that record post hoc — no
+instrumentation overhead.
 
 Usage (from experiments/)::
 
@@ -375,6 +376,9 @@ def run_lbfgs(seed: int, warm_epochs: int = 0) -> dict:
     t0 = time.perf_counter()
     if warm_epochs:
         flow.fit(train, epochs=warm_epochs, learning_rate=1e-2, batch_size=512)
+    # cold start: the same calibrated start a fit would take (no-op when warm).
+    # Not fit_classical: this loop needs per-chunk time-to-target readings and
+    # float32, and node_log_prob (not the no-grad log_prob) keeps the graph.
     flow.calibrate(train)
     vals = flow._tensorize(train)
     flow.train()

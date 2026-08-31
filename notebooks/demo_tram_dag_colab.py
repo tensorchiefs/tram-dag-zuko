@@ -312,7 +312,8 @@ plt.show()
 # `"bernstein"` (default, TRAM-faithful polynomial), `"spline"` (monotone
 # rational-quadratic, the neural-spline-flow building block), or `"affine"`
 # (location–scale only, which forces every node-conditional to be a logistic,
-# in effect a classical GLM). Same DAG, same training, three model families:
+# in effect a classical GLM). Same DAG, same protocol (the learning rate is
+# tuned per family), three model families:
 
 
 # %%
@@ -360,12 +361,15 @@ plt.show()
 # Reading the table: **affine** pays exactly where you expect it to pay. A
 # location–scale transform *cannot* produce a bimodal $x_1$ (the same failure
 # mode as the inflexible CNF in Fig. 4 of the paper). The **RQ-spline** is
-# expressive enough *in principle*. But with the small TRAM-DAG parameter heads,
-# it consistently trains to a worse optimum on this target (same result for
-# 8–32 bins, lr 0.01–0.1, up to 2000 epochs). This is an honest empirical reason
-# why **Bernstein** is the TRAM-faithful default: its monotone softplus-cumsum
-# parametrization is easier to optimize. You can swap the transform per node at
-# any time with `I(..., transform="spline", bins=16)`.
+# expressive enough *in principle*, and its gap is **structural, not an
+# optimization failure** (same result for 8–32 bins, lr 0.01–0.1, up to 2000
+# epochs): zuko's spline extrapolates outside its `[-5, 5]` domain with a
+# *fixed* slope regardless of the fitted parameters, so the ~10% of data
+# beyond the 5%/95% pre-scaling range is misweighted whenever the true tail
+# slope differs. Bernstein's linear extrapolation follows the boundary
+# derivative instead — which is why it is the TRAM-faithful default. You can
+# swap the transform per node at any time with `I(..., transform="spline",
+# bins=16)`.
 
 # %% [markdown]
 # ## What you just saw

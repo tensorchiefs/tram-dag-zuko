@@ -22,7 +22,8 @@ Usage on any machine (no repo clone needed)::
 Collecting results: copy each machine's JSON into the repo's ``docs/perf/``
 (when run from a repo clone the JSON is written there directly), then::
 
-    python -m benchmarks.perf_machine --report docs/perf   # table + docs/perf/REPORT.md
+    # from experiments/: writes the table and docs/perf/REPORT.md
+    python -m benchmarks.perf_machine --report ../docs/perf
 """
 
 # %% imports ---------------------------------------------------------------------------
@@ -164,8 +165,6 @@ def machine_info() -> dict:
     import platform
     import socket
 
-    import torch
-
     info: dict = {
         "hostname": socket.gethostname().split(".")[0],
         "os": f"{platform.system()} {platform.release()}",
@@ -293,6 +292,7 @@ def run_workload(name: str, device: str) -> dict:
         "abduct_10k_s": round(abduct_s, 2),
         # cross-machine sanity check: same seed + data -> NLL must be ~equal
         "final_val_nll": round(sum(flow.nll(val).values()), 4),
+        # underscore: ignored by --report, a cross-machine sampling sanity value
         "_sample_mean_x_last": round(float(samp.iloc[:, -1].mean()), 4),
     }
 
@@ -351,7 +351,7 @@ def main() -> None:
     ap.add_argument(
         "--report",
         metavar="DIR",
-        help="merge perf_*.json from DIR into a table and exit",
+        help="merge the machine JSONs from DIR into a table and exit",
     )
     args = ap.parse_args()
     if args.report:

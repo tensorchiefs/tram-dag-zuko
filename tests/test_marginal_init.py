@@ -151,6 +151,7 @@ def test_init_marginals_is_explicit_and_repeatable():
     flow.init_marginals(df)  # fresh flow: takes the ranges too
     assert bool(flow.calibrated)
     start = flow.nodes["x1"].intercept.theta.detach().clone()
+    start_y = flow.nodes["y"].intercept.theta.detach().clone()
 
     flow.fit(df, epochs=5, learning_rate=1e-2, batch_size=128)
     assert not torch.equal(start, flow.nodes["x1"].intercept.theta.detach())
@@ -159,6 +160,9 @@ def test_init_marginals_is_explicit_and_repeatable():
     flow.init_marginals(df)  # explicit restart at the marginal
     np.testing.assert_allclose(
         start.numpy(), flow.nodes["x1"].intercept.theta.detach().numpy(), atol=1e-6
+    )
+    np.testing.assert_allclose(
+        start_y.numpy(), flow.nodes["y"].intercept.theta.detach().numpy(), atol=1e-6
     )
     for fitted, after in zip(
         ci_fitted, flow.nodes["x2"].intercept.parameters(), strict=True

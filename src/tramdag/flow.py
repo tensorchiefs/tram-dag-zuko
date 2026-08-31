@@ -743,7 +743,9 @@ class CausalFlowDAG(nn.Module):
         guarded by the calibrated flag, so calling it on a loaded or
         already-trained flow **discards those intercepts' weights** and
         restarts them at the marginal. An uncalibrated flow takes its ranges
-        from the same rows first.
+        from the same rows first. On a calibrated flow the Bernstein start
+        comes from the stored range alone (the canonical map; the df is not
+        read) — only ordinal intercepts re-read the rows.
 
         Returns
         -------

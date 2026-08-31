@@ -384,6 +384,9 @@ def describe_node(flow, name):
 def decompose_row(flow, name, row_df):
     """Numeric view: print u = intercept + sum(shifts) for one row and check it
     reproduces flow.node_log_prob exactly.
+
+    Anatomy on purpose: ``_tensorize``/``_features`` are library internals,
+    used here to open the model up — user code never needs them.
     """
     node = flow.nodes[name]
     vals = flow._tensorize(row_df)
@@ -483,6 +486,8 @@ plt.show()
 # compare them with the DGP constants:
 
 # %%
+# raw parameter access, to make the point; flow.ls_coefficients() is the
+# one-call read-out for all of them
 b21_hat = float(flow.nodes["X2"].shifts["X1"].weight.detach())
 b31_hat = float(flow.nodes["X3"].shifts["X1"].weight.detach())
 bY_hat = float(flow.nodes["Y"].shifts["X3"].weight.detach())
