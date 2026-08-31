@@ -115,6 +115,9 @@
 # | CI — $\boldsymbol{\vartheta}$ depends on parents | `I("X1")` (several `I(...)` parents feed **one joint** network → interactions) |
 # | LS — $\beta_{ij} x_j$ | `LS("X1")` (a single weight, no bias) |
 # | CS — $g_{ik}(x_k)$ | `CS("X1")` (64-128-64 MLP, additive) |
+#
+# `I(...)` dispatches on its arguments: no parents → a simple intercept (`SI`),
+# parents → a complex intercept (`CI`). The explicit names work too.
 
 # %% [markdown]
 # ### Gallery: a transformation *is* an additive decomposition
@@ -151,17 +154,13 @@
 # parent.
 
 # %%
-import logging
-
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import torch
 
 from tramdag import CS, LS, CausalFlowDAG, ContinuousNode, OrdinalNode
-
-# tramdag reports fit() progress on its module logger
-logging.basicConfig(level=logging.INFO, format="%(message)s")
+from tramdag.callbacks import Logger
 
 plt.rcParams["figure.dpi"] = 110
 
@@ -311,8 +310,9 @@ plt.show()
 # Fitting maximizes the joint likelihood. Because the flow is triangular, the
 # negative log-likelihood **decomposes per node**
 # ($\log p(x) = \sum_i \log p(x_i \mid \mathrm{pa}(x_i))$). Thus one Adam
-# optimizer trains all nodes at once. With `restore_best=False` (the default) we
-# keep the final converged weights. These weights are the exact MLE.
+# optimizer trains all nodes at once. `fit` keeps the final weights — for
+# this unconfounded DGP the MLE is the right target. Progress printing is a
+# shipped callback (`tramdag.callbacks.Logger`).
 
 # %%
 spec = {
@@ -326,11 +326,13 @@ flow = CausalFlowDAG(
     spec, seed=1
 )  # seed here too, for the Bernsteins' initial uniform knots
 flow.fit(
-    train_df, val_df, epochs=800, learning_rate=1e-2, batch_size=20000, verbose=200
+    train_df,
+    epochs=800,
+    learning_rate=1e-2,
+    batch_size=20000,
+    after_epoch_callbacks=Logger(every=200),
 )
-flow.fit(
-    train_df, val_df, epochs=300, learning_rate=1e-3, batch_size=512, verbose=300
-)  # polish
+flow.fit(train_df, epochs=300, learning_rate=1e-3, batch_size=512)  # polish
 flow.nll(val_df)
 
 # %% [markdown]
@@ -382,6 +384,9 @@ def describe_node(flow, name):
 def decompose_row(flow, name, row_df):
     """Numeric view: print u = intercept + sum(shifts) for one row and check it
     reproduces flow.node_log_prob exactly.
+
+    Anatomy on purpose: ``_tensorize``/``_features`` are library internals,
+    used here to open the model up — user code never needs them.
     """
     node = flow.nodes[name]
     vals = flow._tensorize(row_df)
@@ -481,6 +486,8 @@ plt.show()
 # compare them with the DGP constants:
 
 # %%
+# raw parameter access, to make the point; flow.ls_coefficients() is the
+# one-call read-out for all of them
 b21_hat = float(flow.nodes["X2"].shifts["X1"].weight.detach())
 b31_hat = float(flow.nodes["X3"].shifts["X1"].weight.detach())
 bY_hat = float(flow.nodes["Y"].shifts["X3"].weight.detach())
@@ -555,10 +562,10 @@ spec_ls = {
     "X3": ContinuousNode(LS("X1") + LS("X2")),  # <- CS replaced by LS
     "Y": OrdinalNode(4, LS("X3")),
 }
-torch.manual_seed(7)
-flow_ls = CausalFlowDAG(spec_ls)
-flow_ls.fit(train_df, val_df, epochs=800, learning_rate=1e-2, batch_size=512, verbose=0)
-flow_ls.fit(train_df, val_df, epochs=300, learning_rate=1e-3, batch_size=512, verbose=0)
+flow_ls = CausalFlowDAG(spec_ls, seed=7)
+# the same schedule as the cs model above, so the NLL comparison is fair
+flow_ls.fit(train_df, epochs=800, learning_rate=1e-2, batch_size=20000)
+flow_ls.fit(train_df, epochs=300, learning_rate=1e-3, batch_size=512)
 
 print(
     f"misspecified beta_32 (X2 -> X3): "
@@ -714,10 +721,11 @@ plt.show()
 #   `uv run python -m paper.vaca flexible` (from `experiments/`) for an all-intercept flow on a
 #   bimodal benchmark with analytic interventional truth.
 # * **Early stopping vs. exact MLE** — this notebook's DGP has no unobserved
-#   confounding, so the MLE (`restore_best=False`, the default) is the right
+#   confounding, so the MLE (the final weights `fit` keeps) is the right
 #   target. Under observational confounding, flexible (`I`/`CS`) models can
-#   *overfit the confounding* at the MLE and need `restore_best=True` to recover
-#   the causal effect. See `CHANGELOG.md`.
+#   *overfit the confounding* at the MLE and need best-validation weights
+#   (`tramdag.callbacks.RestoreBest`) to recover
+#   the causal effect. See `docs/fitting.md`.
 # * **Validation against classical models** — an all-`LS` flow trained to
 #   convergence *is* the classical proportional-odds MLE
 #   (`experiments/misc/validate_ls.py` pins flow ≡ `statsmodels` ≡ R `polr`, and the

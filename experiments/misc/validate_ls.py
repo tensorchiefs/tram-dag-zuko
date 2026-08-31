@@ -6,7 +6,7 @@ classical maximum-likelihood estimate — not approximately, but to the
 precision of the optimizer. This experiment is the framework's external
 correctness anchor: it fits the same data three ways and compares.
 
-1. the flow, on the full dataset with ``restore_best=False`` so it sits at
+1. the flow, on the full dataset with its final weights, so it sits at
    the training-data maximum likelihood;
 2. ``statsmodels`` ``OrderedModel``, on the design matrix the flow builds;
 3. R's ``MASS::polr`` / ``tram``, whose committed output is read from
@@ -89,9 +89,7 @@ def fit_flow(spec: dict, observed: pd.DataFrame, config: dict) -> CausalFlowDAG:
     """
     flow = CausalFlowDAG(spec, seed=config["init_seed"])
     if config["fitter"] == "classical":
-        flow.fit_classical(
-            observed, max_iter=config["classical_max_iter"], verbose=False
-        )
+        flow.fit_classical(observed, max_iter=config["classical_max_iter"])
     elif config["fitter"] == "adam":
         for phase, (epochs, learning_rate) in enumerate(config["phases"]):
             flow.fit(
@@ -99,8 +97,6 @@ def fit_flow(spec: dict, observed: pd.DataFrame, config: dict) -> CausalFlowDAG:
                 epochs=epochs,
                 learning_rate=learning_rate,
                 batch_size=config["batch_size"],
-                verbose=0,
-                restore_best=False,  # stay at the training-data MLE
                 seed=config["shuffle_seed"] if phase == 0 else None,
             )
     else:

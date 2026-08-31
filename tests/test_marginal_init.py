@@ -1,4 +1,4 @@
-"""Tests for ``fit(marginal_init=True)`` — calibrated initialization of each
+"""Tests for ``calibrate(marginal_init=True)`` — calibrated initialization of each
 *unconditional* (root) node's transform to the empirical marginal.
 
 What it guarantees:
@@ -80,7 +80,7 @@ def test_marginal_init_only_touches_unconditional_roots():
         for k, v in flow.nodes["x2"].intercept.state_dict().items()
     }
 
-    flow._set_ranges(df, marginal_init=True)
+    flow.calibrate(df, marginal_init=True)
 
     # the two roots are now calibrated (changed from their zero init)...
     assert not torch.allclose(flow.nodes["x1"].intercept.theta.detach(), root_x1_before)
@@ -97,7 +97,7 @@ def test_marginal_init_only_touches_unconditional_roots():
 
 def test_marginal_init_on_by_default_calibrates_roots():
     flow, df = _mixed_flow_and_df()
-    flow._set_ranges(df, marginal_init=False)  # zuko's zero start, on request
+    flow.calibrate(df, marginal_init=False)  # zuko's zero start, on request
     assert torch.allclose(
         flow.nodes["x1"].intercept.theta.detach(),
         torch.zeros_like(flow.nodes["x1"].intercept.theta),
@@ -113,19 +113,9 @@ def test_marginal_init_is_pure_init_same_optimum(ls_chain):
     spec = {"x1": ContinuousNode(), "x2": ContinuousNode([LS("x1")])}
 
     def converged_nll(marginal_init):
-        torch.manual_seed(0)
-        flow = CausalFlowDAG(spec)
-        flow.fit(
-            obs,
-            epochs=1500,
-            learning_rate=1e-2,
-            batch_size=512,
-            verbose=0,
-            schedule="plateau",
-            plateau_patience=15,
-            freeze_patience=60,
-            marginal_init=marginal_init,
-        )
+        flow = CausalFlowDAG(spec, seed=0)
+        flow.calibrate(obs, marginal_init=marginal_init)
+        flow.fit(obs, epochs=1500, learning_rate=1e-2, batch_size=512)
         return sum(flow.nll(obs).values())
 
     np.testing.assert_allclose(converged_nll(True), converged_nll(False), atol=1e-2)
@@ -134,21 +124,47 @@ def test_marginal_init_is_pure_init_same_optimum(ls_chain):
 def test_marginal_init_does_not_reset_a_loaded_model(tmp_path):
     """A loaded model is trained, so re-fitting must not re-initialize it.
 
-    The continuous guard is the transform's ``_fitted`` flag, which
-    ``load`` restores; the ordinal guard lives on the intercept and used to
-    be lost, so a second ``fit(marginal_init=True)`` reset the cutpoints.
+    The ``calibrated`` flag is a buffer, so it travels in the checkpoint; a
+    second ``fit`` (or an explicit ``calibrate``) is a no-op on the start.
     """
     rng = np.random.default_rng(0)
     df = pd.DataFrame({"y": rng.integers(0, 4, 400).astype(float)})
     flow = CausalFlowDAG({"y": OrdinalNode(4)}, seed=0)
-    flow.fit(
-        df, epochs=5, learning_rate=1e-2, batch_size=128, verbose=0, marginal_init=True
-    )
+    flow.fit(df, epochs=5, learning_rate=1e-2, batch_size=128)
     flow.save(tmp_path / "m.pt")
     loaded = CausalFlowDAG.load(tmp_path / "m.pt")
 
     before = loaded.nodes["y"].intercept.theta.detach().clone()
-    loaded.fit(
-        df, epochs=0, learning_rate=1e-2, batch_size=128, verbose=0, marginal_init=True
-    )
+    loaded.calibrate(df, marginal_init=True)
+    # lr 0: the epoch runs (and would recalibrate, if the flag were lost)
+    # without moving any weight
+    loaded.fit(df, epochs=1, learning_rate=0.0, batch_size=128)
     assert torch.equal(before, loaded.nodes["y"].intercept.theta.detach())
+
+
+def test_init_marginals_is_explicit_and_repeatable():
+    """``init_marginals`` re-applies the calibrated start on a trained flow
+    (unlike ``calibrate``, which is once-only), touches only simple
+    intercepts, and calibrates a fresh flow's ranges itself.
+    """
+    flow, df = _mixed_flow_and_df()
+    flow.init_marginals(df)  # fresh flow: takes the ranges too
+    assert bool(flow.calibrated)
+    start = flow.nodes["x1"].intercept.theta.detach().clone()
+    start_y = flow.nodes["y"].intercept.theta.detach().clone()
+
+    flow.fit(df, epochs=5, learning_rate=1e-2, batch_size=128)
+    assert not torch.equal(start, flow.nodes["x1"].intercept.theta.detach())
+    ci_fitted = [p.detach().clone() for p in flow.nodes["x2"].intercept.parameters()]
+
+    flow.init_marginals(df)  # explicit restart at the marginal
+    np.testing.assert_allclose(
+        start.numpy(), flow.nodes["x1"].intercept.theta.detach().numpy(), atol=1e-6
+    )
+    np.testing.assert_allclose(
+        start_y.numpy(), flow.nodes["y"].intercept.theta.detach().numpy(), atol=1e-6
+    )
+    for fitted, after in zip(
+        ci_fitted, flow.nodes["x2"].intercept.parameters(), strict=True
+    ):
+        assert torch.equal(fitted, after.detach())  # ci intercept: never re-inited

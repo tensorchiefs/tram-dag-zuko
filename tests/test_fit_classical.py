@@ -53,7 +53,7 @@ def test_same_seed_is_bit_identical(ls_chain):
     for _ in range(2):
         torch.manual_seed(7)
         flow = CausalFlowDAG(_ls_spec())
-        flow.fit_classical(obs, max_iter=100, verbose=False)
+        flow.fit_classical(obs, max_iter=100)
         coefs.append(flow.ls_coefficients()["y"]["t"].copy())
     np.testing.assert_array_equal(coefs[0], coefs[1])
 
@@ -64,7 +64,7 @@ def test_dtype_round_trip_and_usable(ls_chain):
     torch.manual_seed(0)
     flow = CausalFlowDAG(_ls_spec())
     assert next(flow.parameters()).dtype == torch.float32
-    rep = flow.fit_classical(obs, max_iter=75, verbose=False)
+    rep = flow.fit_classical(obs, max_iter=75)
     assert next(flow.parameters()).dtype == torch.float32
     assert {"n_iter", "final_nll", "grad_norm", "coefficients", "seconds"} <= rep.keys()
     assert flow.pmf(obs.head(5), "y").shape == (5, 4)
@@ -77,7 +77,7 @@ def test_continuous_only_all_ls_recovers_the_true_shift(ls_chain):
     spec = {"x1": ContinuousNode(), "x2": ContinuousNode([LS("x1")])}
     torch.manual_seed(0)
     flow = CausalFlowDAG(spec)
-    rep = flow.fit_classical(df, max_iter=200, verbose=False)
+    rep = flow.fit_classical(df, max_iter=200)
     assert np.isfinite(rep["final_nll"])
     beta = float(flow.ls_coefficients()["x2"]["x1"][0])
     assert beta == pytest.approx(ls_chain["truth"]["beta_x2_x1"], abs=0.15)
@@ -87,7 +87,7 @@ def test_max_iter_and_history_size_reach_the_solver(ls_chain):
     """max_iter caps the L-BFGS iterations the report counts."""
     obs = ls_chain["draw"](800, 3)
     rep = CausalFlowDAG(_ls_spec(), seed=0).fit_classical(
-        obs, max_iter=10, history_size=7, verbose=False
+        obs, max_iter=10, history_size=7
     )
     assert 0 < rep["n_iter"] <= 10
     assert rep["converged"] is False  # ten iterations cannot settle this fit
@@ -113,7 +113,7 @@ def test_matches_statsmodels_mle(ls_chain):
     res = OrderedModel(obs["y"].astype(int), X, distr="logit").fit(
         method="bfgs", disp=False
     )
-    flow.fit_classical(obs, verbose=False)
+    flow.fit_classical(obs)
     coefs = flow.ls_coefficients()["y"]
     assert float(coefs["x1"][0]) == pytest.approx(res.params["x1"], abs=0.01)
     assert float(coefs["x2"][0]) == pytest.approx(res.params["x2"], abs=0.01)
@@ -137,12 +137,10 @@ def test_agrees_with_adam_mle(ls_chain):
             epochs=ep,
             learning_rate=lr,
             batch_size=256,
-            verbose=0,
-            restore_best=False,
         )
     torch.manual_seed(0)
     fc = CausalFlowDAG(_ls_spec())
-    fc.fit_classical(obs, verbose=False)
+    fc.fit_classical(obs)
     for node, parent in [("y", "x1"), ("y", "x2"), ("t", "x1"), ("x2", "x1")]:
         a = float(fa.ls_coefficients()[node][parent][0])
         c = float(fc.ls_coefficients()[node][parent][0])

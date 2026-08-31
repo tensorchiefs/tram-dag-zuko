@@ -50,23 +50,24 @@ from tramdag import CausalFlowDAG, ContinuousNode, OrdinalNode, I, LS, CS
 spec = {  # the spec IS the labelled DAG
     "X1": ContinuousNode(),
     "X2": ContinuousNode(I("X1")),
-    "T": OrdinalNode(2, LS("X1") + CS("X2")),
+    "T": OrdinalNode(2, LS("X1") + CS("X2")),  # 2 levels, column coded 0..1
     "Y": OrdinalNode(4, I("X1") + CS("X2") + LS("T")),
 }
+# train_df / val_df: DataFrames with one column per node
 flow = CausalFlowDAG(spec)  # validates acyclicity, builds the flow
 
-# self-stopping training: per-node plateau lr decay + freezing of converged
-# nodes (exact, since the per-node NLLs have independent gradients);
-# see docs/training-speed.md for benchmarks and the classic two-phase recipe
+# fit() is one minibatch Adam loop; validation, schedules and early stopping
+# attach through optimizer= and the callback hooks — the common recipes ship
+# in tramdag.callbacks (docs/fitting.md)
+from tramdag.callbacks import Logger, RestoreBest
+
+best = RestoreBest(val_df)  # keep the best-validation weights
 flow.fit(
     train_df,
-    val_df,
     epochs=4000,
-    learning_rate=1e-2,
     batch_size=512,
-    schedule="plateau",
-    plateau_patience=30,
-    freeze_patience=120,
+    after_epoch_callbacks=[Logger(val_df, every=100), best],
+    after_fit_callbacks=[best.restore],
 )
 
 # all-`ls` model? fit it classically instead: deterministic float64 L-BFGS,
@@ -84,12 +85,12 @@ cf = flow.sample(do={"T": 1}, u=u)  # L3 steps 2+3: counterfactuals
 
 flow.ls_coefficients()  # interpret: per-edge log-odds-ratios (LS terms)
 # per-parent partial effects of an additive complex intercept (centered):
-# flow.intercept_contributions("Y", df) on a CI("A", "B", allow_interaction=False)
+# flow.intercept_contributions(df, "Y") on a CI("A", "B", allow_interaction=False)
 
 # heterogeneous treatment effects: a small, penalized effect head beta(x)*T
 # (VC term) with a first-class read-out — see docs/varying-coefficients.md
 # e.g. CS("X1", "X2") + VC("X1", t="T") ->
-# flow.varying_coef("Y", df)               # beta(x): deterministic, y-free
+# flow.varying_coef(df, "Y")               # beta(x): deterministic, y-free
 
 flow.scores(df, node="Y")  # per-observation scores dl_i/dtheta
 flow.effect_modifier_scan(df, "Y", t="T")  # which VC modifiers? (CUSUM
@@ -193,7 +194,7 @@ See the [`tests/README.md`](tests/README.md) file for more details.
 
 ```
 src/tramdag/            spec.py transforms.py conditioners.py flow.py
-                        scores.py utils.py        <- the framework, and nothing else
+                        scores.py                 <- the framework, and nothing else
 tests/                  unit tests, identities, acceptance bars, three inline DGPs
 experiments/            research code, one directory per area, each self-contained:
                           paper/       the replications + generators + frozen data

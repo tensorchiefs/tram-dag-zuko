@@ -9,10 +9,11 @@ import torch
 from tramdag import CS, LS, CausalFlowDAG, ContinuousNode, I, OrdinalNode
 from tramdag.spec import validate_and_sort
 from tramdag.transforms import (
+    BOUND,
     AffineUT,
     BernsteinUT,
     SplineUT,
-    _expanding_bisection,
+    StandardLogistic,
     ordinal_cutpoints,
     ordinal_log_prob,
     ordinal_pmf,
@@ -40,11 +41,9 @@ def fitted_flow():
     flow = CausalFlowDAG(spec)
     flow.fit(
         df.iloc[:2400],
-        df.iloc[2400:],
         epochs=300,
         learning_rate=0.05,
         batch_size=600,
-        verbose=0,
         seed=0,
     )
     return flow, df
@@ -58,6 +57,8 @@ def test_univariate_roundtrip(ut):
     x = torch.linspace(-6.0, 10.0, n)  # includes values outside the fitted range
     z0, ladj = ut.forward(theta, x)
     assert torch.isfinite(z0).all()
+    far = ut.inverse(theta[:2], torch.tensor([-40.0, 60.0]))  # far tails: closed form
+    assert torch.isfinite(far).all()
     assert torch.isfinite(ladj).all()
     x_rec = ut.inverse(theta, z0)
     assert torch.allclose(x_rec, x, atol=1e-3), (x_rec - x).abs().max()
@@ -189,7 +190,7 @@ def test_ls_node_equals_proportional_odds():
         "Y": OrdinalNode(4, [LS("X1"), LS("X2")]),
     }
     flow = CausalFlowDAG(spec)
-    flow.fit(df, df, epochs=400, learning_rate=0.05, batch_size=1000, verbose=0, seed=1)
+    flow.fit(df, epochs=400, learning_rate=0.05, batch_size=1000, seed=1)
 
     res = OrderedModel(df["Y"].astype(int), df[["X1", "X2"]], distr="logit").fit(
         method="bfgs", disp=False
@@ -209,11 +210,23 @@ def test_ls_node_equals_proportional_odds():
     assert np.abs(pmf_flow - pmf_sm).max() < 0.01
 
 
-def test_bisection_warns_when_a_root_escapes_the_bracket():
-    """A root beyond max_expand doublings is clipped and reported, not silent."""
-    z = torch.tensor([0.5, 1e12])  # the second target is out of any reach
-    lo, hi = torch.tensor([-1.0, -1.0]), torch.tensor([1.0, 1.0])
-    with pytest.warns(RuntimeWarning, match="1 latent value"):
-        root = _expanding_bisection(lambda t: t, z, lo, hi, max_expand=5, iters=30)
-    assert torch.isclose(root[0], torch.tensor(0.5), atol=1e-6)
-    assert root[1] < 1e12  # clipped to the (expanded) bracket edge
+def test_affine_zero_theta_is_the_logistic_density():
+    """A closed-form anchor for the continuous path: with an affine transform at
+    theta = 0 the model *is* the standard logistic, rescaled by the pre-map's
+    Jacobian log(2*BOUND / (xmax - xmin)).
+    """
+    df = pd.DataFrame({"x": np.linspace(-4.0, 6.0, 400)})
+    flow = CausalFlowDAG({"x": ContinuousNode(I(transform="affine"))}, seed=0)
+    flow.calibrate(df, marginal_init=False)
+    with torch.no_grad():
+        flow.nodes["x"].intercept.theta.zero_()
+    xmin, xmax = (float(v) for v in (flow.nodes["x"].ut.xmin, flow.nodes["x"].ut.xmax))
+    z = (df["x"].to_numpy() - xmin) / (xmax - xmin) * 2 * BOUND - BOUND
+    expected = StandardLogistic.log_prob(torch.tensor(z, dtype=torch.float32))
+    expected = expected + np.log(2 * BOUND / (xmax - xmin))
+    np.testing.assert_allclose(
+        flow.log_prob(df).detach().numpy(), expected.numpy(), atol=1e-5
+    )
+    # the transform ranges are the train 5%/95% quantiles, as calibrate documents
+    q = df["x"].quantile([0.05, 0.95])
+    assert (xmin, xmax) == pytest.approx((q.iloc[0], q.iloc[1]))

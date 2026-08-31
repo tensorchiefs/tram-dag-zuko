@@ -29,14 +29,19 @@ def fit_paper(generator, spec: dict, config: dict, out: Path, record=None):
     ``summerof24/*.R`` calls Keras ``fit(epochs = 1)`` in a loop over one
     compiled model and reads the ``beta`` layer after every epoch, so the
     trajectory comes from a single continuous Adam run; ``comparison/utils.R``
-    takes one full-batch step per epoch with a ReduceLROnPlateau on the
-    validation NLL. Both are one ``fit`` call here: ``epoch_callback`` is the
-    per-epoch read-out, and ``schedule``/``plateau_*`` carry the plateau rule.
+    takes one full-batch step per epoch and reduces the learning rate of that
+    one optimizer when the summed validation NLL plateaus
+    (``update_learning_rate``: factor, patience, min_lr, strict ``<``). Both
+    are one ``fit`` call here: the plateau rule is torch's own
+    ``ReduceLROnPlateau`` on the summed validation NLL — global, like the
+    reference — stepped from the epoch callback, which is also where the
+    coefficients are read.
 
-    Train and validation are two separate draws, as in R. The fitted flow is
-    saved to ``out / "flow.pt"``. ``record(flow)``, when given, is stored
-    after each epoch with the epoch count — the coefficient trajectories of
-    paper Fig. 14, 15 and 19.
+    Train and validation are two separate draws, as in R. The reference has
+    no calibrated start, so the flow is calibrated with ``marginal_init=False``.
+    The fitted flow is saved to ``out / "flow.pt"``. ``record(flow)``, when
+    given, is stored after each epoch with the epoch count — the coefficient
+    trajectories of paper Fig. 14, 15 and 19.
 
     Returns
     -------
@@ -49,35 +54,36 @@ def fit_paper(generator, spec: dict, config: dict, out: Path, record=None):
         spec,
         seed=config["init_seed"],
         net_input_scaling=config["net_input_scaling"],
+        init=config["init"],
     )
-    plateau = (
-        {
-            "plateau_patience": config["plateau_patience"],
-            "plateau_factor": config["plateau_factor"],
-            "plateau_min_lr": config["plateau_min_lr"],
-            "min_delta": config["min_delta"],
-        }
-        if config["schedule"] == "plateau"
-        else {}
-    )
+    flow.calibrate(train, marginal_init=False)
+    opt = torch.optim.Adam(flow.parameters(), lr=config["learning_rate"])
+    plateau = None
+    if config["schedule"] == "plateau":
+        plateau = torch.optim.lr_scheduler.ReduceLROnPlateau(
+            opt,
+            factor=config["plateau_factor"],
+            # torch reduces once `bad > patience`, the reference at `bad == patience`
+            patience=config["plateau_patience"] - 1,
+            threshold=config["min_delta"],
+            threshold_mode="abs",
+            min_lr=config["plateau_min_lr"],
+        )
     trajectory = []
+
+    def epoch_end(f, epoch, _opt):
+        if plateau is not None:
+            plateau.step(sum(f.nll(val).values()))
+        if record is not None:
+            trajectory.append({"epoch": epoch, **record(f)})
+
     flow.fit(
         train,
-        val,
         epochs=config["epochs"],
-        learning_rate=config["learning_rate"],
         batch_size=config["batch_size"],
         seed=config["shuffle_seed"],
-        # a framework switch the reference lacks: no calibrated start
-        marginal_init=False,
-        schedule=config["schedule"],
-        **plateau,
-        verbose=0,
-        epoch_callback=(
-            None
-            if record is None
-            else lambda f, e: trajectory.append({"epoch": e, **record(f)})
-        ),
+        optimizer=opt,
+        after_epoch_callbacks=epoch_end,
     )
     flow.save(out / "flow.pt")
     return flow, train, val, trajectory
@@ -172,9 +178,12 @@ def compare_do_x1(
         title,
         ordinal_levels,
     )
+    dgp_mean = float(dgp_samples[do_query]["x3"].mean())
+    flow_mean = float(flow_samples[do_query]["x3"].mean())
     return {
-        "mean_x3_dgp_do_x1": float(dgp_samples[do_query]["x3"].mean()),
-        "mean_x3_flow_do_x1": float(flow_samples[do_query]["x3"].mean()),
+        "mean_x3_dgp_do_x1": dgp_mean,
+        "mean_x3_flow_do_x1": flow_mean,
+        "mean_x3_abs_err_do_x1": abs(flow_mean - dgp_mean),
     }
 
 

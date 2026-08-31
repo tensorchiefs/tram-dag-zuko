@@ -163,7 +163,7 @@ def fit_x3_nll():
             },
             seed=0,
         )
-        flow.fit(train, val, epochs=300, learning_rate=1e-2, batch_size=512, verbose=0)
+        flow.fit(train, epochs=300, learning_rate=1e-2, batch_size=512)
         return flow.nll(val)["x3"]
 
     return _fit

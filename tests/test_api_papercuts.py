@@ -1,6 +1,5 @@
-"""Tests for the API papercuts in issue #12: constructor seeding, history +
-and machine-info persistence through save/load (the helper itself is
-tested in test_utils.py).
+"""Tests for the API papercuts in issue #12: constructor seeding, history and
+version metadata through save/load, the init option.
 """
 
 # %% imports ---------------------------------------------------------------------------
@@ -59,25 +58,23 @@ def test_save_load_round_trips_history(tmp_path):
         }
     )
     flow = CausalFlowDAG(_spec(), seed=0)
-    flow.fit(df, df, epochs=12, verbose=0)
-    assert len(flow.history["val"]) == 12
+    flow.fit(df, epochs=12)
+    assert len(flow.history["train"]) == 12
     p = tmp_path / "flow.pt"
     flow.save(p)
     loaded = CausalFlowDAG.load(p)
-    assert set(loaded.history) == {"train", "val", "lr", "time"}
-    assert len(loaded.history["val"]) == 12
-    assert len(loaded.history["time"]) == 12  # wall-clock curve survives too
+    assert set(loaded.history) == {"train"}
+    assert len(loaded.history["train"]) == 12
 
 
-def test_save_carries_machine_and_version_metadata(tmp_path):
+def test_save_carries_version_metadata(tmp_path):
     flow = CausalFlowDAG(_spec(), seed=0)
     p = tmp_path / "flow.pt"
     flow.save(p)
     loaded = CausalFlowDAG.load(p)
-    assert {"tramdag_version", "saved_at", "device", "machine"} <= set(loaded.meta)
+    assert {"tramdag_version", "saved_at", "device"} <= set(loaded.meta)
     assert loaded.meta["tramdag_version"] == td.__version__
     assert loaded.meta["device"] == "cpu"
-    assert loaded.meta["machine"]["torch"] == torch.__version__
 
 
 def test_load_requires_a_complete_checkpoint(tmp_path):
@@ -125,3 +122,49 @@ def test_fit_rejects_a_batch_size_below_one():
     df = pd.DataFrame({"x1": np.zeros(8), "x2": np.zeros(8), "y": np.zeros(8)})
     with pytest.raises(ValueError, match="batch_size must be at least 1"):
         CausalFlowDAG(_spec(), seed=0).fit(df, epochs=1, batch_size=0)
+
+
+def test_glorot_init_is_keras_dense_default(tmp_path):
+    """``init="glorot"``: every linear layer gets glorot-uniform weights and a
+    zero bias; the default stays torch's; a checkpoint carries the choice.
+    """
+    spec = {
+        "x1": td.ContinuousNode(),
+        "x2": td.ContinuousNode(td.CI("x1", units=[8])),
+        "x3": td.ContinuousNode(td.CS("x1", units=[8]) + td.LS("x2")),
+    }
+    with pytest.raises(ValueError, match="init"):
+        td.CausalFlowDAG(spec, init="he")
+    flow = td.CausalFlowDAG(spec, seed=0, init="glorot")
+    for m in flow.modules():
+        if isinstance(m, torch.nn.Linear):
+            bound = (6.0 / (m.in_features + m.out_features)) ** 0.5
+            assert float(m.weight.abs().max()) <= bound
+            assert m.bias is None or torch.equal(m.bias, torch.zeros_like(m.bias))
+    vc_spec = {
+        "x": td.ContinuousNode(),
+        "t": td.OrdinalNode(2, td.LS("x")),
+        "y": td.ContinuousNode(td.LS("x") + td.VC("x", t="t")),
+    }
+    head = td.CausalFlowDAG(vc_spec, seed=0, init="glorot").nodes["y"].shifts["t"]
+    assert torch.equal(head.net[-1].weight, torch.zeros_like(head.net[-1].weight))
+    normal = td.CausalFlowDAG(spec, seed=0, init="normal")
+    weights = torch.cat(
+        [m.weight.flatten() for m in normal.modules() if isinstance(m, torch.nn.Linear)]
+    )
+    assert 0.03 < float(weights.std()) < 0.07  # Keras RandomNormal, sd 0.05
+    biases = torch.cat(
+        [
+            m.bias.flatten()
+            for m in normal.modules()
+            if isinstance(m, torch.nn.Linear) and m.bias is not None
+        ]
+    )
+    assert biases.numel() > 0
+    assert float(biases.abs().max()) < 0.3  # drawn, not zeroed (sd 0.05)
+    assert float(biases.abs().max()) > 0.0
+    a = td.CausalFlowDAG(spec, seed=0).state_dict()
+    b = td.CausalFlowDAG(spec, seed=0, init="torch").state_dict()
+    assert all(torch.equal(a[k], b[k]) for k in a)
+    flow.save(tmp_path / "g.pt")
+    assert td.CausalFlowDAG.load(tmp_path / "g.pt").init == "glorot"

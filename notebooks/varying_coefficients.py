@@ -38,6 +38,7 @@ import numpy as np
 import pandas as pd
 
 from tramdag import CS, LS, VC, CausalFlowDAG, ContinuousNode, I, OrdinalNode
+from tramdag.callbacks import RestoreBest
 
 plt.rcParams["figure.dpi"] = 110
 
@@ -104,7 +105,7 @@ def cheap_all_ls():
 
 
 screen = CausalFlowDAG(cheap_all_ls(), seed=0)
-screen.fit_classical(train, verbose=False)
+screen.fit_classical(train)
 print(screen.effect_modifier_scan(train, "Y", t="T"))
 
 # %% [markdown]
@@ -132,7 +133,7 @@ def simulate_linear_x1(n, seed):
 
 well_specified = simulate_linear_x1(4500, 1)
 screen2 = CausalFlowDAG(cheap_all_ls(), seed=0)
-screen2.fit_classical(well_specified, verbose=False)
+screen2.fit_classical(well_specified)
 print(screen2.effect_modifier_scan(well_specified, "Y", t="T"))
 
 # %% [markdown]
@@ -157,15 +158,15 @@ spec = {
     "Y": ContinuousNode([CS("X1", "X2", "X3"), VC("X2", "X3", t="T")]),
 }
 flow = CausalFlowDAG(spec, seed=0)
+best = RestoreBest(val)
 flow.fit(
     train,
-    val,
     epochs=300,
     learning_rate=1e-2,
     batch_size=512,
-    verbose=0,
     seed=0,
-    restore_best=True,
+    after_epoch_callbacks=best,
+    after_fit_callbacks=best.restore,
 )
 print(flow.to_matrix())
 
@@ -183,7 +184,7 @@ print(flow.to_matrix())
 # `Y` values.
 
 # %%
-beta_hat = flow.varying_coef("Y", test)
+beta_hat = flow.varying_coef(test, "Y")
 beta_true = true_beta(test)
 corr = float(np.corrcoef(beta_hat, beta_true)[0, 1])
 beta0 = float(flow.nodes["Y"].shifts["T"].beta0)
@@ -238,7 +239,9 @@ print(f"max |beta(x) - (u(T=1) - u(T=0))| = {np.abs(beta_hat - (u1 - u0)).max():
 # $\tau = -1$, and a quadratic prognostic part fitted with a linear term.
 # `center=True` replaces $t$ by $t - \hat e(x)$ using **cross-fitted**
 # (out-of-fold) propensities, so the head sees the part of the treatment that
-# the covariates do not explain.
+# the covariates do not explain. Stage 1 — the propensities — is yours: any
+# classifier, predicted out of fold, handed to `fit(vc_ehat=)`. Here, five
+# classical fits of the treatment spec.
 
 # %%
 TAU = -1.0
@@ -254,6 +257,19 @@ def confounded(n, seed):
 
 c_train, c_val, c_test = confounded(5400, 0), confounded(600, 7), confounded(3000, 1000)
 
+# stage 1 of the centered design, the caller's job: cross-fitted P(T=1|X), each
+# fold predicted by a treatment model that never saw it (the DML requirement)
+fold_id = np.random.default_rng(0).permutation(len(c_train)) % 5
+e_oof = np.empty(len(c_train))
+for j in range(5):
+    t_spec = {
+        "X": ContinuousNode([I(transform="affine")]),
+        "T": OrdinalNode(2, [LS("X")]),
+    }
+    proxy = CausalFlowDAG(t_spec, seed=0)
+    proxy.fit_classical(c_train.iloc[fold_id != j][["X", "T"]])
+    e_oof[fold_id == j] = proxy.pmf(c_train.iloc[fold_id == j], "T")[:, 1]
+
 for center in (False, True):
     spec_c = {
         "X": ContinuousNode([I(transform="affine")]),
@@ -262,17 +278,18 @@ for center in (False, True):
         "Y": ContinuousNode([LS("X"), VC("X", center=center, t="T")]),
     }
     fc = CausalFlowDAG(spec_c, seed=0)
+    best = RestoreBest(c_val)
     fc.fit(
         c_train,
-        c_val,
         epochs=250,
         learning_rate=1e-2,
         batch_size=512,
-        verbose=0,
         seed=0,
-        restore_best=True,
+        after_epoch_callbacks=best,
+        after_fit_callbacks=best.restore,
+        vc_ehat={"Y": {"T": e_oof}} if center else None,
     )
-    b = fc.varying_coef("Y", c_test)
+    b = fc.varying_coef(c_test, "Y")
     print(
         f"center={center!s:5s}  mean |beta - tau| = {np.abs(b - TAU).mean():.3f}"
         f"   mean beta = {b.mean():+.3f}  (true tau {TAU:+.1f})"
@@ -291,7 +308,7 @@ for center in (False, True):
 # | you want | use | read it with |
 # |---|---|---|
 # | one interpretable effect | `LS("T")` | `ls_coefficients()` |
-# | an effect that varies with covariates | `VC(*modifiers, t="T")` | `varying_coef(node, df)` |
+# | an effect that varies with covariates | `VC(*modifiers, t="T")` | `varying_coef(df, node)` |
 # | the same under confounding + a misspecified prognostic part | `VC(..., center=True)` | the same read-out |
 # | a shortlist of modifiers before you commit | `effect_modifier_scan` on a cheap all-`ls` fit | its `flag` column, read as screening |
 #
@@ -303,5 +320,3 @@ for center in (False, True):
 # regularization where the question is. See
 # [`docs/varying-coefficients.md`](../docs/varying-coefficients.md) for the
 # semantics and [`docs/scores.md`](../docs/scores.md) for the scan.
-
-# %%
