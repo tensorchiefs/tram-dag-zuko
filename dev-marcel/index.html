@@ -1,230 +1,1634 @@
+
 <!doctype html>
-<html lang="en">
-<head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="generator" content="pdoc 16.0.0"/>
-    <title>Module List</title>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Interpretable Neural Causal Models (TRAM-DAGs) in PyTorch">
+      
+      
+      
+        <link rel="canonical" href="https://tensorchiefs.github.io/tramdag/dev-marcel/">
+      
+      
+      
+        <link rel="next" href="notation/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>tramdag</title>
+      
+    
+    
+      <link rel="stylesheet" href="assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
 
-    <style>/*! * Bootstrap Reboot v5.0.0 (https://getbootstrap.com/) * Copyright 2011-2021 The Bootstrap Authors * Copyright 2011-2021 Twitter, Inc. * Licensed under MIT (https://github.com/twbs/bootstrap/blob/main/LICENSE) * Forked from Normalize.css, licensed MIT (https://github.com/necolas/normalize.css/blob/master/LICENSE.md) */*,::after,::before{box-sizing:border-box}@media (prefers-reduced-motion:no-preference){:root{scroll-behavior:smooth}}body{margin:0;font-family:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,"Noto Sans","Liberation Sans",sans-serif,"Apple Color Emoji","Segoe UI Emoji","Segoe UI Symbol","Noto Color Emoji";font-size:1rem;font-weight:400;line-height:1.5;color:#212529;background-color:#fff;-webkit-text-size-adjust:100%;-webkit-tap-highlight-color:transparent}hr{margin:1rem 0;color:inherit;background-color:currentColor;border:0;opacity:.25}hr:not([size]){height:1px}h1,h2,h3,h4,h5,h6{margin-top:0;margin-bottom:.5rem;font-weight:500;line-height:1.2}h1{font-size:calc(1.375rem + 1.5vw)}@media (min-width:1200px){h1{font-size:2.5rem}}h2{font-size:calc(1.325rem + .9vw)}@media (min-width:1200px){h2{font-size:2rem}}h3{font-size:calc(1.3rem + .6vw)}@media (min-width:1200px){h3{font-size:1.75rem}}h4{font-size:calc(1.275rem + .3vw)}@media (min-width:1200px){h4{font-size:1.5rem}}h5{font-size:1.25rem}h6{font-size:1rem}p{margin-top:0;margin-bottom:1rem}abbr[data-bs-original-title],abbr[title]{-webkit-text-decoration:underline dotted;text-decoration:underline dotted;cursor:help;-webkit-text-decoration-skip-ink:none;text-decoration-skip-ink:none}address{margin-bottom:1rem;font-style:normal;line-height:inherit}ol,ul{padding-left:2rem}dl,ol,ul{margin-top:0;margin-bottom:1rem}ol ol,ol ul,ul ol,ul ul{margin-bottom:0}dt{font-weight:700}dd{margin-bottom:.5rem;margin-left:0}blockquote{margin:0 0 1rem}b,strong{font-weight:bolder}small{font-size:.875em}mark{padding:.2em;background-color:#fcf8e3}sub,sup{position:relative;font-size:.75em;line-height:0;vertical-align:baseline}sub{bottom:-.25em}sup{top:-.5em}a{color:#0d6efd;text-decoration:underline}a:hover{color:#0a58ca}a:not([href]):not([class]),a:not([href]):not([class]):hover{color:inherit;text-decoration:none}code,kbd,pre,samp{font-family:SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono","Courier New",monospace;font-size:1em;direction:ltr;unicode-bidi:bidi-override}pre{display:block;margin-top:0;margin-bottom:1rem;overflow:auto;font-size:.875em}pre code{font-size:inherit;color:inherit;word-break:normal}code{font-size:.875em;color:#d63384;word-wrap:break-word}a>code{color:inherit}kbd{padding:.2rem .4rem;font-size:.875em;color:#fff;background-color:#212529;border-radius:.2rem}kbd kbd{padding:0;font-size:1em;font-weight:700}figure{margin:0 0 1rem}img,svg{vertical-align:middle}table{caption-side:bottom;border-collapse:collapse}caption{padding-top:.5rem;padding-bottom:.5rem;color:#6c757d;text-align:left}th{text-align:inherit;text-align:-webkit-match-parent}tbody,td,tfoot,th,thead,tr{border-color:inherit;border-style:solid;border-width:0}label{display:inline-block}button{border-radius:0}button:focus:not(:focus-visible){outline:0}button,input,optgroup,select,textarea{margin:0;font-family:inherit;font-size:inherit;line-height:inherit}button,select{text-transform:none}[role=button]{cursor:pointer}select{word-wrap:normal}select:disabled{opacity:1}[list]::-webkit-calendar-picker-indicator{display:none}[type=button],[type=reset],[type=submit],button{-webkit-appearance:button}[type=button]:not(:disabled),[type=reset]:not(:disabled),[type=submit]:not(:disabled),button:not(:disabled){cursor:pointer}::-moz-focus-inner{padding:0;border-style:none}textarea{resize:vertical}fieldset{min-width:0;padding:0;margin:0;border:0}legend{float:left;width:100%;padding:0;margin-bottom:.5rem;font-size:calc(1.275rem + .3vw);line-height:inherit}@media (min-width:1200px){legend{font-size:1.5rem}}legend+*{clear:left}::-webkit-datetime-edit-day-field,::-webkit-datetime-edit-fields-wrapper,::-webkit-datetime-edit-hour-field,::-webkit-datetime-edit-minute,::-webkit-datetime-edit-month-field,::-webkit-datetime-edit-text,::-webkit-datetime-edit-year-field{padding:0}::-webkit-inner-spin-button{height:auto}[type=search]{outline-offset:-2px;-webkit-appearance:textfield}::-webkit-search-decoration{-webkit-appearance:none}::-webkit-color-swatch-wrapper{padding:0}::file-selector-button{font:inherit}::-webkit-file-upload-button{font:inherit;-webkit-appearance:button}output{display:inline-block}iframe{border:0}summary{display:list-item;cursor:pointer}progress{vertical-align:baseline}[hidden]{display:none!important}</style>
-    <style>/*! syntax-highlighting.css */pre{line-height:125%;}span.linenos{color:inherit; background-color:transparent; padding-left:5px; padding-right:20px;}.pdoc-code .hll{background-color:#ffffcc}.pdoc-code{background:#f8f8f8;}.pdoc-code .c{color:#3D7B7B; font-style:italic}.pdoc-code .err{border:1px solid #FF0000}.pdoc-code .k{color:#008000; font-weight:bold}.pdoc-code .o{color:#666666}.pdoc-code .ch{color:#3D7B7B; font-style:italic}.pdoc-code .cm{color:#3D7B7B; font-style:italic}.pdoc-code .cp{color:#9C6500}.pdoc-code .cpf{color:#3D7B7B; font-style:italic}.pdoc-code .c1{color:#3D7B7B; font-style:italic}.pdoc-code .cs{color:#3D7B7B; font-style:italic}.pdoc-code .gd{color:#A00000}.pdoc-code .ge{font-style:italic}.pdoc-code .gr{color:#E40000}.pdoc-code .gh{color:#000080; font-weight:bold}.pdoc-code .gi{color:#008400}.pdoc-code .go{color:#717171}.pdoc-code .gp{color:#000080; font-weight:bold}.pdoc-code .gs{font-weight:bold}.pdoc-code .gu{color:#800080; font-weight:bold}.pdoc-code .gt{color:#0044DD}.pdoc-code .kc{color:#008000; font-weight:bold}.pdoc-code .kd{color:#008000; font-weight:bold}.pdoc-code .kn{color:#008000; font-weight:bold}.pdoc-code .kp{color:#008000}.pdoc-code .kr{color:#008000; font-weight:bold}.pdoc-code .kt{color:#B00040}.pdoc-code .m{color:#666666}.pdoc-code .s{color:#BA2121}.pdoc-code .na{color:#687822}.pdoc-code .nb{color:#008000}.pdoc-code .nc{color:#0000FF; font-weight:bold}.pdoc-code .no{color:#880000}.pdoc-code .nd{color:#AA22FF}.pdoc-code .ni{color:#717171; font-weight:bold}.pdoc-code .ne{color:#CB3F38; font-weight:bold}.pdoc-code .nf{color:#0000FF}.pdoc-code .nl{color:#767600}.pdoc-code .nn{color:#0000FF; font-weight:bold}.pdoc-code .nt{color:#008000; font-weight:bold}.pdoc-code .nv{color:#19177C}.pdoc-code .ow{color:#AA22FF; font-weight:bold}.pdoc-code .w{color:#bbbbbb}.pdoc-code .mb{color:#666666}.pdoc-code .mf{color:#666666}.pdoc-code .mh{color:#666666}.pdoc-code .mi{color:#666666}.pdoc-code .mo{color:#666666}.pdoc-code .sa{color:#BA2121}.pdoc-code .sb{color:#BA2121}.pdoc-code .sc{color:#BA2121}.pdoc-code .dl{color:#BA2121}.pdoc-code .sd{color:#BA2121; font-style:italic}.pdoc-code .s2{color:#BA2121}.pdoc-code .se{color:#AA5D1F; font-weight:bold}.pdoc-code .sh{color:#BA2121}.pdoc-code .si{color:#A45A77; font-weight:bold}.pdoc-code .sx{color:#008000}.pdoc-code .sr{color:#A45A77}.pdoc-code .s1{color:#BA2121}.pdoc-code .ss{color:#19177C}.pdoc-code .bp{color:#008000}.pdoc-code .fm{color:#0000FF}.pdoc-code .vc{color:#19177C}.pdoc-code .vg{color:#19177C}.pdoc-code .vi{color:#19177C}.pdoc-code .vm{color:#19177C}.pdoc-code .il{color:#666666}</style>
-    <style>/*! theme.css */:root{--pdoc-background:#fff;}.pdoc{--text:#212529;--muted:#6c757d;--link:#3660a5;--link-hover:#1659c5;--code:#f8f8f8;--active:#fff598;--accent:#eee;--accent2:#c1c1c1;--nav-hover:rgba(255, 255, 255, 0.5);--name:#0066BB;--def:#008800;--annotation:#007020;}</style>
-    <style>/*! layout.css */html, body{width:100%;height:100%;}html, main{scroll-behavior:smooth;}body{background-color:var(--pdoc-background);}@media (max-width:769px){#navtoggle{cursor:pointer;position:absolute;width:50px;height:40px;top:1rem;right:1rem;border-color:var(--text);color:var(--text);display:flex;opacity:0.8;z-index:999;}#navtoggle:hover{opacity:1;}#togglestate + div{display:none;}#togglestate:checked + div{display:inherit;}main, header{padding:2rem 3vw;}header + main{margin-top:-3rem;}.git-button{display:none !important;}nav input[type="search"]{max-width:77%;}nav input[type="search"]:first-child{margin-top:-6px;}nav input[type="search"]:valid ~ *{display:none !important;}}@media (min-width:770px){:root{--sidebar-width:clamp(12.5rem, 28vw, 22rem);}nav{position:fixed;overflow:auto;height:100vh;width:var(--sidebar-width);}main, header{padding:3rem 2rem 3rem calc(var(--sidebar-width) + 3rem);width:calc(54rem + var(--sidebar-width));max-width:100%;}header + main{margin-top:-4rem;}#navtoggle{display:none;}}#togglestate{position:absolute;height:0;opacity:0;}nav.pdoc{--pad:clamp(0.5rem, 2vw, 1.75rem);--indent:1.5rem;background-color:var(--accent);border-right:1px solid var(--accent2);box-shadow:0 0 20px rgba(50, 50, 50, .2) inset;padding:0 0 0 var(--pad);overflow-wrap:anywhere;scrollbar-width:thin; scrollbar-color:var(--accent2) transparent; z-index:1}nav.pdoc::-webkit-scrollbar{width:.4rem; }nav.pdoc::-webkit-scrollbar-thumb{background-color:var(--accent2); }nav.pdoc > div{padding:var(--pad) 0;}nav.pdoc .module-list-button{display:inline-flex;align-items:center;color:var(--text);border-color:var(--muted);margin-bottom:1rem;}nav.pdoc .module-list-button:hover{border-color:var(--text);}nav.pdoc input[type=search]{display:block;outline-offset:0;width:calc(100% - var(--pad));}nav.pdoc .logo{max-width:calc(100% - var(--pad));max-height:35vh;display:block;margin:0 auto 1rem;transform:translate(calc(-.5 * var(--pad)), 0);}nav.pdoc ul{list-style:none;padding-left:0;}nav.pdoc > div > ul{margin-left:calc(0px - var(--pad));}nav.pdoc li a{padding:.2rem 0 .2rem calc(var(--pad) + var(--indent));}nav.pdoc > div > ul > li > a{padding-left:var(--pad);}nav.pdoc li{transition:all 100ms;}nav.pdoc li:hover{background-color:var(--nav-hover);}nav.pdoc a, nav.pdoc a:hover{color:var(--text);}nav.pdoc a{display:block;}nav.pdoc > h2:first-of-type{margin-top:1.5rem;}nav.pdoc .class:before{content:"class ";color:var(--muted);}nav.pdoc .function:after{content:"()";color:var(--muted);}nav.pdoc footer:before{content:"";display:block;width:calc(100% - var(--pad));border-top:solid var(--accent2) 1px;margin-top:1.5rem;padding-top:.5rem;}nav.pdoc footer{font-size:small;}</style>
-    <style>/*! content.css */.pdoc{color:var(--text);box-sizing:border-box;line-height:1.5;background:none;}.pdoc .pdoc-button{cursor:pointer;display:inline-block;border:solid black 1px;border-radius:2px;font-size:.75rem;padding:calc(0.5em - 1px) 1em;transition:100ms all;}.pdoc .alert{padding:1rem 1rem 1rem calc(1.5rem + 24px);border:1px solid transparent;border-radius:.25rem;background-repeat:no-repeat;background-position:.75rem center;margin-bottom:1rem;}.pdoc .alert > em{display:none;}.pdoc .alert > *:last-child{margin-bottom:0;}.pdoc .alert.note{color:#084298;background-color:#cfe2ff;border-color:#b6d4fe;background-image:url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20width%3D%2224%22%20height%3D%2224%22%20fill%3D%22%23084298%22%20viewBox%3D%220%200%2016%2016%22%3E%3Cpath%20d%3D%22M8%2016A8%208%200%201%200%208%200a8%208%200%200%200%200%2016zm.93-9.412-1%204.705c-.07.34.029.533.304.533.194%200%20.487-.07.686-.246l-.088.416c-.287.346-.92.598-1.465.598-.703%200-1.002-.422-.808-1.319l.738-3.468c.064-.293.006-.399-.287-.47l-.451-.081.082-.381%202.29-.287zM8%205.5a1%201%200%201%201%200-2%201%201%200%200%201%200%202z%22/%3E%3C/svg%3E");}.pdoc .alert.tip{color:#0a3622;background-color:#d1e7dd;border-color:#a3cfbb;background-image:url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20width%3D%2224%22%20height%3D%2224%22%20fill%3D%22%230a3622%22%20viewBox%3D%220%200%2016%2016%22%3E%3Cpath%20d%3D%22M2%206a6%206%200%201%201%2010.174%204.31c-.203.196-.359.4-.453.619l-.762%201.769A.5.5%200%200%201%2010.5%2013a.5.5%200%200%201%200%201%20.5.5%200%200%201%200%201l-.224.447a1%201%200%200%201-.894.553H6.618a1%201%200%200%201-.894-.553L5.5%2015a.5.5%200%200%201%200-1%20.5.5%200%200%201%200-1%20.5.5%200%200%201-.46-.302l-.761-1.77a2%202%200%200%200-.453-.618A5.98%205.98%200%200%201%202%206m6-5a5%205%200%200%200-3.479%208.592c.263.254.514.564.676.941L5.83%2012h4.342l.632-1.467c.162-.377.413-.687.676-.941A5%205%200%200%200%208%201%22/%3E%3C/svg%3E");}.pdoc .alert.important{color:#055160;background-color:#cff4fc;border-color:#9eeaf9;background-image:url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20width%3D%2224%22%20height%3D%2224%22%20fill%3D%22%23055160%22%20viewBox%3D%220%200%2016%2016%22%3E%3Cpath%20d%3D%22M2%200a2%202%200%200%200-2%202v12a2%202%200%200%200%202%202h12a2%202%200%200%200%202-2V2a2%202%200%200%200-2-2zm6%204c.535%200%20.954.462.9.995l-.35%203.507a.552.552%200%200%201-1.1%200L7.1%204.995A.905.905%200%200%201%208%204m.002%206a1%201%200%201%201%200%202%201%201%200%200%201%200-2%22/%3E%3C/svg%3E");}.pdoc .alert.warning{color:#664d03;background-color:#fff3cd;border-color:#ffecb5;background-image:url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20width%3D%2224%22%20height%3D%2224%22%20fill%3D%22%23664d03%22%20viewBox%3D%220%200%2016%2016%22%3E%3Cpath%20d%3D%22M8.982%201.566a1.13%201.13%200%200%200-1.96%200L.165%2013.233c-.457.778.091%201.767.98%201.767h13.713c.889%200%201.438-.99.98-1.767L8.982%201.566zM8%205c.535%200%20.954.462.9.995l-.35%203.507a.552.552%200%200%201-1.1%200L7.1%205.995A.905.905%200%200%201%208%205zm.002%206a1%201%200%201%201%200%202%201%201%200%200%201%200-2z%22/%3E%3C/svg%3E");}.pdoc .alert.caution{color:#842029;background-color:#f8d7da;border-color:#f5c2c7;background-image:url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20width%3D%2224%22%20height%3D%2224%22%20fill%3D%22%23842029%22%20viewBox%3D%220%200%2016%2016%22%3E%3Cpath%20d%3D%22M11.46.146A.5.5%200%200%200%2011.107%200H4.893a.5.5%200%200%200-.353.146L.146%204.54A.5.5%200%200%200%200%204.893v6.214a.5.5%200%200%200%20.146.353l4.394%204.394a.5.5%200%200%200%20.353.146h6.214a.5.5%200%200%200%20.353-.146l4.394-4.394a.5.5%200%200%200%20.146-.353V4.893a.5.5%200%200%200-.146-.353zM8%204c.535%200%20.954.462.9.995l-.35%203.507a.552.552%200%200%201-1.1%200L7.1%204.995A.905.905%200%200%201%208%204m.002%206a1%201%200%201%201%200%202%201%201%200%200%201%200-2%22/%3E%3C/svg%3E");}.pdoc .alert.danger{color:#842029;background-color:#f8d7da;border-color:#f5c2c7;background-image:url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20width%3D%2224%22%20height%3D%2224%22%20fill%3D%22%23842029%22%20viewBox%3D%220%200%2016%2016%22%3E%3Cpath%20d%3D%22M5.52.359A.5.5%200%200%201%206%200h4a.5.5%200%200%201%20.474.658L8.694%206H12.5a.5.5%200%200%201%20.395.807l-7%209a.5.5%200%200%201-.873-.454L6.823%209.5H3.5a.5.5%200%200%201-.48-.641l2.5-8.5z%22/%3E%3C/svg%3E");}.pdoc .visually-hidden{position:absolute !important;width:1px !important;height:1px !important;padding:0 !important;margin:-1px !important;overflow:hidden !important;clip:rect(0, 0, 0, 0) !important;white-space:nowrap !important;border:0 !important;}.pdoc h1, .pdoc h2, .pdoc h3{font-weight:300;margin:.3em 0;padding:.2em 0;}.pdoc > section:not(.module-info) h1{font-size:1.5rem;font-weight:500;}.pdoc > section:not(.module-info) h2{font-size:1.4rem;font-weight:500;}.pdoc > section:not(.module-info) h3{font-size:1.3rem;font-weight:500;}.pdoc > section:not(.module-info) h4{font-size:1.2rem;}.pdoc > section:not(.module-info) h5{font-size:1.1rem;}.pdoc a{text-decoration:none;color:var(--link);}.pdoc a:hover{color:var(--link-hover);}.pdoc blockquote{margin-left:2rem;}.pdoc pre{border-top:1px solid var(--accent2);border-bottom:1px solid var(--accent2);margin-top:0;margin-bottom:1em;padding:.5rem 0 .5rem .5rem;overflow-x:auto;background-color:var(--code);}.pdoc code{color:var(--text);padding:.2em .4em;margin:0;font-size:85%;background-color:var(--accent);border-radius:6px;}.pdoc a > code{color:inherit;}.pdoc pre > code{display:inline-block;font-size:inherit;background:none;border:none;padding:0;}.pdoc > section:not(.module-info){margin-bottom:1.5rem;}.pdoc .modulename{margin-top:0;font-weight:bold;}.pdoc .modulename a{color:var(--link);transition:100ms all;}.pdoc .git-button{float:right;border:solid var(--link) 1px;}.pdoc .git-button:hover{background-color:var(--link);color:var(--pdoc-background);}.view-source-toggle-state,.view-source-toggle-state ~ .pdoc-code{display:none;}.view-source-toggle-state:checked ~ .pdoc-code{display:block;}.view-source-button{display:inline-block;float:right;font-size:.75rem;line-height:1.5rem;color:var(--muted);padding:0 .4rem 0 1.3rem;cursor:pointer;text-indent:-2px;}.view-source-button > span{visibility:hidden;}.module-info .view-source-button{float:none;display:flex;justify-content:flex-end;margin:-1.2rem .4rem -.2rem 0;}.view-source-button::before{position:absolute;content:"View Source";display:list-item;list-style-type:disclosure-closed;}.view-source-toggle-state:checked ~ .attr .view-source-button::before,.view-source-toggle-state:checked ~ .view-source-button::before{list-style-type:disclosure-open;}.pdoc .docstring{margin-bottom:1.5rem;}.pdoc section:not(.module-info) .docstring{margin-left:clamp(0rem, 5vw - 2rem, 1rem);}.pdoc .docstring .pdoc-code{margin-left:1em;margin-right:1em;}.pdoc h1:target,.pdoc h2:target,.pdoc h3:target,.pdoc h4:target,.pdoc h5:target,.pdoc h6:target,.pdoc .pdoc-code > pre > span:target{background-color:var(--active);box-shadow:-1rem 0 0 0 var(--active);}.pdoc .pdoc-code > pre > span:target{display:block;}.pdoc div:target > .attr,.pdoc section:target > .attr,.pdoc dd:target > a{background-color:var(--active);}.pdoc *{scroll-margin:2rem;}.pdoc .pdoc-code .linenos{user-select:none;}.pdoc .attr:hover{filter:contrast(0.95);}.pdoc section, .pdoc .classattr{position:relative;}.pdoc .headerlink{--width:clamp(1rem, 3vw, 2rem);position:absolute;top:0;left:calc(0rem - var(--width));transition:all 100ms ease-in-out;opacity:0;}.pdoc .headerlink::before{content:"#";display:block;text-align:center;width:var(--width);height:2.3rem;line-height:2.3rem;font-size:1.5rem;}.pdoc .attr:hover ~ .headerlink,.pdoc *:target > .headerlink,.pdoc .headerlink:hover{opacity:1;}.pdoc .attr{display:block;margin:.5rem 0 .5rem;padding:.4rem .4rem .4rem 1rem;background-color:var(--accent);overflow-x:auto;}.pdoc .classattr{margin-left:2rem;}.pdoc .decorator-deprecated{color:#842029;}.pdoc .decorator-deprecated ~ span{filter:grayscale(1) opacity(0.8);}.pdoc .name{color:var(--name);font-weight:bold;}.pdoc .def{color:var(--def);font-weight:bold;}.pdoc .signature{background-color:transparent;}.pdoc .param, .pdoc .return-annotation{white-space:pre;}.pdoc .signature.multiline .param{display:block;}.pdoc .signature.condensed .param{display:inline-block;}.pdoc .annotation{color:var(--annotation);}.pdoc .view-value-toggle-state,.pdoc .view-value-toggle-state ~ .default_value{display:none;}.pdoc .view-value-toggle-state:checked ~ .default_value{display:inherit;}.pdoc .view-value-button{font-size:.5rem;vertical-align:middle;border-style:dashed;margin-top:-0.1rem;}.pdoc .view-value-button:hover{background:white;}.pdoc .view-value-button::before{content:"show";text-align:center;width:2.2em;display:inline-block;}.pdoc .view-value-toggle-state:checked ~ .view-value-button::before{content:"hide";}.pdoc .inherited{margin-left:2rem;}.pdoc .inherited dt{font-weight:700;}.pdoc .inherited dt, .pdoc .inherited dd{display:inline;margin-left:0;margin-bottom:.5rem;}.pdoc .inherited dd:not(:last-child):after{content:", ";}.pdoc .inherited .class:before{content:"class ";}.pdoc .inherited .function a:after{content:"()";}.pdoc .search-result .docstring{overflow:auto;max-height:25vh;}.pdoc .search-result.focused > .attr{background-color:var(--active);}.pdoc .attribution{margin-top:2rem;display:block;opacity:0.5;transition:all 200ms;filter:grayscale(100%);}.pdoc .attribution:hover{opacity:1;filter:grayscale(0%);}.pdoc .attribution img{margin-left:5px;height:27px;vertical-align:bottom;width:50px;transition:all 200ms;}.pdoc table{display:block;width:max-content;max-width:100%;overflow:auto;margin-bottom:1rem;}.pdoc table th{font-weight:600;}.pdoc table th, .pdoc table td{padding:6px 13px;border:1px solid var(--accent2);}</style>
-    <style>/*! custom.css */</style>
-    <style>header.pdoc{display:flex;align-items:center;flex-wrap:wrap;}header.pdoc img{max-width:200px;max-height:75px;padding-right:2rem;}header.pdoc input[type=search]{outline-offset:0;font-size:1.5rem;min-width:60%;flex-grow:1;padding-left:.5rem;margin:1.75rem 0;}</style></head>
-<body>
-    <nav class="pdoc">
-        <label id="navtoggle" for="togglestate" class="pdoc-button"><svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 30 30'><path stroke-linecap='round' stroke="currentColor" stroke-miterlimit='10' stroke-width='2' d='M4 7h22M4 15h22M4 23h22'/></svg></label>
-        <input id="togglestate" type="checkbox" aria-hidden="true" tabindex="-1">
-        <div>    <h2>Available Modules</h2>
-    <ul>
-            <li><a href="tramdag.html">tramdag</a></li>
-            <li><a href="guides.html">guides</a></li>
-            <li><a href="guides/code_map.html">guides.code_map</a></li>
-            <li><a href="guides/fitting.html">guides.fitting</a></li>
-            <li><a href="guides/notation.html">guides.notation</a></li>
-            <li><a href="guides/paper_replication.html">guides.paper_replication</a></li>
-            <li><a href="guides/scores.html">guides.scores</a></li>
-            <li><a href="guides/training_speed.html">guides.training_speed</a></li>
-            <li><a href="guides/varying_coefficients.html">guides.varying_coefficients</a></li>
-            <li><a href="guides/zuko_upstream.html">guides.zuko_upstream</a></li>
-            <li><a href="examples.html">examples</a></li>
-            <li><a href="examples/additive_vs_joint_ci.html">examples.additive_vs_joint_ci</a></li>
-            <li><a href="examples/demo_tram_dag_colab.html">examples.demo_tram_dag_colab</a></li>
-            <li><a href="examples/intro_tram_dag.html">examples.intro_tram_dag</a></li>
-            <li><a href="examples/varying_coefficients.html">examples.varying_coefficients</a></li>
-    </ul>
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL(".",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#tramdag-interpretable-neural-causal-models-tram-dags-in-pytorch" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+      <div data-md-color-scheme="default" data-md-component="outdated" hidden>
+        
+      </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="." title="tramdag" class="md-header__button md-logo" aria-label="tramdag" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            tramdag
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Home
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
 </div>
-    </nav>
-    <header class="pdoc">
-                <a href="https://pdoc.dev">
-                    <img src="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20role%3D%22img%22%20aria-label%3D%22pdoc%20logo%22%20width%3D%22300%22%20height%3D%22160%22%20viewBox%3D%220%200%20150%2080%22%3E%3Ctitle%3Epdoc%3C/title%3E%3Cpath%20d%3D%22M132.316%2048.886c.276-4.679%202.342-6.698%204.409-7.982s4.27-1.165%206.751-1.055c1.586.07%203.044.156%204.222-.482%201.142-.619%202.026-1.932%202.162-3.739.268-3.576-1.929-5.368-5.006-5.551s-7.599.524-10.517%201.606c-4.455%201.652-8.588%206.606-9.552%208.992s-2.342%206.193-1.745%2010.873%202.664%209.221%205.878%2011.79%205.878%203.808%2010.103%204.312%203.444.229%206.062.229%205.006-2.202%204.914-4.909-2.296-5.001-4.501-4.863-3.077.505-5.281.229-7.715-2.064-7.899-9.451z%22%20fill%3D%22%23198754%22/%3E%3Ccircle%20cx%3D%22101.504%22%20cy%3D%2248.943%22%20r%3D%2214.208%22%20fill%3D%22none%22%20stroke%3D%22%23198754%22%20stroke-width%3D%229.354%22/%3E%3Cpath%20d%3D%22M87.81.002c-3.637.065-5.001.454-7.014%201.232s-3.443%201.363-6.3%204.282c-1.723%201.76-3.148%205.019-3.776%207.329-.413%201.521-.316%202.63-.316%202.63l-.195%2034.612c.065%205.774-6.755%208.305-9.612%208.37s-9.678-1.038-9.743-9.408%207.128-9.521%208.362-9.521c1.413-.13%202.526-.021%203.718-.016%202.071.009%204.157-.778%204.092-4.671s-4.157-4.736-4.157-4.736c-6.3-.843-11.43%202.206-11.43%202.206S40.917%2038.15%2041.372%2049.634%2051.568%2068.19%2061.311%2068.125s18.316-7.007%2018.445-17.193l.13-22.772c.046-2.291%202.683-3.644%204.476-4.203.745-.232%201.694-.274%201.694-.274l10.457-.13s4.871-.324%207.729-3.114%204.352-6.294%204.352-6.294.974-3.049.13-4.606-.195-1.233-2.792-3.309-8.573-4.477-8.573-4.477S91.447-.063%2087.81.002zM0%2047.169l.065%2028.417S0%2080.127%204.481%2079.997s5.072-3.866%205.049-4.152l-.113-28.482s1.624-7.656%209.937-7.721%2010.002%206.942%2010.002%208.499-.909%2010.51-9.093%2010.51c-.948%200-2.99-.567-4.145-.272-3.919%201-3.194%204.554-3.194%204.554s.065%205.061%207.404%204.996%2018.575-6.034%2018.575-19.074S26.953%2030.04%2019.549%2029.91%201.234%2035.296%200%2047.169z%22%20fill%3D%22%23198754%22/%3E%3Cg%20transform%3D%22matrix%28.325601%200%200%20.325256%20-10.32669%20-45.802786%29%22%3E%3Ccircle%20cx%3D%22297.554%22%20cy%3D%22172.286%22%20r%3D%2216.5%22%20fill%3D%22%23fff%22/%3E%3Cellipse%20cx%3D%22297.709%22%20cy%3D%22172.642%22%20rx%3D%2211.071%22%20ry%3D%2210.871%22%20fill%3D%22%23105a48%22/%3E%3Ccircle%20cx%3D%22304.104%22%20cy%3D%22167.667%22%20r%3D%224.5%22%20fill%3D%22%23fff%22/%3E%3C/g%3E%3Cpath%20d%3D%22M94.661%2017.032l.893-1.476s.99.714%201.916.925%201.575.114%202.955.114l14.565-.162c1.283-.032%203.085-.762%203.02-3.293s-.373-3.503-.373-3.503l1.283-.487s.52.503.877%201.573.309%201.995.292%202.66-.227%201.541-.227%201.541%201.564-.308%202.359-1.038.823-.779%201.489-1.508.812-.86.812-.86.552-.13.877.26.341.957.065%201.46-1.672%202.206-3.247%203.066-2.76%201.427-3.929%201.768-3.848.73-7.063.714l-10.944-.114s-2.143-.081-3.02-.373-2.241-.973-2.598-1.265z%22%20fill%3D%22%23d36d49%22/%3E%3Cg%20fill%3D%22%23105a48%22%3E%3Cellipse%20cx%3D%2293.052%22%20cy%3D%2243.567%22%20rx%3D%22.869%22%20ry%3D%221.014%22%20transform%3D%22rotate%28341.022%29%22/%3E%3Cellipse%20cx%3D%22104.3%22%20cy%3D%22-16.184%22%20rx%3D%22.865%22%20ry%3D%221.009%22%20transform%3D%22rotate%2814.786%29%22/%3E%3C/g%3E%3C/svg%3E"
-                         alt="pdoc"/>
-                </a>
-            <input type="search" placeholder="Search API Documentation..." aria-label="search box">
-    </header>
-    <main class="pdoc"></main>
-<script>
-    function escapeHTML(html) {
-        return document.createElement('div').appendChild(document.createTextNode(html)).parentNode.innerHTML;
-    }
-
-    const originalContent = document.querySelector("main.pdoc");
-    let currentContent = originalContent;
-
-    function setContent(innerHTML) {
-        let elem;
-        if (innerHTML) {
-            elem = document.createElement("main");
-            elem.classList.add("pdoc");
-            elem.innerHTML = innerHTML;
-        } else {
-            elem = originalContent;
-        }
-        if (currentContent !== elem) {
-            currentContent.replaceWith(elem);
-            currentContent = elem;
-        }
-    }
-
-    function getSearchTerm() {
-        return (new URL(window.location)).searchParams.get("search");
-    }
-
-    const searchBox = document.querySelector(".pdoc input[type=search]");
-    searchBox.addEventListener("input", function () {
-        let url = new URL(window.location);
-        if (searchBox.value.trim()) {
-            url.hash = "";
-            url.searchParams.set("search", searchBox.value);
-        } else {
-            url.searchParams.delete("search");
-        }
-        history.replaceState("", "", url.toString());
-        onInput();
-    });
-    window.addEventListener("popstate", onInput);
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/tensorchiefs/tramdag" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    GitHub
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
 
 
-    let search, searchErr;
 
-    async function initialize() {
-        try {
-            search = await new Promise((resolve, reject) => {
-                const script = document.createElement("script");
-                script.type = "text/javascript";
-                script.async = true;
-                script.onload = () => resolve(window.pdocSearch);
-                script.onerror = (e) => reject(e);
-                script.src = "search.js";
-                document.getElementsByTagName("head")[0].appendChild(script);
-            });
-        } catch (e) {
-            console.error("Cannot fetch pdoc search index");
-            searchErr = "Cannot fetch search index.";
-        }
-        onInput();
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="." title="tramdag" class="md-nav__button md-logo" aria-label="tramdag" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
 
-        document.querySelector("nav.pdoc").addEventListener("click", e => {
-            if (e.target.hash) {
-                searchBox.value = "";
-                searchBox.dispatchEvent(new Event("input"));
-            }
-        });
-    }
+    </a>
+    tramdag
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/tensorchiefs/tramdag" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    GitHub
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
 
-    function onInput() {
-        setContent((() => {
-            const term = getSearchTerm();
-            if (!term) {
-                return null
-            }
-            if (searchErr) {
-                return `<h3>Error: ${searchErr}</h3>`
-            }
-            if (!search) {
-                return "<h3>Searching...</h3>"
-            }
+    
+  </span>
+  
+  
 
-            window.scrollTo({top: 0, left: 0, behavior: 'auto'});
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="." class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
 
-            const results = search(term);
+    
+  </span>
+  
+  
 
-            let html;
-            if (results.length === 0) {
-                html = `No search results for '${escapeHTML(term)}'.`
-            } else {
-                html = `<h4>${results.length} search result${results.length > 1 ? "s" : ""} for '${escapeHTML(term)}'.</h4>`;
-            }
-            for (let result of results.slice(0, 10)) {
-                let doc = result.doc;
-                let url = `${doc.modulename.replaceAll(".", "/")}.html`;
-                if (doc.qualname) {
-                    url += `#${doc.qualname}`;
-                }
+      </a>
+      
+        
 
-                let heading;
-                switch (result.doc.kind) {
-                    case "function":
-                        if (doc.fullname.endsWith(".__init__")) {
-                            heading = `<span class="name">${doc.fullname.replace(/\.__init__$/, "")}</span>${doc.signature}`;
-                        } else {
-                            heading = `<span class="def">${doc.funcdef}</span> <span class="name">${doc.fullname}</span>${doc.signature}`;
-                        }
-                        break;
-                    case "class":
-                        heading = `<span class="def">class</span> <span class="name">${doc.fullname}</span>`;
-                        if (doc.bases)
-                            heading += `<wbr>(<span class="base">${doc.bases}</span>)`;
-                        heading += `:`;
-                        break;
-                    case "variable":
-                        heading = `<span class="name">${doc.fullname}</span>`;
-                        if (doc.annotation)
-                            heading += `<span class="annotation">${doc.annotation}</span>`;
-                        if (doc.default_value)
-                            heading += `<span class="default_value"> = ${doc.default_value}</span>`;
-                        break;
-                    default:
-                        heading = `<span class="name">${doc.fullname}</span>`;
-                        break;
-                }
-                html += `
-                        <section class="search-result">
-                        <a href="${url}" class="attr ${doc.kind}">${heading}</a>
-                        <div class="docstring">${doc.doc}</div>
-                        </section>
-                    `;
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#install" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Install
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#30-seconds-of-api" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        30 seconds of API
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-model-in-detail-spec-math-networks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The model in detail: spec → math → networks
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#validation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Validation
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#testing-policy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Testing policy
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#layout" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Layout
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#citation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Citation
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
 
-            }
-            return html;
-        })());
-    }
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Guides
+  
 
-    if (getSearchTerm()) {
-        initialize();
-        searchBox.value = getSearchTerm();
-        onInput();
-    } else {
-        searchBox.addEventListener("focus", initialize, {once: true});
-    }
+    
+  </span>
+  
+  
 
-    searchBox.addEventListener("keydown", e => {
-        if (["ArrowDown", "ArrowUp", "Enter"].includes(e.key)) {
-            let focused = currentContent.querySelector(".search-result.focused");
-            if (!focused) {
-                currentContent.querySelector(".search-result").classList.add("focused");
-            } else if (
-                e.key === "ArrowDown"
-                && focused.nextElementSibling
-                && focused.nextElementSibling.classList.contains("search-result")
-            ) {
-                focused.classList.remove("focused");
-                focused.nextElementSibling.classList.add("focused");
-                focused.nextElementSibling.scrollIntoView({
-                    behavior: "smooth",
-                    block: "nearest",
-                    inline: "nearest"
-                });
-            } else if (
-                e.key === "ArrowUp"
-                && focused.previousElementSibling
-                && focused.previousElementSibling.classList.contains("search-result")
-            ) {
-                focused.classList.remove("focused");
-                focused.previousElementSibling.classList.add("focused");
-                focused.previousElementSibling.scrollIntoView({
-                    behavior: "smooth",
-                    block: "nearest",
-                    inline: "nearest"
-                });
-            } else if (
-                e.key === "Enter"
-            ) {
-                focused.querySelector("a").click();
-            }
-        }
-    });
-</script></body>
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Guides
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="notation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Notation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="fitting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Fitting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="training-speed/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Training speed
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="scores/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Scores
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="varying-coefficients/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Varying coefficients
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="paper-replication/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Paper replication
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="code-map/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Code map
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="zuko-upstream/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Zuko upstream
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Notebooks
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Notebooks
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="notebooks/demo_tram_dag_colab/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    TRAM-DAG in 5 minutes — one causal model, all three rungs of Pearl's ladder
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="notebooks/intro_tram_dag/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    TRAM-DAG — a didactic introduction with
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="notebooks/additive_vs_joint_ci/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Additive vs joint complex intercept — interpreting per-parent effects
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="notebooks/varying_coefficients/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Heterogeneous treatment effects: the term
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="notebooks/classical_fit_tram_dag/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Classical fitting of all- TRAM-DAGs ()
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="api/tramdag/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    tramdag
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="api/spec/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    spec
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="api/flow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    flow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="api/transforms/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    transforms
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="api/conditioners/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    conditioners
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="api/scores/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    scores
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="api/callbacks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    callbacks
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#install" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Install
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#30-seconds-of-api" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        30 seconds of API
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-model-in-detail-spec-math-networks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The model in detail: spec → math → networks
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#validation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Validation
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#testing-policy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Testing policy
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#layout" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Layout
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#citation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Citation
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<p><a href="tramdag-docs.pdf">Download these docs as one PDF</a></p>
+<h1 id="tramdag-interpretable-neural-causal-models-tram-dags-in-pytorch">tramdag — Interpretable Neural Causal Models (TRAM-DAGs) in PyTorch<a class="headerlink" href="#tramdag-interpretable-neural-causal-models-tram-dags-in-pytorch" title="Permanent link">&para;</a></h1>
+<p><a href="https://colab.research.google.com/github/tensorchiefs/tramdag/blob/main/notebooks/demo_tram_dag_colab.ipynb"><img alt="Open the demo in Colab" src="https://colab.research.google.com/assets/colab-badge.svg" /></a>
+<a href="https://pypi.org/project/tramdag/"><img alt="PyPI" src="https://img.shields.io/pypi/v/tramdag" /></a>
+<a href="https://github.com/tensorchiefs/tramdag/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/tensorchiefs/tramdag/actions/workflows/ci.yml/badge.svg" /></a>
+<a href="https://github.com/tensorchiefs/tramdag/tree/dev-marcel/LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/License-MIT-yellow.svg" /></a></p>
+<blockquote>
+<p>⚠️ <strong>Status: beta (0.x), under active development.</strong> The API may change
+between releases until 1.0, so pin a version for reproducibility. Note that
+this README documents the <strong>unreleased 0.4</strong> API: the term constructors
+(<code>SI</code>/<code>CI</code>/<code>VC</code>), <code>scores</code>, <code>varying_coef</code> and <code>intercept_contributions</code> are
+not in <code>0.3.0</code> on PyPI. Until 0.4 ships, install from git to follow the docs
+below.</p>
+</blockquote>
+<p><strong>TRAM-DAGs</strong> model each variable of a structural causal model with a
+(transformation-model) flow: one triangular normalizing flow from iid
+standard-logistic latents to the observed variables. The triangular adjacency
+structure is exactly your causal DAG. Fit it <strong>once</strong> on observational data and answer all
+three rungs of Pearl's causal hierarchy — observational (L1), interventional
+(L2, the do-operator), and counterfactual (L3, Pearl abduction) — while keeping
+<strong>interpretable effects</strong>: every linear-shift coefficient is a log-odds ratio,
+exactly as in classical proportional-odds models.</p>
+<blockquote>
+<p>Beate Sick &amp; Oliver Dürr, <em>Interpretable Neural Causal Models with TRAM-DAGs</em>,
+CLeaR 2025 (<a href="https://arxiv.org/abs/2503.16206">arXiv:2503.16206</a>).
+This repo is the reference implementation (PyTorch, built on
+<a href="https://zuko.readthedocs.io/stable/">zuko</a>); all of the paper's experiments are
+replicated here with pinned tests.</p>
+</blockquote>
+<p><strong>5-minute showcase</strong>: the <a href="https://colab.research.google.com/github/tensorchiefs/tramdag/blob/main/notebooks/demo_tram_dag_colab.ipynb">Colab badge above</a> fits the paper's bimodal benchmark
+live and walks L1 → L2 → L3, every answer checked against analytic
+ground truth. Further notebooks are available at <a href="https://github.com/tensorchiefs/tramdag/tree/dev-marcel/notebooks"><code>notebooks/</code></a> like the didactic walkthrough of the model:
+<a href="notebooks/intro_tram_dag/"><code>notebooks/intro_tram_dag.py</code></a>.</p>
+<h2 id="install">Install<a class="headerlink" href="#install" title="Permanent link">&para;</a></h2>
+<div class="highlight"><pre><span></span><code>pip<span class="w"> </span>install<span class="w"> </span>tramdag<span class="w">            </span><span class="c1"># latest release (PyPI)</span>
+pip<span class="w"> </span>install<span class="w"> </span><span class="s2">"git+https://github.com/tensorchiefs/tramdag.git@main"</span><span class="w">   </span><span class="c1"># dev version (track main)</span>
+uv<span class="w"> </span>sync<span class="w">                        </span><span class="c1"># or: dev setup from a clone (tests, experiments)</span>
+</code></pre></div>
+<p>Pin the dev install to a commit for reproducibility, e.g. <code>...tramdag.git@&lt;sha&gt;</code>.</p>
+<h2 id="30-seconds-of-api">30 seconds of API<a class="headerlink" href="#30-seconds-of-api" title="Permanent link">&para;</a></h2>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">tramdag</span><span class="w"> </span><span class="kn">import</span> <span class="n">CausalFlowDAG</span><span class="p">,</span> <span class="n">ContinuousNode</span><span class="p">,</span> <span class="n">OrdinalNode</span><span class="p">,</span> <span class="n">I</span><span class="p">,</span> <span class="n">LS</span><span class="p">,</span> <span class="n">CS</span>
+
+<span class="n">spec</span> <span class="o">=</span> <span class="p">{</span>  <span class="c1"># the spec IS the labelled DAG</span>
+    <span class="s2">"X1"</span><span class="p">:</span> <span class="n">ContinuousNode</span><span class="p">(),</span>
+    <span class="s2">"X2"</span><span class="p">:</span> <span class="n">ContinuousNode</span><span class="p">(</span><span class="n">I</span><span class="p">(</span><span class="s2">"X1"</span><span class="p">)),</span>
+    <span class="s2">"T"</span><span class="p">:</span> <span class="n">OrdinalNode</span><span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="n">LS</span><span class="p">(</span><span class="s2">"X1"</span><span class="p">)</span> <span class="o">+</span> <span class="n">CS</span><span class="p">(</span><span class="s2">"X2"</span><span class="p">)),</span>  <span class="c1"># 2 levels, column coded 0..1</span>
+    <span class="s2">"Y"</span><span class="p">:</span> <span class="n">OrdinalNode</span><span class="p">(</span><span class="mi">4</span><span class="p">,</span> <span class="n">I</span><span class="p">(</span><span class="s2">"X1"</span><span class="p">)</span> <span class="o">+</span> <span class="n">CS</span><span class="p">(</span><span class="s2">"X2"</span><span class="p">)</span> <span class="o">+</span> <span class="n">LS</span><span class="p">(</span><span class="s2">"T"</span><span class="p">)),</span>
+<span class="p">}</span>
+<span class="c1"># train_df / val_df: DataFrames with one column per node</span>
+<span class="n">flow</span> <span class="o">=</span> <span class="n">CausalFlowDAG</span><span class="p">(</span><span class="n">spec</span><span class="p">)</span>  <span class="c1"># validates acyclicity, builds the flow</span>
+
+<span class="c1"># fit() is one minibatch Adam loop; validation, schedules and early stopping</span>
+<span class="c1"># attach through optimizer= and the callback hooks — the common recipes ship</span>
+<span class="c1"># in tramdag.callbacks (docs/fitting.md)</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">tramdag.callbacks</span><span class="w"> </span><span class="kn">import</span> <span class="n">Logger</span><span class="p">,</span> <span class="n">RestoreBest</span>
+
+<span class="n">best</span> <span class="o">=</span> <span class="n">RestoreBest</span><span class="p">(</span><span class="n">val_df</span><span class="p">)</span>  <span class="c1"># keep the best-validation weights</span>
+<span class="n">flow</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span>
+    <span class="n">train_df</span><span class="p">,</span>
+    <span class="n">epochs</span><span class="o">=</span><span class="mi">4000</span><span class="p">,</span>
+    <span class="n">batch_size</span><span class="o">=</span><span class="mi">512</span><span class="p">,</span>
+    <span class="n">after_epoch_callbacks</span><span class="o">=</span><span class="p">[</span><span class="n">Logger</span><span class="p">(</span><span class="n">val_df</span><span class="p">,</span> <span class="n">every</span><span class="o">=</span><span class="mi">100</span><span class="p">),</span> <span class="n">best</span><span class="p">],</span>
+    <span class="n">after_fit_callbacks</span><span class="o">=</span><span class="p">[</span><span class="n">best</span><span class="o">.</span><span class="n">restore</span><span class="p">],</span>
+<span class="p">)</span>
+
+<span class="c1"># all-`ls` model? fit it classically instead: deterministic float64 L-BFGS,</span>
+<span class="c1"># exact MLE matching statsmodels/R (see docs/fitting.md)</span>
+<span class="n">flow</span><span class="o">.</span><span class="n">fit_classical</span><span class="p">(</span><span class="n">train_df</span><span class="p">)</span>  <span class="c1"># raises on cs/ci/vc specs</span>
+
+<span class="n">flow</span><span class="o">.</span><span class="n">log_prob</span><span class="p">(</span><span class="n">df</span><span class="p">)</span>  <span class="c1"># L1: joint log-likelihood per row</span>
+<span class="n">flow</span><span class="o">.</span><span class="n">sample</span><span class="p">(</span><span class="mi">1000</span><span class="p">)</span>  <span class="c1"># L1: observational sampling</span>
+<span class="n">flow</span><span class="o">.</span><span class="n">sample</span><span class="p">(</span><span class="mi">1000</span><span class="p">,</span> <span class="n">do</span><span class="o">=</span><span class="p">{</span><span class="s2">"T"</span><span class="p">:</span> <span class="mi">1</span><span class="p">})</span>  <span class="c1"># L2: interventional (graph mutilation)</span>
+<span class="n">flow</span><span class="o">.</span><span class="n">pmf</span><span class="p">(</span><span class="n">df</span><span class="p">,</span> <span class="n">node</span><span class="o">=</span><span class="s2">"Y"</span><span class="p">,</span> <span class="n">do</span><span class="o">=</span><span class="p">{</span><span class="s2">"T"</span><span class="p">:</span> <span class="mi">1</span><span class="p">})</span>  <span class="c1"># L2: analytic interventional PMF</span>
+<span class="n">flow</span><span class="o">.</span><span class="n">density</span><span class="p">(</span><span class="n">df</span><span class="p">,</span> <span class="n">node</span><span class="o">=</span><span class="s2">"X2"</span><span class="p">,</span> <span class="n">grid</span><span class="o">=</span><span class="n">grid</span><span class="p">,</span> <span class="n">do</span><span class="o">=</span><span class="p">{</span><span class="s2">"X1"</span><span class="p">:</span> <span class="mf">0.5</span><span class="p">})</span>  <span class="c1"># ... and density, continuous nodes</span>
+
+<span class="n">u</span> <span class="o">=</span> <span class="n">flow</span><span class="o">.</span><span class="n">abduct</span><span class="p">(</span><span class="n">df</span><span class="p">)</span>  <span class="c1"># L3 step 1: latents from observations</span>
+<span class="n">cf</span> <span class="o">=</span> <span class="n">flow</span><span class="o">.</span><span class="n">sample</span><span class="p">(</span><span class="n">do</span><span class="o">=</span><span class="p">{</span><span class="s2">"T"</span><span class="p">:</span> <span class="mi">1</span><span class="p">},</span> <span class="n">u</span><span class="o">=</span><span class="n">u</span><span class="p">)</span>  <span class="c1"># L3 steps 2+3: counterfactuals</span>
+
+<span class="n">flow</span><span class="o">.</span><span class="n">ls_coefficients</span><span class="p">()</span>  <span class="c1"># interpret: per-edge log-odds-ratios (LS terms)</span>
+<span class="c1"># per-parent partial effects of an additive complex intercept (centered):</span>
+<span class="c1"># flow.intercept_contributions(df, "Y") on a CI("A", "B", allow_interaction=False)</span>
+
+<span class="c1"># heterogeneous treatment effects: a small, penalized effect head beta(x)*T</span>
+<span class="c1"># (VC term) with a first-class read-out — see docs/varying-coefficients.md</span>
+<span class="c1"># e.g. CS("X1", "X2") + VC("X1", t="T") -&gt;</span>
+<span class="c1"># flow.varying_coef(df, "Y")               # beta(x): deterministic, y-free</span>
+
+<span class="n">flow</span><span class="o">.</span><span class="n">scores</span><span class="p">(</span><span class="n">df</span><span class="p">,</span> <span class="n">node</span><span class="o">=</span><span class="s2">"Y"</span><span class="p">)</span>  <span class="c1"># per-observation scores dl_i/dtheta</span>
+<span class="n">flow</span><span class="o">.</span><span class="n">effect_modifier_scan</span><span class="p">(</span><span class="n">df</span><span class="p">,</span> <span class="s2">"Y"</span><span class="p">,</span> <span class="n">t</span><span class="o">=</span><span class="s2">"T"</span><span class="p">)</span>  <span class="c1"># which VC modifiers? (CUSUM</span>
+<span class="c1"># scan from a cheap all-ls fit) — docs/scores.md</span>
+
+<span class="n">flow</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="s2">"flow.pt"</span><span class="p">)</span>
+<span class="n">flow</span> <span class="o">=</span> <span class="n">CausalFlowDAG</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="s2">"flow.pt"</span><span class="p">)</span>
+</code></pre></div>
+<h2 id="the-model-in-detail-spec-math-networks">The model in detail: spec → math → networks<a class="headerlink" href="#the-model-in-detail-spec-math-networks" title="Permanent link">&para;</a></h2>
+<p>Per node, the transformation is additive on the latent (log-odds) scale — one
+intercept term <code>I</code> plus any number of shifts (notation:
+<a href="notation/"><code>docs/notation.md</code></a>):</p>
+<p><code>u = h_ϑ(x) + Σ β·x_pa + Σ g(x_pa) + (β₀ + b_Θ(x_mod))·x_t</code></p>
+<table>
+<thead>
+<tr>
+<th>term</th>
+<th>math</th>
+<th>what gets built</th>
+<th>interpretability</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>I()</code> / bare <code>I</code> / omitted</td>
+<td><code>h_ϑ(x)</code> — constant ϑ</td>
+<td><code>SimpleIntercept</code>: one free parameter vector, no network</td>
+<td>the baseline transform</td>
+</tr>
+<tr>
+<td><code>I("A")</code></td>
+<td><code>h_ϑ(a)(x)</code> — ϑ bends with the parent</td>
+<td><code>ComplexIntercept</code>: MLP <code>[8, 8] → n_params</code></td>
+<td>the parent reshapes the whole distribution; no single coefficient</td>
+</tr>
+<tr>
+<td><code>I("A","B")</code> (default <code>allow_interaction=True</code>)</td>
+<td><code>h_ϑ(a,b)(x)</code></td>
+<td><strong>one joint</strong> MLP over both parents — they interact in ϑ</td>
+<td>maximal flexibility</td>
+</tr>
+<tr>
+<td><code>I("A","B", allow_interaction=False)</code></td>
+<td><code>h_ϑ(a)+ϑ(b)(x)</code></td>
+<td>one MLP <strong>per parent</strong>, parameter vectors summed in coefficient space</td>
+<td>per-parent partial effects via <code>flow.intercept_contributions</code></td>
+</tr>
+<tr>
+<td><code>LS("A")</code></td>
+<td><code>β·a</code></td>
+<td><code>Linear(width, 1)</code>, no bias — <strong>one parameter per feature column</strong> (one for a continuous parent, <code>levels</code> for a one-hot ordinal)</td>
+<td><code>exp(β)</code> is an odds ratio</td>
+</tr>
+<tr>
+<td><code>CS("A")</code></td>
+<td><code>g(a)</code>, additive</td>
+<td><code>ComplexShift</code>: MLP <code>[64, 128, 64] → 1</code></td>
+<td>plot <code>g</code></td>
+</tr>
+<tr>
+<td><code>CS("A","B")</code></td>
+<td><code>g(a,b)</code> — joint</td>
+<td>one MLP over the concatenated features</td>
+<td>interaction <em>in the shift</em></td>
+</tr>
+<tr>
+<td><code>CS("A") + CS("B")</code></td>
+<td><code>g₁(a) + g₂(b)</code></td>
+<td>two MLPs, scalars added</td>
+<td>GAM-style, each effect plottable</td>
+</tr>
+<tr>
+<td><code>VC("A","B", t="T")</code></td>
+<td><code>(β₀ + b_Θ(a,b))·x_t</code></td>
+<td>scalar <code>β₀</code> + zero-initialised penalized MLP <code>[16] → 1</code>; the treatment value multiplies, it never enters the net</td>
+<td><code>β₀</code> ≈ constant effect, <code>flow.varying_coef</code> reads <code>β(x)</code></td>
+</tr>
+</tbody>
+</table>
+<p>A node takes <strong>at most one <code>I</code> term with parents</strong> — a term list is therefore
+always purely additive on the latent scale, and interactions exist only
+<em>inside</em> a term. Lists and <code>+</code> sums are interchangeable:
+<code>[LS("A"), CS("B")]</code> ≡ <code>LS("A") + CS("B")</code>.</p>
+<p>Two knobs on the terms:</p>
+<ul>
+<li><strong><code>transform=</code> on <code>I</code></strong> picks the basis of <code>h_ϑ</code> for a continuous node —
+  <code>"bernstein"</code> (default, 20 coefficients, tails extrapolate with the boundary
+  slope), <code>"spline"</code> (monotone RQ spline, 23 params at <code>bins=8</code>, fixed tail
+  slope) or <code>"affine"</code> (2 params: the latent is exactly logistic). Ordinal
+  nodes have no basis: their intercept is the cutpoint vector,
+  <code>P(x ≤ k) = σ(ϑ_k − shift)</code>.</li>
+<li><strong><code>units=</code> on <code>I</code>/<code>CS</code>/<code>VC</code></strong> sizes the term's network, e.g. <code>units=[16]</code>
+  for one hidden layer of 16 neurons. The defaults match the PyTorch
+  reference this package grew out of (<a href="https://github.com/buehlpa/TramDag">buehlpa/TramDag</a>,
+  <code>tram_models.py</code>), <strong>not</strong> the TRAM-DAG paper's own R nets — so a
+  replication sets <code>units=</code> and <code>activation=</code> explicitly, as the configs in
+  <code>experiments/paper/</code> do.</li>
+</ul>
+<p>Feature widths: a continuous parent enters raw (1 column), an ordinal parent
+one-hot (<code>levels</code> columns). Abduction is exact for continuous nodes and
+truncated-logistic for ordinal ones, so <code>flow.sample(u=flow.abduct(df))</code>
+reproduces <code>df</code> exactly / level-exactly.</p>
+<p>There are two ways to fit the model: a stochastic optimizer (<code>fit</code>) and the classical route (<code>fit_classical</code>). For all-<code>ls</code> models — where each node-conditional is a classical transformation model — the classical fit is deterministic and takes seconds (measured &lt; 2 s vs ~9 s for Adam on the stroke workload); see <a href="fitting/"><code>docs/fitting.md</code></a>.</p>
+<h2 id="validation">Validation<a class="headerlink" href="#validation" title="Permanent link">&para;</a></h2>
+<p>Two layers, deliberately separate.</p>
+<p><strong>The framework's own test suite</strong> (<a href="https://github.com/tensorchiefs/tramdag/tree/dev-marcel/tests"><code>tests/</code></a>) measures the library
+against three inline data-generating processes it carries itself, so it needs no
+research code to run. Its strongest claim is an equality, not a similarity: an
+all-<code>ls</code> outcome node <em>is</em> an ordered-logit model, so the flow's MLE must match
+<code>statsmodels</code> <code>OrderedModel</code> on the same design matrix — it does, and the
+varying-coefficient acceptance bars (effect recovery, propensity centering) are
+pinned the same way. What the tests guarantee, and how each ground truth is
+obtained, is documented in <a href="https://github.com/tensorchiefs/tramdag/blob/dev-marcel/tests/README.md"><code>tests/README.md</code></a>.</p>
+<p><strong>The paper replications</strong> (<a href="https://github.com/tensorchiefs/tramdag/tree/dev-marcel/experiments"><code>experiments/</code></a>) are separate: one
+self-contained script per dataset, with its hyperparameters in a sibling YAML
+file and its expected results committed under each area's <code>ground_truth/</code>. A
+dedicated workflow runs them and compares.</p>
+<table>
+<thead>
+<tr>
+<th>experiment</th>
+<th>paper</th>
+<th>demonstrates</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>triangle.py</code> (<code>linear-ls</code>, <code>linear-cs</code>, <code>atan-cs</code>, <code>sin-cs</code>)</td>
+<td>§6.1, C.3</td>
+<td>LS coefficient recovery (β = 2, −0.2, +0.3), CS curve ≡ −f(x₂) for non-monotone f</td>
+</tr>
+<tr>
+<td><code>triangle_mixed.py</code> (<code>linear-ls</code>, <code>exp-cs</code>)</td>
+<td>§6.2</td>
+<td>mixed data L1/L2 + the C.4 odds-ratio check (OR ≈ 7.4)</td>
+</tr>
+<tr>
+<td><code>vaca.py</code></td>
+<td>§5.1–5.2</td>
+<td>the bimodal L1 case a default CNF misses; L2 <code>p(x₃ \| do(x₂))</code> against analytic means</td>
+</tr>
+<tr>
+<td><code>carefl.py</code></td>
+<td>§5.3</td>
+<td>L3 counterfactual curves vs <strong>analytic</strong> truth</td>
+</tr>
+<tr>
+<td><code>validate_ls.py</code></td>
+<td>—</td>
+<td>flow ≡ <code>statsmodels</code> ≡ R <code>MASS::polr</code> to ~4 decimals with <code>fit_classical</code> (a converged Adam <code>fit</code> gets ~1e-3), on a frozen synthetic cohort with a known true effect</td>
+</tr>
+</tbody>
+</table>
+<p>Sign note: ordinal shifts are <em>subtracted</em> here but <em>added</em> in the paper, so
+fitted ordinal weights are the paper's with flipped sign (each <code>truth.json</code>
+records both conventions). A figure-by-figure account of what is reproduced,
+and what is not (the competing CNF/NSF baselines), is in
+<a href="https://github.com/tensorchiefs/tramdag/blob/dev-marcel/experiments/paper/PAPER_COVERAGE.md"><code>experiments/paper/PAPER_COVERAGE.md</code></a>.</p>
+<p><strong>Training speed</strong> — schedules, per-node freezing, L-BFGS and device benchmarks:
+<a href="training-speed/"><code>docs/training-speed.md</code></a>.</p>
+<p><strong>Paper replication</strong> — every hyperparameter of the eight <code>experiments/paper</code>
+variants with its source in the paper's R code, the deviations, and the
+numbers (paper / previous protocol / now):
+<a href="paper-replication/"><code>docs/paper-replication.md</code></a>.</p>
+<h2 id="testing-policy">Testing policy<a class="headerlink" href="#testing-policy" title="Permanent link">&para;</a></h2>
+<p>See the <a href="https://github.com/tensorchiefs/tramdag/blob/dev-marcel/tests/README.md"><code>tests/README.md</code></a> file for more details.</p>
+<h2 id="layout">Layout<a class="headerlink" href="#layout" title="Permanent link">&para;</a></h2>
+<div class="highlight"><pre><span></span><code>src/tramdag/            spec.py transforms.py conditioners.py flow.py
+                        scores.py                 &lt;- the framework, and nothing else
+tests/                  unit tests, identities, acceptance bars, three inline DGPs
+experiments/            research code, one directory per area, each self-contained:
+                          paper/       the replications + generators + frozen data
+                          benchmarks/  training-speed and machine measurements
+                          misc/        the classical-MLE validation
+                        paper/misc: &lt;name&gt;.py + &lt;name&gt;.yaml, data/,
+                        ground_truth/, tests/, results/ (benchmarks reads the
+                        other areas' data and pins no ground truth)
+notebooks/              four executed examples: didactic intro, Colab demo,
+                        additive-vs-joint intercepts, varying coefficients
+docs/                   code-map.md (every class/function + all knobs),
+                        fitting.md, notation.md, training-speed.md,
+                        paper-replication.md, varying-coefficients.md,
+                        scores.md
+</code></pre></div>
+<p>Implementation conventions (latent-scale signs, raw/one-hot parent encoding,
+log-space ordinal likelihood, seeding) are documented in
+<a href="https://github.com/tensorchiefs/tramdag/blob/dev-marcel/CLAUDE.md"><code>CLAUDE.md</code></a> and pinned by tests.</p>
+<h2 id="citation">Citation<a class="headerlink" href="#citation" title="Permanent link">&para;</a></h2>
+<p>If you use <code>tramdag</code>, please cite the method paper:</p>
+<div class="highlight"><pre><span></span><code><span class="nc">@inproceedings</span><span class="p">{</span><span class="nl">sick2025tramdag</span><span class="p">,</span>
+<span class="w">  </span><span class="na">title</span><span class="w">     </span><span class="p">=</span><span class="w"> </span><span class="s">{Interpretable Neural Causal Models with TRAM-DAGs}</span><span class="p">,</span>
+<span class="w">  </span><span class="na">author</span><span class="w">    </span><span class="p">=</span><span class="w"> </span><span class="s">{Sick, Beate and D{\"u}rr, Oliver}</span><span class="p">,</span>
+<span class="w">  </span><span class="na">booktitle</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="s">{Proceedings of the 4th Conference on Causal Learning and Reasoning (CLeaR)}</span><span class="p">,</span>
+<span class="w">  </span><span class="na">series</span><span class="w">    </span><span class="p">=</span><span class="w"> </span><span class="s">{Proceedings of Machine Learning Research}</span><span class="p">,</span>
+<span class="w">  </span><span class="na">volume</span><span class="w">    </span><span class="p">=</span><span class="w"> </span><span class="s">{275}</span><span class="p">,</span>
+<span class="w">  </span><span class="na">year</span><span class="w">      </span><span class="p">=</span><span class="w"> </span><span class="s">{2025}</span><span class="p">,</span>
+<span class="p">}</span>
+</code></pre></div>
+<!-- For the stroke application (and the `magic-mrclean` cohort design) additionally:
+
+```bibtex
+@article{duerr2026stroke,
+  title  = {Estimating Individualized Treatment Effects in Acute Ischemic Stroke
+            with Causal Transformation Models (TRAM-DAG): A Multi-Centre
+            Observational Study with External RCT Validation},
+  author = {D{\"u}rr, Oliver and Herzog, Lisa and B{\"u}hler, Pascal and
+            Wegener, Susanne and Sick, Beate},
+  journal = {arXiv preprint arXiv:2606.12623},
+  year   = {2026},
+}
+``` -->
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": ".", "features": ["navigation.sections", "navigation.top", "content.code.copy", "toc.follow"], "search": "assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"provider": "mike"}}</script>
+    
+    
+      <script src="assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+        <script src="javascripts/mathjax.js"></script>
+      
+        <script src="https://unpkg.com/mathjax@3/es5/tex-mml-chtml.js"></script>
+      
+    
+  </body>
 </html>

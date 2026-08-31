@@ -1,0 +1,1788 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Interpretable Neural Causal Models (TRAM-DAGs) in PyTorch">
+      
+      
+      
+        <link rel="canonical" href="https://tensorchiefs.github.io/tramdag/dev-marcel/code-map/">
+      
+      
+        <link rel="prev" href="../paper-replication/">
+      
+      
+        <link rel="next" href="../zuko-upstream/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>Code map - tramdag</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#code-map-every-class-and-function-in-srctramdag" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+      <div data-md-color-scheme="default" data-md-component="outdated" hidden>
+        
+      </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="tramdag" class="md-header__button md-logo" aria-label="tramdag" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            tramdag
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Code map
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/tensorchiefs/tramdag" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    GitHub
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="tramdag" class="md-nav__button md-logo" aria-label="tramdag" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    tramdag
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/tensorchiefs/tramdag" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    GitHub
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Guides
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Guides
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../notation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Notation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../fitting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Fitting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../training-speed/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Training speed
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../scores/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Scores
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../varying-coefficients/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Varying coefficients
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../paper-replication/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Paper replication
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Code map
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Code map
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#specpy-declare-the-model" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        spec.py — declare the model
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#transformspy-the-monotone-map-h-and-the-ordinal-transform" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        transforms.py — the monotone map h and the ordinal transform
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#conditionerspy-the-networks-behind-the-terms" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        conditioners.py — the networks behind the terms
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#flowpy-the-model" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        flow.py — the model
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#scorespy-effect-modifier-detection-issue-29" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        scores.py — effect-modifier detection (issue #29)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#callbackspy-the-shipped-fit-callbacks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        callbacks.py — the shipped fit callbacks
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#what-is-not-in-the-package" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What is not in the package
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#where-every-training-hyperparameter-lives" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Where every training hyperparameter lives
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../zuko-upstream/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Zuko upstream
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Notebooks
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Notebooks
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../notebooks/demo_tram_dag_colab/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    TRAM-DAG in 5 minutes — one causal model, all three rungs of Pearl's ladder
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../notebooks/intro_tram_dag/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    TRAM-DAG — a didactic introduction with
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../notebooks/additive_vs_joint_ci/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Additive vs joint complex intercept — interpreting per-parent effects
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../notebooks/varying_coefficients/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Heterogeneous treatment effects: the term
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../notebooks/classical_fit_tram_dag/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Classical fitting of all- TRAM-DAGs ()
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/tramdag/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    tramdag
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/spec/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    spec
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/flow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    flow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/transforms/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    transforms
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/conditioners/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    conditioners
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/scores/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    scores
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/callbacks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    callbacks
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#specpy-declare-the-model" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        spec.py — declare the model
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#transformspy-the-monotone-map-h-and-the-ordinal-transform" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        transforms.py — the monotone map h and the ordinal transform
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#conditionerspy-the-networks-behind-the-terms" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        conditioners.py — the networks behind the terms
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#flowpy-the-model" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        flow.py — the model
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#scorespy-effect-modifier-detection-issue-29" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        scores.py — effect-modifier detection (issue #29)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#callbackspy-the-shipped-fit-callbacks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        callbacks.py — the shipped fit callbacks
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#what-is-not-in-the-package" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What is not in the package
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#where-every-training-hyperparameter-lives" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Where every training hyperparameter lives
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="code-map-every-class-and-function-in-srctramdag">Code map — every class and function in <code>src/tramdag/</code><a class="headerlink" href="#code-map-every-class-and-function-in-srctramdag" title="Permanent link">&para;</a></h1>
+<p>One entry per name, with its role and its place in the pipeline. Names in
+parentheses are private machinery: useful to know, not part of the API.
+The last section lists every training hyperparameter and where it lives.</p>
+<h2 id="specpy-declare-the-model"><code>spec.py</code> — declare the model<a class="headerlink" href="#specpy-declare-the-model" title="Permanent link">&para;</a></h2>
+<p>Every term constructor has a pythonic name and a short alias; the two
+are the same object, so <code>LS is linear_shift</code>.</p>
+<table>
+<thead>
+<tr>
+<th>Name</th>
+<th>Role</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a class="autorefs autorefs-internal" title="Term
+
+
+  
+      dataclass
+  " href="../api/spec/#tramdag.spec.Term"><code>Term</code></a></td>
+<td>One additive term of a node's transformation: the frozen triple <code>(effect, parents, options)</code>. <code>+</code> on terms builds plain lists. Effect-specific settings live in <code>options</code> and read as attributes (<code>term.penalty</code>, <code>term.units</code>, ...).</td>
+</tr>
+<tr>
+<td><a class="autorefs autorefs-internal" title="simple_intercept" href="../api/spec/#tramdag.spec.simple_intercept"><code>simple_intercept()</code></a> / <a class="autorefs autorefs-internal" title="simple_intercept" href="../api/spec/#tramdag.spec.simple_intercept"><code>SI</code></a></td>
+<td>The parentless intercept — the paper's SI. Free transform parameters, the same for every row. Carries the basis choice (<code>transform=</code>, default <code>"bernstein"</code>); extra keyword arguments pass straight to the transform class.</td>
+</tr>
+<tr>
+<td><a class="autorefs autorefs-internal" title="complex_intercept" href="../api/spec/#tramdag.spec.complex_intercept"><code>complex_intercept()</code></a> / <a class="autorefs autorefs-internal" title="complex_intercept" href="../api/spec/#tramdag.spec.complex_intercept"><code>CI</code></a></td>
+<td>The parent-conditioned intercept — the paper's CI: the parents reshape the monotone transform. Needs at least one parent. Also carries <code>units=</code> and <code>allow_interaction=</code> (joint vs. additive multi-parent intercept).</td>
+</tr>
+<tr>
+<td><a class="autorefs autorefs-internal" title="intercept" href="../api/spec/#tramdag.spec.intercept"><code>intercept()</code></a> / <a class="autorefs autorefs-internal" title="intercept" href="../api/spec/#tramdag.spec.intercept"><code>I</code></a></td>
+<td>The fallback: dispatches on its arguments to <code>SI</code> (no parents) or <code>CI</code> (parents). The bare names <code>I</code> and <code>SI</code> in a term list both mean the simple intercept.</td>
+</tr>
+<tr>
+<td><a class="autorefs autorefs-internal" title="linear_shift" href="../api/spec/#tramdag.spec.linear_shift"><code>linear_shift()</code></a> / <a class="autorefs autorefs-internal" title="linear_shift" href="../api/spec/#tramdag.spec.linear_shift"><code>LS</code></a></td>
+<td>Linear shift <code>beta * x</code> — the interpretable log-odds coefficient. Exactly one parent.</td>
+</tr>
+<tr>
+<td><a class="autorefs autorefs-internal" title="complex_shift" href="../api/spec/#tramdag.spec.complex_shift"><code>complex_shift()</code></a> / <a class="autorefs autorefs-internal" title="complex_shift" href="../api/spec/#tramdag.spec.complex_shift"><code>CS</code></a></td>
+<td>Complex shift: an MLP <code>g(x)</code>, additive on the latent scale. Several parents form one joint network.</td>
+</tr>
+<tr>
+<td><a class="autorefs autorefs-internal" title="varying_coefficient" href="../api/spec/#tramdag.spec.varying_coefficient"><code>varying_coefficient()</code></a> / <a class="autorefs autorefs-internal" title="varying_coefficient" href="../api/spec/#tramdag.spec.varying_coefficient"><code>VC</code></a></td>
+<td>Varying-coefficient shift <code>(beta0 + b_theta(mods)) * x_t</code> — the penalized treatment-effect head (issue #28). <code>center=</code> adds propensity centering (issue #30).</td>
+</tr>
+<tr>
+<td><a class="autorefs autorefs-internal" title="ContinuousNode" href="../api/spec/#tramdag.spec.ContinuousNode"><code>ContinuousNode</code></a></td>
+<td>Continuous variable: monotone 1-D transform plus shifts. <code>terms</code> is the first positional argument.</td>
+</tr>
+<tr>
+<td><a class="autorefs autorefs-internal" title="OrdinalNode" href="../api/spec/#tramdag.spec.OrdinalNode"><code>OrdinalNode</code></a></td>
+<td>Ordinal variable with <code>levels</code> classes: ordered logit (cutpoints) plus shifts.</td>
+</tr>
+<tr>
+<td><a class="autorefs autorefs-internal" title="node_terms" href="../api/spec/#tramdag.spec.node_terms"><code>node_terms()</code></a> / <a class="autorefs autorefs-internal" title="node_parents" href="../api/spec/#tramdag.spec.node_parents"><code>node_parents()</code></a></td>
+<td>Canonical term list / ordered de-duplicated parent names of a node.</td>
+</tr>
+<tr>
+<td><a class="autorefs autorefs-internal" title="validate_and_sort" href="../api/spec/#tramdag.spec.validate_and_sort"><code>validate_and_sort()</code></a></td>
+<td>Edge-ownership validation plus Kahn topological sort. The returned order makes the flow triangular.</td>
+</tr>
+<tr>
+<td><a class="autorefs autorefs-internal" title="spec_to_dict" href="../api/spec/#tramdag.spec.spec_to_dict"><code>spec_to_dict()</code></a> / <a class="autorefs autorefs-internal" title="spec_from_dict" href="../api/spec/#tramdag.spec.spec_from_dict"><code>spec_from_dict()</code></a></td>
+<td>Checkpoint (de)serialization. A term serializes as <code>{effect, parents, options}</code> and nothing else, since <code>options</code> is already canonical. No compatibility shims: <code>spec_from_dict</code> rejects a term without <code>options</code>, the node constructors normalize the formula, and <code>validate_and_sort</code> checks the DAG.</td>
+</tr>
+<tr>
+<td>(<code>_normalize_terms</code>, <code>_as_term</code>, <code>_intercept_basis</code>, <code>_options</code>, <code>_OPTION_DEFAULTS</code>)</td>
+<td>Formula flattening and per-entry validation (a <code>+</code> sum nested in a list is rejected), the one-parented-<code>I</code> rule plus basis hoisting in one pass, canonical option storage.</td>
+</tr>
+<tr>
+<td>(<code>_check_term</code>, <code>_check_node</code>, <code>_check_vc_term</code>, <code>_kahn_sort</code>)</td>
+<td>The stages behind <code>validate_and_sort</code>: per-term validation (effect, LS arity, unknown parents), per-node edge-ownership bookkeeping, the VC-specific checks, and the topological sort.</td>
+</tr>
+</tbody>
+</table>
+<h2 id="transformspy-the-monotone-map-h-and-the-ordinal-transform"><code>transforms.py</code> — the monotone map h and the ordinal transform<a class="headerlink" href="#transformspy-the-monotone-map-h-and-the-ordinal-transform" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Name</th>
+<th>Role</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a class="autorefs autorefs-internal" title="StandardLogistic" href="../api/transforms/#tramdag.transforms.StandardLogistic"><code>StandardLogistic</code></a></td>
+<td>The TRAM base distribution: <code>log_prob</code>, <code>sample</code> (generator-aware), <code>icdf</code>.</td>
+</tr>
+<tr>
+<td><a class="autorefs autorefs-internal" title="BernsteinUT" href="../api/transforms/#tramdag.transforms.BernsteinUT"><code>BernsteinUT</code></a></td>
+<td>Bernstein-polynomial transform (default basis, <code>n_coeffs=20</code>). Linear tail extrapolation follows the boundary derivative. <code>marginal_init_theta()</code> gives the calibrated start used by <code>calibrate(marginal_init=True)</code>.</td>
+</tr>
+<tr>
+<td><a class="autorefs autorefs-internal" title="SplineUT" href="../api/transforms/#tramdag.transforms.SplineUT"><code>SplineUT</code></a></td>
+<td>Monotone rational-quadratic spline (<code>bins=8</code>). Tails extrapolate with a <em>fixed</em> slope — the structural reason spline trails Bernstein on tail-heavy data.</td>
+</tr>
+<tr>
+<td><a class="autorefs autorefs-internal" title="AffineUT" href="../api/transforms/#tramdag.transforms.AffineUT"><code>AffineUT</code></a></td>
+<td>Monotone affine transform: the node-conditional is a logistic GLM.</td>
+</tr>
+<tr>
+<td><a class="autorefs autorefs-internal" title="make_univariate_transform" href="../api/transforms/#tramdag.transforms.make_univariate_transform"><code>make_univariate_transform()</code></a></td>
+<td>Basis registry: name → transform instance.</td>
+</tr>
+<tr>
+<td><a class="autorefs autorefs-internal" title="ordinal_cutpoints" href="../api/transforms/#tramdag.transforms.ordinal_cutpoints"><code>ordinal_cutpoints()</code></a></td>
+<td>Unconstrained <code>(n, K-1)</code> → increasing cutpoints with ±inf ends. Port of the original parametrization.</td>
+</tr>
+<tr>
+<td><a class="autorefs autorefs-internal" title="ordinal_log_prob" href="../api/transforms/#tramdag.transforms.ordinal_log_prob"><code>ordinal_log_prob()</code></a></td>
+<td><code>log P(Y=y)</code>, computed in log-space. Load-bearing: the naive sigmoid difference saturates in float32 and freezes nodes at init. Do not simplify.</td>
+</tr>
+<tr>
+<td><a class="autorefs autorefs-internal" title="ordinal_pmf" href="../api/transforms/#tramdag.transforms.ordinal_pmf"><code>ordinal_pmf()</code></a> / <a class="autorefs autorefs-internal" title="ordinal_sample" href="../api/transforms/#tramdag.transforms.ordinal_sample"><code>ordinal_sample()</code></a> / <a class="autorefs autorefs-internal" title="ordinal_abduct" href="../api/transforms/#tramdag.transforms.ordinal_abduct"><code>ordinal_abduct()</code></a></td>
+<td>Class probabilities / latent → level / truncated-logistic latent recovery (Pearl step 1) for ordinal nodes.</td>
+</tr>
+<tr>
+<td><a class="autorefs autorefs-internal" title="ordinal_marginal_init_theta" href="../api/transforms/#tramdag.transforms.ordinal_marginal_init_theta"><code>ordinal_marginal_init_theta()</code></a></td>
+<td>Cutpoint start that matches the empirical class frequencies (<code>calibrate(marginal_init=True)</code>).</td>
+</tr>
+<tr>
+<td>(<code>_ScaledUT</code>, <code>_bounds</code>, <code>_log1mexp</code>)</td>
+<td>Quantile pre-scaling base class (the inverse is zuko's, with its closed-form tail); per-level cutpoint intervals; stable <code>log(1-exp(x))</code>.</td>
+</tr>
+</tbody>
+</table>
+<h2 id="conditionerspy-the-networks-behind-the-terms"><code>conditioners.py</code> — the networks behind the terms<a class="headerlink" href="#conditionerspy-the-networks-behind-the-terms" title="Permanent link">&para;</a></h2>
+<p>Default architectures replicate the PyTorch reference this package grew out of
+(<a href="https://github.com/buehlpa/TramDag">buehlpa/TramDag</a>, <code>tram_models.py</code>), so a
+fitted model stays comparable to it. They are <strong>not</strong> the TRAM-DAG paper's nets:
+the paper's R code uses <code>c(2, 25, 25, 2)</code> with sigmoid for the triangle
+experiments and a 10-100 tanh net for its CAREFL/VACA comparisons, so each
+config in <code>experiments/paper/</code> states <code>units=</code> and <code>activation=</code> itself.</p>
+<table>
+<thead>
+<tr>
+<th>Name</th>
+<th>Term</th>
+<th>Role</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a class="autorefs autorefs-internal" title="SimpleIntercept" href="../api/conditioners/#tramdag.conditioners.SimpleIntercept"><code>SimpleIntercept</code></a></td>
+<td>bare <code>I</code></td>
+<td>Free parameter vector; no parents.</td>
+</tr>
+<tr>
+<td><a class="autorefs autorefs-internal" title="ComplexIntercept" href="../api/conditioners/#tramdag.conditioners.ComplexIntercept"><code>ComplexIntercept</code></a></td>
+<td><code>I(...)</code></td>
+<td>8-8 ReLU MLP from parent features to the transform parameters.</td>
+</tr>
+<tr>
+<td><a class="autorefs autorefs-internal" title="LinearShift" href="../api/conditioners/#tramdag.conditioners.LinearShift"><code>LinearShift</code></a></td>
+<td><code>LS</code></td>
+<td><code>Linear(n, 1, bias=False)</code>. <code>.weight</code> is the interpretable coefficient; no bias because the intercept slot owns the constant.</td>
+</tr>
+<tr>
+<td><a class="autorefs autorefs-internal" title="ComplexShift" href="../api/conditioners/#tramdag.conditioners.ComplexShift"><code>ComplexShift</code></a></td>
+<td><code>CS</code></td>
+<td>64-128-64 ReLU MLP to one shift value.</td>
+</tr>
+<tr>
+<td><a class="autorefs autorefs-internal" title="VaryingCoef" href="../api/conditioners/#tramdag.conditioners.VaryingCoef"><code>VaryingCoef</code></a></td>
+<td><code>VC</code></td>
+<td><code>beta0 + b_theta(mods)</code> with a zero-initialized output layer and the L2 hook <code>l2()</code>. <code>beta()</code> evaluates the effect, <code>recenter()</code> re-splits <code>beta0</code>/<code>b_theta</code> after training (function-preserving).</td>
+</tr>
+<tr>
+<td>(<code>_mlp</code>)</td>
+<td>—</td>
+<td>The one MLP builder: a stack of the given <code>units</code> with the term's <code>activation</code> (relu by default), then a bias-free output layer.</td>
+</tr>
+</tbody>
+</table>
+<h2 id="flowpy-the-model"><code>flow.py</code> — the model<a class="headerlink" href="#flowpy-the-model" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Name</th>
+<th>Role</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a class="autorefs autorefs-internal" title="CausalFlowDAG" href="../api/flow/#tramdag.flow.CausalFlowDAG"><code>CausalFlowDAG</code></a></td>
+<td>The flow: one <code>_Node</code> per variable in topological order. Construction seeds the weights (<code>seed=</code> is the reproducibility knob).</td>
+</tr>
+<tr>
+<td><a class="autorefs autorefs-internal" title="calibrate" href="../api/flow/#tramdag.flow.CausalFlowDAG.calibrate"><code>calibrate()</code></a></td>
+<td>Once, from the training rows: transform ranges (train 5%/95% quantiles onto the domain), network-input min-max, the calibrated start (<code>marginal_init=True</code>). Called by the first fit; a checkpoint carries the flag.</td>
+</tr>
+<tr>
+<td><a class="autorefs autorefs-internal" title="init_marginals" href="../api/flow/#tramdag.flow.CausalFlowDAG.init_marginals"><code>init_marginals()</code></a></td>
+<td>The calibrated start as an explicit step, callable any time: resets every simple intercept to its column's marginal (Bernstein map / ordinal class log-odds; spline and affine have no calibrated start). Not once-guarded — on a trained flow it restarts those intercepts. Calibrates a fresh flow's ranges itself.</td>
+</tr>
+<tr>
+<td><a class="autorefs autorefs-internal" title="fit" href="../api/flow/#tramdag.flow.CausalFlowDAG.fit"><code>fit()</code></a></td>
+<td>Joint maximum likelihood: one minibatch Adam loop over all parameters (exact per node, because the NLL decomposes), final weights kept. Hooks: <code>optimizer=</code> (any torch optimizer, for schedulers), <code>after_epoch_callbacks=</code> (one callable or a list, <code>cb(flow, epoch, opt)</code> after every epoch, any <code>True</code> stops) and <code>before_fit_callbacks=</code>/<code>after_fit_callbacks=</code> around the loop — validation, schedules, early stopping and logging attach here; the common recipes ship in <code>callbacks.py</code>. <code>vc_ehat=</code> carries the out-of-fold propensities of centered VC terms. A second call continues training.</td>
+</tr>
+<tr>
+<td><a class="autorefs autorefs-internal" title="fit_classical" href="../api/flow/#tramdag.flow.CausalFlowDAG.fit_classical"><code>fit_classical()</code></a></td>
+<td>Float64 full-batch L-BFGS for all-<code>ls</code> specs: deterministic, exact MLE, matches <code>statsmodels</code>/R <code>polr</code>. Refuses flexible specs.</td>
+</tr>
+<tr>
+<td><a class="autorefs autorefs-internal" title="sample" href="../api/flow/#tramdag.flow.CausalFlowDAG.sample"><code>sample()</code></a></td>
+<td>Observational, interventional (<code>do=</code>, graph mutilation) and counterfactual (<code>u=</code>) sampling.</td>
+</tr>
+<tr>
+<td><a class="autorefs autorefs-internal" title="abduct" href="../api/flow/#tramdag.flow.CausalFlowDAG.abduct"><code>abduct()</code></a></td>
+<td>Pearl step 1: recover the latents. Continuous exactly, ordinal by truncated draw.</td>
+</tr>
+<tr>
+<td><a class="autorefs autorefs-internal" title="pmf" href="../api/flow/#tramdag.flow.CausalFlowDAG.pmf"><code>pmf()</code></a></td>
+<td>Analytic class probabilities of an ordinal node, with <code>do=</code> overrides.</td>
+</tr>
+<tr>
+<td><a class="autorefs autorefs-internal" title="density" href="../api/flow/#tramdag.flow.CausalFlowDAG.density"><code>density()</code></a></td>
+<td>Analytic conditional density of a continuous node on a grid, with <code>do=</code> overrides — the continuous counterpart of <code>pmf</code>.</td>
+</tr>
+<tr>
+<td><a class="autorefs autorefs-internal" title="log_prob" href="../api/flow/#tramdag.flow.CausalFlowDAG.log_prob"><code>log_prob()</code></a> / <a class="autorefs autorefs-internal" title="nll" href="../api/flow/#tramdag.flow.CausalFlowDAG.nll"><code>nll()</code></a></td>
+<td>Joint per-row log-likelihood / mean per-node NLL diagnostic.</td>
+</tr>
+<tr>
+<td><a class="autorefs autorefs-internal" title="node_log_prob" href="../api/flow/#tramdag.flow.CausalFlowDAG.node_log_prob"><code>node_log_prob()</code></a></td>
+<td>The per-node decomposition everything trains and evaluates through.</td>
+</tr>
+<tr>
+<td><a class="autorefs autorefs-internal" title="varying_coef" href="../api/flow/#tramdag.flow.CausalFlowDAG.varying_coef"><code>varying_coef()</code></a></td>
+<td>Closed-form read-out <code>beta(x)</code> of a fitted VC term. Deterministic, y-free.</td>
+</tr>
+<tr>
+<td><a class="autorefs autorefs-internal" title="scores" href="../api/flow/#tramdag.flow.CausalFlowDAG.scores"><code>scores()</code></a> / <a class="autorefs autorefs-internal" title="effect_modifier_scan" href="../api/flow/#tramdag.flow.CausalFlowDAG.effect_modifier_scan"><code>effect_modifier_scan()</code></a></td>
+<td>Analytic per-observation scores and the CUSUM modifier scan (delegate to <code>scores.py</code>).</td>
+</tr>
+<tr>
+<td><a class="autorefs autorefs-internal" title="intercept_contributions" href="../api/flow/#tramdag.flow.CausalFlowDAG.intercept_contributions"><code>intercept_contributions()</code></a></td>
+<td>Post-hoc GAM-style decomposition of a complex intercept into mean-centered per-term parts.</td>
+</tr>
+<tr>
+<td><a class="autorefs autorefs-internal" title="ls_coefficients" href="../api/flow/#tramdag.flow.CausalFlowDAG.ls_coefficients"><code>ls_coefficients()</code></a></td>
+<td>The per-node linear-shift weights — the interpretable coefficients.</td>
+</tr>
+<tr>
+<td><a class="autorefs autorefs-internal" title="design_matrix" href="../api/flow/#tramdag.flow.CausalFlowDAG.design_matrix"><code>design_matrix()</code></a></td>
+<td>Parent encoding as a DataFrame (<code>drop_first=</code> gives the classical statsmodels/<code>polr</code> design).</td>
+</tr>
+<tr>
+<td><a class="autorefs autorefs-internal" title="to_matrix" href="../api/flow/#tramdag.flow.CausalFlowDAG.to_matrix"><code>to_matrix()</code></a></td>
+<td>The labeled meta-adjacency matrix of term effects.</td>
+</tr>
+<tr>
+<td><a class="autorefs autorefs-internal" title="save" href="../api/flow/#tramdag.flow.CausalFlowDAG.save"><code>save()</code></a> / <a class="autorefs autorefs-internal" title="load
+
+
+  
+      classmethod
+  " href="../api/flow/#tramdag.flow.CausalFlowDAG.load"><code>load()</code></a></td>
+<td>Checkpoints with history and provenance (version, time, device). <code>load</code> requires a complete checkpoint and fails loudly otherwise.</td>
+</tr>
+<tr>
+<td>(<code>_Node</code>, <code>_VCGroup</code>)</td>
+<td>Per-node module (intercept + shift <code>ModuleDict</code> + VC bookkeeping); construction is <code>_build_intercept</code>/<code>_build_shifts</code>, and <code>theta_shift()</code> computes <code>(theta, shift)</code> through <code>_theta</code>/<code>_vc_shift</code>/<code>vc_column</code>.</td>
+</tr>
+<tr>
+<td>(<code>_node</code>, <code>_encode_parent</code>, <code>_features</code>, <code>_tensorize</code>, <code>_generator</code>, <code>_dtype</code>, <code>_np_dtype</code>, <code>_feat_width</code>, <code>_slice_ehat</code>, <code>_term_cells</code>)</td>
+<td>Node lookup with one shared error; parent encoding (continuous raw, ordinal one-hot); <code>_tensorize(df, cols=None)</code> for any column subset; seeded-generator, dtype, feature-width and adjacency-cell plumbing.</td>
+</tr>
+<tr>
+<td>(<code>_fit_epoch</code>)</td>
+<td>One shuffled pass over the rows; the epoch-mean train NLL per node goes to <code>history["train"]</code>.</td>
+</tr>
+<tr>
+<td>(<code>_vc_ehat_train</code>, <code>_binary_p1</code>, <code>_vc_ehat_live</code>, <code>_vc_ehat_columns</code>, <code>_recenter_vc</code>)</td>
+<td>The VC machinery: the caller's out-of-fold propensities as frozen training tensors (DML); live full-fit propensities for inference (recomputed under <code>do</code>, never cached); post-fit re-centering.</td>
+</tr>
+<tr>
+<td>(<code>_is_all_ls</code>, <code>_covered_by_classical</code>)</td>
+<td>Guard for <code>fit_classical</code>: every term an <code>LS</code>, or a parentless <code>I()</code> basis carrier.</td>
+</tr>
+</tbody>
+</table>
+<h2 id="scorespy-effect-modifier-detection-issue-29"><code>scores.py</code> — effect-modifier detection (issue #29)<a class="headerlink" href="#scorespy-effect-modifier-detection-issue-29" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Name</th>
+<th>Role</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a class="autorefs autorefs-internal" title="node_scores" href="../api/scores/#tramdag.scores.node_scores"><code>node_scores()</code></a></td>
+<td>Analytic, exact per-observation scores <code>psi_i = d l_i / d theta</code> for every <code>LS</code> weight and VC <code>beta0</code>. No autograd.</td>
+</tr>
+<tr>
+<td><a class="autorefs autorefs-internal" title="effect_modifier_scan" href="../api/scores/#tramdag.scores.effect_modifier_scan"><code>effect_modifier_scan()</code></a></td>
+<td>Zeileis-Hornik fluctuation scan: order the treatment scores by each candidate, <code>sup|CUSUM|</code> against the Kolmogorov 5% value. A measured shortlist for VC modifiers from a seconds-long classical fit.</td>
+</tr>
+<tr>
+<td><a class="autorefs autorefs-internal" title="sup_bb_pvalue" href="../api/scores/#tramdag.scores.sup_bb_pvalue"><code>sup_bb_pvalue()</code></a></td>
+<td><code>P(sup |Brownian bridge| &gt; stat)</code>, the Kolmogorov series.</td>
+</tr>
+<tr>
+<td>(<code>_dl_ds</code>, <code>_ls_score_columns</code>, <code>CRIT_5PCT</code>)</td>
+<td>Closed-form latent-scale derivative; the LS/one-hot score-column builder; the 5% critical value 1.3581.</td>
+</tr>
+</tbody>
+</table>
+<h2 id="callbackspy-the-shipped-fit-callbacks"><code>callbacks.py</code> — the shipped <code>fit</code> callbacks<a class="headerlink" href="#callbackspy-the-shipped-fit-callbacks" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Name</th>
+<th>Role</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a class="autorefs autorefs-internal" title="Logger" href="../api/callbacks/#tramdag.callbacks.Logger"><code>Logger</code></a></td>
+<td>Prints one line per <code>every</code> epochs: summed train NLL, plus validation NLL when <code>val_df</code> is given.</td>
+</tr>
+<tr>
+<td><a class="autorefs autorefs-internal" title="RestoreBest" href="../api/callbacks/#tramdag.callbacks.RestoreBest"><code>RestoreBest</code></a></td>
+<td>Snapshots the weights of the best summed validation NLL per epoch; <code>restore</code> (registered in <code>after_fit_callbacks</code>) loads them back before the VC re-centering.</td>
+</tr>
+<tr>
+<td><a class="autorefs autorefs-internal" title="PerNodePlateau" href="../api/callbacks/#tramdag.callbacks.PerNodePlateau"><code>PerNodePlateau</code></a></td>
+<td>Per-node lr decay and freezing on each node's own validation NLL; stops the fit once every node froze. The pre-0.4 <code>fit(schedule="plateau")</code> recipe, opt-in. <code>step(nll, opt)</code> for a hand-computed NLL.</td>
+</tr>
+<tr>
+<td><a class="autorefs autorefs-internal" title="per_node_adam" href="../api/callbacks/#tramdag.callbacks.per_node_adam"><code>per_node_adam()</code></a></td>
+<td>Adam with one <code>node</code>-tagged parameter group per node — the optimizer <code>PerNodePlateau</code> needs.</td>
+</tr>
+</tbody>
+</table>
+<h2 id="what-is-not-in-the-package">What is <em>not</em> in the package<a class="headerlink" href="#what-is-not-in-the-package" title="Permanent link">&para;</a></h2>
+<p>The SCM generators, the frozen datasets and the replication scripts are
+research code and live in <a href="https://github.com/tensorchiefs/tramdag/tree/dev-marcel/experiments"><code>experiments/</code></a>, outside the
+installed package — see
+<a href="https://github.com/tensorchiefs/tramdag/blob/dev-marcel/experiments/README.md"><code>experiments/README.md</code></a>. The framework's own
+tests do not depend on them: they measure against three inline DGPs in
+<a href="https://github.com/tensorchiefs/tramdag/blob/dev-marcel/tests/conftest.py"><code>tests/conftest.py</code></a>.</p>
+<h2 id="where-every-training-hyperparameter-lives">Where every training hyperparameter lives<a class="headerlink" href="#where-every-training-hyperparameter-lives" title="Permanent link">&para;</a></h2>
+<p>Everything that shapes a fit is either a keyword you pass or a documented
+default you can read at the call site. Nothing numeric is buried.</p>
+<table>
+<thead>
+<tr>
+<th>Knob</th>
+<th>Where</th>
+<th>Default</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>learning rate, batch size</td>
+<td><code>fit()</code></td>
+<td>1e-2 / 512 (in-repo callers state them explicitly anyway)</td>
+</tr>
+<tr>
+<td>schedules, early stopping, logging</td>
+<td><code>fit(optimizer=, after_epoch_callbacks=)</code></td>
+<td><code>tramdag.callbacks</code> ships <code>Logger</code>, <code>RestoreBest</code>, <code>PerNodePlateau</code>; anything else is torch's <code>lr_scheduler</code> and a few lines of callback (<a href="../fitting/">fitting.md</a>)</td>
+</tr>
+<tr>
+<td>calibrated init</td>
+<td><code>calibrate(marginal_init=)</code></td>
+<td>True (pure init, MLE unchanged; <code>False</code> = zuko's zero start; called by the first fit)</td>
+</tr>
+<tr>
+<td>VC stage-1 propensities</td>
+<td><code>fit(vc_ehat=)</code></td>
+<td>required for a centered VC term, out of fold, computed by the caller</td>
+</tr>
+<tr>
+<td>VC penalty and centering</td>
+<td><code>VC(penalty=, center=)</code></td>
+<td>1.0 / False (centering needs <code>fit(vc_ehat=)</code>)</td>
+</tr>
+<tr>
+<td>L-BFGS budget</td>
+<td><code>fit_classical(max_iter=, tol=, history_size=)</code></td>
+<td>400 / 1e-9 (torch <code>tolerance_change</code>; <code>tolerance_grad</code> is off) / 50 — one full-batch run, no chunks</td>
+</tr>
+<tr>
+<td>training budget</td>
+<td><code>fit(epochs=)</code></td>
+<td><strong>required</strong> — a fixed default is wrong in both directions (<a href="../training-speed/">training-speed</a>)</td>
+</tr>
+<tr>
+<td>network widths</td>
+<td><code>units=</code> on <code>I</code>/<code>CS</code>/<code>VC</code></td>
+<td>(8, 8) / (64, 128, 64) — parity with the PyTorch reference's default classes; VC's (16,) has no counterpart there and comes from the recovery measurement</td>
+</tr>
+<tr>
+<td>activation</td>
+<td><code>activation=</code> on <code>I</code>/<code>CS</code>/<code>VC</code></td>
+<td><code>"relu"</code> (the reference default classes); <code>"sigmoid"</code> and <code>"tanh"</code> are the paper's</td>
+</tr>
+<tr>
+<td>transform basis</td>
+<td><code>I(transform=, **kwargs)</code> (extra kwargs go to the transform class)</td>
+<td><code>"bernstein"</code>, <code>n_coeffs=20</code> unconstrained coefficients (zuko ties two more control points on, so order 21); spline <code>bins=8</code> = zuko's NSF default (the domain is fixed at [-5, 5], <code>transforms.BOUND</code>)</td>
+</tr>
+<tr>
+<td>shuffling / weight init</td>
+<td><code>fit(seed=)</code> / <code>CausalFlowDAG(seed=)</code></td>
+<td>init happens at construction — the constructor seed is the reproducibility knob</td>
+</tr>
+<tr>
+<td>weight init</td>
+<td><code>CausalFlowDAG(init=)</code></td>
+<td><code>"torch"</code> (<code>nn.Linear</code> Kaiming-uniform); <code>"glorot"</code> = Keras <code>Dense</code> default, glorot-uniform weights and zero biases — the paper's reference; decisive under its full-batch protocol</td>
+</tr>
+<tr>
+<td>network inputs</td>
+<td><code>CausalFlowDAG(net_input_scaling=)</code></td>
+<td><code>None</code> (raw parents); <code>"minmax"</code> scales the continuous parents of every net (CI/CS/VC modifiers) to [0, 1] by the training min–max, the reference's <code>scale_df</code> — LS and the VC treatment stay raw</td>
+</tr>
+</tbody>
+</table>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.sections", "navigation.top", "content.code.copy", "toc.follow"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"provider": "mike"}}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+        <script src="../javascripts/mathjax.js"></script>
+      
+        <script src="https://unpkg.com/mathjax@3/es5/tex-mml-chtml.js"></script>
+      
+    
+  </body>
+</html>

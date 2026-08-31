@@ -1,0 +1,4221 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Interpretable Neural Causal Models (TRAM-DAGs) in PyTorch">
+      
+      
+      
+        <link rel="canonical" href="https://tensorchiefs.github.io/tramdag/dev-marcel/api/flow/">
+      
+      
+        <link rel="prev" href="../spec/">
+      
+      
+        <link rel="next" href="../transforms/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>flow - tramdag</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#tramdagflow" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+      <div data-md-color-scheme="default" data-md-component="outdated" hidden>
+        
+      </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="tramdag" class="md-header__button md-logo" aria-label="tramdag" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            tramdag
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              flow
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/tensorchiefs/tramdag" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    GitHub
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="tramdag" class="md-nav__button md-logo" aria-label="tramdag" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    tramdag
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/tensorchiefs/tramdag" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    GitHub
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Guides
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Guides
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../notation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Notation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../fitting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Fitting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../training-speed/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Training speed
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../scores/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Scores
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../varying-coefficients/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Varying coefficients
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../paper-replication/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Paper replication
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../code-map/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Code map
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../zuko-upstream/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Zuko upstream
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Notebooks
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Notebooks
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../notebooks/demo_tram_dag_colab/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    TRAM-DAG in 5 minutes — one causal model, all three rungs of Pearl's ladder
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../notebooks/intro_tram_dag/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    TRAM-DAG — a didactic introduction with
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../notebooks/additive_vs_joint_ci/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Additive vs joint complex intercept — interpreting per-parent effects
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../notebooks/varying_coefficients/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Heterogeneous treatment effects: the term
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../notebooks/classical_fit_tram_dag/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Classical fitting of all- TRAM-DAGs ()
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../tramdag/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    tramdag
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../spec/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    spec
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    flow
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    flow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#tramdag.flow" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        flow
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="flow">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#tramdag.flow.CausalFlowDAG" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CausalFlowDAG
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="CausalFlowDAG">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#tramdag.flow.CausalFlowDAG.node_log_prob" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        node_log_prob
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tramdag.flow.CausalFlowDAG.log_prob" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        log_prob
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tramdag.flow.CausalFlowDAG.nll" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        nll
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tramdag.flow.CausalFlowDAG.calibrate" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        calibrate
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tramdag.flow.CausalFlowDAG.init_marginals" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        init_marginals
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tramdag.flow.CausalFlowDAG.fit" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        fit
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tramdag.flow.CausalFlowDAG.varying_coef" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        varying_coef
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tramdag.flow.CausalFlowDAG.ls_coefficients" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ls_coefficients
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tramdag.flow.CausalFlowDAG.to_matrix" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        to_matrix
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tramdag.flow.CausalFlowDAG.intercept_contributions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        intercept_contributions
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tramdag.flow.CausalFlowDAG.design_matrix" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        design_matrix
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tramdag.flow.CausalFlowDAG.fit_classical" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        fit_classical
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tramdag.flow.CausalFlowDAG.sample" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        sample
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tramdag.flow.CausalFlowDAG.abduct" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        abduct
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tramdag.flow.CausalFlowDAG.pmf" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        pmf
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tramdag.flow.CausalFlowDAG.density" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        density
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tramdag.flow.CausalFlowDAG.scores" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        scores
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tramdag.flow.CausalFlowDAG.effect_modifier_scan" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        effect_modifier_scan
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tramdag.flow.CausalFlowDAG.save" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        save
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tramdag.flow.CausalFlowDAG.load" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        load
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../transforms/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    transforms
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../conditioners/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    conditioners
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../scores/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    scores
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../callbacks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    callbacks
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#tramdag.flow" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        flow
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="flow">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#tramdag.flow.CausalFlowDAG" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CausalFlowDAG
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="CausalFlowDAG">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#tramdag.flow.CausalFlowDAG.node_log_prob" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        node_log_prob
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tramdag.flow.CausalFlowDAG.log_prob" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        log_prob
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tramdag.flow.CausalFlowDAG.nll" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        nll
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tramdag.flow.CausalFlowDAG.calibrate" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        calibrate
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tramdag.flow.CausalFlowDAG.init_marginals" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        init_marginals
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tramdag.flow.CausalFlowDAG.fit" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        fit
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tramdag.flow.CausalFlowDAG.varying_coef" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        varying_coef
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tramdag.flow.CausalFlowDAG.ls_coefficients" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ls_coefficients
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tramdag.flow.CausalFlowDAG.to_matrix" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        to_matrix
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tramdag.flow.CausalFlowDAG.intercept_contributions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        intercept_contributions
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tramdag.flow.CausalFlowDAG.design_matrix" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        design_matrix
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tramdag.flow.CausalFlowDAG.fit_classical" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        fit_classical
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tramdag.flow.CausalFlowDAG.sample" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        sample
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tramdag.flow.CausalFlowDAG.abduct" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        abduct
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tramdag.flow.CausalFlowDAG.pmf" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        pmf
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tramdag.flow.CausalFlowDAG.density" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        density
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tramdag.flow.CausalFlowDAG.scores" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        scores
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tramdag.flow.CausalFlowDAG.effect_modifier_scan" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        effect_modifier_scan
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tramdag.flow.CausalFlowDAG.save" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        save
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tramdag.flow.CausalFlowDAG.load" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        load
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="tramdagflow">tramdag.flow<a class="headerlink" href="#tramdagflow" title="Permanent link">&para;</a></h1>
+
+
+<div class="doc doc-object doc-module">
+
+
+
+<h2 id="tramdag.flow" class="doc doc-heading">
+            <span class="doc doc-object-name doc-module-name">tramdag.flow</span>
+
+
+<a href="#tramdag.flow" class="headerlink" title="Permanent link">&para;</a></h2>
+
+    <div class="doc doc-contents first">
+
+        <p>CausalFlowDAG — a single triangular normalizing flow on a user-defined DAG.</p>
+<p>The flow maps iid standard-logistic latents <code>U</code> to the observed variables <code>X</code>
+in topological order; its Jacobian sparsity is exactly the DAG adjacency. The
+joint log-likelihood decomposes per node, so one optimizer fits all nodes at once.</p>
+<p>Causal queries:
+    flow.sample(n)                    observational sampling
+    flow.sample(n, do={"T": 1})       interventional sampling (graph mutilation)
+    u = flow.abduct(df)               Pearl step 1 (latents from observations)
+    flow.sample(do={"T": 1}, u=u)     Pearl steps 2+3 (counterfactuals)
+    flow.pmf(df, node, do=...)        analytic per-row interventional PMF</p>
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="tramdag.flow.CausalFlowDAG" class="doc doc-heading">
+            <span class="doc doc-object-name doc-class-name">CausalFlowDAG</span>
+
+
+<a href="#tramdag.flow.CausalFlowDAG" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><span title="torch.nn.Module">Module</span></code></p>
+
+
+
+        <p>A causal normalizing flow defined by a DAG specification.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>spec</code>
+            </td>
+            <td>
+                  <code><span title="dict">dict</span>[<span title="str">str</span>, <span title="tramdag.spec.NodeSpec">NodeSpec</span>]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The DAG specification, <code>{name: ContinuousNode | OrdinalNode}</code>.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>device</code>
+            </td>
+            <td>
+                  <code><span title="str">str</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Torch device, by default <code>"cpu"</code>.</p>
+              </div>
+            </td>
+            <td>
+                  <code>&#39;cpu&#39;</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>seed</code>
+            </td>
+            <td>
+                  <code><span title="int">int</span> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>If given, seeds the weight initialization deterministically
+(<code>torch.manual_seed</code> runs before the nodes are built). Weight
+initialization happens at construction, so this is the one knob
+for a reproducible model. <code>fit(seed=...)</code> only seeds the
+minibatch shuffling.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>net_input_scaling</code>
+            </td>
+            <td>
+                  <code><span title="str">str</span> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p><code>"minmax"</code> feeds every network (complex intercepts, complex shifts,
+VC modifiers) its continuous parents scaled to <code>[0, 1]</code> by the
+training min and max, the way the paper's reference implementation
+does; raw parents (default <code>None</code>) saturate a tanh net whenever
+<code>|x| &gt; 2</code>. Linear shifts and the VC treatment stay raw, so their
+coefficients keep their units. Set by <code>calibrate</code>; stored in
+the checkpoint.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>init</code>
+            </td>
+            <td>
+                  <code><span title="str">str</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Weight initialization of every linear layer (the LS weights and the
+CI/CS/VC networks): <code>"torch"</code> (default, <code>nn.Linear</code>'s
+Kaiming-uniform), <code>"glorot"</code> — Keras' <code>Dense</code> default,
+glorot-uniform weights and zero biases, the paper's VACA/CAREFL
+scripts — or <code>"normal"</code> — Keras' <code>RandomNormal</code>, N(0, 0.05^2)
+on weights and biases, the paper's triangle scripts. A VC head's
+output layer stays zero either way. Under the reference's full-batch
+protocol the choice decides the fit: VACA's <code>do(x2)</code> error at the
+config's seed is 0.52 / 0.33 / 0.13 with torch's init and
+0.098 / 0.159 / 0.026 with glorot (another draw: 0.035 / 0.006 /
+0.007; measured 2026-08-26). Stored in the checkpoint.</p>
+              </div>
+            </td>
+            <td>
+                  <code>&#39;torch&#39;</code>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="tramdag.flow.CausalFlowDAG.node_log_prob" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">node_log_prob</span>
+
+
+<a href="#tramdag.flow.CausalFlowDAG.node_log_prob" class="headerlink" title="Permanent link">&para;</a></h4>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">node_log_prob</span><span class="p">(</span><span class="n">values</span><span class="p">,</span> <span class="n">nodes</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">vc_ehat</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Compute the per-node log-likelihood contributions.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>values</code>
+            </td>
+            <td>
+                  <code><span title="dict">dict</span>[<span title="str">str</span>, <span title="torch.Tensor">Tensor</span>]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Raw node values, keyed by node name, each shape <code>(n,)</code>.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>nodes</code>
+            </td>
+            <td>
+                  <code><span title="list">list</span>[<span title="str">str</span>] | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Restrict the computation to these nodes. A subset is exact
+because the per-node losses
+are independent. <code>None</code> (default) computes every node.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>vc_ehat</code>
+            </td>
+            <td>
+                  <code><span title="dict">dict</span>[<span title="str">str</span>, <span title="dict">dict</span>[<span title="str">str</span>, <span title="torch.Tensor">Tensor</span>]] | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Propensity override for centered VC terms, as
+<code>{node: {on: e_hat}}</code>. <code>fit</code> passes the frozen
+<strong>out-of-fold</strong> values for the training rows. When omitted,
+the live full-fit propensity is recomputed from the flow's
+own treatment node.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="dict">dict</span>[<span title="str">str</span>, <span title="torch.Tensor">Tensor</span>]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>One log-likelihood tensor per node, each shape <code>(n,)</code>.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="tramdag.flow.CausalFlowDAG.log_prob" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">log_prob</span>
+
+
+<a href="#tramdag.flow.CausalFlowDAG.log_prob" class="headerlink" title="Permanent link">&para;</a></h4>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">log_prob</span><span class="p">(</span><span class="n">df</span><span class="p">)</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Compute the joint log-likelihood per row.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>df</code>
+            </td>
+            <td>
+                  <code><span title="pandas.DataFrame">DataFrame</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Observations, one column per node.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="torch.Tensor">Tensor</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p><code>log p(x)</code> per row, shape <code>(n,)</code>.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="tramdag.flow.CausalFlowDAG.nll" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">nll</span>
+
+
+<a href="#tramdag.flow.CausalFlowDAG.nll" class="headerlink" title="Permanent link">&para;</a></h4>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">nll</span><span class="p">(</span><span class="n">df</span><span class="p">)</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Compute the mean negative log-likelihood per node (a diagnostic).</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>df</code>
+            </td>
+            <td>
+                  <code><span title="pandas.DataFrame">DataFrame</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Observations, one column per node.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="dict">dict</span>[<span title="str">str</span>, <span title="float">float</span>]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The mean NLL, keyed by node name.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="tramdag.flow.CausalFlowDAG.calibrate" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">calibrate</span>
+
+
+<a href="#tramdag.flow.CausalFlowDAG.calibrate" class="headerlink" title="Permanent link">&para;</a></h4>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">calibrate</span><span class="p">(</span><span class="n">train_df</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">marginal_init</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Take the data-dependent state from the training rows, once.</p>
+<p>Per continuous node the transform's domain: the train <code>RANGE_Q</code> /
+<code>1 - RANGE_Q</code> quantiles map onto <code>[-5, 5]</code> (the min-max scaling
+of the original implementation, made robust to outliers). With
+<code>net_input_scaling="minmax"</code> the min and max of every continuous
+parent, for the networks. With <code>marginal_init</code> a calibrated start:
+a Bernstein simple intercept starts at the data marginal instead of
+zuko's default (about 2.5x too steep), an ordinal simple intercept at
+the marginal class log-odds. The optimum is unchanged, the path to
+it is shorter (docs/training-speed.md).</p>
+<p>The first <code>fit</code> or <code>fit_classical</code> calls this when it has not run
+yet; a loaded model is already calibrated, and later fits on other rows
+reuse this state — data on a new scale needs a new flow. Calling it
+yourself is how to choose <code>marginal_init=False</code> (the paper
+replications do, to match a reference that has no such step). To
+re-apply the calibrated start later — a loaded or already-trained
+model — call :meth:<code>init_marginals</code> directly.</p>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="CausalFlowDAG (tramdag.flow.CausalFlowDAG)" href="#tramdag.flow.CausalFlowDAG">CausalFlowDAG</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p><code>self</code>.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="tramdag.flow.CausalFlowDAG.init_marginals" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">init_marginals</span>
+
+
+<a href="#tramdag.flow.CausalFlowDAG.init_marginals" class="headerlink" title="Permanent link">&para;</a></h4>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">init_marginals</span><span class="p">(</span><span class="n">train_df</span><span class="p">)</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Set every simple intercept to the marginal of its column — any time.</p>
+<p>The calibrated start, as an explicit step: a Bernstein simple
+intercept starts at the data marginal instead of zuko's default
+(about 2.5x too steep), an ordinal simple intercept at the marginal
+class log-odds; spline/affine intercepts and intercepts with parents
+are untouched. The optimum is unchanged, the path to it is shorter
+(docs/training-speed.md). <code>calibrate(marginal_init=True)</code> — and so
+the first <code>fit</code> — runs this once; unlike <code>calibrate</code> it is NOT
+guarded by the calibrated flag, so calling it on a loaded or
+already-trained flow <strong>discards those intercepts' weights</strong> and
+restarts them at the marginal. An uncalibrated flow takes its ranges
+from the same rows first. On a calibrated flow the Bernstein start
+comes from the stored range alone (the canonical map; the df is not
+read) — only ordinal intercepts re-read the rows.</p>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="CausalFlowDAG (tramdag.flow.CausalFlowDAG)" href="#tramdag.flow.CausalFlowDAG">CausalFlowDAG</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p><code>self</code>.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="tramdag.flow.CausalFlowDAG.fit" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">fit</span>
+
+
+<a href="#tramdag.flow.CausalFlowDAG.fit" class="headerlink" title="Permanent link">&para;</a></h4>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">fit</span><span class="p">(</span>
+    <span class="n">train_df</span><span class="p">,</span>
+    <span class="o">*</span><span class="p">,</span>
+    <span class="n">epochs</span><span class="p">,</span>
+    <span class="n">learning_rate</span><span class="o">=</span><span class="mf">0.01</span><span class="p">,</span>
+    <span class="n">batch_size</span><span class="o">=</span><span class="mi">512</span><span class="p">,</span>
+    <span class="n">seed</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+    <span class="n">optimizer</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+    <span class="n">before_fit_callbacks</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+    <span class="n">after_epoch_callbacks</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+    <span class="n">after_fit_callbacks</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+    <span class="n">vc_ehat</span><span class="o">=</span><span class="kc">None</span>
+<span class="p">)</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Fit all nodes jointly by maximum likelihood — one minibatch Adam loop.</p>
+<p>The joint NLL decomposes per node with independent gradients, so one
+optimizer over all parameters is the same as one per node. The loop
+keeps the <strong>final</strong> weights: an all-<code>ls</code> model trained to
+convergence reproduces the classical maximum-likelihood estimate and
+matches <code>statsmodels</code> and R <code>polr</code>. A second <code>fit</code> call
+continues the training. Everything else — validation monitoring,
+learning-rate schedules, early stopping, best-weight restoration,
+logging — is the caller's, through <code>optimizer</code> and the callback
+hooks; :mod:<code>tramdag.callbacks</code> ships the common recipes::</p>
+<pre><code>from tramdag.callbacks import Logger, RestoreBest
+
+best = RestoreBest(val_df)
+flow.fit(
+    train_df,
+    epochs=4000,
+    after_epoch_callbacks=[Logger(val_df, every=50), best],
+    after_fit_callbacks=[best.restore],
+)
+</code></pre>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>train_df</code>
+            </td>
+            <td>
+                  <code><span title="pandas.DataFrame">DataFrame</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Training data, one column per node.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>epochs</code>
+            </td>
+            <td>
+                  <code><span title="int">int</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Number of passes over the data. There is no default: a fixed
+budget over-spends on some workloads and under-spends on others
+(docs/training-speed.md).</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>learning_rate</code>
+            </td>
+            <td>
+                  <code><span title="float">float</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Adam step size of the default optimizer, by default 1e-2.
+Ignored when <code>optimizer</code> is given.</p>
+              </div>
+            </td>
+            <td>
+                  <code>0.01</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>batch_size</code>
+            </td>
+            <td>
+                  <code><span title="int">int</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Rows per gradient step, by default 512. <code>len(train_df)</code> is one
+full-batch step per epoch.</p>
+              </div>
+            </td>
+            <td>
+                  <code>512</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>seed</code>
+            </td>
+            <td>
+                  <code><span title="int">int</span> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Seeds torch's global RNG before the loop, for the minibatch
+shuffling. Weight initialization is seeded at construction
+(<code>CausalFlowDAG(spec, seed=...)</code>).</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>optimizer</code>
+            </td>
+            <td>
+                  <code><span title="torch.optim.Optimizer">Optimizer</span> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Any torch optimizer over <code>flow.parameters()</code>; the default is
+<code>Adam(lr=learning_rate)</code>. Build it yourself to attach a
+<code>torch.optim.lr_scheduler</code> or to continue with its state.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>before_fit_callbacks</code>
+            </td>
+            <td>
+                  <code><span title="callable">callable</span> | <span title="list">list</span>[<span title="callable">callable</span>] | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Each called as <code>cb(flow, optimizer)</code> once, after calibration
+and before the first epoch.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>after_epoch_callbacks</code>
+            </td>
+            <td>
+                  <code><span title="callable">callable</span> | <span title="list">list</span>[<span title="callable">callable</span>] | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Each called as <code>cb(flow, epoch, optimizer)</code> after every epoch
+(<code>epoch</code> counts from 1), once the epoch's train NLLs are in
+<code>flow.history["train"]</code>. All of them run each epoch; the fit
+stops after an epoch in which any returned <code>True</code>
+(<code>len(flow.history["train"])</code> says how many epochs ran). Use them
+for validation (<code>flow.nll(val_df)</code>), schedules, snapshots and
+coefficient trajectories — :mod:<code>tramdag.callbacks</code> ships
+<code>Logger</code>, <code>RestoreBest</code> and <code>PerNodePlateau</code>.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>after_fit_callbacks</code>
+            </td>
+            <td>
+                  <code><span title="callable">callable</span> | <span title="list">list</span>[<span title="callable">callable</span>] | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Each called as <code>cb(flow, optimizer)</code> once, after the loop and
+<strong>before</strong> the VC re-centering — so a callback that swaps the
+weights (<code>RestoreBest.restore</code>) hands them to the re-centering.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>vc_ehat</code>
+            </td>
+            <td>
+                  <code><span title="dict">dict</span> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Out-of-fold propensities <code>{node: {t: array}}</code> for every centered
+<code>VC</code> term, one value per training row; required when the spec
+has one (see docs/varying-coefficients.md).</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="CausalFlowDAG (tramdag.flow.CausalFlowDAG)" href="#tramdag.flow.CausalFlowDAG">CausalFlowDAG</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p><code>self</code>, fitted, in eval mode.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<p><span class="doc-section-title">Raises:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="ValueError">ValueError</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>If <code>epochs</code> or <code>batch_size</code> is below 1, or <code>vc_ehat</code> does
+not match the centered VC terms of the spec.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="TypeError">TypeError</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>If a callback does not accept its hook's arguments — checked
+before the first epoch, so a mis-registered callback cannot
+waste a run.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<details class="note" open>
+  <summary>Notes</summary>
+  <p>For <code>VC</code> terms the objective is the <strong>penalized</strong> NLL on the
+total-likelihood scale: each term adds
+<code>penalty * ||b_theta weights||^2</code> to the summed NLL, that is
+<code>penalty * ||w||^2 / n_train</code> to the mean loss — a fixed Gaussian
+prior whose shrinkage vanishes as n grows. <code>beta0</code> is not
+penalized, and <code>history["train"]</code> holds pure likelihoods. After
+the loop each <code>b_theta</code> is re-centered to mean zero over the
+training rows; the constant moves into <code>beta0</code>, the function is
+unchanged.</p>
+</details>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="tramdag.flow.CausalFlowDAG.varying_coef" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">varying_coef</span>
+
+
+<a href="#tramdag.flow.CausalFlowDAG.varying_coef" class="headerlink" title="Permanent link">&para;</a></h4>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">varying_coef</span><span class="p">(</span><span class="n">df</span><span class="p">,</span> <span class="n">node</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">t</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Evaluate the fitted effect function <code>beta(x)</code> of a <code>VC</code> term.</p>
+<p>This is the first-class read-out of issue #28. The value comes in
+closed form from the fitted term, as <code>beta0 + b_theta(modifiers)</code>.
+It is deterministic and needs no abduction. It is free of <code>y</code>,
+because only the modifier columns of <code>df</code> are read. For a binary
+treatment it is identical to the abduction difference
+<code>u(x, t=1, y) - u(x, t=0, y)</code>.</p>
+<p>The value lives on the latent, log-odds scale of the node. A
+continuous node adds it. An ordinal node subtracts it from the
+cutpoints.</p>
+<p>For a centered term (<code>center=...</code>) the form of the returned
+<code>beta</code> does not change. <code>beta0</code> then reads as the effect at the
+treatment margin, which is the observed propensities.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>node</code>
+            </td>
+            <td>
+                  <code><span title="str">str</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Name of the node that carries the VC term.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>df</code>
+            </td>
+            <td>
+                  <code><span title="pandas.DataFrame">DataFrame</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Rows at which to evaluate <code>beta</code>. Must contain every modifier
+column of the term.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>t</code>
+            </td>
+            <td>
+                  <code><span title="str">str</span> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Treatment name of the VC term. Optional when the node has
+exactly one VC term.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="numpy.ndarray">ndarray</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The <code>beta</code> values, shape <code>(n,)</code>. Constant when the term has
+no modifiers.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<p><span class="doc-section-title">Raises:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="KeyError">KeyError</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>If <code>node</code> is unknown, if the node has no VC term on <code>t</code>, or
+if a modifier column is missing from <code>df</code>.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="ValueError">ValueError</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>If the node has no VC term, or if <code>t</code> is omitted while the
+node has several VC terms.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="tramdag.flow.CausalFlowDAG.ls_coefficients" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">ls_coefficients</span>
+
+
+<a href="#tramdag.flow.CausalFlowDAG.ls_coefficients" class="headerlink" title="Permanent link">&para;</a></h4>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">ls_coefficients</span><span class="p">()</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Give the per-node linear-shift weights.</p>
+<p>For an all-<code>ls</code> model these are the interpretable log-odds-ratio
+coefficients.</p>
+<p>Only <code>LS</code> terms have a weight to give. A node's <code>CS</code> and <code>VC</code>
+shifts are networks, so they are skipped — reading them needs
+:meth:<code>varying_coef</code> or an evaluation of the network itself.</p>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="dict">dict</span>[<span title="str">str</span>, <span title="dict">dict</span>[<span title="str">str</span>, <span title="numpy.ndarray">ndarray</span>]]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The weights, as <code>{node: {parent: array}}</code>. A node without
+linear-shift terms is absent.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="tramdag.flow.CausalFlowDAG.to_matrix" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">to_matrix</span>
+
+
+<a href="#tramdag.flow.CausalFlowDAG.to_matrix" class="headerlink" title="Permanent link">&para;</a></h4>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">to_matrix</span><span class="p">()</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Give the labeled adjacency matrix of term effects.</p>
+<p>This is the meta-adjacency view of the paper.</p>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="pandas.DataFrame">DataFrame</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Rows are parents and columns are children. A cell holds the
+term tag: <code>"LS"</code>, <code>"CS"</code>, <code>"CI"</code>, <code>"VC"</code> for a VC
+treatment, or <code>"VCm"</code> for a VC modifier. An empty cell means
+there is no edge. A multi-parent term carries its parent group
+as a suffix. When several terms share a cell, their tags join
+with <code>"+"</code>.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="tramdag.flow.CausalFlowDAG.intercept_contributions" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">intercept_contributions</span>
+
+
+<a href="#tramdag.flow.CausalFlowDAG.intercept_contributions" class="headerlink" title="Permanent link">&para;</a></h4>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">intercept_contributions</span><span class="p">(</span><span class="n">df</span><span class="p">,</span> <span class="n">node</span><span class="p">)</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Decompose a complex intercept into mean-centered per-term parts.</p>
+<p>The parts are contributions to the transform parameters of the node.
+Use them to plot additive partial effects.</p>
+<p>An additive complex intercept,
+<code>CI("x1", "x2", allow_interaction=False)</code>, builds one
+network per <code>I</code> term and <strong>sums their outputs in unconstrained
+parameter space</strong>: <code>theta(pa) = net_1(x1) + net_2(x2)</code>. The sum is
+identified, so every L1/L2/L3 query is correct. Each term's output,
+however, is identified only up to a constant — a constant moves
+freely between the nets. The <em>raw</em> per-term outputs are therefore
+not directly comparable.</p>
+<p>This method resolves the ambiguity with the usual additive-model
+(GAM) convention: a <strong>sum-to-zero (mean-centering) constraint over
+the rows of</strong> <code>df</code>. Each term's contribution is centered to mean
+zero per parameter. The removed constants collect into a single
+<code>baseline</code>. The decomposition is exact:</p>
+<pre><code>``theta(pa) = baseline + sum_terms contribution_term(pa)``
+</code></pre>
+<p><code>baseline</code> plus the uncentered row sum of the contributions
+reproduces the model's transform parameters. This is <strong>post-hoc
+only</strong>: it reads the fitted weights and changes nothing about the
+model or any frozen number (issue #20, Option A). Shift terms
+(<code>LS</code>/<code>CS</code>) are a separate, already-interpretable slot — see
+:meth:<code>ls_coefficients</code>.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>node</code>
+            </td>
+            <td>
+                  <code><span title="str">str</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Name of a node with at least one complex-intercept (<code>I</code>) term
+that has parents.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>df</code>
+            </td>
+            <td>
+                  <code><span title="pandas.DataFrame">DataFrame</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Rows over which to center and at which to evaluate the
+contributions. Must contain every intercept-parent column.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="dict">dict</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Three keys. <code>"baseline"</code> is the absorbed constant, a <code>(P,)</code>
+array — the sum of the per-term means. <code>P</code> is the node's
+transform-parameter count: <code>ut.n_params</code> for a continuous
+node, <code>levels - 1</code> cutpoint parameters for an ordinal node.
+<code>"contributions"</code> is <code>{term_label: (n, P) array}</code> — each
+term's mean-centered contribution at each row, columns summing
+to about zero over the rows. <code>term_label</code> is the term's
+parents joined by <code>"+"</code>. <code>"parents"</code> is
+<code>{term_label: tuple(parent_names)}</code>.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<p><span class="doc-section-title">Raises:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="KeyError">KeyError</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>If <code>node</code> is unknown, or if an intercept-parent column is
+missing from <code>df</code>.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="ValueError">ValueError</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>If the node has no complex-intercept term with parents.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<details class="note" open>
+  <summary>Notes</summary>
+  <p>The contributions live in the transform's <strong>unconstrained</strong>
+parameter space, where the model sums the additive terms before the
+monotonicity constraint. They are exact partial effects on those
+parameters, but not, in general, an additive shift of the curve
+itself.</p>
+</details>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="tramdag.flow.CausalFlowDAG.design_matrix" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">design_matrix</span>
+
+
+<a href="#tramdag.flow.CausalFlowDAG.design_matrix" class="headerlink" title="Permanent link">&para;</a></h4>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">design_matrix</span><span class="p">(</span><span class="n">df</span><span class="p">,</span> <span class="n">node</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">drop_first</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Encode a node's parents the way the flow feeds them to its shifts.</p>
+<p>A continuous parent stays raw in one column named after it. An
+ordinal parent becomes one column per level, named
+<code>"{parent}[{k}]"</code> — the same one-hot the flow builds internally.</p>
+<p>Use <code>drop_first=True</code> to get the design a classical reference
+expects (<code>statsmodels</code> <code>OrderedModel</code>, R <code>polr</code>): with
+cutpoints the full one-hot is unidentified, so each ordinal parent's
+level-0 column drops out and its remaining coefficients read as
+differences against level 0 — exactly what <code>w[k] - w[0]</code> gives on
+the flow side.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>df</code>
+            </td>
+            <td>
+                  <code><span title="pandas.DataFrame">DataFrame</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Rows to encode. Must contain every parent column of <code>node</code>.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>node</code>
+            </td>
+            <td>
+                  <code><span title="str">str</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Name of the node whose parents are encoded.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>drop_first</code>
+            </td>
+            <td>
+                  <code><span title="bool">bool</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Drop each ordinal parent's level-0 column, by default <code>False</code>.</p>
+              </div>
+            </td>
+            <td>
+                  <code>False</code>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="pandas.DataFrame">DataFrame</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>One column per encoded feature, indexed like <code>df</code>.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="tramdag.flow.CausalFlowDAG.fit_classical" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">fit_classical</span>
+
+
+<a href="#tramdag.flow.CausalFlowDAG.fit_classical" class="headerlink" title="Permanent link">&para;</a></h4>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">fit_classical</span><span class="p">(</span>
+    <span class="n">train_df</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">max_iter</span><span class="o">=</span><span class="mi">400</span><span class="p">,</span> <span class="n">tol</span><span class="o">=</span><span class="mf">1e-09</span><span class="p">,</span> <span class="n">history_size</span><span class="o">=</span><span class="mi">50</span>
+<span class="p">)</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Fit an all-<code>ls</code> model the classical way.</p>
+<p>The fit uses full batches, float64, and L-BFGS with a strong-Wolfe
+line search. There are no minibatches, no schedule and no early
+stopping, so the fit is deterministic and bit-reproducible. It lands
+on the exact maximum-likelihood estimate and matches classical
+software, that is <code>statsmodels</code> <code>OrderedModel</code> and R <code>polr</code> or
+<code>Colr</code>. It is much faster than minibatch Adam.</p>
+<p>This method is valid only when every edge is <code>ls</code>, because each
+node-conditional is then a classical transformation model. Any other
+model raises. For a <code>cs</code> or <code>ci</code> model use :meth:<code>fit</code>, where
+the minibatch noise also regularizes the MLPs.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>train_df</code>
+            </td>
+            <td>
+                  <code><span title="pandas.DataFrame">DataFrame</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Training data, one column per node.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>max_iter</code>
+            </td>
+            <td>
+                  <code><span title="int">int</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Upper limit on L-BFGS iterations, by default 400.</p>
+              </div>
+            </td>
+            <td>
+                  <code>400</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>tol</code>
+            </td>
+            <td>
+                  <code><span title="float">float</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>torch's <code>tolerance_change</code>: the NLL (or parameter) change below
+which L-BFGS stops, by default 1e-9. Measured on the classical
+anchor: 1e-6 stops on a plateau step and leaves a rare one-hot
+level 0.24 off statsmodels; 1e-9 lands within 0.03, the same as
+running to the iteration cap.</p>
+              </div>
+            </td>
+            <td>
+                  <code>1e-09</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>history_size</code>
+            </td>
+            <td>
+                  <code><span title="int">int</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>L-BFGS memory, by default 50.</p>
+              </div>
+            </td>
+            <td>
+                  <code>50</code>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="dict">dict</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>A convergence report: <code>converged</code>, <code>n_iter</code>, <code>final_nll</code>,
+<code>grad_norm</code>, <code>seconds</code>, and the fitted <code>coefficients</code>
+from :meth:<code>ls_coefficients</code>.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<p><span class="doc-section-title">Raises:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="ValueError">ValueError</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>If the spec has <code>cs</code>, <code>ci</code> or <code>vc</code> terms.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<details class="note" open>
+  <summary>Notes</summary>
+  <p>float64 is a transient compute mode. The model is upcast for the
+fit, and <code>self.double()</code> converts the parameters and the range
+buffers of the transforms in one call. Afterwards the model returns
+to float32, so the stored model and <code>save</code>/<code>load</code> stay float32.
+Double precision is what lets the line search resolve the optimum
+cleanly.</p>
+<p>Convergence is torch's own: L-BFGS stops when the NLL or the
+parameters move by less than <code>tol</code> (<code>tolerance_grad</code> is set to
+0, so the gradient never ends the run). <code>|grad|</code> and individual
+coefficients do <em>not</em> settle to machine precision. A continuous
+node's Bernstein intercept, and weakly-identified directions such
+as rare one-hot levels or a flat treatment-effect ridge, keep
+drifting along near-zero-curvature valleys long after the
+likelihood and the well-identified coefficients reach the MLE.
+Correctness is therefore verified by comparison to classical
+software (see <code>experiments/misc/validate_ls.py</code>), not by this flag.</p>
+</details>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="tramdag.flow.CausalFlowDAG.sample" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">sample</span>
+
+
+<a href="#tramdag.flow.CausalFlowDAG.sample" class="headerlink" title="Permanent link">&para;</a></h4>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">sample</span><span class="p">(</span><span class="n">n</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">do</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">u</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">seed</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Sample from the flow, with optional interventions.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>n</code>
+            </td>
+            <td>
+                  <code><span title="int">int</span> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Number of samples. Ignored if <code>u</code> is given.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>do</code>
+            </td>
+            <td>
+                  <code><span title="dict">dict</span>[<span title="str">str</span>, <span title="float">float</span>] | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Interventions, as <code>{node: value}</code>. An intervened node is
+clamped and its parent dependence removed (graph mutilation).</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>u</code>
+            </td>
+            <td>
+                  <code><span title="pandas.DataFrame">DataFrame</span> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Latent variables, as returned by :meth:<code>abduct</code>. If given,
+they are pushed through the flow. Together with <code>do</code> this
+yields counterfactuals: Pearl's abduction, action, prediction.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>seed</code>
+            </td>
+            <td>
+                  <code><span title="int">int</span> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>If given, seeds the latent draw. Ignored if <code>u</code> is given.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="pandas.DataFrame">DataFrame</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The samples, one column per node.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<p><span class="doc-section-title">Raises:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="ValueError">ValueError</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>If both <code>n</code> and <code>u</code> are omitted.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="tramdag.flow.CausalFlowDAG.abduct" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">abduct</span>
+
+
+<a href="#tramdag.flow.CausalFlowDAG.abduct" class="headerlink" title="Permanent link">&para;</a></h4>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">abduct</span><span class="p">(</span><span class="n">df</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">seed</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Recover the latent variables <code>u</code> from observations (Pearl step 1).</p>
+<p>A continuous node inverts exactly: <code>u = h(x) + shift</code>. For an
+ordinal node the latent is only interval-identified, so it is
+sampled from the standard logistic truncated to the observed
+level's interval.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>df</code>
+            </td>
+            <td>
+                  <code><span title="pandas.DataFrame">DataFrame</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Observations, one column per node.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>seed</code>
+            </td>
+            <td>
+                  <code><span title="int">int</span> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>If given, seeds the truncated draw for the ordinal nodes.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="pandas.DataFrame">DataFrame</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The latents, one column per node, aligned with the rows of
+<code>df</code>.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="tramdag.flow.CausalFlowDAG.pmf" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">pmf</span>
+
+
+<a href="#tramdag.flow.CausalFlowDAG.pmf" class="headerlink" title="Permanent link">&para;</a></h4>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">pmf</span><span class="p">(</span><span class="n">df</span><span class="p">,</span> <span class="n">node</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">do</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Give the analytic class probabilities of an ordinal node.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>df</code>
+            </td>
+            <td>
+                  <code><span title="pandas.DataFrame">DataFrame</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Rows that supply the parent values of the node.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>node</code>
+            </td>
+            <td>
+                  <code><span title="str">str</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Name of the ordinal node.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>do</code>
+            </td>
+            <td>
+                  <code><span title="dict">dict</span>[<span title="str">str</span>, <span title="float">float</span>] | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Column overrides, applied to <code>df</code> before the evaluation.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="numpy.ndarray">ndarray</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The class probabilities, shape <code>(n, levels)</code>.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<p><span class="doc-section-title">Raises:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="ValueError">ValueError</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>If <code>node</code> is continuous.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="tramdag.flow.CausalFlowDAG.density" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">density</span>
+
+
+<a href="#tramdag.flow.CausalFlowDAG.density" class="headerlink" title="Permanent link">&para;</a></h4>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">density</span><span class="p">(</span><span class="n">df</span><span class="p">,</span> <span class="n">node</span><span class="p">,</span> <span class="n">grid</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">do</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Give the analytic conditional density of a continuous node on a grid.</p>
+<p>The continuous counterpart of :meth:<code>pmf</code>: for every row of <code>df</code>
+the density <code>p(node = g | parents)</code> at each grid value <code>g</code>, in
+closed form from the transform — no sampling.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>df</code>
+            </td>
+            <td>
+                  <code><span title="pandas.DataFrame">DataFrame</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Rows that supply the parent values of the node.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>node</code>
+            </td>
+            <td>
+                  <code><span title="str">str</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Name of the continuous node.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>grid</code>
+            </td>
+            <td>
+                  <code><span title="array">array</span> - <span title="like">like</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Values of <code>node</code> at which to evaluate the density, shape <code>(m,)</code>.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>do</code>
+            </td>
+            <td>
+                  <code><span title="dict">dict</span>[<span title="str">str</span>, <span title="float">float</span>] | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Column overrides, applied to <code>df</code> before the evaluation.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="numpy.ndarray">ndarray</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The densities, shape <code>(n, m)</code>.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<p><span class="doc-section-title">Raises:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="ValueError">ValueError</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>If <code>node</code> is ordinal; use :meth:<code>pmf</code> for it.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="tramdag.flow.CausalFlowDAG.scores" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">scores</span>
+
+
+<a href="#tramdag.flow.CausalFlowDAG.scores" class="headerlink" title="Permanent link">&para;</a></h4>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">scores</span><span class="p">(</span><span class="n">df</span><span class="p">,</span> <span class="n">node</span><span class="p">)</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Give the per-observation scores <code>psi_i = d l_i / d theta</code>.</p>
+<p>The scores belong to the interpretable shift coefficients of a node
+and are analytic and exact, see <code>tramdag.scores</code> (issue #29).</p>
+<p>At a fitted MLE each column sums to about zero. Order the rows by a
+covariate that truly modifies the treatment effect, and the
+cumulative sum of the treatment column drifts.
+:meth:<code>effect_modifier_scan</code> measures that drift.</p>
+<p>This is a pure read-out. It touches no fitting or sampling code
+path.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>df</code>
+            </td>
+            <td>
+                  <code><span title="pandas.DataFrame">DataFrame</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Observations. Must contain the node, its parents, and the
+propensity inputs of centered VC terms.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>node</code>
+            </td>
+            <td>
+                  <code><span title="str">str</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Name of the node whose coefficients are scored.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="pandas.DataFrame">DataFrame</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>One column per coefficient, one row per observation. See
+:func:<code>tramdag.scores.node_scores</code> for the column naming.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="tramdag.flow.CausalFlowDAG.effect_modifier_scan" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">effect_modifier_scan</span>
+
+
+<a href="#tramdag.flow.CausalFlowDAG.effect_modifier_scan" class="headerlink" title="Permanent link">&para;</a></h4>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">effect_modifier_scan</span><span class="p">(</span><span class="n">df</span><span class="p">,</span> <span class="n">node</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">t</span><span class="p">,</span> <span class="n">candidates</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Rank candidate effect modifiers with a fluctuation scan.</p>
+<p>Issue #29 describes the Zeileis-Hornik method. Each candidate
+covariate is ranked by how strongly the scores of the <code>t</code>
+coefficient drift when the rows are ordered by it. A cheap
+all-<code>ls</code> fit is enough, so this gives a measured shortlist for
+<code>VC</code> modifiers.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>df</code>
+            </td>
+            <td>
+                  <code><span title="pandas.DataFrame">DataFrame</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Observations, as for :meth:<code>scores</code>.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>node</code>
+            </td>
+            <td>
+                  <code><span title="str">str</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Name of the outcome node.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>t</code>
+            </td>
+            <td>
+                  <code><span title="str">str</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Name of the treatment whose coefficient is scanned.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>candidates</code>
+            </td>
+            <td>
+                  <code><span title="list">list</span>[<span title="str">str</span>] | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Candidate covariates. Defaults to every column of <code>df</code>
+except <code>node</code> and <code>t</code>.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="pandas.DataFrame">DataFrame</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>One row per candidate, sorted by <code>stat</code> descending, with
+columns <code>stat</code>, <code>p_value</code>, <code>crit_5pct</code> and <code>flag</code>. See
+:func:<code>tramdag.scores.effect_modifier_scan</code>.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="tramdag.flow.CausalFlowDAG.save" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">save</span>
+
+
+<a href="#tramdag.flow.CausalFlowDAG.save" class="headerlink" title="Permanent link">&para;</a></h4>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">save</span><span class="p">(</span><span class="n">path</span><span class="p">)</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Write the model, its history and its provenance to a checkpoint.</p>
+<p>The file holds the spec and the weights, the training <code>history</code>,
+and a <code>meta</code> block with the tramdag version, the save time and the
+device.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>path</code>
+            </td>
+            <td>
+                  <code><span title="str">str</span> | <span title="pathlib.Path">Path</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Target file. Parent directories are created when missing.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="tramdag.flow.CausalFlowDAG.load" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">load</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-classmethod"><code>classmethod</code></small>
+  </span>
+
+<a href="#tramdag.flow.CausalFlowDAG.load" class="headerlink" title="Permanent link">&para;</a></h4>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">load</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="s1">'cpu'</span><span class="p">)</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Restore a model from a checkpoint.</p>
+<p><code>flow.history</code> and <code>flow.meta</code> are refilled.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>path</code>
+            </td>
+            <td>
+                  <code><span title="str">str</span> | <span title="pathlib.Path">Path</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Checkpoint file written by :meth:<code>save</code>.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>device</code>
+            </td>
+            <td>
+                  <code><span title="str">str</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Torch device to load onto, by default <code>"cpu"</code>.</p>
+              </div>
+            </td>
+            <td>
+                  <code>&#39;cpu&#39;</code>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="CausalFlowDAG (tramdag.flow.CausalFlowDAG)" href="#tramdag.flow.CausalFlowDAG">CausalFlowDAG</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The restored model, in eval mode.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.sections", "navigation.top", "content.code.copy", "toc.follow"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"provider": "mike"}}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+        <script src="../../javascripts/mathjax.js"></script>
+      
+        <script src="https://unpkg.com/mathjax@3/es5/tex-mml-chtml.js"></script>
+      
+    
+  </body>
+</html>
