@@ -104,6 +104,9 @@ learning rates and freezing (a callback, below) and the all-`ls` classical fit.
   5%/95% quantiles, ordinal cutpoints at the empirical class log-odds, a pure
   init that leaves the MLE unchanged. Call it yourself to switch the start
   off. A checkpoint carries the flag, so a loaded model is never recalibrated.
+  The start itself is also a public step: `flow.init_marginals(train_df)`
+  resets every simple intercept to its column's marginal, any time — e.g. to
+  restart a trained or loaded flow (`calibrate` won't, it is once-only).
 - **Callback hooks** — `after_epoch_callbacks=` takes one callable or a list,
   each called as `cb(flow, epoch, optimizer)` after every epoch, once the
   epoch's train NLLs are in `flow.history["train"]`; every callback runs each

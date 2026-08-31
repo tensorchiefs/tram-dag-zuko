@@ -120,7 +120,8 @@ See `experiments/README.md`.
   stops; the fit-level hooks get `(flow, opt)`); `tramdag/callbacks.py` ships
   `Logger`, `RestoreBest`, `PerNodePlateau`+`per_node_adam`; `flow.calibrate(train_df, marginal_init=)`
   takes the data-dependent state once (ranges, net min-max, calibrated start)
-  and is called by the first fit. Key empirical finding (stroke storyline):
+  and is called by the first fit; `init_marginals(train_df)` re-applies the
+  calibrated start explicitly, any time. Key empirical finding (stroke storyline):
   **flexible (CI/CS) models overfit observational confounding at the MLE and
   need best-validation weights to recover the causal effect; all-`ls` models
   don't** — `callbacks.RestoreBest` now, see docs/fitting.md.

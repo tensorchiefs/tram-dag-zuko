@@ -707,7 +707,9 @@ class CausalFlowDAG(nn.Module):
         yet; a loaded model is already calibrated, and later fits on other rows
         reuse this state — data on a new scale needs a new flow. Calling it
         yourself is how to choose ``marginal_init=False`` (the paper
-        replications do, to match a reference that has no such step).
+        replications do, to match a reference that has no such step). To
+        re-apply the calibrated start later — a loaded or already-trained
+        model — call :meth:`init_marginals` directly.
 
         Returns
         -------
@@ -723,9 +725,39 @@ class CausalFlowDAG(nn.Module):
             node.set_net_range(train_df)
             if node.kind == "continuous":
                 self._set_range(name, train_df)
-            if marginal_init and isinstance(node.intercept, SimpleIntercept):
-                self._marginal_start(name, train_df)
         self.calibrated.fill_(True)
+        if marginal_init:
+            self.init_marginals(train_df)
+        return self
+
+    def init_marginals(self, train_df: pd.DataFrame) -> CausalFlowDAG:
+        """Set every simple intercept to the marginal of its column — any time.
+
+        The calibrated start, as an explicit step: a Bernstein simple
+        intercept starts at the data marginal instead of zuko's default
+        (about 2.5x too steep), an ordinal simple intercept at the marginal
+        class log-odds; spline/affine intercepts and intercepts with parents
+        are untouched. The optimum is unchanged, the path to it is shorter
+        (docs/training-speed.md). ``calibrate(marginal_init=True)`` — and so
+        the first ``fit`` — runs this once; unlike ``calibrate`` it is NOT
+        guarded by the calibrated flag, so calling it on a loaded or
+        already-trained flow **discards those intercepts' weights** and
+        restarts them at the marginal. An uncalibrated flow takes its ranges
+        from the same rows first.
+
+        Returns
+        -------
+        CausalFlowDAG
+            ``self``.
+        """
+        if not bool(self.calibrated):
+            self.calibrate(train_df, marginal_init=False)
+        for name in self.order:
+            node = self.nodes[name]
+            if isinstance(node.intercept, SimpleIntercept):
+                if node.kind == "ordinal":
+                    self._check_levels(name, train_df)
+                self._marginal_start(name, train_df)
         return self
 
     def _set_range(self, name: str, train_df: pd.DataFrame) -> None:

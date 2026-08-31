@@ -121,6 +121,12 @@ default the paper replication or the tests had to switch off.
   the option on (0.026 under the earlier per-node plateau approximation). Default off; calibrated at the first `fit`, stored in the
   checkpoint (the buffers are part of every node's state, so checkpoints
   saved before this change do not load — refit).
+- **`init_marginals(train_df)`** — the calibrated start as an explicit,
+  repeatable step: resets every simple intercept to its column's marginal
+  (`calibrate(marginal_init=True)` delegates to it). Unlike `calibrate` it
+  is not once-guarded, so a loaded or already-trained flow can be restarted
+  at the marginal; an uncalibrated flow takes its ranges from the same rows
+  first.
 - **`density(df, node, grid, do=)`** — the analytic conditional density of a
   continuous node on a grid, the continuous counterpart of `pmf`; closed
   form from the transform, no sampling. Pinned against `exp(log_prob)` at
