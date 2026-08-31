@@ -27,7 +27,7 @@ spec = {
 }
 flow = td.CausalFlowDAG(spec, seed=0).fit(
     train, epochs=500, learning_rate=1e-2, batch_size=512
-)  # best-validation weights: a callback, see fitting.md
+)  # best-validation weights: callbacks.RestoreBest, see fitting.md
 
 beta = flow.varying_coef(df_new, "Y")  # (n,) array beta(x) — deterministic, y-free
 beta0 = float(flow.nodes["Y"].shifts["T"].beta0)  # interpretable main effect

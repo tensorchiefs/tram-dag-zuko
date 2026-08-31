@@ -61,6 +61,13 @@ __all__ = ["CausalFlowDAG"]
 
 
 # %% private functions -----------------------------------------------------------------
+def _callback_list(cbs) -> list:
+    """Normalize a ``fit`` callback argument: None, one callable, or a sequence."""
+    if cbs is None:
+        return []
+    return [cbs] if callable(cbs) else list(cbs)
+
+
 def _slice_ehat(
     vc_ehat: dict[str, dict[str, Tensor]] | None, idx: Tensor
 ) -> dict[str, dict[str, Tensor]] | None:
@@ -785,7 +792,9 @@ class CausalFlowDAG(nn.Module):
         batch_size: int = 512,
         seed: int | None = None,
         optimizer: torch.optim.Optimizer | None = None,
-        callback=None,
+        before_fit_callbacks=None,
+        after_epoch_callbacks=None,
+        after_fit_callbacks=None,
         vc_ehat: dict | None = None,
     ) -> CausalFlowDAG:
         """Fit all nodes jointly by maximum likelihood — one minibatch Adam loop.
@@ -797,19 +806,18 @@ class CausalFlowDAG(nn.Module):
         matches ``statsmodels`` and R ``polr``. A second ``fit`` call
         continues the training. Everything else — validation monitoring,
         learning-rate schedules, early stopping, best-weight restoration,
-        logging — is the caller's, through ``optimizer`` and ``callback``::
+        logging — is the caller's, through ``optimizer`` and the callback
+        hooks; :mod:`tramdag.callbacks` ships the common recipes::
 
-            from torch.optim.lr_scheduler import ReduceLROnPlateau
+            from tramdag.callbacks import Logger, RestoreBest
 
-            opt = torch.optim.Adam(flow.parameters(), lr=1e-3)
-            plateau = ReduceLROnPlateau(opt, factor=0.1, patience=50)
-
-            def monitor(flow, epoch, opt):
-                val = sum(flow.nll(val_df).values())
-                plateau.step(val)
-                return val > 1e6  # True stops the fit
-
-            flow.fit(train_df, epochs=10000, optimizer=opt, callback=monitor)
+            best = RestoreBest(val_df)
+            flow.fit(
+                train_df,
+                epochs=4000,
+                after_epoch_callbacks=[Logger(val_df, every=50), best],
+                after_fit_callbacks=[best.restore],
+            )
 
         Parameters
         ----------
@@ -833,12 +841,21 @@ class CausalFlowDAG(nn.Module):
             Any torch optimizer over ``flow.parameters()``; the default is
             ``Adam(lr=learning_rate)``. Build it yourself to attach a
             ``torch.optim.lr_scheduler`` or to continue with its state.
-        callback : callable | None, optional
-            ``callback(flow, epoch, optimizer)`` after every epoch (``epoch``
-            counts from 1), once the epoch's train NLLs are in
-            ``flow.history["train"]``. Return ``True`` to stop the fit. Use
-            it for validation (``flow.nll(val_df)``), schedules, snapshots
-            and coefficient trajectories.
+        before_fit_callbacks : callable | list[callable] | None, optional
+            Each called as ``cb(flow, optimizer)`` once, after calibration
+            and before the first epoch.
+        after_epoch_callbacks : callable | list[callable] | None, optional
+            Each called as ``cb(flow, epoch, optimizer)`` after every epoch
+            (``epoch`` counts from 1), once the epoch's train NLLs are in
+            ``flow.history["train"]``. All of them run each epoch; the fit
+            stops after an epoch in which any returned ``True``. Use them
+            for validation (``flow.nll(val_df)``), schedules, snapshots and
+            coefficient trajectories — :mod:`tramdag.callbacks` ships
+            ``Logger``, ``RestoreBest`` and ``PerNodePlateau``.
+        after_fit_callbacks : callable | list[callable] | None, optional
+            Each called as ``cb(flow, optimizer)`` once, after the loop and
+            **before** the VC re-centering — so a callback that swaps the
+            weights (``RestoreBest.restore``) hands them to the re-centering.
         vc_ehat : dict | None, optional
             Out-of-fold propensities ``{node: {t: array}}`` for every centered
             ``VC`` term, one value per training row; required when the spec
@@ -881,14 +898,21 @@ class CausalFlowDAG(nn.Module):
             for g in nd._vc_groups
             if g.mods and nd.shifts[g.on].penalty > 0
         ]
+        for cb in _callback_list(before_fit_callbacks):
+            cb(self, opt)
+        after_epoch = _callback_list(after_epoch_callbacks)
         for epoch in range(1, epochs + 1):
             self.train()
             self.history["train"].append(
                 self._fit_epoch(vals, ehat, opt, batch_size, penalized)
             )
             self.eval()
-            if callback is not None and callback(self, epoch, opt):
+            # every callback runs (a stop must not skip the logger)
+            stops = [bool(cb(self, epoch, opt)) for cb in after_epoch]
+            if any(stops):
                 break
+        for cb in _callback_list(after_fit_callbacks):
+            cb(self, opt)  # before the re-centering: restored weights re-center too
         self._recenter_vc(vals)
         self.eval()
         return self

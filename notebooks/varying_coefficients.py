@@ -33,28 +33,12 @@
 # confounding.
 
 # %%
-import copy
-
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
 from tramdag import CS, LS, VC, CausalFlowDAG, ContinuousNode, I, OrdinalNode
-
-
-def keep_best(flow, val):
-    """The former ``restore_best`` as a callback: snapshot the best-validation
-    weights; load them back after ``fit``.
-    """
-    best = {"nll": np.inf, "state": None}
-
-    def cb(f, epoch, opt):
-        nll = sum(f.nll(val).values())
-        if nll < best["nll"]:
-            best.update(nll=nll, state=copy.deepcopy(f.state_dict()))
-
-    return best, cb
-
+from tramdag.callbacks import RestoreBest
 
 plt.rcParams["figure.dpi"] = 110
 
@@ -174,9 +158,16 @@ spec = {
     "Y": ContinuousNode([CS("X1", "X2", "X3"), VC("X2", "X3", t="T")]),
 }
 flow = CausalFlowDAG(spec, seed=0)
-best, cb = keep_best(flow, val)
-flow.fit(train, epochs=300, learning_rate=1e-2, batch_size=512, seed=0, callback=cb)
-flow.load_state_dict(best["state"])
+best = RestoreBest(val)
+flow.fit(
+    train,
+    epochs=300,
+    learning_rate=1e-2,
+    batch_size=512,
+    seed=0,
+    after_epoch_callbacks=best,
+    after_fit_callbacks=best.restore,
+)
 print(flow.to_matrix())
 
 # %% [markdown]
@@ -287,17 +278,17 @@ for center in (False, True):
         "Y": ContinuousNode([LS("X"), VC("X", center=center, t="T")]),
     }
     fc = CausalFlowDAG(spec_c, seed=0)
-    best, cb = keep_best(fc, c_val)
+    best = RestoreBest(c_val)
     fc.fit(
         c_train,
         epochs=250,
         learning_rate=1e-2,
         batch_size=512,
         seed=0,
-        callback=cb,
+        after_epoch_callbacks=best,
+        after_fit_callbacks=best.restore,
         vc_ehat={"Y": {"T": e_oof}} if center else None,
     )
-    fc.load_state_dict(best["state"])
     b = fc.varying_coef(c_test, "Y")
     print(
         f"center={center!s:5s}  mean |beta - tau| = {np.abs(b - TAU).mean():.3f}"

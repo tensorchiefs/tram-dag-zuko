@@ -73,6 +73,10 @@ See `experiments/README.md`.
   `ComplexShiftDefaultTabular` 64-128-64, `ComplexInterceptDefaultTabular` 8-8,
   `n_thetas=20`) — **not** the paper's R nets, which every `experiments/paper/`
   config sets explicitly instead.
+- `callbacks.py` — the shipped `fit` callbacks: `Logger`, `RestoreBest`
+  (best-validation weights, restored through `after_fit_callbacks`),
+  `PerNodePlateau` + `per_node_adam` (per-node lr decay and freezing, the
+  pre-0.4 plateau recipe). Optional; `fit` itself stays one plain loop.
 - (no `utils.py` any more: `config_section` moved to
   `experiments/common.py`, `machine_info` to
   `experiments/benchmarks/perf_machine.py` — each next to its only caller, so
@@ -111,13 +115,15 @@ See `experiments/README.md`.
 - **`fit` keeps the final weights and is one minibatch Adam loop** — an
   all-`ls` model then matches statsmodels/R-polr to ~1e-3. Validation, lr
   schedules, early stopping / best-weight restoration and logging are the
-  caller's, through `fit(optimizer=, callback=)` (`callback(flow, epoch, opt)`
-  after every epoch, `True` stops); `flow.calibrate(train_df, marginal_init=)`
+  caller's, through `fit(optimizer=, after_epoch_callbacks=, before_fit_callbacks=,
+  after_fit_callbacks=)` (per-epoch callbacks get `(flow, epoch, opt)`, any `True`
+  stops; the fit-level hooks get `(flow, opt)`); `tramdag/callbacks.py` ships
+  `Logger`, `RestoreBest`, `PerNodePlateau`+`per_node_adam`; `flow.calibrate(train_df, marginal_init=)`
   takes the data-dependent state once (ranges, net min-max, calibrated start)
   and is called by the first fit. Key empirical finding (stroke storyline):
   **flexible (CI/CS) models overfit observational confounding at the MLE and
   need best-validation weights to recover the causal effect; all-`ls` models
-  don't** — a six-line callback now, see docs/fitting.md.
+  don't** — `callbacks.RestoreBest` now, see docs/fitting.md.
 
 ## Ground truth & reference numbers
 
@@ -137,7 +143,7 @@ paper states only four training numbers — n=40000, 500 epochs, Adam lr 1e-3,
 Bernstein order 20. The configs follow the paper's own R code 1:1 where the
 framework allows: the triangle scripts train one continuous Adam run with a
 separate validation draw (40k / 10k mixed) and read the coefficients after
-every epoch (`fit(callback=)`) — at batch 256 / lr 0.004 instead of the
+every epoch (`fit(after_epoch_callbacks=)`) — at batch 256 / lr 0.004 instead of the
 paper's Keras-default batch 32 / lr 0.001, the one deviation taken for CI
 runtime (8× fewer steps, every metric kept; the grid is in
 docs/paper-replication.md); the

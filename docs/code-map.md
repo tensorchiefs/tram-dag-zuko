@@ -65,7 +65,7 @@ config in `experiments/paper/` states `units=` and `activation=` itself.
 |---|---|
 | `CausalFlowDAG` | The flow: one `_Node` per variable in topological order. Construction seeds the weights (`seed=` is the reproducibility knob). |
 | `calibrate()` | Once, from the training rows: transform ranges (train 5%/95% quantiles onto the domain), network-input min-max, the calibrated start (`marginal_init=True`). Called by the first fit; a checkpoint carries the flag. |
-| `fit()` | Joint maximum likelihood: one minibatch Adam loop over all parameters (exact per node, because the NLL decomposes), final weights kept. Hooks: `optimizer=` (any torch optimizer, for schedulers) and `callback(flow, epoch, opt)` after every epoch (`True` stops) — validation, schedules, early stopping and logging are the caller's. `vc_ehat=` carries the out-of-fold propensities of centered VC terms. A second call continues training. |
+| `fit()` | Joint maximum likelihood: one minibatch Adam loop over all parameters (exact per node, because the NLL decomposes), final weights kept. Hooks: `optimizer=` (any torch optimizer, for schedulers), `after_epoch_callbacks=` (one callable or a list, `cb(flow, epoch, opt)` after every epoch, any `True` stops) and `before_fit_callbacks=`/`after_fit_callbacks=` around the loop — validation, schedules, early stopping and logging attach here; the common recipes ship in `callbacks.py`. `vc_ehat=` carries the out-of-fold propensities of centered VC terms. A second call continues training. |
 | `fit_classical()` | Float64 full-batch L-BFGS for all-`ls` specs: deterministic, exact MLE, matches `statsmodels`/R `polr`. Refuses flexible specs. |
 | `sample()` | Observational, interventional (`do=`, graph mutilation) and counterfactual (`u=`) sampling. |
 | `abduct()` | Pearl step 1: recover the latents. Continuous exactly, ordinal by truncated draw. |
@@ -95,6 +95,15 @@ config in `experiments/paper/` states `units=` and `activation=` itself.
 | `sup_bb_pvalue()` | `P(sup |Brownian bridge| > stat)`, the Kolmogorov series. |
 | (`_dl_ds`, `_ls_score_columns`, `CRIT_5PCT`) | Closed-form latent-scale derivative; the LS/one-hot score-column builder; the 5% critical value 1.3581. |
 
+## `callbacks.py` — the shipped `fit` callbacks
+
+| Name | Role |
+|---|---|
+| `Logger` | Prints one line per `every` epochs: summed train NLL, plus validation NLL when `val_df` is given. |
+| `RestoreBest` | Snapshots the weights of the best summed validation NLL per epoch; `restore` (registered in `after_fit_callbacks`) loads them back before the VC re-centering. |
+| `PerNodePlateau` | Per-node lr decay and freezing on each node's own validation NLL; stops the fit once every node froze. The pre-0.4 `fit(schedule="plateau")` recipe, opt-in. `step(nll, opt)` for a hand-computed NLL. |
+| `per_node_adam()` | Adam with one `node`-tagged parameter group per node — the optimizer `PerNodePlateau` needs. |
+
 ## What is *not* in the package
 
 The SCM generators, the frozen datasets and the replication scripts are
@@ -112,7 +121,7 @@ default you can read at the call site. Nothing numeric is buried.
 | Knob | Where | Default |
 |---|---|---|
 | learning rate, batch size | `fit()` | 1e-2 / 512 (in-repo callers state them explicitly anyway) |
-| schedules, early stopping, logging | `fit(optimizer=, callback=)` | none shipped — torch's `lr_scheduler` and a few lines of callback ([fitting.md](fitting.md)) |
+| schedules, early stopping, logging | `fit(optimizer=, after_epoch_callbacks=)` | `tramdag.callbacks` ships `Logger`, `RestoreBest`, `PerNodePlateau`; anything else is torch's `lr_scheduler` and a few lines of callback ([fitting.md](fitting.md)) |
 | calibrated init | `calibrate(marginal_init=)` | True (pure init, MLE unchanged; `False` = zuko's zero start; called by the first fit) |
 | VC stage-1 propensities | `fit(vc_ehat=)` | required for a centered VC term, out of fold, computed by the caller |
 | VC penalty and centering | `VC(penalty=, center=)` | 1.0 / False (centering needs `fit(vc_ehat=)`) |

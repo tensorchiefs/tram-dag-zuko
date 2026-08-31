@@ -43,6 +43,7 @@ import pandas as pd
 import torch
 
 from tramdag import LS, CausalFlowDAG, ContinuousNode, I, OrdinalNode
+from tramdag.callbacks import PerNodePlateau, per_node_adam
 
 # %% global variables ------------------------------------------------------------------
 HERE = Path(__file__).resolve().parent
@@ -59,8 +60,9 @@ TOL_PRACT = {"stroke-ls": 5e-3, "vaca-ci": 1e-2}
 # workload. 'onecycle' and 'cosine' were measured in the June 2026 grid and are
 # still in the table of docs/training-speed.md, but were dropped in 0.4 (they
 # lost to plateau on every workload), so they cannot be run again here. The
-# plateau+freeze recipe itself left fit() in 0.4 as well — it is _PerNodePlateau
-# below, a callback, which is what the benchmark measures.
+# plateau+freeze recipe itself left fit() in 0.4 as well — it is
+# tramdag.callbacks.PerNodePlateau, a callback, which is what the benchmark
+# measures.
 CONFIGS = {
     "stroke-ls": [
         ("baseline-2phase", [(3000, 1e-2), (1000, 1e-3)], {}),
@@ -252,50 +254,6 @@ def _plot_curves(curves, seed) -> None:
         _plot_workload(workload, cs, sched_color, seed)
 
 
-# %% private classes -------------------------------------------------------------------
-class _PerNodePlateau:
-    """The 0.4 ``fit()`` recipe as a callback: per-node plateau decay and freezing.
-
-    The per-node NLLs have independent gradients, so a learning rate per
-    parameter group (one group per node) is exactly independent per-node
-    training. A node's rate decays by ``factor`` after every ``patience``
-    epochs without a ``min_delta`` improvement of its own validation NLL,
-    floored at ``1e-3`` of the start; once it has decayed to ``1e-2`` of the
-    start and stayed flat for ``freeze`` epochs the node leaves training
-    (rate 0). ``step`` returns True when every node has left.
-
-    Rate 0 keeps the node's weights fixed but its forward/backward still
-    runs — the 0.4 ``fit`` also skipped a frozen node's computation, so the
-    wall-clock of this recipe is not the June 2026 table's; the epochs are.
-    """
-
-    def __init__(self, lr, patience, freeze, min_delta=1e-4, factor=0.3):
-        self.lr0, self.patience, self.freeze = lr, patience, freeze
-        self.min_delta, self.factor = min_delta, factor
-        self.best: dict = {}
-        self.bad: dict = {}
-        self.frozen: set = set()
-
-    def step(self, nll: dict, opt) -> bool:
-        for g in opt.param_groups:
-            if g["node"] not in self.frozen:
-                self._step_node(g, nll[g["node"]])
-        return len(self.frozen) == len(opt.param_groups)
-
-    def _step_node(self, g: dict, nll: float) -> None:
-        name = g["node"]
-        if nll < self.best.get(name, np.inf) - self.min_delta:
-            self.best[name], self.bad[name] = nll, 0
-        else:
-            self.bad[name] = self.bad.get(name, 0) + 1
-        if self.bad[name] and self.bad[name] % self.patience == 0:
-            g["lr"] = max(g["lr"] * self.factor, self.lr0 * 1e-3)
-        decayed = g["lr"] <= self.lr0 * 1e-2 * (1 + 1e-9)
-        if decayed and self.bad[name] >= self.freeze:
-            self.frozen.add(name)
-            g["lr"] = 0.0
-
-
 # %% public functions ------------------------------------------------------------------
 def all_ls_spec():
     """Give the 5-node all-``ls`` spec of the frozen cohort.
@@ -359,21 +317,22 @@ def run_config(workload, phases, extra, batch, device, seed):
     t0 = time.perf_counter()
     extras = extra if isinstance(extra, list) else [extra] * len(phases)
     for (epochs, lr), phase_extra in zip(phases, extras, strict=True):
-        opt = torch.optim.Adam(
-            [
-                {"params": list(flow.nodes[n].parameters()), "lr": lr, "node": n}
-                for n in flow.order
-            ]
-        )
-        sched = _PerNodePlateau(lr, **phase_extra) if phase_extra else None
+        opt = per_node_adam(flow, lr)
+        sched = PerNodePlateau(**phase_extra) if phase_extra else None
 
         def monitor(f, epoch, opt, sched=sched):
-            nll = f.nll(val)
+            nll = f.nll(val)  # computed once, shared with the schedule
             hist["val"].append(nll)
             hist["time"].append(time.perf_counter() - t0)
             return sched is not None and sched.step(nll, opt)
 
-        flow.fit(train, epochs=epochs, batch_size=bs, optimizer=opt, callback=monitor)
+        flow.fit(
+            train,
+            epochs=epochs,
+            batch_size=bs,
+            optimizer=opt,
+            after_epoch_callbacks=monitor,
+        )
     return flow, hist
 
 

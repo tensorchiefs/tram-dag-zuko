@@ -59,7 +59,7 @@ in `create_param_net` is commented out).
 | batch | 32 (Keras `fit()` default) | 512 | **256**, the CI deviation |
 | `len_theta` / `n_coeffs` | 20 | 20 | 20 |
 | schedule / early stop / init | none / none, final weights / random_normal | none / none / torch | none / none / `init: normal` |
-| coefficient read-out | after every epoch (Keras loop) | at chunk boundaries | `fit(callback=)`, every epoch |
+| coefficient read-out | after every epoch (Keras loop) | at chunk boundaries | `fit(after_epoch_callbacks=)`, every epoch |
 
 **Results**
 
@@ -123,7 +123,7 @@ E[x3 | do(x2 = a)] = −0.25 + 0.25 a. The paper's Sec. 5.2 text says a ∈ {−
 | epochs | 10000 (`Figure_Triangle_Linear_Bimodal.R`, the sourcing script — not in our copy of the R code, so EPOCHS/M/nTrain for VACA rest on that reading) | 400 in chunks of 50, then 120 "polish" | 10000, one run |
 | lr | 0.001 | 0.01, polish 0.001 | 0.001 |
 | batch | full batch (one `apply_gradients` per epoch) | 512 | 2500 = n_train |
-| schedule | `update_learning_rate`: ReduceLROnPlateau on the summed val NLL, factor 0.1, patience 50, min_lr 1e-7, strict `<` | none | the same rule, global (torch's scheduler through `fit(optimizer=, callback=)`) |
+| schedule | `update_learning_rate`: ReduceLROnPlateau on the summed val NLL, factor 0.1, patience 50, min_lr 1e-7, strict `<` | none | the same rule, global (torch's scheduler through `fit(optimizer=, after_epoch_callbacks=)`) |
 | input scaling | `scale_df`: everything min-max to [0, 1] | raw | `net_input_scaling: minmax` (network inputs; targets D1) |
 | n_compare | — | 50000 | 50000 |
 

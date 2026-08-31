@@ -22,7 +22,7 @@ strategies, not part of the model (see [fitting.md](fitting.md)):
 | recipe | behavior | today |
 |---|---|---|
 | constant | one lr for the whole run | `flow.fit(train, epochs=, learning_rate=)` |
-| plateau+freeze | **per-node**: a node whose own validation NLL hasn't improved by `min_delta` (1e-4) for `patience` epochs gets its lr × 0.3, floored at 1e-3 × the start; once decayed ≥ 100× and flat for `freeze` epochs it leaves training (rate 0). Valid because the per-node losses have independent gradients. | `experiments/benchmarks/bench_training.py::_PerNodePlateau`, a callback over one parameter group per node |
+| plateau+freeze | **per-node**: a node whose own validation NLL hasn't improved by `min_delta` (1e-4) for `patience` epochs gets its lr × 0.3, floored at 1e-3 × the start; once decayed ≥ 100× and flat for `freeze` epochs it leaves training (rate 0). Valid because the per-node losses have independent gradients. | `tramdag.callbacks.PerNodePlateau`, a callback over one parameter group per node (`per_node_adam`), measured in `experiments/benchmarks/bench_training.py |
 | global plateau | torch's `ReduceLROnPlateau` on the summed validation NLL — the paper reference's rule | `experiments/paper/helpers.py::fit_paper` |
 
 `"onecycle"` and `"cosine"` were part of this benchmark and lost to
@@ -148,13 +148,13 @@ def on_epoch(flow, epoch, opt):
     plateau.step(sum(flow.nll(val).values()))
     return opt.param_groups[0]["lr"] < 1e-5
 
-flow.fit(train, epochs=4000, batch_size=512, optimizer=opt, callback=on_epoch)
+flow.fit(train, epochs=4000, batch_size=512, optimizer=opt, after_epoch_callbacks=on_epoch)
 ```
 
 The generous `epochs` value is only a ceiling; the callback stops the fit. For exact
 classical comparisons where the last 1e-3 matters, append a short constant-lr polish
 phase (`epochs=500, learning_rate=1e-3`). The per-node variant with freezing is the
-benchmark's own `_PerNodePlateau`.
+shipped `tramdag.callbacks.PerNodePlateau`.
 
 One finding is a package default: `epochs` has no default at all, because
 finding 6 is precisely that a fixed budget cannot be right for every workload. The paper scripts follow the paper's own protocol (one constant-lr

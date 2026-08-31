@@ -146,7 +146,7 @@ plt.show()
 # enter (`I(...)` = the parents control the transform parameters, for maximal
 # flexibility). Training maximizes the exact joint likelihood with one Adam.
 # `fit` is a plain loop; validation, the learning-rate schedule and early
-# stopping are a few lines of your own through `callback=` — here torch's
+# stopping are a few lines of your own through `after_epoch_callbacks=` — here torch's
 # `ReduceLROnPlateau` on the validation NLL, and a stop after 30 flat epochs.
 
 # %%
@@ -179,7 +179,9 @@ torch.manual_seed(0)
 flow = CausalFlowDAG(spec, device=DEVICE)
 log, cb = early_stopping(val, patience=30)
 t0 = time.perf_counter()
-flow.fit(train, epochs=400, learning_rate=1e-1, batch_size=4096, callback=cb)
+flow.fit(
+    train, epochs=400, learning_rate=1e-1, batch_size=4096, after_epoch_callbacks=cb
+)
 t_fit = time.perf_counter() - t0
 print(
     f"\nfitted on {DEVICE} in {t_fit:.1f}s "
@@ -329,7 +331,9 @@ for tr in ["spline", "affine"]:
     torch.manual_seed(0)
     f = CausalFlowDAG(make_spec(tr), device=DEVICE)
     _, cb = early_stopping(val, patience=30)
-    f.fit(train, epochs=400, learning_rate=1e-2, batch_size=4096, callback=cb)
+    f.fit(
+        train, epochs=400, learning_rate=1e-2, batch_size=4096, after_epoch_callbacks=cb
+    )
     fits[tr] = f
 print("held-out NLL (lower is better):")
 for tr, f in fits.items():

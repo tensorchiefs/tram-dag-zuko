@@ -11,13 +11,18 @@ this repository's own DGPs — not the TRAM-DAG model, and each of them had a
 default the paper replication or the tests had to switch off.
 
 - **`fit(train_df, *, epochs, learning_rate=1e-2, batch_size=512, seed=None,
-  optimizer=None, callback=None, vc_ehat=None)`.** One optimizer over all
+  optimizer=None, before_fit_callbacks=None, after_epoch_callbacks=None,
+  after_fit_callbacks=None, vc_ehat=None)`.** One optimizer over all
   parameters (the per-node NLLs have independent gradients, so this equals
   per-node training); `optimizer=` takes any torch optimizer, which is how a
-  `torch.optim.lr_scheduler` attaches; `callback(flow, epoch, optimizer)`
-  runs after every epoch and stops the fit on `True`. `flow.history` holds
-  the per-node train NLL per epoch and nothing else. `epochs` is a required
-  keyword.
+  `torch.optim.lr_scheduler` attaches. Each callback argument takes one
+  callable or a list. After-epoch callbacks run as `cb(flow, epoch,
+  optimizer)` after every epoch — all of them, every epoch — and the fit
+  stops after an epoch in which any returned `True`; the fit-level hooks run
+  as `cb(flow, optimizer)` once around the loop, the after-fit ones before
+  the VC re-centering (so restored weights get re-centered). `flow.history`
+  holds the per-node train NLL per epoch and nothing else. `epochs` is a
+  required keyword.
 - **Gone from `fit`, with what replaces them** (all shown in
   `docs/fitting.md`): `val_df` (compute `flow.nll(val_df)` in the callback);
   `schedule="plateau"`, `plateau_patience`, `plateau_factor`,
@@ -25,10 +30,10 @@ default the paper replication or the tests had to switch off.
   optimizer you pass — the paper's VACA/CAREFL replication now runs the
   reference's *global* rule instead of the per-node approximation that was
   a documented deviation); `freeze_patience` and the per-node freeze
-  (`experiments/benchmarks/bench_training.py::_PerNodePlateau`, the recipe
-  the benchmark measures, 40 lines); `restore_best` (a six-line snapshot
-  callback); `verbose` and the `tramdag.flow` logger (print or log in the
-  callback); `epoch_callback` (renamed `callback`, now receives the
+  (back as the opt-in `tramdag.callbacks.PerNodePlateau`, the recipe
+  `experiments/benchmarks/bench_training.py` measures); `restore_best`
+  (`tramdag.callbacks.RestoreBest`, or a six-line snapshot callback); `verbose` and the `tramdag.flow` logger (print or log in the
+  callback); `epoch_callback` (now `after_epoch_callbacks`, receives the
   optimizer); `marginal_init` (moved to `calibrate`); `vc_warm_start` and
   the hidden classical proxy fit (two lines of user code, see
   `docs/varying-coefficients.md`; measured on `vc_hetero`: `beta0` 0.16
@@ -81,6 +86,15 @@ default the paper replication or the tests had to switch off.
 
 ### Added
 
+- **`tramdag.callbacks`** — the common training recipes as shipped, opt-in
+  callbacks: `Logger` (epoch lines: train and validation NLL, `every=`),
+  `RestoreBest` (best-validation weights, restored through
+  `after_fit_callbacks` — the recipe the stroke finding needs, since
+  flexible CI/CS models overfit confounding at the MLE), and
+  `PerNodePlateau` with `per_node_adam` (per-node lr decay and freezing on
+  each node's own validation NLL, the pre-0.4 `fit(schedule="plateau")`
+  strategy). `fit` itself stays one plain loop; the callbacks are ordinary
+  `(flow, epoch, optimizer)` callables you could have written yourself.
 - **`CausalFlowDAG(spec, init="glorot")`** — Keras' `Dense` default
   initialization (glorot-uniform weights, zero biases) for every linear
   layer, the paper's reference; default stays torch's Kaiming-uniform.

@@ -104,15 +104,41 @@ learning rates and freezing (a callback, below) and the all-`ls` classical fit.
   5%/95% quantiles, ordinal cutpoints at the empirical class log-odds, a pure
   init that leaves the MLE unchanged. Call it yourself to switch the start
   off. A checkpoint carries the flag, so a loaded model is never recalibrated.
-- **`callback(flow, epoch, optimizer)`** after every epoch, once the epoch's
-  train NLLs are in `flow.history["train"]`; return `True` to stop. This is
+- **Callback hooks** — `after_epoch_callbacks=` takes one callable or a list,
+  each called as `cb(flow, epoch, optimizer)` after every epoch, once the
+  epoch's train NLLs are in `flow.history["train"]`; every callback runs each
+  epoch, and the fit stops after an epoch in which any returned `True`.
+  `before_fit_callbacks=` / `after_fit_callbacks=` (`cb(flow, optimizer)`)
+  bracket the loop — the after-fit hooks run *before* the `VC` re-centering,
+  so a callback that swaps weights hands them to the re-centering. This is
   where validation (`flow.nll(val_df)`), schedules, snapshots, logging and
-  coefficient trajectories live — the package ships none of them.
+  coefficient trajectories live. The common recipes ship in
+  [`tramdag.callbacks`](../src/tramdag/callbacks.py): `Logger` (epoch lines),
+  `RestoreBest` (best-validation weights), `PerNodePlateau` + `per_node_adam`
+  (per-node decay and freezing).
 - **`vc_ehat=`**: the out-of-fold propensities a centered `VC` term needs,
   `{node: {t: array}}` with one value per training row (see
   [varying-coefficients.md](varying-coefficients.md)).
 
 ### The recipes, as callbacks
+
+The shipped ones first — best-validation weights plus progress lines is two
+imports:
+
+```python
+from tramdag.callbacks import Logger, RestoreBest
+
+best = RestoreBest(val_df)
+flow.fit(
+    train_df,
+    epochs=4000,
+    after_epoch_callbacks=[Logger(val_df, every=50), best],
+    after_fit_callbacks=[best.restore],
+)
+```
+
+Anything else is a few lines of your own. A learning-rate schedule is torch's,
+stepped from the hook — this is what `RestoreBest` does inside, written out:
 
 ```python
 import copy
@@ -122,7 +148,7 @@ opt = torch.optim.Adam(flow.parameters(), lr=1e-2)
 # a learning-rate schedule: torch's, on the validation NLL
 plateau = torch.optim.lr_scheduler.ReduceLROnPlateau(opt, factor=0.3, patience=30)
 
-# best-validation weights (early stopping)
+# best-validation weights (early stopping) — RestoreBest, spelled out
 best = {"nll": float("inf"), "state": None}
 
 def on_epoch(flow, epoch, opt):
@@ -132,15 +158,17 @@ def on_epoch(flow, epoch, opt):
         best.update(nll=nll, state=copy.deepcopy(flow.state_dict()))
     return opt.param_groups[0]["lr"] < 1e-5      # stop once the rate bottomed out
 
-flow.fit(train_df, epochs=4000, batch_size=512, optimizer=opt, callback=on_epoch)
+flow.fit(train_df, epochs=4000, batch_size=512, optimizer=opt,
+         after_epoch_callbacks=on_epoch)
 flow.load_state_dict(best["state"])
 ```
 
 The per-node variant — one parameter group per node, each decayed on its own
-validation NLL and frozen (rate 0) once flat — is what
-`experiments/benchmarks/bench_training.py::_PerNodePlateau` measures; it was
-`fit(schedule="plateau", freeze_patience=)` before 0.4 and left the package
-because it is a training strategy, not part of the model.
+validation NLL and frozen (rate 0) once flat — is
+`tramdag.callbacks.PerNodePlateau` over a `per_node_adam(flow, lr)` optimizer;
+it was `fit(schedule="plateau", freeze_patience=)` before 0.4, left `fit`
+because it is a training strategy, not part of the model, and is measured in
+`experiments/benchmarks/bench_training.py`.
 
 #### Freezing vs. parallelism (why one helps and the other usually does not)
 

@@ -83,7 +83,7 @@ def fit_paper(generator, spec: dict, config: dict, out: Path, record=None):
         batch_size=config["batch_size"],
         seed=config["shuffle_seed"],
         optimizer=opt,
-        callback=epoch_end,
+        after_epoch_callbacks=epoch_end,
     )
     flow.save(out / "flow.pt")
     return flow, train, val, trajectory
