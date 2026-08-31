@@ -9,6 +9,7 @@ shares (config loading, output directories, reports) lives in
 # %% imports ---------------------------------------------------------------------------
 from __future__ import annotations
 
+import time
 from pathlib import Path
 
 import matplotlib as mpl
@@ -46,7 +47,8 @@ def fit_paper(generator, spec: dict, config: dict, out: Path, record=None):
     Returns
     -------
     tuple
-        ``(flow, train, val, trajectory)``.
+        ``(flow, train, val, trajectory, fit_seconds)`` — the last is the
+        wall-clock of the ``fit`` call alone, the CI runtime tripwire.
     """
     train = generator.observational(config["n_train"])
     val = generator.observational(config["n_val"], seed_offset=1)
@@ -77,6 +79,7 @@ def fit_paper(generator, spec: dict, config: dict, out: Path, record=None):
         if record is not None:
             trajectory.append({"epoch": epoch, **record(f)})
 
+    t0 = time.perf_counter()
     flow.fit(
         train,
         epochs=config["epochs"],
@@ -85,8 +88,9 @@ def fit_paper(generator, spec: dict, config: dict, out: Path, record=None):
         optimizer=opt,
         after_epoch_callbacks=epoch_end,
     )
+    fit_seconds = round(time.perf_counter() - t0, 1)
     flow.save(out / "flow.pt")
-    return flow, train, val, trajectory
+    return flow, train, val, trajectory, fit_seconds
 
 
 def shift_term(config: dict):

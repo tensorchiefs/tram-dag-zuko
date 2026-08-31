@@ -186,7 +186,7 @@ def run(variant: str) -> dict:
         f"fitting triangle-mixed/{config['f']} with a {config['shift']} shift "
         f"on n={config['n_train']} for {config['epochs']} epochs ..."
     )
-    flow, _, val, trajectory = fit_paper(
+    flow, _, val, trajectory, fit_seconds = fit_paper(
         generator,
         build_spec(config),
         config,
@@ -205,6 +205,7 @@ def run(variant: str) -> dict:
 
     metrics = {key: value for key, value in trajectory[-1].items() if key != "epoch"}
     metrics["val_nll_x3"] = float(flow.nll(val)["x3"])
+    metrics["fit_seconds"] = fit_seconds
 
     if config["shift"] == "cs":
         metrics["cs_curve_max_abs_err"] = cs_curve_error(
@@ -261,6 +262,15 @@ def run(variant: str) -> dict:
         f"(paper Sec. 6.2; cutpoints {generator.theta.tolist()})",
         metrics,
         figures,
+        truths={
+            **truths,
+            "mean_x3_flow_do_x1": metrics["mean_x3_dgp_do_x1"],
+            # C.4: both odds-ratio readings answer to the theory value e^2
+            "odds_ratio_predicted": float(np.exp(2.0)),
+            "odds_ratio_dgp": float(np.exp(2.0)),
+            # what a model knowing the analytic law exactly would score
+            "cf_prob_true_level_flow": metrics["cf_prob_true_level_analytic"],
+        },
     )
     print(f"-> {out}")
     return metrics

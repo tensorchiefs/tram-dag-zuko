@@ -123,7 +123,9 @@ def run(variant: str) -> dict:
         f"fitting the flexible flow on the VACA triangle, n={config['n_train']}: "
         f"{config['epochs']} epochs at lr {config['learning_rate']:g} ..."
     )
-    flow, train, val, _ = fit_paper(generator, build_spec(config), config, out)
+    flow, train, val, _, fit_seconds = fit_paper(
+        generator, build_spec(config), config, out
+    )
 
     sampled = flow.sample(len(train), seed=config["sample_seed"])
     plot_pairs(
@@ -142,10 +144,9 @@ def run(variant: str) -> dict:
         )
     )
     # L1: does the flow reproduce the bimodal source marginal?
-    metrics["std_x1_analytic"] = truth["std_x1_analytic"]
-    metrics["std_x1_abs_err"] = abs(
-        float(sampled["x1"].std()) - truth["std_x1_analytic"]
-    )
+    metrics["std_x1_flow"] = float(sampled["x1"].std())
+    metrics["std_x1_abs_err"] = abs(metrics["std_x1_flow"] - truth["std_x1_analytic"])
+    metrics["fit_seconds"] = fit_seconds
 
     save_metrics(out, metrics)
     write_report(
@@ -154,6 +155,15 @@ def run(variant: str) -> dict:
         "interventional means are analytic)",
         metrics,
         ["pairs.png", "interventional.png"],
+        truths={
+            "std_x1_flow": truth["std_x1_analytic"],
+            **{
+                f"mean_x3_flow_do_x2_{v:+.0f}": truth["do_x2"][str(v)][
+                    "mean_x3_analytic"
+                ]
+                for v in DO_X2_VALUES
+            },
+        },
     )
     print(f"-> {out}")
     return metrics

@@ -122,7 +122,7 @@ def run(variant: str) -> dict:
         f"fitting the flexible flow on the CAREFL SCM, n={config['n_train']}: "
         f"{config['epochs']} epochs at lr {config['learning_rate']:g} ..."
     )
-    flow, _, val, _ = fit_paper(generator, build_spec(config), config, out)
+    flow, _, val, _, fit_seconds = fit_paper(generator, build_spec(config), config, out)
 
     paper_latents = flow.abduct(pd.DataFrame([X_OBS]))
     truth = generator.true_cf_curves()
@@ -136,12 +136,14 @@ def run(variant: str) -> dict:
     val_nll = flow.nll(val)
     metrics["val_nll_x3"] = float(val_nll["x3"])
     metrics["val_nll_x4"] = float(val_nll["x4"])
+    metrics["fit_seconds"] = fit_seconds
 
     save_metrics(out, metrics)
     write_report(
         out,
         "CAREFL counterfactual benchmark (paper Sec. 5.3; the DGP's "
-        "counterfactuals are analytic, so these are exact errors)",
+        "counterfactuals are analytic, so every error metric is an exact "
+        "deviation from the DGP truth — a truth column would be zeros)",
         metrics,
         ["cf_curves.png"],
     )

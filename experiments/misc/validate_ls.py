@@ -26,6 +26,7 @@ Usage (from experiments/)::
 from __future__ import annotations
 
 import json
+import time
 from pathlib import Path
 
 import pandas as pd
@@ -209,7 +210,9 @@ def run(variant: str) -> dict:
         f"using the {config['fitter']} fitter ..."
     )
 
+    t0 = time.perf_counter()
     flow = fit_flow(build_spec(config), observed, config)
+    fit_seconds = round(time.perf_counter() - t0, 1)
     flow.save(out / "flow.pt")
 
     # the design matrix comes from the flow, so both fits see the same encoding.
@@ -244,6 +247,8 @@ def run(variant: str) -> dict:
         f"(naive observational contrast {metrics['ate_naive_observational']:+.4f})"
     )
 
+    metrics["fit_seconds"] = fit_seconds
+
     save_metrics(out, metrics)
     write_report(
         out,
@@ -251,6 +256,13 @@ def run(variant: str) -> dict:
         f"({config['fitter']} fitter)",
         metrics,
         [],
+        truths={
+            # the generator's true ATE answers every ATE reading, including
+            # the naive observational contrast (its |err| IS the confounding)
+            "ate_flow": metrics["ate_true"],
+            "ate_statsmodels": metrics["ate_true"],
+            "ate_naive_observational": metrics["ate_true"],
+        },
     )
     print(f"-> {out}")
     return metrics

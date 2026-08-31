@@ -66,7 +66,7 @@ def run(variant: str) -> dict:
         f"n={config['n_train']} for {config['epochs']} epochs "
         f"at lr {config['learning_rate']:g} ..."
     )
-    flow, _, val, trajectory = fit_paper(
+    flow, _, val, trajectory, fit_seconds = fit_paper(
         generator,
         build_spec(config),
         config,
@@ -85,6 +85,7 @@ def run(variant: str) -> dict:
 
     metrics = {key: value for key, value in trajectory[-1].items() if key != "epoch"}
     metrics["val_nll_x3"] = float(flow.nll(val)["x3"])
+    metrics["fit_seconds"] = fit_seconds
 
     if config["shift"] == "cs":
         # which paper figure this is depends on f (7 right for atan, 17 for
@@ -120,6 +121,8 @@ def run(variant: str) -> dict:
         f"beta13 = {truths['beta13']:+.1f})",
         metrics,
         figures,
+        # the do(x1) DGP mean is this run's Monte-Carlo truth for the flow's
+        truths={**truths, "mean_x3_flow_do_x1": metrics["mean_x3_dgp_do_x1"]},
     )
     print(f"-> {out}")
     return metrics

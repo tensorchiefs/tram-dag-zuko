@@ -13,11 +13,11 @@
   "mean_x3_abs_err_do_x2_+0": {
     "max": 0.04659
   },
-  "std_x1_analytic": {
-    "value": 2.0766559657295187,
-    "atol": 1e-09
-  },
   "std_x1_abs_err": {
     "max": 0.07999
+  },
+  "std_x1_flow": {
+    "value": 2.0766559657295187,
+    "atol": 0.07999
   }
 }

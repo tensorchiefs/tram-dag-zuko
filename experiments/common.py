@@ -166,7 +166,20 @@ def save_metrics(out: Path, metrics: dict) -> None:
     (out / "metrics.json").write_text(json.dumps(metrics, indent=2, default=float))
 
 
-def write_report(out: Path, title: str, metrics: dict, figures: list[str]) -> None:
+def _report_row(name: str, value, truths: dict) -> str:
+    """One metric row; with truths, a fitted-vs-true row where one exists."""
+    fmt = lambda v: f"{v:+.4f}" if isinstance(v, float) else f"{v}"  # noqa: E731
+    if not truths:
+        return f"| `{name}` | {fmt(value)} |"
+    if name not in truths:
+        return f"| `{name}` | {fmt(value)} |  |  |"
+    err = abs(float(value) - float(truths[name]))
+    return f"| `{name}` | {fmt(value)} | {fmt(truths[name])} | {err:.4f} |"
+
+
+def write_report(
+    out: Path, title: str, metrics: dict, figures: list[str], truths: dict | None = None
+) -> None:
     """Write ``report.md``: the metrics table and the figures.
 
     The experiments workflow posts this file as a commit comment, so the
@@ -183,13 +196,18 @@ def write_report(out: Path, title: str, metrics: dict, figures: list[str]) -> No
         Flat ``{name: value}`` mapping, as written to ``metrics.json``.
     figures : list[str]
         File names under ``plots/``, in the order they should appear.
+    truths : dict | None, optional
+        ``{metric_name: true_value}`` — the DGP/analytic ground truth for the
+        metrics that have one. Those rows gain a truth and an ``|err|``
+        column, so the commit comment shows fitted-vs-true at a glance.
     """
-    lines = [f"## {title}", "", "| metric | value |", "|---|---|"]
-    for name, value in metrics.items():
-        if isinstance(value, float):
-            lines.append(f"| `{name}` | {value:+.4f} |")
-        else:
-            lines.append(f"| `{name}` | {value} |")
+    truths = truths or {}
+    lines = [f"## {title}", ""]
+    if truths:
+        lines += ["| metric | value | DGP truth | \\|err\\| |", "|---|---|---|---|"]
+    else:
+        lines += ["| metric | value |", "|---|---|"]
+    lines += [_report_row(name, value, truths) for name, value in metrics.items()]
     lines.append("")
     for figure in figures:
         lines += [f"![{figure}](plots/{figure})", ""]
