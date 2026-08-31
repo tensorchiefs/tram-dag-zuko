@@ -122,7 +122,8 @@ default the paper replication or the tests had to switch off.
   checkpoint (the buffers are part of every node's state, so checkpoints
   saved before this change do not load — refit).
 - **`init_marginals(train_df)`** — the calibrated start as an explicit,
-  repeatable step: resets every simple intercept to its column's marginal
+  repeatable step: resets every Bernstein/ordinal simple intercept to its
+  column's marginal (spline and affine have no calibrated start)
   (`calibrate(marginal_init=True)` delegates to it). Unlike `calibrate` it
   is not once-guarded, so a loaded or already-trained flow can be restarted
   at the marginal; an uncalibrated flow takes its ranges from the same rows

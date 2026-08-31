@@ -105,7 +105,8 @@ learning rates and freezing (a callback, below) and the all-`ls` classical fit.
   init that leaves the MLE unchanged. Call it yourself to switch the start
   off. A checkpoint carries the flag, so a loaded model is never recalibrated.
   The start itself is also a public step: `flow.init_marginals(train_df)`
-  resets every simple intercept to its column's marginal, any time — e.g. to
+  resets every Bernstein/ordinal simple intercept to its column's marginal
+  (spline and affine have no calibrated start), any time — e.g. to
   restart a trained or loaded flow (`calibrate` won't, it is once-only).
 - **Callback hooks** — `after_epoch_callbacks=` takes one callable or a list,
   each called as `cb(flow, epoch, optimizer)` after every epoch, once the

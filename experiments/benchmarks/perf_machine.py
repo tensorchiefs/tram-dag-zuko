@@ -292,7 +292,7 @@ def run_workload(name: str, device: str) -> dict:
         "abduct_10k_s": round(abduct_s, 2),
         # cross-machine sanity check: same seed + data -> NLL must be ~equal
         "final_val_nll": round(sum(flow.nll(val).values()), 4),
-        # underscore: ignored by --report, a cross-machine sampling sanity value
+        # not in --report's key list: a cross-machine sampling sanity value
         "_sample_mean_x_last": round(float(samp.iloc[:, -1].mean()), 4),
     }
 
@@ -388,8 +388,8 @@ def main() -> None:
     )
     print(f"\n-> {out.resolve()}")
     print(
-        "collect the JSONs from all machines in docs/perf/, then:"
-        "  python -m benchmarks.perf_machine --report docs/perf"
+        "collect the JSONs from all machines in docs/perf/, then "
+        "(from experiments/):  python -m benchmarks.perf_machine --report ../docs/perf"
     )
 
 
