@@ -15,6 +15,7 @@ Causal queries:
 # %% imports ---------------------------------------------------------------------------
 from __future__ import annotations
 
+import inspect
 import time
 from datetime import datetime, timezone
 from pathlib import Path
@@ -66,6 +67,27 @@ def _callback_list(cbs) -> list:
     if cbs is None:
         return []
     return [cbs] if callable(cbs) else list(cbs)
+
+
+def _check_callbacks(cbs: list, args: tuple[str, ...], name: str) -> None:
+    """Reject a mis-registered callback before training, not hours after it.
+
+    The classic slip is the instance/method swap (``RestoreBest`` itself in
+    ``after_fit_callbacks`` instead of its ``restore``) — without this check
+    that only raises after the last epoch, losing the whole run.
+    """
+    for cb in cbs:
+        try:
+            sig = inspect.signature(cb)
+        except (TypeError, ValueError):  # a callable without a signature
+            continue
+        try:
+            sig.bind(*[None] * len(args))
+        except TypeError:
+            raise TypeError(
+                f"{name}_callbacks are called as cb({', '.join(args)}); "
+                f"{cb!r} does not accept these arguments"
+            ) from None
 
 
 def _slice_ehat(
@@ -514,6 +536,14 @@ class CausalFlowDAG(nn.Module):
             for c in (self.order if cols is None else cols)
         }
 
+    def _to_frame(self, values: dict[str, Tensor]) -> pd.DataFrame:
+        """Tensors -> DataFrame; an ordinal column goes back as a level index."""
+        out = {}
+        for k, v in values.items():
+            arr = v.cpu().numpy()
+            out[k] = arr.astype(np.int64) if self.nodes[k].kind == "ordinal" else arr
+        return pd.DataFrame(out)
+
     def _generator(self, seed: int | None) -> torch.Generator | None:
         """Give a seeded generator on this flow's device, or None for unseeded."""
         if seed is None:
@@ -635,7 +665,8 @@ class CausalFlowDAG(nn.Module):
         Tensor
             ``log p(x)`` per row, shape ``(n,)``.
         """
-        per_node = self.node_log_prob(self._tensorize(df))
+        with torch.no_grad():
+            per_node = self.node_log_prob(self._tensorize(df))
         return torch.stack(list(per_node.values()), dim=0).sum(dim=0)
 
     def nll(self, df: pd.DataFrame) -> dict[str, float]:
@@ -848,7 +879,8 @@ class CausalFlowDAG(nn.Module):
             Each called as ``cb(flow, epoch, optimizer)`` after every epoch
             (``epoch`` counts from 1), once the epoch's train NLLs are in
             ``flow.history["train"]``. All of them run each epoch; the fit
-            stops after an epoch in which any returned ``True``. Use them
+            stops after an epoch in which any returned ``True``
+            (``len(flow.history["train"])`` says how many epochs ran). Use them
             for validation (``flow.nll(val_df)``), schedules, snapshots and
             coefficient trajectories — :mod:`tramdag.callbacks` ships
             ``Logger``, ``RestoreBest`` and ``PerNodePlateau``.
@@ -884,8 +916,16 @@ class CausalFlowDAG(nn.Module):
         training rows; the constant moves into ``beta0``, the function is
         unchanged.
         """
+        if epochs < 1:
+            raise ValueError(f"epochs must be at least 1, got {epochs}")
         if batch_size < 1:
             raise ValueError(f"batch_size must be at least 1, got {batch_size}")
+        before = _callback_list(before_fit_callbacks)
+        after_epoch = _callback_list(after_epoch_callbacks)
+        after_fit = _callback_list(after_fit_callbacks)
+        _check_callbacks(before, ("flow", "optimizer"), "before_fit")
+        _check_callbacks(after_epoch, ("flow", "epoch", "optimizer"), "after_epoch")
+        _check_callbacks(after_fit, ("flow", "optimizer"), "after_fit")
         if seed is not None:
             torch.manual_seed(seed)
         ehat = self._vc_ehat_train(train_df, vc_ehat)  # validate before calibrating
@@ -898,9 +938,8 @@ class CausalFlowDAG(nn.Module):
             for g in nd._vc_groups
             if g.mods and nd.shifts[g.on].penalty > 0
         ]
-        for cb in _callback_list(before_fit_callbacks):
+        for cb in before:
             cb(self, opt)
-        after_epoch = _callback_list(after_epoch_callbacks)
         for epoch in range(1, epochs + 1):
             self.train()
             self.history["train"].append(
@@ -911,7 +950,7 @@ class CausalFlowDAG(nn.Module):
             stops = [bool(cb(self, epoch, opt)) for cb in after_epoch]
             if any(stops):
                 break
-        for cb in _callback_list(after_fit_callbacks):
+        for cb in after_fit:
             cb(self, opt)  # before the re-centering: restored weights re-center too
         self._recenter_vc(vals)
         self.eval()
@@ -1432,7 +1471,7 @@ class CausalFlowDAG(nn.Module):
                 values[name] = node.ut.inverse(theta, u_val - shift)
             else:
                 values[name] = ordinal_sample(theta, shift, u_val)
-        return pd.DataFrame({k: v.cpu().numpy() for k, v in values.items()})
+        return self._to_frame(values)
 
     @torch.no_grad()
     def abduct(self, df: pd.DataFrame, *, seed: int | None = None) -> pd.DataFrame:

@@ -320,5 +320,3 @@ for center in (False, True):
 # regularization where the question is. See
 # [`docs/varying-coefficients.md`](../docs/varying-coefficients.md) for the
 # semantics and [`docs/scores.md`](../docs/scores.md) for the scan.
-
-# %%

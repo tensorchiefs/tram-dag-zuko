@@ -58,6 +58,8 @@ class Logger:
     """
 
     def __init__(self, val_df: pd.DataFrame | None = None, every: int = 1):
+        if every < 1:
+            raise ValueError(f"every must be at least 1, got {every}")
         self.val_df = val_df
         self.every = every
 
@@ -80,7 +82,8 @@ class RestoreBest:
     recover the causal effect (docs/fitting.md). Register the instance in
     ``after_epoch_callbacks`` and its :meth:`restore` in
     ``after_fit_callbacks``; ``fit`` runs the latter *before* the VC
-    re-centering, so the restored weights are what gets re-centered.
+    re-centering, so the restored weights are what gets re-centered. One
+    instance per fit and per flow — the snapshot is a full ``state_dict``.
 
     Attributes
     ----------
@@ -129,7 +132,9 @@ class PerNodePlateau:
     A frozen node's rate is 0 but its forward/backward still runs, so the
     saving is in epochs, not per-epoch wall clock. This is the pre-0.4
     ``fit(schedule="plateau", freeze_patience=)`` recipe, back as an opt-in
-    callback; `docs/training-speed.md` has its measurements.
+    callback; `docs/training-speed.md` has its measurements. One instance
+    per fit — ``frozen``/``best``/``lr0`` carry over and would stop a second
+    fit immediately.
 
     Parameters
     ----------
@@ -138,6 +143,9 @@ class PerNodePlateau:
         :meth:`step` with your own NLL dict.
     patience, freeze : int
         Flat epochs before a decay, and before a decayed node freezes.
+        The training-speed benchmark runs ``patience=30, freeze=120`` on its
+        stroke workload and ``patience=15, freeze=50`` on the VACA one
+        (docs/training-speed.md).
     min_delta : float, optional
         Improvement below this is flat, by default 1e-4.
     factor : float, optional
@@ -153,6 +161,10 @@ class PerNodePlateau:
         min_delta: float = 1e-4,
         factor: float = 0.3,
     ):
+        if patience < 1 or freeze < 1:
+            raise ValueError(
+                f"patience and freeze must be at least 1, got {patience}/{freeze}"
+            )
         self.val_df = val_df
         self.patience, self.freeze = patience, freeze
         self.min_delta, self.factor = min_delta, factor

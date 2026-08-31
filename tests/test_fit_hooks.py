@@ -143,6 +143,29 @@ def test_restore_best_matches_the_manual_six_line_callback(ls_chain):
     assert sum(flow.nll(val).values()) == pytest.approx(best.best_nll, rel=1e-6)
 
 
+def test_misregistered_callback_fails_before_training(ls_chain):
+    """The instance/method swap (RestoreBest itself in after_fit_callbacks)
+    must raise up front, not after the last epoch of a long run.
+    """
+    df = ls_chain["draw"](200, 0)[["x1", "x2"]]
+    flow = CausalFlowDAG(_two_node_spec(), seed=0)
+    best = RestoreBest(df)
+    with pytest.raises(TypeError, match="after_fit_callbacks"):
+        flow.fit(df, epochs=10, after_fit_callbacks=[best])  # not best.restore
+    assert len(flow.history["train"]) == 0  # nothing trained
+    with pytest.raises(TypeError, match="after_epoch_callbacks"):
+        flow.fit(df, epochs=10, after_epoch_callbacks=[best.restore])
+
+
+def test_epochs_must_be_positive(ls_chain):
+    """epochs=0 would skip the loop but still calibrate and run the
+    after-fit hooks — refuse it instead.
+    """
+    flow = CausalFlowDAG(_two_node_spec(), seed=0)
+    with pytest.raises(ValueError, match="epochs"):
+        flow.fit(ls_chain["draw"](100, 0)[["x1", "x2"]], epochs=0)
+
+
 def test_restore_best_without_an_epoch_refuses(ls_chain):
     """``restore`` before any epoch is a bug in the caller's loop — loud."""
     flow = CausalFlowDAG(_two_node_spec(), seed=0)

@@ -31,13 +31,11 @@
 # fails (paper, Fig. 4) and TRAM-DAG does not. The ground truth is known
 # analytically. Thus every claim below is *checked*, not asserted.
 #
-# The demo runs on CPU. On a Colab **GPU runtime** (Runtime → Change runtime
-# type → any GPU, for example the free T4), the final section compares the
-# speed of the two devices.
+# The demo runs on CPU; a Colab **GPU runtime** (Runtime → Change runtime
+# type → any GPU, for example the free T4) speeds up training.
 
 # %%
 import importlib.util
-import logging
 import subprocess
 import sys
 import time
@@ -54,9 +52,6 @@ import scipy.stats as st  # for KDE plots only (preinstalled on Colab)
 import torch
 
 from tramdag import CausalFlowDAG, ContinuousNode, I
-
-# tramdag reports fit() progress on its module logger
-logging.basicConfig(level=logging.INFO, format="%(message)s")  # TODO: check
 
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 plt.rcParams["figure.dpi"] = 110
@@ -148,6 +143,8 @@ plt.show()
 # `fit` is a plain loop; validation, the learning-rate schedule and early
 # stopping are a few lines of your own through `after_epoch_callbacks=` — here torch's
 # `ReduceLROnPlateau` on the validation NLL, and a stop after 30 flat epochs.
+# (Predefined callbacks live in `tramdag.callbacks`; we roll our own to show
+# the hook.)
 
 # %%
 spec = {
@@ -163,6 +160,7 @@ def early_stopping(val, patience):
 
     def cb(f, epoch, opt):
         if not log["lr"]:
+            # built lazily: the optimizer only exists once fit() runs
             log["sched"] = torch.optim.lr_scheduler.ReduceLROnPlateau(
                 opt, factor=0.3, patience=patience // 3
             )
@@ -211,7 +209,7 @@ plt.show()
 # ## 3. Rung 1 — does it actually fit? (the plot the CNF baseline fails)
 
 # %%
-samp = flow.sample(5 * len(df), seed=1)
+samp = flow.sample(len(df), seed=1)
 cols = list(df.columns)
 fig, axes = plt.subplots(3, 3, figsize=(9, 8.5))
 for i, ci in enumerate(cols):
@@ -255,7 +253,7 @@ for ax, a in zip(axes, (-3.0, -1.0, 0.0), strict=True):
     # DGP histogram
     ax.hist(truth["x3"], bins=bins, density=True, alpha=0.5, label="DGP")
     # Flow density: KDE for a smoother estimate
-    kde = st.gaussian_kde(fl["x3"].iloc[:50_000])
+    kde = st.gaussian_kde(fl["x3"])
     x_eval = np.linspace(bins[0], bins[-1], 300)
     ax.plot(x_eval, kde(x_eval), color="C3", lw=1.8, label="TRAM-DAG density")
     ax.set_title(f"$p(x_3 \\mid do(x_2={a:+.0f}))$")

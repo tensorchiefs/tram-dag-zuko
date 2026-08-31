@@ -5,7 +5,8 @@
 ### Changed (breaking) — `fit` is one loop, the strategies are yours
 
 `CausalFlowDAG.fit` shrank from 18 keyword arguments to a minibatch Adam loop
-with two hooks (`flow.py` 2089 → 1606 lines). Three independent reviews of the
+with an `optimizer=` hook and three callback lists (`flow.py` 2089 → 1606
+lines). Three independent reviews of the
 file agreed on the cut: what left was training *strategy* — choices tuned on
 this repository's own DGPs — not the TRAM-DAG model, and each of them had a
 default the paper replication or the tests had to switch off.
@@ -404,7 +405,7 @@ default the paper replication or the tests had to switch off.
   ~1500 of 4000 budgeted epochs, the vaca fit is 0.03 nats short at 520 — so
   a package-level number could only be arbitrary. `epochs` is a bare
   keyword-only argument (`TypeError` without it); a generous budget with a
-  stopping `callback` is the alternative.
+  stopping after-epoch callback is the alternative.
 
 - **`make_univariate_transform` raises `KeyError`, not `ValueError`.** The
   registry lookup speaks for itself; this package no longer re-words the
@@ -428,8 +429,8 @@ default the paper replication or the tests had to switch off.
 
 - **No progress output from the package.** `fit` and `fit_classical`
   print and log nothing (the `verbose=` gate and the `tramdag.flow`
-  logger of an intermediate state are gone); a `callback` reports what
-  you want, `fit_classical` returns its report dict.
+  logger of an intermediate state are gone); an after-epoch callback
+  (e.g. `tramdag.callbacks.Logger`) reports what you want, `fit_classical` returns its report dict.
 
 - **The node formula argument is `terms`, not `transformation`.**
   `ContinuousNode(terms=...)` / `OrdinalNode(levels, terms=...)`, and the
@@ -446,7 +447,7 @@ default the paper replication or the tests had to switch off.
 ### Changed (internal, no API surface)
 
 - `experiments/paper/helpers.py`: the per-epoch coefficient read-out is
-  `fit(callback=)` inside one `fit_paper(generator, spec, config, out,
+  `fit(after_epoch_callbacks=)` inside one `fit_paper(generator, spec, config, out,
   record)` call — there is no chunked or snapshotting fit helper any more.
 
 - **Every complexity hotspot is dissolved into named stages** — `fit`

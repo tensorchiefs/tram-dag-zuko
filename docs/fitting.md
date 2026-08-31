@@ -163,6 +163,9 @@ flow.fit(train_df, epochs=4000, batch_size=512, optimizer=opt,
 flow.load_state_dict(best["state"])
 ```
 
+(One difference to `RestoreBest`: a post-fit `load_state_dict` skips the VC
+re-centering, so on a spec with a `VC` term prefer `after_fit_callbacks`.)
+
 The per-node variant — one parameter group per node, each decayed on its own
 validation NLL and frozen (rate 0) once flat — is
 `tramdag.callbacks.PerNodePlateau` over a `per_node_adam(flow, lr)` optimizer;

@@ -136,5 +136,7 @@ def test_marginal_init_does_not_reset_a_loaded_model(tmp_path):
 
     before = loaded.nodes["y"].intercept.theta.detach().clone()
     loaded.calibrate(df, marginal_init=True)
-    loaded.fit(df, epochs=0, learning_rate=1e-2, batch_size=128)
+    # lr 0: the epoch runs (and would recalibrate, if the flag were lost)
+    # without moving any weight
+    loaded.fit(df, epochs=1, learning_rate=0.0, batch_size=128)
     assert torch.equal(before, loaded.nodes["y"].intercept.theta.detach())

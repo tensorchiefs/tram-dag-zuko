@@ -50,9 +50,10 @@ from tramdag import CausalFlowDAG, ContinuousNode, OrdinalNode, I, LS, CS
 spec = {  # the spec IS the labelled DAG
     "X1": ContinuousNode(),
     "X2": ContinuousNode(I("X1")),
-    "T": OrdinalNode(2, LS("X1") + CS("X2")),
+    "T": OrdinalNode(2, LS("X1") + CS("X2")),  # 2 levels, column coded 0..1
     "Y": OrdinalNode(4, I("X1") + CS("X2") + LS("T")),
 }
+# train_df / val_df: DataFrames with one column per node
 flow = CausalFlowDAG(spec)  # validates acyclicity, builds the flow
 
 # fit() is one minibatch Adam loop; validation, schedules and early stopping

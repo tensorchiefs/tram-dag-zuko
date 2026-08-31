@@ -133,8 +133,9 @@ def run(variant: str) -> dict:
         out / "plots" / "cf_curves.png",
     )
     metrics.update(heldout_errors(generator, flow, config))
-    metrics["val_nll_x3"] = float(flow.nll(val)["x3"])
-    metrics["val_nll_x4"] = float(flow.nll(val)["x4"])
+    val_nll = flow.nll(val)
+    metrics["val_nll_x3"] = float(val_nll["x3"])
+    metrics["val_nll_x4"] = float(val_nll["x4"])
 
     save_metrics(out, metrics)
     write_report(
