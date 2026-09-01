@@ -3,7 +3,7 @@
 #   pre-commit install --install-hooks -t pre-commit -t commit-msg
 repos:
 - repo: https://github.com/astral-sh/ruff-pre-commit
-  rev: v0.16.3
+  rev: v0.16.5
   hooks:
   - id: ruff-check
     args: [--fix]
