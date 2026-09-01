@@ -1336,7 +1336,7 @@ are the same object, so <code>LS is linear_shift</code>.</p>
 </tr>
 <tr>
 <td><a class="autorefs autorefs-internal" title="complex_shift" href="../api/spec/#tramdag.spec.complex_shift"><code>complex_shift()</code></a> / <a class="autorefs autorefs-internal" title="complex_shift" href="../api/spec/#tramdag.spec.complex_shift"><code>CS</code></a></td>
-<td>Complex shift: an MLP <code>g(x)</code>, additive on the latent scale. Several parents form one joint network.</td>
+<td>Complex shift: an NN <code>g(x)</code>, additive on the latent scale. Several parents form one joint network.</td>
 </tr>
 <tr>
 <td><a class="autorefs autorefs-internal" title="varying_coefficient" href="../api/spec/#tramdag.spec.varying_coefficient"><code>varying_coefficient()</code></a> / <a class="autorefs autorefs-internal" title="varying_coefficient" href="../api/spec/#tramdag.spec.varying_coefficient"><code>VC</code></a></td>
@@ -1447,7 +1447,7 @@ config in <code>experiments/paper/</code> states <code>units=</code> and <code>a
 <tr>
 <td><a class="autorefs autorefs-internal" title="ComplexIntercept" href="../api/conditioners/#tramdag.conditioners.ComplexIntercept"><code>ComplexIntercept</code></a></td>
 <td><code>I(...)</code></td>
-<td>8-8 ReLU MLP from parent features to the transform parameters.</td>
+<td>8-8 ReLU NN from parent features to the transform parameters.</td>
 </tr>
 <tr>
 <td><a class="autorefs autorefs-internal" title="LinearShift" href="../api/conditioners/#tramdag.conditioners.LinearShift"><code>LinearShift</code></a></td>
@@ -1457,7 +1457,7 @@ config in <code>experiments/paper/</code> states <code>units=</code> and <code>a
 <tr>
 <td><a class="autorefs autorefs-internal" title="ComplexShift" href="../api/conditioners/#tramdag.conditioners.ComplexShift"><code>ComplexShift</code></a></td>
 <td><code>CS</code></td>
-<td>64-128-64 ReLU MLP to one shift value.</td>
+<td>64-128-64 ReLU NN to one shift value.</td>
 </tr>
 <tr>
 <td><a class="autorefs autorefs-internal" title="VaryingCoef" href="../api/conditioners/#tramdag.conditioners.VaryingCoef"><code>VaryingCoef</code></a></td>
@@ -1465,9 +1465,9 @@ config in <code>experiments/paper/</code> states <code>units=</code> and <code>a
 <td><code>beta0 + b_theta(mods)</code> with a zero-initialized output layer and the L2 hook <code>l2()</code>. <code>beta()</code> evaluates the effect, <code>recenter()</code> re-splits <code>beta0</code>/<code>b_theta</code> after training (function-preserving).</td>
 </tr>
 <tr>
-<td>(<code>_mlp</code>)</td>
+<td>(<code>_nn</code>)</td>
 <td>—</td>
-<td>The one MLP builder: a stack of the given <code>units</code> with the term's <code>activation</code> (relu by default), then a bias-free output layer.</td>
+<td>The one NN builder: a stack of the given <code>units</code> with the term's <code>activation</code> (relu by default), then a bias-free output layer.</td>
 </tr>
 </tbody>
 </table>

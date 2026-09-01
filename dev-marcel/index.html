@@ -1386,19 +1386,19 @@ intercept term <code>I</code> plus any number of shifts (notation:
 <tr>
 <td><code>I("A")</code></td>
 <td><code>h_ϑ(a)(x)</code> — ϑ bends with the parent</td>
-<td><code>ComplexIntercept</code>: MLP <code>[8, 8] → n_params</code></td>
+<td><code>ComplexIntercept</code>: NN <code>[8, 8] → n_params</code></td>
 <td>the parent reshapes the whole distribution; no single coefficient</td>
 </tr>
 <tr>
 <td><code>I("A","B")</code> (default <code>allow_interaction=True</code>)</td>
 <td><code>h_ϑ(a,b)(x)</code></td>
-<td><strong>one joint</strong> MLP over both parents — they interact in ϑ</td>
+<td><strong>one joint</strong> NN over both parents — they interact in ϑ</td>
 <td>maximal flexibility</td>
 </tr>
 <tr>
 <td><code>I("A","B", allow_interaction=False)</code></td>
 <td><code>h_ϑ(a)+ϑ(b)(x)</code></td>
-<td>one MLP <strong>per parent</strong>, parameter vectors summed in coefficient space</td>
+<td>one NN <strong>per parent</strong>, parameter vectors summed in coefficient space</td>
 <td>per-parent partial effects via <code>flow.intercept_contributions</code></td>
 </tr>
 <tr>
@@ -1410,25 +1410,25 @@ intercept term <code>I</code> plus any number of shifts (notation:
 <tr>
 <td><code>CS("A")</code></td>
 <td><code>g(a)</code>, additive</td>
-<td><code>ComplexShift</code>: MLP <code>[64, 128, 64] → 1</code></td>
+<td><code>ComplexShift</code>: NN <code>[64, 128, 64] → 1</code></td>
 <td>plot <code>g</code></td>
 </tr>
 <tr>
 <td><code>CS("A","B")</code></td>
 <td><code>g(a,b)</code> — joint</td>
-<td>one MLP over the concatenated features</td>
+<td>one NN over the concatenated features</td>
 <td>interaction <em>in the shift</em></td>
 </tr>
 <tr>
 <td><code>CS("A") + CS("B")</code></td>
 <td><code>g₁(a) + g₂(b)</code></td>
-<td>two MLPs, scalars added</td>
+<td>two NNs, scalars added</td>
 <td>GAM-style, each effect plottable</td>
 </tr>
 <tr>
 <td><code>VC("A","B", t="T")</code></td>
 <td><code>(β₀ + b_Θ(a,b))·x_t</code></td>
-<td>scalar <code>β₀</code> + zero-initialised penalized MLP <code>[16] → 1</code>; the treatment value multiplies, it never enters the net</td>
+<td>scalar <code>β₀</code> + zero-initialised penalized NN <code>[16] → 1</code>; the treatment value multiplies, it never enters the net</td>
 <td><code>β₀</code> ≈ constant effect, <code>flow.varying_coef</code> reads <code>β(x)</code></td>
 </tr>
 </tbody>

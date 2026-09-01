@@ -1732,7 +1732,7 @@ object, so use whichever reads better:</p>
   continuous node; extra keyword arguments go straight to the transform
   class (<code>SI(transform="spline", bins=16)</code>).</li>
 <li>:func:<code>LS</code> — <em>linear shift</em>: <code>beta * x</code> (one interpretable weight), one parent.</li>
-<li>:func:<code>CS</code> — <em>complex shift</em>: an additive MLP <code>g(x)</code> on the latent scale.</li>
+<li>:func:<code>CS</code> — <em>complex shift</em>: an additive NN <code>g(x)</code> on the latent scale.</li>
 <li>:func:<code>VC</code> — <em>varying-coefficient shift</em>: <code>beta(modifiers) * x_on</code> with
   <code>beta(x) = beta0 + b_theta(x)</code> and <code>b_theta</code> a small, <strong>penalized</strong> network
   — a treatment-effect head with its own bias–variance budget (issue #28).</li>
@@ -2779,7 +2779,7 @@ docs and the paper.</p>
 
     <div class="doc doc-contents ">
 
-        <p>Build a complex-shift term: an additive MLP <code>g(x)</code>.</p>
+        <p>Build a complex-shift term: an additive NN <code>g(x)</code>.</p>
 <p><code>CS</code> is the exported alias of this function, the notation of the
 docs and the paper.</p>
 
@@ -2913,7 +2913,7 @@ docs and the paper.</p>
 docs and the paper.</p>
 <p>This is the treatment-effect term of issue #28:
 <code>VC("X2", "X3", t="T")</code> is <code>(beta0 + b_theta(x2, x3)) * x_t</code>.</p>
-<p><code>beta(x) = beta0 + b_theta(x)</code>, with <code>b_theta</code> a small MLP whose
+<p><code>beta(x) = beta0 + b_theta(x)</code>, with <code>b_theta</code> a small NN whose
 weights carry the L2 <code>penalty</code>. The fitting objective is the
 penalized NLL <code>sum_i nll_i + penalty * ||b_theta weights||^2</code> on the
 total-likelihood scale. That is a fixed Gaussian prior whose shrinkage

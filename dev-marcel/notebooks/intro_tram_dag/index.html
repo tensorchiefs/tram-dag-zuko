@@ -2127,7 +2127,7 @@ span.linenos.special { color: #000000; background-color: #ffffc0; padding-left: 
 </style>
 <!-- End of mermaid configuration --><div class="jupyter-wrapper">
 <div class="jp-Notebook" data-jp-theme-light="true" data-jp-theme-name="JupyterLab Light">
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=0dacfe76">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=96ddce56">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -2173,7 +2173,7 @@ small data-generating process (DGP) <strong>inside the model family</strong>. It
 </div>
 </div>
 </div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=51108b29">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=704f895a">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -2223,7 +2223,7 @@ themselves a function of (a subset of) the parents. The whole transformation
 bends with the parent, which permits interactions beyond additive shifts.</li>
 <li><strong>Linear shift (LS):</strong> $\beta_{51} x_1 + \beta_{52} x_2$. This gives one
 interpretable number per parent.</li>
-<li><strong>Complex shift (CS):</strong> $g(x_4)$, an unrestricted (MLP) function of the
+<li><strong>Complex shift (CS):</strong> $g(x_4)$, an unrestricted (NN) function of the
 parent. It stays <em>additive</em> on the latent scale.</li>
 </ul>
 <p>so that <strong>sampling</strong> (the inverse direction) must invert only the intercept.
@@ -2260,7 +2260,7 @@ term depends on:</p>
 </tr>
 <tr>
 <td>CS — $g_{ik}(x_k)$</td>
-<td><code>CS("X1")</code> (64-128-64 MLP, additive)</td>
+<td><code>CS("X1")</code> (64-128-64 NN, additive)</td>
 </tr>
 </tbody>
 </table>
@@ -2270,7 +2270,7 @@ parents → a complex intercept (<code>CI</code>). The explicit names work too.<
 </div>
 </div>
 </div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=4433c3ec">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=2d5a0772">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -2306,7 +2306,7 @@ table shows the resulting decomposition for a single continuous target $X_3$:</p
 <tr>
 <td><code>[CS("X1")]</code></td>
 <td>$h_{\boldsymbol{\vartheta}}(x_3) + g_1(x_1)$</td>
-<td><code>ComplexShift</code> — additive MLP $g_1$</td>
+<td><code>ComplexShift</code> — additive NN $g_1$</td>
 </tr>
 <tr>
 <td><code>LS("X1") + CS("X2")</code></td>
@@ -2351,7 +2351,7 @@ parent.</p>
 </div>
 </div>
 </div><div class="jp-Cell jp-CodeCell jp-Notebook-cell jp-mod-noOutputs">
-<div class="jp-Cell jp-CodeCell jp-Notebook-cell jp-mod-noOutputs" id="cell-id=77431354">
+<div class="jp-Cell jp-CodeCell jp-Notebook-cell jp-mod-noOutputs" id="cell-id=e215bf99">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -2394,7 +2394,7 @@ plt.rcParams["figure.dpi"] = 110</div>
 </div>
 </div>
 </div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=883e06d2">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=a14ad79e">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -2435,7 +2435,7 @@ A linear shift cannot represent this function. We will return to this later.</p>
 </div>
 </div>
 </div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=d5b4b48b">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=dfd23b19">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -2447,7 +2447,7 @@ through which its parent enters:</p>
 </div>
 </div>
 </div><div class="jp-Cell jp-CodeCell jp-Notebook-cell">
-<div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=8288f408">
+<div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=6434e5a3">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -2570,7 +2570,7 @@ plt.show()</div>
 </div>
 </div>
 </div><div class="jp-Cell jp-CodeCell jp-Notebook-cell">
-<div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=752dd07e">
+<div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=ef9a0f01">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -2762,7 +2762,7 @@ df.describe().round(2)</div>
 </div>
 </div>
 </div><div class="jp-Cell jp-CodeCell jp-Notebook-cell">
-<div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=5a4c4de1">
+<div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=811ca639">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -2815,7 +2815,7 @@ plt.show()</div>
 </div>
 </div>
 </div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=fd5e6fca">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=b0f7af95">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -2835,7 +2835,7 @@ shipped callback (<code>tramdag.callbacks.Logger</code>).</p>
 </div>
 </div>
 </div><div class="jp-Cell jp-CodeCell jp-Notebook-cell">
-<div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=4a92db69">
+<div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=6a304163">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -2941,7 +2941,7 @@ flow.nll(val_df)</div>
 </div>
 </div>
 </div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=f16c6419">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=f881d882">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -2955,7 +2955,7 @@ object rather than drawn by hand, so it cannot disagree with the model:</p>
 </div>
 </div>
 </div><div class="jp-Cell jp-CodeCell jp-Notebook-cell">
-<div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=96803b72">
+<div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=16e1246b">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -2999,7 +2999,7 @@ Y
 </div>
 </div>
 </div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=4070af0c">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=06e7e129">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -3016,7 +3016,7 @@ and the ordinal <code>Y</code> (shift <strong>subtracted</strong>).</p>
 </div>
 </div>
 </div><div class="jp-Cell jp-CodeCell jp-Notebook-cell">
-<div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=d5c6c755">
+<div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=0b9dd4ff">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -3212,7 +3212,7 @@ Y = +1.000  (ordinal)
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>/tmp/ipykernel_4502/3702411266.py:42: UserWarning: Converting a tensor with requires_grad=True to a scalar may lead to unexpected behavior.
+<pre>/tmp/ipykernel_4449/3702411266.py:42: UserWarning: Converting a tensor with requires_grad=True to a scalar may lead to unexpected behavior.
 Consider using tensor.detach() first. (Triggered internally at /__w/pytorch/pytorch/torch/csrc/autograd/generated/python_variable_methods.cpp:822.)
   [f"h_theta(x)={float(h0[0]):+.3f}"]
 </pre>
@@ -3222,7 +3222,7 @@ Consider using tensor.detach() first. (Triggered internally at /__w/pytorch/pyto
 </div>
 </div>
 </div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=cd558352">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=822e6995">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -3234,7 +3234,7 @@ observational distribution (including the ordinal outcome's marginal).</p>
 </div>
 </div>
 </div><div class="jp-Cell jp-CodeCell jp-Notebook-cell">
-<div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=9fa26b44">
+<div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=7bacf8f9">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -3347,7 +3347,7 @@ plt.show()</div>
 </div>
 </div>
 </div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=bc870489">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=1f4a6ef7">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -3366,7 +3366,7 @@ compare them with the DGP constants:</p>
 </div>
 </div>
 </div><div class="jp-Cell jp-CodeCell jp-Notebook-cell">
-<div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=99d691e8">
+<div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=bf7e6f35">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -3435,7 +3435,7 @@ cutpoints theta_Y:   true [-2.   0.   1.5]   fitted [-2.011  0.019  1.587]
 </div>
 </div>
 </div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=16b8c7c8">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=2379996e">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -3450,7 +3450,7 @@ sum is identified). Therefore we center both curves before the comparison.</p>
 </div>
 </div>
 </div><div class="jp-Cell jp-CodeCell jp-Notebook-cell">
-<div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=4c8e3eea">
+<div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=40cfe61d">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -3553,7 +3553,7 @@ plt.show()</div>
 </div>
 </div>
 </div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=2e454c4c">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=690ce9b8">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -3570,7 +3570,7 @@ distributions in the next section are visibly wrong.</p>
 </div>
 </div>
 </div><div class="jp-Cell jp-CodeCell jp-Notebook-cell">
-<div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=38b351d8">
+<div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=b8a2a02b">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -3647,7 +3647,7 @@ val NLL of node X3:  cs model 1.1749   ls model 1.3799
 </div>
 </div>
 </div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=cf0a3a16">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=d33bcc33">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -3662,7 +3662,7 @@ gets the interventional distribution of $X_3$ visibly wrong.</p>
 </div>
 </div>
 </div><div class="jp-Cell jp-CodeCell jp-Notebook-cell">
-<div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=e479c977">
+<div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=69570c39">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -3785,7 +3785,7 @@ plt.show()</div>
 </div>
 </div>
 </div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=cc2623cf">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=e68ed3fe">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -3798,7 +3798,7 @@ $P(Y = k \mid do(X_3 = a)) = \sigma(\vartheta_k - \beta_Y a) - \sigma(\vartheta_
 </div>
 </div>
 </div><div class="jp-Cell jp-CodeCell jp-Notebook-cell">
-<div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=2801bfa9">
+<div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=1dc7cfb5">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -3850,7 +3850,7 @@ print("  true:", pmf_true.round(4), "\n  flow:", pmf_flow.round(4))</div>
 </div>
 </div>
 </div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=e21c3500">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=3e224e76">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -3864,7 +3864,7 @@ $p(x_3) = f_U\!\big(u_3\big)\cosh(x_3)$ with $f_U$ the standard-logistic density
 </div>
 </div>
 </div><div class="jp-Cell jp-CodeCell jp-Notebook-cell">
-<div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=62353d8c">
+<div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=cca5827c">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -3931,7 +3931,7 @@ plt.show()</div>
 </div>
 </div>
 </div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=94c69d19">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=2e6c9a03">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -3956,7 +3956,7 @@ This must reproduce the factual data exactly (level-exactly for $Y$).</p>
 </div>
 </div>
 </div><div class="jp-Cell jp-CodeCell jp-Notebook-cell">
-<div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=bba38249">
+<div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=56927a45">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -4005,7 +4005,7 @@ Y level-exact: 100.0%
 </div>
 </div>
 </div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=3f2db000">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=b1e9ca08">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -4019,7 +4019,7 @@ unit by unit. This is the strongest test on the ladder.</p>
 </div>
 </div>
 </div><div class="jp-Cell jp-CodeCell jp-Notebook-cell">
-<div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=4f854f71">
+<div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=d892de3a">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -4098,7 +4098,7 @@ counterfactual X3:  corr(truth, flow) = 0.9949   RMSE = 0.124
 </div>
 </div>
 </div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=ca38133b">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=309a6e11">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -4134,7 +4134,7 @@ the standard logistic.</li>
 </div>
 </div>
 </div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=48a3d44b">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=3e3b921c">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>

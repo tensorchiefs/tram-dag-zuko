@@ -1554,10 +1554,10 @@ and none of them relies on the defaults here.</p>
 Conditioner           Architecture                                 Term
 ===================== ============================================ ======
 <code>LinearShift</code>       <code>Linear(n, 1, bias=False)</code>                 <code>LS</code>
-<code>ComplexShift</code>      64-128-64 ReLU MLP to 1, no bias             <code>CS</code>
-<code>ComplexIntercept</code>  8-8 ReLU MLP to <code>n_params</code>, bias-free out  <code>I</code>
+<code>ComplexShift</code>      64-128-64 ReLU NN to 1, no bias             <code>CS</code>
+<code>ComplexIntercept</code>  8-8 ReLU NN to <code>n_params</code>, bias-free out  <code>I</code>
 <code>SimpleIntercept</code>   free parameter vector, no parent             none
-<code>VaryingCoef</code>       <code>beta0</code> + penalized 16-unit MLP            <code>VC</code>
+<code>VaryingCoef</code>       <code>beta0</code> + penalized 16-unit NN            <code>VC</code>
 ===================== ============================================ ======</p>
 <p><code>ComplexShift</code> and <code>ComplexIntercept</code> correspond to
 <code>ComplexShiftDefaultTabular</code> and <code>ComplexInterceptDefaultTabular</code>.
@@ -2138,7 +2138,7 @@ this explicitly.</p>
 
 
 
-        <p>Additive shift <code>g(x)</code> from an MLP, still additive on the latent scale.</p>
+        <p>Additive shift <code>g(x)</code> from an NN, still additive on the latent scale.</p>
 
 
 <p><span class="doc-section-title">Parameters:</span></p>
