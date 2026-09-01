@@ -58,7 +58,7 @@ jobs:
       run: |
         set -euo pipefail
         if [ ! -f docs/tramdag-docs.pdf ]; then
-          dir=latest; [ "$REF" = main ] || dir="$REF"
+          dir="$REF"   # mike's latest alias is a symlink git show cannot traverse
           git show "origin/gh-pages:$dir/tramdag-docs.pdf" > docs/tramdag-docs.pdf 2>/dev/null \
             && echo "PDF build failed — republishing the previous PDF" \
             || echo "no PDF this run and none to republish"

@@ -170,6 +170,8 @@ default the paper replication or the tests had to switch off.
   each node's own validation NLL, the pre-0.4 `fit(schedule="plateau")`
   strategy). `fit` itself stays one plain loop; the callbacks are ordinary
   `(flow, epoch, optimizer)` callables you could have written yourself.
+- **`src/tramdag/py.typed` ships (PEP 561)** — the package is fully
+  annotated, and pip users' type checkers now see the inline types.
 - **`CausalFlowDAG(spec, init="glorot")`** — Keras' `Dense` default
   initialization (glorot-uniform weights, zero biases) for every linear
   layer, the paper's reference; default stays torch's Kaiming-uniform.
@@ -236,7 +238,11 @@ default the paper replication or the tests had to switch off.
   compares each run's `metrics.json` against the committed
   `experiments/<area>/ground_truth/<name>.json` (a `{value, atol}` entry
   per metric, or `{max}` for an error measure), and posts the run's report — metrics table plus figures — as a
-  commit comment through CML. `experiments/paper/check_data.py` additionally
+  commit comment through CML. Where an analytic or generator truth
+  exists, the table carries `DGP truth` and `abs. error` columns next to
+  the fitted value, and every run records `fit_seconds` against a
+  `{max, why}` tripwire pinned at 3x the CI-runner measurement — a
+  gross-regression alarm (a lost `no_grad`), not a benchmark. `experiments/paper/check_data.py` additionally
   verifies that every frozen dataset still regenerates from its stored
   seed, at 1e-9 rather than bit equality.
 
