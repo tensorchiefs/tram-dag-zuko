@@ -52,6 +52,7 @@ import scipy.stats as st  # for KDE plots only (preinstalled on Colab)
 import torch
 
 from tramdag import CausalFlowDAG, ContinuousNode, I
+from tramdag.callbacks import PerNodePlateau, per_node_adam
 
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 plt.rcParams["figure.dpi"] = 110
@@ -140,11 +141,12 @@ plt.show()
 # Each node gets a monotone Bernstein transform. The terms say how parents
 # enter (`I(...)` = the parents control the transform parameters, for maximal
 # flexibility). Training maximizes the exact joint likelihood with one Adam.
-# `fit` is a plain loop; validation, the learning-rate schedule and early
-# stopping are a few lines of your own through `after_epoch_callbacks=` — here torch's
-# `ReduceLROnPlateau` on the validation NLL, and a stop after 30 flat epochs.
-# (Predefined callbacks live in `tramdag.callbacks`; we roll our own to show
-# the hook.)
+# `fit` is a plain loop; training strategy attaches through the callback
+# hooks. Here the shipped self-stopping recipe: `per_node_adam` gives every
+# node its own parameter group, and `PerNodePlateau` decays each node's rate
+# on its own validation NLL and freezes it once flat — the fit ends when the
+# last node froze. (Section 6 shows the hand-rolled alternative: torch's
+# `ReduceLROnPlateau` through the same hook.)
 
 # %%
 spec = {
@@ -155,7 +157,7 @@ spec = {
 
 
 def early_stopping(val, patience):
-    """Validation NLL per epoch, ReduceLROnPlateau, stop after `patience` flat epochs."""
+    """Total validation NLL per epoch, ReduceLROnPlateau, stop after `patience` flat epochs."""
     log = {"val": [], "lr": []}
 
     def cb(f, epoch, opt):
@@ -175,20 +177,34 @@ def early_stopping(val, patience):
 
 torch.manual_seed(0)
 flow = CausalFlowDAG(spec, device=DEVICE)
-log, cb = early_stopping(val, patience=30)
+log = {"val": [], "lr": []}
+
+
+def record(f, epoch, opt):
+    """Keep the curves for the plot below; PerNodePlateau does the deciding."""
+    log["val"].append(sum(f.nll(val).values()))
+    log["lr"].append(opt.param_groups[0]["lr"])  # x1's group
+
+
+sched = PerNodePlateau(val, patience=10, freeze=40)
 t0 = time.perf_counter()
 flow.fit(
-    train, epochs=400, learning_rate=1e-1, batch_size=4096, after_epoch_callbacks=cb
+    train,
+    epochs=400,
+    batch_size=4096,
+    optimizer=per_node_adam(flow, lr=1e-1),
+    after_epoch_callbacks=[record, sched],
 )
 t_fit = time.perf_counter() - t0
 print(
     f"\nfitted on {DEVICE} in {t_fit:.1f}s "
-    f"({len(log['val'])} epochs, then the callback stopped it)"
+    f"({len(log['val'])} epochs, then every node had frozen)"
 )
 
 # %% [markdown]
-# `fit` records the per-node train NLL; the callback recorded the validation
-# NLL and the learning rate. Watch the plateau rule step the rate down:
+# `fit` records the per-node train NLL; the recording callback kept the
+# validation NLL and x1's learning rate. Watch the per-node plateau rule
+# step that rate down until the node freezes (rate 0):
 
 # %%
 ep = np.arange(1, len(log["val"]) + 1)

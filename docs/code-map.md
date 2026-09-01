@@ -16,7 +16,7 @@ are the same object, so `LS is linear_shift`.
 | [`complex_intercept()`][tramdag.spec.complex_intercept] / [`CI`][tramdag.spec.complex_intercept] | The parent-conditioned intercept — the paper's CI: the parents reshape the monotone transform. Needs at least one parent. Also carries `units=` and `allow_interaction=` (joint vs. additive multi-parent intercept). |
 | [`intercept()`][tramdag.spec.intercept] / [`I`][tramdag.spec.intercept] | The fallback: dispatches on its arguments to `SI` (no parents) or `CI` (parents). The bare names `I` and `SI` in a term list both mean the simple intercept. |
 | [`linear_shift()`][tramdag.spec.linear_shift] / [`LS`][tramdag.spec.linear_shift] | Linear shift `beta * x` — the interpretable log-odds coefficient. Exactly one parent. |
-| [`complex_shift()`][tramdag.spec.complex_shift] / [`CS`][tramdag.spec.complex_shift] | Complex shift: an MLP `g(x)`, additive on the latent scale. Several parents form one joint network. |
+| [`complex_shift()`][tramdag.spec.complex_shift] / [`CS`][tramdag.spec.complex_shift] | Complex shift: an NN `g(x)`, additive on the latent scale. Several parents form one joint network. |
 | [`varying_coefficient()`][tramdag.spec.varying_coefficient] / [`VC`][tramdag.spec.varying_coefficient] | Varying-coefficient shift `(beta0 + b_theta(mods)) * x_t` — the penalized treatment-effect head (issue #28). `center=` adds propensity centering (issue #30). |
 | [`ContinuousNode`][tramdag.spec.ContinuousNode] | Continuous variable: monotone 1-D transform plus shifts. `terms` is the first positional argument. |
 | [`OrdinalNode`][tramdag.spec.OrdinalNode] | Ordinal variable with `levels` classes: ordered logit (cutpoints) plus shifts. |
@@ -53,11 +53,11 @@ config in `experiments/paper/` states `units=` and `activation=` itself.
 | Name | Term | Role |
 |---|---|---|
 | [`SimpleIntercept`][tramdag.conditioners.SimpleIntercept] | bare `I` | Free parameter vector; no parents. |
-| [`ComplexIntercept`][tramdag.conditioners.ComplexIntercept] | `I(...)` | 8-8 ReLU MLP from parent features to the transform parameters. |
+| [`ComplexIntercept`][tramdag.conditioners.ComplexIntercept] | `I(...)` | 8-8 ReLU NN from parent features to the transform parameters. |
 | [`LinearShift`][tramdag.conditioners.LinearShift] | `LS` | `Linear(n, 1, bias=False)`. `.weight` is the interpretable coefficient; no bias because the intercept slot owns the constant. |
-| [`ComplexShift`][tramdag.conditioners.ComplexShift] | `CS` | 64-128-64 ReLU MLP to one shift value. |
+| [`ComplexShift`][tramdag.conditioners.ComplexShift] | `CS` | 64-128-64 ReLU NN to one shift value. |
 | [`VaryingCoef`][tramdag.conditioners.VaryingCoef] | `VC` | `beta0 + b_theta(mods)` with a zero-initialized output layer and the L2 hook `l2()`. `beta()` evaluates the effect, `recenter()` re-splits `beta0`/`b_theta` after training (function-preserving). |
-| (`_mlp`) | — | The one MLP builder: a stack of the given `units` with the term's `activation` (relu by default), then a bias-free output layer. |
+| (`_nn`) | — | The one NN builder: a stack of the given `units` with the term's `activation` (relu by default), then a bias-free output layer. |
 
 ## `flow.py` — the model
 

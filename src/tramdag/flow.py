@@ -968,7 +968,11 @@ class CausalFlowDAG(nn.Module):
         _check_callbacks(after_fit, ("flow", "optimizer"), "after_fit")
         if seed is not None:
             torch.manual_seed(seed)
-        ehat = self._vc_ehat_train(train_df, vc_ehat)  # validate before calibrating
+        # vc_ehat is validated BEFORE calibrate: a malformed dict must fail
+        # while the flow is still untouched (calibrate sets ranges and the
+        # marginal start — a half-mutated flow after an error would be worse
+        # than no fit at all)
+        ehat = self._vc_ehat_train(train_df, vc_ehat)
         self.calibrate(train_df)
         vals = self._tensorize(train_df)
         opt = optimizer or torch.optim.Adam(self.parameters(), lr=learning_rate)
@@ -1331,7 +1335,7 @@ class CausalFlowDAG(nn.Module):
         This method is valid only when every edge is ``ls``, because each
         node-conditional is then a classical transformation model. Any other
         model raises. For a ``cs`` or ``ci`` model use :meth:`fit`, where
-        the minibatch noise also regularizes the MLPs.
+        the minibatch noise also regularizes the NNs.
 
         Parameters
         ----------

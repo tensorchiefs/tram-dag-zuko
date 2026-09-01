@@ -23,7 +23,7 @@ object, so use whichever reads better:
   continuous node; extra keyword arguments go straight to the transform
   class (``SI(transform="spline", bins=16)``).
 - :func:`LS` — *linear shift*: ``beta * x`` (one interpretable weight), one parent.
-- :func:`CS` — *complex shift*: an additive MLP ``g(x)`` on the latent scale.
+- :func:`CS` — *complex shift*: an additive NN ``g(x)`` on the latent scale.
 - :func:`VC` — *varying-coefficient shift*: ``beta(modifiers) * x_on`` with
   ``beta(x) = beta0 + b_theta(x)`` and ``b_theta`` a small, **penalized** network
   — a treatment-effect head with its own bias–variance budget (issue #28).
@@ -528,7 +528,7 @@ def complex_shift(
     units: list[int] | tuple[int, ...] | None = None,
     activation: str | None = None,
 ) -> Term:
-    """Build a complex-shift term: an additive MLP ``g(x)``.
+    """Build a complex-shift term: an additive NN ``g(x)``.
 
     ``CS`` is the exported alias of this function, the notation of the
     docs and the paper.
@@ -580,7 +580,7 @@ def varying_coefficient(
     This is the treatment-effect term of issue #28:
     ``VC("X2", "X3", t="T")`` is ``(beta0 + b_theta(x2, x3)) * x_t``.
 
-    ``beta(x) = beta0 + b_theta(x)``, with ``b_theta`` a small MLP whose
+    ``beta(x) = beta0 + b_theta(x)``, with ``b_theta`` a small NN whose
     weights carry the L2 ``penalty``. The fitting objective is the
     penalized NLL ``sum_i nll_i + penalty * ||b_theta weights||^2`` on the
     total-likelihood scale. That is a fixed Gaussian prior whose shrinkage

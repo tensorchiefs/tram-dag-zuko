@@ -111,14 +111,14 @@ intercept term `I` plus any number of shifts (notation:
 | term | math | what gets built | interpretability |
 |---|---|---|---|
 | `I()` / bare `I` / omitted | `h_ϑ(x)` — constant ϑ | `SimpleIntercept`: one free parameter vector, no network | the baseline transform |
-| `I("A")` | `h_ϑ(a)(x)` — ϑ bends with the parent | `ComplexIntercept`: MLP `[8, 8] → n_params` | the parent reshapes the whole distribution; no single coefficient |
-| `I("A","B")` (default `allow_interaction=True`) | `h_ϑ(a,b)(x)` | **one joint** MLP over both parents — they interact in ϑ | maximal flexibility |
-| `I("A","B", allow_interaction=False)` | `h_ϑ(a)+ϑ(b)(x)` | one MLP **per parent**, parameter vectors summed in coefficient space | per-parent partial effects via `flow.intercept_contributions` |
+| `I("A")` | `h_ϑ(a)(x)` — ϑ bends with the parent | `ComplexIntercept`: NN `[8, 8] → n_params` | the parent reshapes the whole distribution; no single coefficient |
+| `I("A","B")` (default `allow_interaction=True`) | `h_ϑ(a,b)(x)` | **one joint** NN over both parents — they interact in ϑ | maximal flexibility |
+| `I("A","B", allow_interaction=False)` | `h_ϑ(a)+ϑ(b)(x)` | one NN **per parent**, parameter vectors summed in coefficient space | per-parent partial effects via `flow.intercept_contributions` |
 | `LS("A")` | `β·a` | `Linear(width, 1)`, no bias — **one parameter per feature column** (one for a continuous parent, `levels` for a one-hot ordinal) | `exp(β)` is an odds ratio |
-| `CS("A")` | `g(a)`, additive | `ComplexShift`: MLP `[64, 128, 64] → 1` | plot `g` |
-| `CS("A","B")` | `g(a,b)` — joint | one MLP over the concatenated features | interaction *in the shift* |
-| `CS("A") + CS("B")` | `g₁(a) + g₂(b)` | two MLPs, scalars added | GAM-style, each effect plottable |
-| `VC("A","B", t="T")` | `(β₀ + b_Θ(a,b))·x_t` | scalar `β₀` + zero-initialised penalized MLP `[16] → 1`; the treatment value multiplies, it never enters the net | `β₀` ≈ constant effect, `flow.varying_coef` reads `β(x)` |
+| `CS("A")` | `g(a)`, additive | `ComplexShift`: NN `[64, 128, 64] → 1` | plot `g` |
+| `CS("A","B")` | `g(a,b)` — joint | one NN over the concatenated features | interaction *in the shift* |
+| `CS("A") + CS("B")` | `g₁(a) + g₂(b)` | two NNs, scalars added | GAM-style, each effect plottable |
+| `VC("A","B", t="T")` | `(β₀ + b_Θ(a,b))·x_t` | scalar `β₀` + zero-initialised penalized NN `[16] → 1`; the treatment value multiplies, it never enters the net | `β₀` ≈ constant effect, `flow.varying_coef` reads `β(x)` |
 
 A node takes **at most one `I` term with parents** — a term list is therefore
 always purely additive on the latent scale, and interactions exist only
