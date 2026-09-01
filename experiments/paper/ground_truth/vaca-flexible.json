@@ -21,7 +21,7 @@
     "atol": 0.07999
   },
   "fit_seconds": {
-    "max": 1066,
-    "why": "3x the 2-core CI runner measurement (355 s, 2026-08-31): shared-runner wall clock is noisy, so this is a gross-regression tripwire (a lost no_grad, an accidental O(n^2)), not a benchmark"
+    "max": 414,
+    "why": "3x the 2-core CI runner measurement (138 s, 2026-09-01, tuned protocol): shared-runner wall clock is noisy, so this is a gross-regression tripwire, not a benchmark"
   }
 }
