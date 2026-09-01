@@ -1,5 +1,5 @@
 {
-  "_note": "The exactness anchor: an all-ls outcome node IS an ordered-logit model, so the flow's MLE must equal statsmodels. Multi-phase Adam without RestoreBest (final weights) reaches it to ~4e-4. Re-pinned 2026-09-01 from the tuned protocol (fewer epochs; see the YAML header).",
+  "_note": "The exactness anchor: an all-ls outcome node IS an ordered-logit model, so the flow's MLE must equal statsmodels. Multi-phase Adam without best-weight restoration (final weights) reaches it to ~4e-4. Re-pinned 2026-09-01 from the tuned protocol (fewer epochs; see the YAML header).",
   "coef_Age_flow": {
     "value": 0.052554257214069366,
     "atol": 0.005

@@ -14,13 +14,7 @@ import pytest
 import torch
 
 from tramdag import LS, CausalFlowDAG, ContinuousNode, OrdinalNode
-from tramdag.callbacks import (
-    Callback,
-    EarlyStopping,
-    PerNodePlateau,
-    RestoreBest,
-    per_node_adam,
-)
+from tramdag.callbacks import Callback, EarlyStopping, PerNodePlateau, per_node_adam
 
 
 # %% private functions -----------------------------------------------------------------
@@ -104,8 +98,9 @@ def test_user_optimizer_is_used_and_keeps_its_state(ls_chain):
 
 
 def test_restore_best_matches_the_manual_six_line_callback(ls_chain):
-    """``callbacks.RestoreBest`` lands exactly where the manual snapshot
-    recipe (docs/fitting.md) does — restoration is automatic at fit end.
+    """``EarlyStopping()`` (no patience) lands exactly where the manual
+    snapshot recipe (docs/fitting.md) does — restoration is automatic at
+    fit end, and without patience the full budget runs.
     """
     df = ls_chain["draw"](800, 2)[["x1", "x2"]]
     val = ls_chain["draw"](400, 3)[["x1", "x2"]]
@@ -117,7 +112,7 @@ def test_restore_best_matches_the_manual_six_line_callback(ls_chain):
         if nll < manual["nll"]:
             manual.update(nll=nll, epoch=epoch)
 
-    best = RestoreBest()
+    best = EarlyStopping()
     flow.fit(
         df,
         epochs=40,
@@ -125,6 +120,7 @@ def test_restore_best_matches_the_manual_six_line_callback(ls_chain):
         validation_data=val,
         callbacks=[keep_best, best],
     )
+    assert len(flow.history["train"]) == 40  # no patience: full budget
     assert (best.best_nll, best.best_epoch) == (manual["nll"], manual["epoch"])
     assert sum(flow.nll(val).values()) == pytest.approx(best.best_nll, rel=1e-6)
 
@@ -135,7 +131,7 @@ def test_restore_best_resets_between_fits(ls_chain):
     """
     df = ls_chain["draw"](400, 6)[["x1", "x2"]]
     flow = CausalFlowDAG(_two_node_spec(), seed=0)
-    best = RestoreBest()
+    best = EarlyStopping()
     flow.fit(df, epochs=5, validation_data=df, callbacks=best)
     first = (best.best_nll, best.best_epoch)
     flow.fit(df, epochs=3, validation_data=df, callbacks=best)
@@ -143,25 +139,38 @@ def test_restore_best_resets_between_fits(ls_chain):
     assert best.best_nll <= first[0] + 1e-9  # training continued, no stale state
 
 
-def test_early_stopping_stops_and_composes_with_restore_best(ls_chain):
-    """EarlyStopping halts the fit once the best epoch is ``patience`` old,
-    in either registration order relative to RestoreBest.
+def test_early_stopping_stops_and_restores_the_best(ls_chain):
+    """One instance both halts the fit once the best epoch is ``patience``
+    old and leaves the flow at the best-validation weights.
     """
     df = ls_chain["draw"](800, 7)[["x1", "x2"]]
     val = ls_chain["draw"](400, 8)[["x1", "x2"]]
-    for order in (lambda b, e: [b, e], lambda b, e: [e, b]):
-        flow = CausalFlowDAG(_two_node_spec(), seed=0)
-        best, early = RestoreBest(), EarlyStopping(patience=5)
-        flow.fit(
-            df,
-            epochs=4000,
-            validation_data=val,
-            callbacks=order(best, early),
-        )
-        ran = len(flow.history["train"])
-        assert ran < 4000
-        assert ran - early.best_epoch == 5
-        assert sum(flow.nll(val).values()) == pytest.approx(best.best_nll, rel=1e-6)
+    flow = CausalFlowDAG(_two_node_spec(), seed=0)
+    early = EarlyStopping(patience=5)
+    flow.fit(df, epochs=4000, validation_data=val, callbacks=early)
+    ran = len(flow.history["train"])
+    assert ran < 4000
+    assert ran - early.best_epoch == 5
+    assert sum(flow.nll(val).values()) == pytest.approx(early.best_nll, rel=1e-6)
+
+
+def test_early_stopping_without_restore_keeps_the_final_weights(ls_chain):
+    """``restore_best=False`` stops but leaves the last epoch's weights."""
+    df = ls_chain["draw"](800, 7)[["x1", "x2"]]
+    val = ls_chain["draw"](400, 8)[["x1", "x2"]]
+    flow = CausalFlowDAG(_two_node_spec(), seed=0)
+    flow.fit(
+        df,
+        epochs=4000,
+        validation_data=val,
+        callbacks=EarlyStopping(patience=5, restore_best=False),
+    )
+    final = sum(flow.nll(val).values())
+    assert final == pytest.approx(
+        sum(flow.history["val"][-1].values()), rel=1e-6
+    )  # last epoch, not the best
+    with pytest.raises(ValueError, match="no-op"):
+        EarlyStopping(restore_best=False)
 
 
 def test_misregistered_callback_fails_before_training(ls_chain):
@@ -190,15 +199,15 @@ def test_restore_best_without_an_epoch_refuses(ls_chain):
     """Restoring before any epoch is a bug in the caller's loop — loud."""
     flow = CausalFlowDAG(_two_node_spec(), seed=0)
     with pytest.raises(RuntimeError, match="no epoch"):
-        RestoreBest().on_fit_end(flow, None)
+        EarlyStopping().on_fit_end(flow, None)
 
 
 def test_callbacks_demand_fit_managed_validation(ls_chain):
-    """RestoreBest without validation_data/-split fails loudly at epoch 1."""
+    """EarlyStopping without validation_data/-split fails loudly at epoch 1."""
     df = ls_chain["draw"](100, 0)[["x1", "x2"]]
     flow = CausalFlowDAG(_two_node_spec(), seed=0)
     with pytest.raises(RuntimeError, match="validation_data"):
-        flow.fit(df, epochs=2, callbacks=RestoreBest())
+        flow.fit(df, epochs=2, callbacks=EarlyStopping())
 
 
 def test_verbose_prints_every_nth_and_final_epoch(ls_chain, capsys):
@@ -289,10 +298,10 @@ def test_fit_classical_marks_validation_stale(ls_chain):
     """
     df = ls_chain["draw"](400, 0)[["x1", "x2"]]
     flow = CausalFlowDAG(_two_node_spec(), seed=0)
-    flow.fit(df, epochs=2, validation_data=df, callbacks=RestoreBest())
+    flow.fit(df, epochs=2, validation_data=df, callbacks=EarlyStopping())
     flow.fit_classical(df)
     with pytest.raises(RuntimeError, match="validation_data"):
-        RestoreBest().on_epoch_end(flow, 1, None)
+        EarlyStopping().on_epoch_end(flow, 1, None)
 
 
 def test_callbacks_reject_stale_validation_from_an_earlier_fit(ls_chain):
@@ -301,18 +310,18 @@ def test_callbacks_reject_stale_validation_from_an_earlier_fit(ls_chain):
     """
     df = ls_chain["draw"](200, 0)[["x1", "x2"]]
     flow = CausalFlowDAG(_two_node_spec(), seed=0)
-    flow.fit(df, epochs=2, validation_data=df, callbacks=RestoreBest())
+    flow.fit(df, epochs=2, validation_data=df, callbacks=EarlyStopping())
     with pytest.raises(RuntimeError, match="validation_data"):
-        flow.fit(df, epochs=2, callbacks=RestoreBest())  # no validation now
-    flow.fit(df, epochs=2, validation_data=df, callbacks=RestoreBest())  # fine again
+        flow.fit(df, epochs=2, callbacks=EarlyStopping())  # no validation now
+    flow.fit(df, epochs=2, validation_data=df, callbacks=EarlyStopping())  # fine again
 
 
 def test_callbacks_reject_the_class_instead_of_an_instance(ls_chain):
-    """`callbacks=RestoreBest` (forgotten parens) fails with the fix named."""
+    """`callbacks=EarlyStopping` (forgotten parens) fails with the fix named."""
     df = ls_chain["draw"](200, 0)[["x1", "x2"]]
     flow = CausalFlowDAG(_two_node_spec(), seed=0)
-    with pytest.raises(TypeError, match="instantiate it: RestoreBest"):
-        flow.fit(df, epochs=2, callbacks=RestoreBest)
+    with pytest.raises(TypeError, match="instantiate it: EarlyStopping"):
+        flow.fit(df, epochs=2, callbacks=EarlyStopping)
 
 
 def test_per_node_plateau_rejects_a_zero_start_rate(ls_chain):

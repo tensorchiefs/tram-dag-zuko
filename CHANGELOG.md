@@ -25,7 +25,7 @@ default the paper replication or the tests had to switch off.
   this section first shipped as — `before_fit_callbacks=` /
   `after_epoch_callbacks=` / `after_fit_callbacks=` — collapsed into
   `callbacks=` before release, after a usability review flagged the
-  two-hook `RestoreBest` registration as a silent footgun.) `flow.history`
+  two-hook best-weights registration as a silent footgun.) `flow.history`
   holds the per-node train NLL per epoch — and, with validation configured,
   the per-node validation NLL under `"val"`. `epochs` is a required
   keyword.
@@ -40,7 +40,7 @@ default the paper replication or the tests had to switch off.
   a documented deviation); `freeze_patience` and the per-node freeze
   (back as the opt-in `tramdag.callbacks.PerNodePlateau`, the recipe
   `experiments/benchmarks/bench_training.py` measures); `restore_best`
-  (`tramdag.callbacks.RestoreBest`, or a six-line snapshot callback);
+  (`tramdag.callbacks.EarlyStopping`, or a six-line snapshot callback);
   `verbose` and the `tramdag.flow` logger — `verbose=` also returned,
   Keras-style (below), and the module logger stayed gone;
   `epoch_callback` (now an entry in `callbacks=`, receives the
@@ -181,18 +181,19 @@ default the paper replication or the tests had to switch off.
 - **`tramdag.callbacks`** — the common training recipes as shipped, opt-in
   callbacks on a small `Callback` base (`on_fit_begin` / `on_epoch_end` /
   `on_fit_end`, each resetting its state at fit begin so instances are
-  reusable): `RestoreBest` (best-validation weights, restored
+  reusable): `EarlyStopping` (best-validation weights, restored
   automatically at fit end — the recipe the stroke finding needs, since
-  flexible CI/CS models overfit confounding at the MLE), `EarlyStopping`
-  (`patience=` epochs without validation improvement; tracks its own best,
-  so it composes with `RestoreBest` in any order) and `PerNodePlateau`
+  flexible CI/CS models overfit confounding at the MLE; an optional
+  `patience=` also stops the fit once the best epoch is that many epochs
+  old, `restore_best=False` keeps the final weights) and `PerNodePlateau`
   with `per_node_adam` (per-node lr decay and freezing on each node's own
   validation NLL, the pre-0.4 `fit(schedule="plateau")` strategy; its
   `patience`/`freeze` now default to the benchmark's 15/50). All read
   `history["val"]`, so a fit that registers them needs
   `validation_data=`/`validation_split=` — the NLL is computed once,
-  shared. An earlier `Logger` callback existed briefly and dissolved into
-  `verbose=`. `fit` itself stays one plain loop.
+  shared. Two earlier callbacks existed briefly: `Logger` dissolved into
+  `verbose=`, and a separate `RestoreBest` merged into `EarlyStopping`
+  (whose restoration is the default). `fit` itself stays one plain loop.
 - **`src/tramdag/py.typed` ships (PEP 561)** — the package is fully
   annotated, and pip users' type checkers now see the inline types.
 - **`CausalFlowDAG(spec, init="glorot")`** — Keras' `Dense` default

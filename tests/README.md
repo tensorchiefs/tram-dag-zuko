@@ -97,7 +97,7 @@ unrelated acceptance bars.
 | file | what it covers |
 |---|---|
 | [`test_flow.py`](test_flow.py) | core unit tests — transforms, ordinal log-prob, DAG validation, abduction/counterfactual mechanics, `save`/`load`, the proportional-odds identity |
-| [`test_fit_hooks.py`](test_fit_hooks.py) | `fit(optimizer=, callbacks=)` the Keras-shaped validation/verbose options and the shipped `tramdag.callbacks` — stop, lists, `RestoreBest`, `EarlyStopping`, `PerNodePlateau`, a torch scheduler; the guard that it still lands on the MLE |
+| [`test_fit_hooks.py`](test_fit_hooks.py) | `fit(optimizer=, callbacks=)` the Keras-shaped validation/verbose options and the shipped `tramdag.callbacks` — stop, lists, `EarlyStopping`, `PerNodePlateau`, a torch scheduler; the guard that it still lands on the MLE |
 | [`test_density.py`](test_density.py) | `density()` integrates to one and matches sampling |
 | [`test_input_transform.py`](test_input_transform.py) | per-term `input_transform=` — minmax/standardize statistics frozen at calibrate, the callable's train column on a fresh batch, lambda save rejection, checkpoint round-trip |
 | [`test_fit_classical.py`](test_fit_classical.py) | `fit_classical` — guard on non-`ls` specs, determinism, float64 round-trip, agreement with `statsmodels` and Adam |

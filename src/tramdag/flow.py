@@ -1027,14 +1027,14 @@ class CausalFlowDAG(nn.Module):
         logging — is the caller's, through ``optimizer`` and ``callbacks``;
         :mod:`tramdag.callbacks` ships the common recipes::
 
-            from tramdag.callbacks import EarlyStopping, RestoreBest
+            from tramdag.callbacks import EarlyStopping
 
             flow.fit(
                 train_df,
                 epochs=4000,
                 validation_data=val_df,
                 verbose=50,
-                callbacks=[RestoreBest(), EarlyStopping(patience=200)],
+                callbacks=EarlyStopping(patience=200),
             )
 
         Parameters
@@ -1085,7 +1085,7 @@ class CausalFlowDAG(nn.Module):
             re-centering order). A bare callable is an ``on_epoch_end``
             hook, ``cb(flow, epoch, optimizer)`` — use it for schedules and
             coefficient trajectories. :mod:`tramdag.callbacks` ships
-            ``RestoreBest``, ``EarlyStopping`` and ``PerNodePlateau``, all
+            ``EarlyStopping`` and ``PerNodePlateau``, all
             reading ``history["val"]``.
         vc_ehat : dict | None, optional
             Out-of-fold propensities ``{node: {t: array}}`` for every centered

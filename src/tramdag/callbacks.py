@@ -1,4 +1,4 @@
-"""Predefined ``fit`` callbacks: ``RestoreBest``, ``EarlyStopping``, ``PerNodePlateau``.
+"""Predefined ``fit`` callbacks: ``EarlyStopping`` and ``PerNodePlateau``.
 
 ``fit`` owns validation and progress printing; the callbacks here read the
 per-node validation NLL that ``fit`` appends to ``flow.history["val"]`` after
@@ -80,16 +80,29 @@ class Callback:
         """Run once after the loop, before the VC re-centering."""
 
 
-class RestoreBest(Callback):
-    """Keep the weights of the best summed validation NLL; restore them at the end.
+class EarlyStopping(Callback):
+    """Keep the best-validation weights; optionally stop once they are old.
 
-    The key empirical finding behind it: flexible (CI/CS) models overfit
-    observational confounding at the MLE and need best-validation weights to
-    recover the causal effect (docs/fitting.md). The restoration is
-    automatic (``on_fit_end``, which ``fit`` runs before the VC
-    re-centering) — registering the instance in ``callbacks=`` is the whole
-    recipe. Reads ``flow.history["val"]``, so the fit needs
-    ``validation_data=`` or ``validation_split=``.
+    Tracks the summed validation NLL. With ``restore_best`` (the default)
+    the weights of the best epoch are snapshotted and loaded back at fit
+    end (before the VC re-centering) — the flexible-model recipe: CI/CS
+    models overfit observational confounding at the MLE and need
+    best-validation weights to recover the causal effect
+    (docs/fitting.md). With ``patience`` the fit also stops once the last
+    improvement is that many epochs old; without it (the default) the fit
+    runs its full epoch budget and only the restoration happens. Reads
+    ``flow.history["val"]``, so the fit needs ``validation_data=`` or
+    ``validation_split=``.
+
+    Parameters
+    ----------
+    patience : int | None, optional
+        Epochs without a ``min_delta`` improvement before stopping;
+        ``None`` (the default) never stops.
+    min_delta : float, optional
+        Improvement below this is flat, by default 0.
+    restore_best : bool, optional
+        Load the best epoch's weights back at fit end, by default True.
 
     Attributes
     ----------
@@ -97,7 +110,21 @@ class RestoreBest(Callback):
         The best summed validation NLL seen this fit and its epoch.
     """
 
-    def __init__(self):
+    def __init__(
+        self,
+        *,
+        patience: int | None = None,
+        min_delta: float = 0.0,
+        restore_best: bool = True,
+    ):
+        if patience is not None and patience < 1:
+            raise ValueError(f"patience must be at least 1, got {patience}")
+        if patience is None and not restore_best:
+            raise ValueError(
+                "patience=None and restore_best=False is a no-op — set at least one"
+            )
+        self.patience, self.min_delta = patience, min_delta
+        self.restore_best = restore_best
         self._reset()
 
     def _reset(self) -> None:
@@ -106,60 +133,25 @@ class RestoreBest(Callback):
         self._state = None
 
     def on_fit_begin(self, flow, optimizer) -> None:
-        """Start fresh — the snapshot never leaks into the next fit."""
-        self._reset()
-
-    def on_epoch_end(self, flow, epoch: int, optimizer) -> None:
-        """Snapshot the weights when the validation NLL improves."""
-        nll = sum(_last_val(flow).values())
-        if nll < self.best_nll:
-            self.best_nll, self.best_epoch = nll, epoch
-            self._state = copy.deepcopy(flow.state_dict())
-
-    def on_fit_end(self, flow, optimizer) -> None:
-        """Load the best weights back into the flow."""
-        if self._state is None:
-            raise RuntimeError("RestoreBest has seen no epoch; nothing to restore")
-        flow.load_state_dict(self._state)
-
-
-class EarlyStopping(Callback):
-    """Stop the fit after ``patience`` epochs without validation improvement.
-
-    Tracks the summed validation NLL itself, so it composes with
-    :class:`RestoreBest` in any order — the usual pair is
-    ``callbacks=[RestoreBest(), EarlyStopping(patience=200)]``. Reads
-    ``flow.history["val"]``, so the fit needs ``validation_data=`` or
-    ``validation_split=``.
-
-    Parameters
-    ----------
-    patience : int
-        Epochs without a ``min_delta`` improvement before stopping.
-    min_delta : float, optional
-        Improvement below this is flat, by default 0.
-    """
-
-    def __init__(self, *, patience: int, min_delta: float = 0.0):
-        if patience < 1:
-            raise ValueError(f"patience must be at least 1, got {patience}")
-        self.patience, self.min_delta = patience, min_delta
-        self._reset()
-
-    def _reset(self) -> None:
-        self.best_nll = math.inf
-        self.best_epoch = 0
-
-    def on_fit_begin(self, flow, optimizer) -> None:
-        """Start fresh — patience never carries into the next fit."""
+        """Start fresh — neither patience nor the snapshot carries over."""
         self._reset()
 
     def on_epoch_end(self, flow, epoch: int, optimizer) -> bool:
-        """Give ``True`` once the last improvement is ``patience`` epochs old."""
+        """Snapshot on improvement; ``True`` once the best is ``patience`` old."""
         nll = sum(_last_val(flow).values())
         if nll < self.best_nll - self.min_delta:
             self.best_nll, self.best_epoch = nll, epoch
-        return epoch - self.best_epoch >= self.patience
+            if self.restore_best:
+                self._state = copy.deepcopy(flow.state_dict())
+        return self.patience is not None and epoch - self.best_epoch >= self.patience
+
+    def on_fit_end(self, flow, optimizer) -> None:
+        """Load the best weights back into the flow (``restore_best`` only)."""
+        if not self.restore_best:
+            return
+        if self._state is None:
+            raise RuntimeError("EarlyStopping has seen no epoch; nothing to restore")
+        flow.load_state_dict(self._state)
 
 
 class PerNodePlateau(Callback):
