@@ -1,0 +1,1437 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Interpretable Neural Causal Models (TRAM-DAGs) in PyTorch">
+      
+      
+      
+        <link rel="canonical" href="https://tensorchiefs.github.io/tramdag/main/research/MISSION_autoresearch/">
+      
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>MISSION: autonomous training-speed research for tramdag - tramdag</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#mission-autonomous-training-speed-research-for-tramdag" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+      <div data-md-color-scheme="default" data-md-component="outdated" hidden>
+        
+      </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="tramdag" class="md-header__button md-logo" aria-label="tramdag" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            tramdag
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              MISSION: autonomous training-speed research for tramdag
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/tensorchiefs/tramdag" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    GitHub
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="tramdag" class="md-nav__button md-logo" aria-label="tramdag" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    tramdag
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/tensorchiefs/tramdag" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    GitHub
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Guides
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Guides
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../notation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Notation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../fitting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Fitting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../training-speed/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Training speed
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../scores/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Scores
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../varying-coefficients/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Varying coefficients
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../paper-replication/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Paper replication
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../code-map/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Code map
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../zuko-upstream/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Zuko upstream
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Notebooks
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Notebooks
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../notebooks/demo_tram_dag_colab/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    TRAM-DAG in 5 minutes — one causal model, all three rungs of Pearl's ladder
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../notebooks/intro_tram_dag/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    TRAM-DAG — a didactic introduction with
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../notebooks/additive_vs_joint_ci/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Additive vs joint complex intercept — interpreting per-parent effects
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../notebooks/varying_coefficients/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Heterogeneous treatment effects: the term
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../notebooks/classical_fit_tram_dag/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Classical fitting of all- TRAM-DAGs ()
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/tramdag/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    tramdag
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/spec/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    spec
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/flow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    flow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/transforms/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    transforms
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/conditioners/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    conditioners
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/scores/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    scores
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/callbacks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    callbacks
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#hard-limits" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Hard limits
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#branch-push-rules" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Branch &amp; push rules
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#step-0-very-first-action-prove-you-can-check-in" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 0 (very first action — prove you can check in)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#experiment-0-the-baseline" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Experiment #0 (the baseline)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-metric-non-negotiable" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The metric (non-negotiable)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#runaway-protection-hard-timeout" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Runaway protection (hard timeout)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#scientific-integrity-no-gaming-the-metric" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Scientific integrity (no gaming the metric)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#method-hypothesis-loop-with-a-lab-notebook" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Method: hypothesis loop with a lab notebook
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#starting-backlog-seed-it-then-own-it" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Starting backlog (seed it, then own it)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#cadence-and-end-state" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cadence and end state
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="mission-autonomous-training-speed-research-for-tramdag">MISSION: autonomous training-speed research for tramdag<a class="headerlink" href="#mission-autonomous-training-speed-research-for-tramdag" title="Permanent link">&para;</a></h1>
+<!--
+Launch notes (for the human):
+  ssh -t <server> tmux new -As GPU_Rack_tramdag
+  git clone https://github.com/tensorchiefs/tramdag && cd tramdag
+  claude --remote-control GPU_Rack_tramdag        # /effort medium recommended
+  first message: "Read docs/research/MISSION_autoresearch.md and begin."
+Prerequisites on the server: claude + gh authenticated, uv or pip available.
+-->
+
+<p>You are running a self-directed research loop. Goal: find changes that make
+<code>CausalFlowDAG</code> training <strong>faster to a fixed quality target</strong> (secondarily: reach
+better optima). You have the full repository and this machine (check its GPU). No
+human is in the loop — work autonomously, with rigor.</p>
+<p>Read first: CLAUDE.md, docs/training-speed.md, experiments/benchmarks/bench_training.py,
+src/tramdag/flow.py. The June 2026 benchmark defines your methodology.</p>
+<blockquote>
+<p><strong>Script status.</strong> <code>bench_training.py</code> and <code>perf_machine.py</code> are migrated to
+the current API and live in <code>experiments/benchmarks/</code>; both run. Note that
+<code>fit()</code> no longer has the <code>onecycle</code> and <code>cosine</code> schedules, so those rows of
+the June 2026 grid cannot be re-measured. The transform comparison lives in
+<code>notebooks/demo_tram_dag_colab.py</code> §6.</p>
+</blockquote>
+<h2 id="hard-limits">Hard limits<a class="headerlink" href="#hard-limits" title="Permanent link">&para;</a></h2>
+<ul>
+<li><strong>At most 20 experiments total.</strong> Then stop, write the report, open the PR.</li>
+<li><strong>At most one experiment per 30 minutes</strong>, and fewer is better: one well-designed
+  experiment beats three rushed ones. If you cannot state a falsifiable hypothesis
+  with a predicted effect size, you are not ready to run.</li>
+<li>Run benchmarks as background commands and <strong>wait idly</strong> for them. Do not fill
+  waiting time with speculation, re-reading files you already know, or rewriting
+  logs. Tokens are the scarce resource; wall-clock is free.</li>
+<li>Keep context lean: your accumulated knowledge lives in RESEARCH_LOG.md and
+  IDEAS.md, not in re-derivation. After a context compaction, re-read those two
+  files and LEADERBOARD.md — nothing else — and continue.</li>
+</ul>
+<h2 id="branch-push-rules">Branch &amp; push rules<a class="headerlink" href="#branch-push-rules" title="Permanent link">&para;</a></h2>
+<ul>
+<li>Work on <strong>one</strong> branch named <code>research/&lt;YYYY-MM-DD&gt;-&lt;host&gt;</code> (UTC date at
+  creation, short hostname — e.g. <code>research/2026-06-15-gpu-rack</code>). This identifies
+  the run by machine and date and lets several machines run without colliding.</li>
+<li><strong>One branch per run — never fork your own work.</strong> On every startup (including
+  after a restart or context compaction) first look for an existing branch with
+  <code>git ls-remote --heads origin 'research/*-&lt;host&gt;'</code>; if one exists, check it out
+  and continue on it. Only create a new <code>research/&lt;today&gt;-&lt;host&gt;</code> branch when none
+  exists for this host. Do not create a second dated branch mid-run.</li>
+<li><strong>Never push to main.</strong></li>
+<li>Commit after every experiment (confirmed or rejected) and <strong>push after every
+  commit</strong> — the human follows your progress on GitHub, not by asking you.</li>
+<li>Never touch the frozen CSVs in <code>data/</code>. Library changes stay <strong>opt-in</strong>
+  (new flag/argument, defaults untouched) until the final report.</li>
+</ul>
+<h2 id="step-0-very-first-action-prove-you-can-check-in">Step 0 (very first action — prove you can check in)<a class="headerlink" href="#step-0-very-first-action-prove-you-can-check-in" title="Permanent link">&para;</a></h2>
+<p>Before any benchmarking, verify the full check-in path works from this machine —
+fast, so a broken push/auth setup is caught in seconds instead of after a 30-minute
+baseline run. Create your run branch (see naming/reuse rules above) and push a tiny
+heartbeat commit:</p>
+<div class="highlight"><pre><span></span><code>git<span class="w"> </span>checkout<span class="w"> </span>main<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>git<span class="w"> </span>pull
+<span class="nv">HOST</span><span class="o">=</span><span class="k">$(</span>hostname<span class="w"> </span>-s<span class="k">)</span>
+<span class="c1"># reuse this host's branch if it already exists, else create today's</span>
+<span class="nv">BRANCH</span><span class="o">=</span><span class="k">$(</span>git<span class="w"> </span>ls-remote<span class="w"> </span>--heads<span class="w"> </span>origin<span class="w"> </span><span class="s2">"research/*-</span><span class="nv">$HOST</span><span class="s2">"</span><span class="w"> </span><span class="p">|</span><span class="w"> </span>head<span class="w"> </span>-1<span class="w"> </span><span class="se">\</span>
+<span class="w">         </span><span class="p">|</span><span class="w"> </span>sed<span class="w"> </span><span class="s1">'s#.*refs/heads/##'</span><span class="k">)</span>
+<span class="nv">BRANCH</span><span class="o">=</span><span class="si">${</span><span class="nv">BRANCH</span><span class="k">:-</span><span class="nv">research</span><span class="p">/</span><span class="k">$(</span>date<span class="w"> </span>-u<span class="w"> </span>+%F<span class="k">)</span><span class="p">-</span><span class="nv">$HOST</span><span class="si">}</span>
+git<span class="w"> </span>checkout<span class="w"> </span>-B<span class="w"> </span><span class="s2">"</span><span class="nv">$BRANCH</span><span class="s2">"</span><span class="w"> </span><span class="m">2</span>&gt;/dev/null<span class="w"> </span><span class="o">||</span><span class="w"> </span>git<span class="w"> </span>checkout<span class="w"> </span><span class="s2">"</span><span class="nv">$BRANCH</span><span class="s2">"</span>
+mkdir<span class="w"> </span>-p<span class="w"> </span>docs/research
+<span class="nb">printf</span><span class="w"> </span><span class="s1">'# Autoresearch heartbeat\n\nStep 0 push round-trip from %s at %s.\n'</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span><span class="s2">"</span><span class="nv">$HOST</span><span class="s2">"</span><span class="w"> </span><span class="s2">"</span><span class="k">$(</span>date<span class="w"> </span>-u<span class="w"> </span>+%FT%TZ<span class="k">)</span><span class="s2">"</span><span class="w"> </span>&gt;<span class="w"> </span>docs/research/HEARTBEAT.md
+git<span class="w"> </span>add<span class="w"> </span>docs/research/HEARTBEAT.md
+git<span class="w"> </span>commit<span class="w"> </span>-m<span class="w"> </span><span class="s2">"chore(autoresearch): step 0 push round-trip"</span>
+git<span class="w"> </span>push<span class="w"> </span>-u<span class="w"> </span>origin<span class="w"> </span><span class="s2">"</span><span class="nv">$BRANCH</span><span class="s2">"</span>
+</code></pre></div>
+<p>Then <strong>confirm the commit is visible on GitHub</strong> (the branch + <code>HEARTBEAT.md</code>).
+Report the commit URL. Only once this round-trip succeeds, continue to
+Experiment #0. If the push fails it is almost certainly the git credential helper
+on this machine — run <code>gh auth status</code> / <code>gh auth setup-git</code> (or check the remote
+URL / SSH key), fix it, and retry before doing anything else. Do <strong>not</strong> start the
+baseline until a check-in has demonstrably landed on the remote.</p>
+<h2 id="experiment-0-the-baseline">Experiment #0 (the baseline)<a class="headerlink" href="#experiment-0-the-baseline" title="Permanent link">&para;</a></h2>
+<p>Before changing anything: run the existing benchmark suite unchanged on THIS
+machine — <code>experiments/benchmarks/bench_training.py</code> (full grid, 3 seeds) and
+<code>experiments/benchmarks/perf_machine.py</code> (hardware fingerprint). All published numbers are
+from an Apple-silicon Mac mini; nothing transfers — your baseline is the only
+valid comparison point. Commit the results (bench <code>results.csv</code>/<code>ranking.csv</code>
+into <code>docs/research/baseline/</code>, the perf JSON into <code>docs/perf/</code>) and push.
+This is your first <em>results</em> commit (after the Step 0 heartbeat), before any
+hypothesis. You may delete <code>docs/research/HEARTBEAT.md</code> in this commit.</p>
+<h2 id="the-metric-non-negotiable">The metric (non-negotiable)<a class="headerlink" href="#the-metric-non-negotiable" title="Permanent link">&para;</a></h2>
+<ul>
+<li><strong>Time-to-target</strong> as defined in <code>experiments/benchmarks/bench_training.py</code>: wall-clock
+  seconds until val-NLL is within tolerance of the cached long-run reference
+  (W1 stroke-ls: tight 1e-3 / practical 5e-3; W2 vaca-ci: 2e-3 / 1e-2).</li>
+<li>Add <strong>W3</strong>: vaca-ci at n=50,000, batch 4096, on this machine's GPU — the
+  throughput regime. Cache its reference the same way.</li>
+<li>A change is an IMPROVEMENT only if ALL hold:</li>
+<li>median time-to-practical over ≥3 torch seeds improves ≥10% on ≥1 workload,</li>
+<li>no workload regresses &gt;5%,</li>
+<li>the <strong>full</strong> test suite passes (<code>uv run pytest tests/ -q</code>, incl. <code>slow</code>) —
+     <code>test_plateau_freeze_preserves_exact_mle</code> and
+     <code>test_flow_matches_r_reference</code> are sacred: the exact-MLE property of
+     all-<code>ls</code> models must survive every change.</li>
+<li><strong>Test cadence (cost-staged):</strong> during iteration run only the fast subset
+  (<code>uv run pytest tests/ -q -m "not slow"</code>, ~30 s) plus the specific test(s) your
+  change touches. Run the <strong>full</strong> suite (criterion 3) only when a change is about
+  to be recorded as a <em>confirmed</em> improvement, and again before the final PR — the
+  full suite is ~12 min, so running it on every experiment would dominate the run.</li>
+<li>Wall-clock honesty: nothing else heavy on the machine; rerun the baseline
+  whenever you doubt machine state; never compare numbers across machine states.</li>
+</ul>
+<h2 id="runaway-protection-hard-timeout">Runaway protection (hard timeout)<a class="headerlink" href="#runaway-protection-hard-timeout" title="Permanent link">&para;</a></h2>
+<p>Any experiment can hang (a stuck line search, an unsupported device op, a
+fat-fingered epoch count). Bound every run with an <strong>OS-level</strong> timeout — do not
+rely on noticing it yourself:</p>
+<ul>
+<li><strong>Anchor the cap to the baseline wall-clock of the <em>same scope</em> you re-run, not
+  to a flat ceiling.</strong> Record how long Experiment #0 takes for each scope you'll
+  reuse — the full 3-seed grid (<code>bench_training.py</code>) and any smaller subset you
+  iterate on. Cap a later run at <strong>~2–3× the baseline wall-clock of that same
+  scope</strong> and wrap it in <code>timeout</code>. A legitimate re-run (even a slightly slower
+  variant) finishes inside that; a genuinely hung fit, which would run unbounded,
+  is killed. Example: if the full grid took ~T at baseline, run a confirmation
+  with <code>timeout $((3*T_seconds)) uv run python -u bench_training.py ...</code>.</li>
+<li><strong>This is separate from pacing.</strong> "≤1 experiment per 30 min" caps <em>cadence and
+  token burn</em> (idle-wait between experiments) — it is <strong>not</strong> a limit on how long
+  a single run may take. If the full grid is ~57 min on this machine, an
+  experiment that re-runs it is fine; it just means experiments are naturally
+  ~hourly here. Use a <strong>targeted subset</strong> (one workload / fewer seeds, or
+  <code>--quick</code>) for fast iteration, and reserve the full 3-seed grid for <em>confirming</em>
+  a candidate — each with its own scope-anchored timeout.</li>
+<li><strong>On timeout:</strong> the process is killed by the OS and the command returns
+  non-zero. Log that run as <code>INCONCLUSIVE (timed out)</code> — <strong>never</strong> read a SIGTERM
+  as "no improvement". Downrank the idea and move on; <strong>do not auto-retry</strong> the
+  same configuration unchanged — it will just hang again.</li>
+</ul>
+<h2 id="scientific-integrity-no-gaming-the-metric">Scientific integrity (no gaming the metric)<a class="headerlink" href="#scientific-integrity-no-gaming-the-metric" title="Permanent link">&para;</a></h2>
+<p>The time-to-target metric is a <strong>proxy</strong>; the real goal is genuinely faster/better
+TRAM-DAG training <strong>in general</strong>. Optimize for that, not for the harness:</p>
+<ul>
+<li><strong>Broad applicability, not the particularities of the benchmark.</strong> A change that
+  helps only W1/W2/W3, only the recorded seeds, or only this machine is <strong>not</strong> an
+  improvement. Before believing a candidate win, sanity-check that it generalizes
+  (e.g. it still helps on an extra seed or a held-out config/dataset shape). A win
+  that evaporates off the measured setup is overfitting to the harness — reject it.</li>
+<li><strong>Never touch what measures you.</strong> You may <strong>not</strong> edit the tests, the frozen
+  data in <code>data/</code>, the benchmark targets/tolerances in
+  <code>experiments/benchmarks/bench_training.py</code>, or the cached reference values, in order to make
+  a result look better. <em>Changing the measurement is not a result.</em> If a test
+  fails, your change is wrong — not the test. Reference values are computed once
+  (Experiment #0) and then fixed. <strong>Do not read the target values</strong> either — the
+  test assertions, <code>data/**/truth.json</code>, or <code>data/**/ref_ls/**</code>: run the tests and
+  trust pass/fail rather than curve-fitting to the numbers. (You <em>do</em> read the
+  input data, <code>data/**/obs.csv</code>/<code>rct.csv</code>, and the harness source — those you must
+  fit / run.) On the research machine a <code>PreToolUse</code> hook
+  (<code>.claude/hooks/protect_measurement.py</code>) enforces both rules; treat a <code>BLOCKED</code>
+  message as a hard stop, not an obstacle to route around.</li>
+</ul>
+<h2 id="method-hypothesis-loop-with-a-lab-notebook">Method: hypothesis loop with a lab notebook<a class="headerlink" href="#method-hypothesis-loop-with-a-lab-notebook" title="Permanent link">&para;</a></h2>
+<p>Maintain three append-only files in <code>docs/research/</code>:</p>
+<ul>
+<li><code>RESEARCH_LOG.md</code> — per experiment: HYPOTHESIS (one sentence, predicted effect
+  size), CHANGE (diff summary), COMMANDS, NUMBERS (all seeds), VERDICT
+  (CONFIRMED / REJECTED / INCONCLUSIVE), WHAT THIS TEACHES. Negative results are
+  first-class citizens — log them fully.</li>
+<li><code>IDEAS.md</code> — ranked backlog: (expected gain × plausibility) / cost. Re-rank
+  after every experiment; results should change your beliefs.</li>
+<li><code>LEADERBOARD.md</code> — best known config per workload, with provenance.</li>
+</ul>
+<p>Discipline:</p>
+<ul>
+<li><strong>Profile before optimizing.</strong> Experiment #1 is a torch.profiler breakdown of
+  one epoch per workload — where does the time actually go? Form hypotheses from
+  data, not vibes.</li>
+<li>One change per experiment. No compound changes; if unavoidable, ablate after.</li>
+<li>Three seeds minimum before any verdict; report medians, keep the spread.</li>
+</ul>
+<h2 id="starting-backlog-seed-it-then-own-it">Starting backlog (seed it, then own it)<a class="headerlink" href="#starting-backlog-seed-it-then-own-it" title="Permanent link">&para;</a></h2>
+<p>profiler baseline → where is the time? · torch.compile on the per-node log-prob ·
+TF32 / bf16 autocast on GPU (watch the MLE guard!) · batch-size × lr scaling on
+GPU · <strong>warm-start init</strong>: initialize Bernstein θ from the node's marginal
+quantiles instead of zeros — could delete most of early training · per-node Adam
+betas/eps · LBFGS polish phase after plateau-freeze · evaluate val less often
+(per-epoch val eval is overhead) · vectorize/fuse the Python loop over nodes ·
+one-hot caching in <code>_tensorize</code> · the RQS tail-slope fix (its
+symptom is documented in CLAUDE.md and shown in the demo notebook's §6; an
+accuracy lever that may also help optimization) ·
+gradient accumulation vs huge batches.</p>
+<h2 id="cadence-and-end-state">Cadence and end state<a class="headerlink" href="#cadence-and-end-state" title="Permanent link">&para;</a></h2>
+<p>After every confirmed improvement (or every 5 experiments): update LEADERBOARD,
+write a 5-line status section into the log. Stop at 20 experiments, when the top
+of the backlog has expected gain &lt;5%, or when told to stop. Then write
+<code>docs/research/REPORT.md</code> (what worked, what didn't and why, recommended changes
+with evidence) and open a PR via <code>gh</code> containing ONLY the validated changes, PR
+description = the report's summary table. A human reviews the PR; the log is
+your evidence.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.sections", "navigation.top", "content.code.copy", "toc.follow"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"provider": "mike"}}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+        <script src="../../javascripts/mathjax.js"></script>
+      
+        <script src="https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-mml-chtml.js"></script>
+      
+    
+  </body>
+</html>

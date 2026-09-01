@@ -1,0 +1,76 @@
+{
+  "machine": {
+    "hostname": "ios-nb-duerr",
+    "os": "Darwin 25.5.0",
+    "machine": "arm64",
+    "processor": "arm",
+    "cpu_count": 10,
+    "python": "3.10.10",
+    "torch": "2.9.1",
+    "tramdag": "0.2.0",
+    "cuda": null,
+    "mps": true,
+    "ram_gb": 17.2
+  },
+  "code": {
+    "tramdag": "0.2.0",
+    "git_commit": null,
+    "git_dirty": null
+  },
+  "epochs": 200,
+  "timestamp": "2026-06-12T15:28:22+00:00",
+  "results": [
+    {
+      "workload": "intro",
+      "device": "cpu",
+      "n": 5000,
+      "batch": 512,
+      "epochs": 200,
+      "fit_s": 10.72,
+      "epochs_per_s": 18.66,
+      "sample_100k_s": 2.38,
+      "abduct_10k_s": 0.01,
+      "final_val_nll": 5.3737,
+      "_sample_mean_x_last": 1.2453
+    },
+    {
+      "workload": "intro",
+      "device": "mps",
+      "n": 5000,
+      "batch": 512,
+      "epochs": 200,
+      "fit_s": 32.09,
+      "epochs_per_s": 6.23,
+      "sample_100k_s": 1.27,
+      "abduct_10k_s": 0.23,
+      "final_val_nll": 5.3728,
+      "_sample_mean_x_last": 1.2299
+    },
+    {
+      "workload": "large",
+      "device": "cpu",
+      "n": 50000,
+      "batch": 4096,
+      "epochs": 200,
+      "fit_s": 40.66,
+      "epochs_per_s": 4.92,
+      "sample_100k_s": 2.41,
+      "abduct_10k_s": 0.02,
+      "final_val_nll": 4.9153,
+      "_sample_mean_x_last": -0.2067
+    },
+    {
+      "workload": "large",
+      "device": "mps",
+      "n": 50000,
+      "batch": 4096,
+      "epochs": 200,
+      "fit_s": 38.87,
+      "epochs_per_s": 5.15,
+      "sample_100k_s": 0.74,
+      "abduct_10k_s": 0.11,
+      "final_val_nll": 4.9129,
+      "_sample_mean_x_last": -0.1786
+    }
+  ]
+}

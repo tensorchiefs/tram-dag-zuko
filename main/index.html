@@ -1,0 +1,1634 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Interpretable Neural Causal Models (TRAM-DAGs) in PyTorch">
+      
+      
+      
+        <link rel="canonical" href="https://tensorchiefs.github.io/tramdag/main/">
+      
+      
+      
+        <link rel="next" href="notation/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>tramdag</title>
+      
+    
+    
+      <link rel="stylesheet" href="assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL(".",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#tramdag-interpretable-neural-causal-models-tram-dags-in-pytorch" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+      <div data-md-color-scheme="default" data-md-component="outdated" hidden>
+        
+      </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="." title="tramdag" class="md-header__button md-logo" aria-label="tramdag" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            tramdag
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Home
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/tensorchiefs/tramdag" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    GitHub
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="." title="tramdag" class="md-nav__button md-logo" aria-label="tramdag" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    tramdag
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/tensorchiefs/tramdag" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    GitHub
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="." class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#install" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Install
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#30-seconds-of-api" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        30 seconds of API
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-model-in-detail-spec-math-networks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The model in detail: spec → math → networks
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#validation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Validation
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#testing-policy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Testing policy
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#layout" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Layout
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#citation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Citation
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Guides
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Guides
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="notation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Notation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="fitting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Fitting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="training-speed/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Training speed
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="scores/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Scores
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="varying-coefficients/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Varying coefficients
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="paper-replication/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Paper replication
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="code-map/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Code map
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="zuko-upstream/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Zuko upstream
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Notebooks
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Notebooks
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="notebooks/demo_tram_dag_colab/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    TRAM-DAG in 5 minutes — one causal model, all three rungs of Pearl's ladder
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="notebooks/intro_tram_dag/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    TRAM-DAG — a didactic introduction with
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="notebooks/additive_vs_joint_ci/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Additive vs joint complex intercept — interpreting per-parent effects
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="notebooks/varying_coefficients/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Heterogeneous treatment effects: the term
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="notebooks/classical_fit_tram_dag/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Classical fitting of all- TRAM-DAGs ()
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="api/tramdag/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    tramdag
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="api/spec/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    spec
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="api/flow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    flow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="api/transforms/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    transforms
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="api/conditioners/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    conditioners
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="api/scores/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    scores
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="api/callbacks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    callbacks
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#install" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Install
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#30-seconds-of-api" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        30 seconds of API
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-model-in-detail-spec-math-networks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The model in detail: spec → math → networks
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#validation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Validation
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#testing-policy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Testing policy
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#layout" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Layout
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#citation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Citation
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<p><a href="tramdag-docs.pdf">Download these docs as one PDF</a></p>
+<h1 id="tramdag-interpretable-neural-causal-models-tram-dags-in-pytorch">tramdag — Interpretable Neural Causal Models (TRAM-DAGs) in PyTorch<a class="headerlink" href="#tramdag-interpretable-neural-causal-models-tram-dags-in-pytorch" title="Permanent link">&para;</a></h1>
+<p><a href="https://colab.research.google.com/github/tensorchiefs/tramdag/blob/main/notebooks/demo_tram_dag_colab.ipynb"><img alt="Open the demo in Colab" src="https://colab.research.google.com/assets/colab-badge.svg" /></a>
+<a href="https://pypi.org/project/tramdag/"><img alt="PyPI" src="https://img.shields.io/pypi/v/tramdag" /></a>
+<a href="https://github.com/tensorchiefs/tramdag/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/tensorchiefs/tramdag/actions/workflows/ci.yml/badge.svg" /></a>
+<a href="https://github.com/tensorchiefs/tramdag/tree/main/LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/License-MIT-yellow.svg" /></a></p>
+<blockquote>
+<p>⚠️ <strong>Status: beta (0.x), under active development.</strong> The API may change
+between releases until 1.0, so pin a version for reproducibility. Note that
+this README documents the <strong>unreleased 0.4</strong> API: the term constructors
+(<code>SI</code>/<code>CI</code>/<code>VC</code>), <code>scores</code>, <code>varying_coef</code> and <code>intercept_contributions</code> are
+not in <code>0.3.0</code> on PyPI. Until 0.4 ships, install from git to follow the docs
+below.</p>
+</blockquote>
+<p><strong>TRAM-DAGs</strong> model each variable of a structural causal model with a
+(transformation-model) flow: one triangular normalizing flow from iid
+standard-logistic latents to the observed variables. The triangular adjacency
+structure is exactly your causal DAG. Fit it <strong>once</strong> on observational data and answer all
+three rungs of Pearl's causal hierarchy — observational (L1), interventional
+(L2, the do-operator), and counterfactual (L3, Pearl abduction) — while keeping
+<strong>interpretable effects</strong>: every linear-shift coefficient is a log-odds ratio,
+exactly as in classical proportional-odds models.</p>
+<blockquote>
+<p>Beate Sick &amp; Oliver Dürr, <em>Interpretable Neural Causal Models with TRAM-DAGs</em>,
+CLeaR 2025 (<a href="https://arxiv.org/abs/2503.16206">arXiv:2503.16206</a>).
+This repo is the reference implementation (PyTorch, built on
+<a href="https://zuko.readthedocs.io/stable/">zuko</a>); all of the paper's experiments are
+replicated here with pinned tests.</p>
+</blockquote>
+<p><strong>5-minute showcase</strong>: the <a href="https://colab.research.google.com/github/tensorchiefs/tramdag/blob/main/notebooks/demo_tram_dag_colab.ipynb">Colab badge above</a> fits the paper's bimodal benchmark
+live and walks L1 → L2 → L3, every answer checked against analytic
+ground truth. Further notebooks are available at <a href="https://github.com/tensorchiefs/tramdag/tree/main/notebooks"><code>notebooks/</code></a> like the didactic walkthrough of the model:
+<a href="notebooks/intro_tram_dag/"><code>notebooks/intro_tram_dag.py</code></a>.</p>
+<h2 id="install">Install<a class="headerlink" href="#install" title="Permanent link">&para;</a></h2>
+<div class="highlight"><pre><span></span><code>pip<span class="w"> </span>install<span class="w"> </span>tramdag<span class="w">            </span><span class="c1"># latest release (PyPI)</span>
+pip<span class="w"> </span>install<span class="w"> </span><span class="s2">"git+https://github.com/tensorchiefs/tramdag.git@main"</span><span class="w">   </span><span class="c1"># dev version (track main)</span>
+uv<span class="w"> </span>sync<span class="w">                        </span><span class="c1"># or: dev setup from a clone (tests, experiments)</span>
+</code></pre></div>
+<p>Pin the dev install to a commit for reproducibility, e.g. <code>...tramdag.git@&lt;sha&gt;</code>.</p>
+<h2 id="30-seconds-of-api">30 seconds of API<a class="headerlink" href="#30-seconds-of-api" title="Permanent link">&para;</a></h2>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">tramdag</span><span class="w"> </span><span class="kn">import</span> <span class="n">CausalFlowDAG</span><span class="p">,</span> <span class="n">ContinuousNode</span><span class="p">,</span> <span class="n">OrdinalNode</span><span class="p">,</span> <span class="n">I</span><span class="p">,</span> <span class="n">LS</span><span class="p">,</span> <span class="n">CS</span>
+
+<span class="n">spec</span> <span class="o">=</span> <span class="p">{</span>  <span class="c1"># the spec IS the labelled DAG</span>
+    <span class="s2">"X1"</span><span class="p">:</span> <span class="n">ContinuousNode</span><span class="p">(),</span>
+    <span class="s2">"X2"</span><span class="p">:</span> <span class="n">ContinuousNode</span><span class="p">(</span><span class="n">I</span><span class="p">(</span><span class="s2">"X1"</span><span class="p">)),</span>
+    <span class="s2">"T"</span><span class="p">:</span> <span class="n">OrdinalNode</span><span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="n">LS</span><span class="p">(</span><span class="s2">"X1"</span><span class="p">)</span> <span class="o">+</span> <span class="n">CS</span><span class="p">(</span><span class="s2">"X2"</span><span class="p">)),</span>  <span class="c1"># 2 levels, column coded 0..1</span>
+    <span class="s2">"Y"</span><span class="p">:</span> <span class="n">OrdinalNode</span><span class="p">(</span><span class="mi">4</span><span class="p">,</span> <span class="n">I</span><span class="p">(</span><span class="s2">"X1"</span><span class="p">)</span> <span class="o">+</span> <span class="n">CS</span><span class="p">(</span><span class="s2">"X2"</span><span class="p">)</span> <span class="o">+</span> <span class="n">LS</span><span class="p">(</span><span class="s2">"T"</span><span class="p">)),</span>
+<span class="p">}</span>
+<span class="c1"># train_df / val_df: DataFrames with one column per node</span>
+<span class="n">flow</span> <span class="o">=</span> <span class="n">CausalFlowDAG</span><span class="p">(</span><span class="n">spec</span><span class="p">)</span>  <span class="c1"># validates acyclicity, builds the flow</span>
+
+<span class="c1"># fit() is one minibatch Adam loop; validation, schedules and early stopping</span>
+<span class="c1"># attach through optimizer= and the callback hooks — the common recipes ship</span>
+<span class="c1"># in tramdag.callbacks (docs/fitting.md)</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">tramdag.callbacks</span><span class="w"> </span><span class="kn">import</span> <span class="n">Logger</span><span class="p">,</span> <span class="n">RestoreBest</span>
+
+<span class="n">best</span> <span class="o">=</span> <span class="n">RestoreBest</span><span class="p">(</span><span class="n">val_df</span><span class="p">)</span>  <span class="c1"># keep the best-validation weights</span>
+<span class="n">flow</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span>
+    <span class="n">train_df</span><span class="p">,</span>
+    <span class="n">epochs</span><span class="o">=</span><span class="mi">4000</span><span class="p">,</span>
+    <span class="n">batch_size</span><span class="o">=</span><span class="mi">512</span><span class="p">,</span>
+    <span class="n">after_epoch_callbacks</span><span class="o">=</span><span class="p">[</span><span class="n">Logger</span><span class="p">(</span><span class="n">val_df</span><span class="p">,</span> <span class="n">every</span><span class="o">=</span><span class="mi">100</span><span class="p">),</span> <span class="n">best</span><span class="p">],</span>
+    <span class="n">after_fit_callbacks</span><span class="o">=</span><span class="p">[</span><span class="n">best</span><span class="o">.</span><span class="n">restore</span><span class="p">],</span>
+<span class="p">)</span>
+
+<span class="c1"># all-`ls` model? fit it classically instead: deterministic float64 L-BFGS,</span>
+<span class="c1"># exact MLE matching statsmodels/R (see docs/fitting.md)</span>
+<span class="n">flow</span><span class="o">.</span><span class="n">fit_classical</span><span class="p">(</span><span class="n">train_df</span><span class="p">)</span>  <span class="c1"># raises on cs/ci/vc specs</span>
+
+<span class="n">flow</span><span class="o">.</span><span class="n">log_prob</span><span class="p">(</span><span class="n">df</span><span class="p">)</span>  <span class="c1"># L1: joint log-likelihood per row</span>
+<span class="n">flow</span><span class="o">.</span><span class="n">sample</span><span class="p">(</span><span class="mi">1000</span><span class="p">)</span>  <span class="c1"># L1: observational sampling</span>
+<span class="n">flow</span><span class="o">.</span><span class="n">sample</span><span class="p">(</span><span class="mi">1000</span><span class="p">,</span> <span class="n">do</span><span class="o">=</span><span class="p">{</span><span class="s2">"T"</span><span class="p">:</span> <span class="mi">1</span><span class="p">})</span>  <span class="c1"># L2: interventional (graph mutilation)</span>
+<span class="n">flow</span><span class="o">.</span><span class="n">pmf</span><span class="p">(</span><span class="n">df</span><span class="p">,</span> <span class="n">node</span><span class="o">=</span><span class="s2">"Y"</span><span class="p">,</span> <span class="n">do</span><span class="o">=</span><span class="p">{</span><span class="s2">"T"</span><span class="p">:</span> <span class="mi">1</span><span class="p">})</span>  <span class="c1"># L2: analytic interventional PMF</span>
+<span class="n">flow</span><span class="o">.</span><span class="n">density</span><span class="p">(</span><span class="n">df</span><span class="p">,</span> <span class="n">node</span><span class="o">=</span><span class="s2">"X2"</span><span class="p">,</span> <span class="n">grid</span><span class="o">=</span><span class="n">grid</span><span class="p">,</span> <span class="n">do</span><span class="o">=</span><span class="p">{</span><span class="s2">"X1"</span><span class="p">:</span> <span class="mf">0.5</span><span class="p">})</span>  <span class="c1"># ... and density, continuous nodes</span>
+
+<span class="n">u</span> <span class="o">=</span> <span class="n">flow</span><span class="o">.</span><span class="n">abduct</span><span class="p">(</span><span class="n">df</span><span class="p">)</span>  <span class="c1"># L3 step 1: latents from observations</span>
+<span class="n">cf</span> <span class="o">=</span> <span class="n">flow</span><span class="o">.</span><span class="n">sample</span><span class="p">(</span><span class="n">do</span><span class="o">=</span><span class="p">{</span><span class="s2">"T"</span><span class="p">:</span> <span class="mi">1</span><span class="p">},</span> <span class="n">u</span><span class="o">=</span><span class="n">u</span><span class="p">)</span>  <span class="c1"># L3 steps 2+3: counterfactuals</span>
+
+<span class="n">flow</span><span class="o">.</span><span class="n">ls_coefficients</span><span class="p">()</span>  <span class="c1"># interpret: per-edge log-odds-ratios (LS terms)</span>
+<span class="c1"># per-parent partial effects of an additive complex intercept (centered):</span>
+<span class="c1"># flow.intercept_contributions(df, "Y") on a CI("A", "B", allow_interaction=False)</span>
+
+<span class="c1"># heterogeneous treatment effects: a small, penalized effect head beta(x)*T</span>
+<span class="c1"># (VC term) with a first-class read-out — see docs/varying-coefficients.md</span>
+<span class="c1"># e.g. CS("X1", "X2") + VC("X1", t="T") -&gt;</span>
+<span class="c1"># flow.varying_coef(df, "Y")               # beta(x): deterministic, y-free</span>
+
+<span class="n">flow</span><span class="o">.</span><span class="n">scores</span><span class="p">(</span><span class="n">df</span><span class="p">,</span> <span class="n">node</span><span class="o">=</span><span class="s2">"Y"</span><span class="p">)</span>  <span class="c1"># per-observation scores dl_i/dtheta</span>
+<span class="n">flow</span><span class="o">.</span><span class="n">effect_modifier_scan</span><span class="p">(</span><span class="n">df</span><span class="p">,</span> <span class="s2">"Y"</span><span class="p">,</span> <span class="n">t</span><span class="o">=</span><span class="s2">"T"</span><span class="p">)</span>  <span class="c1"># which VC modifiers? (CUSUM</span>
+<span class="c1"># scan from a cheap all-ls fit) — docs/scores.md</span>
+
+<span class="n">flow</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="s2">"flow.pt"</span><span class="p">)</span>
+<span class="n">flow</span> <span class="o">=</span> <span class="n">CausalFlowDAG</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="s2">"flow.pt"</span><span class="p">)</span>
+</code></pre></div>
+<h2 id="the-model-in-detail-spec-math-networks">The model in detail: spec → math → networks<a class="headerlink" href="#the-model-in-detail-spec-math-networks" title="Permanent link">&para;</a></h2>
+<p>Per node, the transformation is additive on the latent (log-odds) scale — one
+intercept term <code>I</code> plus any number of shifts (notation:
+<a href="notation/"><code>docs/notation.md</code></a>):</p>
+<p><code>u = h_ϑ(x) + Σ β·x_pa + Σ g(x_pa) + (β₀ + b_Θ(x_mod))·x_t</code></p>
+<table>
+<thead>
+<tr>
+<th>term</th>
+<th>math</th>
+<th>what gets built</th>
+<th>interpretability</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>I()</code> / bare <code>I</code> / omitted</td>
+<td><code>h_ϑ(x)</code> — constant ϑ</td>
+<td><code>SimpleIntercept</code>: one free parameter vector, no network</td>
+<td>the baseline transform</td>
+</tr>
+<tr>
+<td><code>I("A")</code></td>
+<td><code>h_ϑ(a)(x)</code> — ϑ bends with the parent</td>
+<td><code>ComplexIntercept</code>: MLP <code>[8, 8] → n_params</code></td>
+<td>the parent reshapes the whole distribution; no single coefficient</td>
+</tr>
+<tr>
+<td><code>I("A","B")</code> (default <code>allow_interaction=True</code>)</td>
+<td><code>h_ϑ(a,b)(x)</code></td>
+<td><strong>one joint</strong> MLP over both parents — they interact in ϑ</td>
+<td>maximal flexibility</td>
+</tr>
+<tr>
+<td><code>I("A","B", allow_interaction=False)</code></td>
+<td><code>h_ϑ(a)+ϑ(b)(x)</code></td>
+<td>one MLP <strong>per parent</strong>, parameter vectors summed in coefficient space</td>
+<td>per-parent partial effects via <code>flow.intercept_contributions</code></td>
+</tr>
+<tr>
+<td><code>LS("A")</code></td>
+<td><code>β·a</code></td>
+<td><code>Linear(width, 1)</code>, no bias — <strong>one parameter per feature column</strong> (one for a continuous parent, <code>levels</code> for a one-hot ordinal)</td>
+<td><code>exp(β)</code> is an odds ratio</td>
+</tr>
+<tr>
+<td><code>CS("A")</code></td>
+<td><code>g(a)</code>, additive</td>
+<td><code>ComplexShift</code>: MLP <code>[64, 128, 64] → 1</code></td>
+<td>plot <code>g</code></td>
+</tr>
+<tr>
+<td><code>CS("A","B")</code></td>
+<td><code>g(a,b)</code> — joint</td>
+<td>one MLP over the concatenated features</td>
+<td>interaction <em>in the shift</em></td>
+</tr>
+<tr>
+<td><code>CS("A") + CS("B")</code></td>
+<td><code>g₁(a) + g₂(b)</code></td>
+<td>two MLPs, scalars added</td>
+<td>GAM-style, each effect plottable</td>
+</tr>
+<tr>
+<td><code>VC("A","B", t="T")</code></td>
+<td><code>(β₀ + b_Θ(a,b))·x_t</code></td>
+<td>scalar <code>β₀</code> + zero-initialised penalized MLP <code>[16] → 1</code>; the treatment value multiplies, it never enters the net</td>
+<td><code>β₀</code> ≈ constant effect, <code>flow.varying_coef</code> reads <code>β(x)</code></td>
+</tr>
+</tbody>
+</table>
+<p>A node takes <strong>at most one <code>I</code> term with parents</strong> — a term list is therefore
+always purely additive on the latent scale, and interactions exist only
+<em>inside</em> a term. Lists and <code>+</code> sums are interchangeable:
+<code>[LS("A"), CS("B")]</code> ≡ <code>LS("A") + CS("B")</code>.</p>
+<p>Two knobs on the terms:</p>
+<ul>
+<li><strong><code>transform=</code> on <code>I</code></strong> picks the basis of <code>h_ϑ</code> for a continuous node —
+  <code>"bernstein"</code> (default, 20 coefficients, tails extrapolate with the boundary
+  slope), <code>"spline"</code> (monotone RQ spline, 23 params at <code>bins=8</code>, fixed tail
+  slope) or <code>"affine"</code> (2 params: the latent is exactly logistic). Ordinal
+  nodes have no basis: their intercept is the cutpoint vector,
+  <code>P(x ≤ k) = σ(ϑ_k − shift)</code>.</li>
+<li><strong><code>units=</code> on <code>I</code>/<code>CS</code>/<code>VC</code></strong> sizes the term's network, e.g. <code>units=[16]</code>
+  for one hidden layer of 16 neurons. The defaults match the PyTorch
+  reference this package grew out of (<a href="https://github.com/buehlpa/TramDag">buehlpa/TramDag</a>,
+  <code>tram_models.py</code>), <strong>not</strong> the TRAM-DAG paper's own R nets — so a
+  replication sets <code>units=</code> and <code>activation=</code> explicitly, as the configs in
+  <code>experiments/paper/</code> do.</li>
+</ul>
+<p>Feature widths: a continuous parent enters raw (1 column), an ordinal parent
+one-hot (<code>levels</code> columns). Abduction is exact for continuous nodes and
+truncated-logistic for ordinal ones, so <code>flow.sample(u=flow.abduct(df))</code>
+reproduces <code>df</code> exactly / level-exactly.</p>
+<p>There are two ways to fit the model: a stochastic optimizer (<code>fit</code>) and the classical route (<code>fit_classical</code>). For all-<code>ls</code> models — where each node-conditional is a classical transformation model — the classical fit is deterministic and takes seconds (measured ~10 s vs ~200 s for Adam on the CI runner); see <a href="fitting/"><code>docs/fitting.md</code></a>.</p>
+<h2 id="validation">Validation<a class="headerlink" href="#validation" title="Permanent link">&para;</a></h2>
+<p>Two layers, deliberately separate.</p>
+<p><strong>The framework's own test suite</strong> (<a href="https://github.com/tensorchiefs/tramdag/tree/main/tests"><code>tests/</code></a>) measures the library
+against three inline data-generating processes it carries itself, so it needs no
+research code to run. Its strongest claim is an equality, not a similarity: an
+all-<code>ls</code> outcome node <em>is</em> an ordered-logit model, so the flow's MLE must match
+<code>statsmodels</code> <code>OrderedModel</code> on the same design matrix — it does, and the
+varying-coefficient acceptance bars (effect recovery, propensity centering) are
+pinned the same way. What the tests guarantee, and how each ground truth is
+obtained, is documented in <a href="https://github.com/tensorchiefs/tramdag/blob/main/tests/README.md"><code>tests/README.md</code></a>.</p>
+<p><strong>The paper replications</strong> (<a href="https://github.com/tensorchiefs/tramdag/tree/main/experiments"><code>experiments/</code></a>) are separate: one
+self-contained script per dataset, with its hyperparameters in a sibling YAML
+file and its expected results committed under each area's <code>ground_truth/</code>. A
+dedicated workflow runs them and compares.</p>
+<table>
+<thead>
+<tr>
+<th>experiment</th>
+<th>paper</th>
+<th>demonstrates</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>triangle.py</code> (<code>linear-ls</code>, <code>linear-cs</code>, <code>atan-cs</code>, <code>sin-cs</code>)</td>
+<td>§6.1, C.3</td>
+<td>LS coefficient recovery (β = 2, −0.2, +0.3), CS curve ≡ −f(x₂) for non-monotone f</td>
+</tr>
+<tr>
+<td><code>triangle_mixed.py</code> (<code>linear-ls</code>, <code>exp-cs</code>)</td>
+<td>§6.2</td>
+<td>mixed data L1/L2 + the C.4 odds-ratio check (OR ≈ 7.4)</td>
+</tr>
+<tr>
+<td><code>vaca.py</code></td>
+<td>§5.1–5.2</td>
+<td>the bimodal L1 case a default CNF misses; L2 <code>p(x₃ \| do(x₂))</code> against analytic means</td>
+</tr>
+<tr>
+<td><code>carefl.py</code></td>
+<td>§5.3</td>
+<td>L3 counterfactual curves vs <strong>analytic</strong> truth</td>
+</tr>
+<tr>
+<td><code>validate_ls.py</code></td>
+<td>—</td>
+<td>flow ≡ <code>statsmodels</code> ≡ R <code>MASS::polr</code> to ~4 decimals with <code>fit_classical</code> (a converged Adam <code>fit</code> gets ~1e-3), on a frozen synthetic cohort with a known true effect</td>
+</tr>
+</tbody>
+</table>
+<p>Sign note: ordinal shifts are <em>subtracted</em> here but <em>added</em> in the paper, so
+fitted ordinal weights are the paper's with flipped sign (each <code>truth.json</code>
+records both conventions). A figure-by-figure account of what is reproduced,
+and what is not (the competing CNF/NSF baselines), is in
+<a href="https://github.com/tensorchiefs/tramdag/blob/main/experiments/paper/PAPER_COVERAGE.md"><code>experiments/paper/PAPER_COVERAGE.md</code></a>.</p>
+<p><strong>Training speed</strong> — schedules, per-node freezing, L-BFGS and device benchmarks:
+<a href="training-speed/"><code>docs/training-speed.md</code></a>.</p>
+<p><strong>Paper replication</strong> — every hyperparameter of the eight <code>experiments/paper</code>
+variants with its source in the paper's R code, the deviations, and the
+numbers (paper / previous protocol / now):
+<a href="paper-replication/"><code>docs/paper-replication.md</code></a>.</p>
+<h2 id="testing-policy">Testing policy<a class="headerlink" href="#testing-policy" title="Permanent link">&para;</a></h2>
+<p>See the <a href="https://github.com/tensorchiefs/tramdag/blob/main/tests/README.md"><code>tests/README.md</code></a> file for more details.</p>
+<h2 id="layout">Layout<a class="headerlink" href="#layout" title="Permanent link">&para;</a></h2>
+<div class="highlight"><pre><span></span><code>src/tramdag/            spec.py transforms.py conditioners.py flow.py
+                        scores.py                 &lt;- the framework, and nothing else
+tests/                  unit tests, identities, acceptance bars, three inline DGPs
+experiments/            research code, one directory per area, each self-contained:
+                          paper/       the replications + generators + frozen data
+                          benchmarks/  training-speed and machine measurements
+                          misc/        the classical-MLE validation
+                        paper/misc: &lt;name&gt;.py + &lt;name&gt;.yaml, data/,
+                        ground_truth/, tests/, results/ (benchmarks reads the
+                        other areas' data and pins no ground truth)
+notebooks/              four executed examples: didactic intro, Colab demo,
+                        additive-vs-joint intercepts, varying coefficients
+docs/                   code-map.md (every class/function + all knobs),
+                        fitting.md, notation.md, training-speed.md,
+                        paper-replication.md, varying-coefficients.md,
+                        scores.md
+</code></pre></div>
+<p>Implementation conventions (latent-scale signs, raw/one-hot parent encoding,
+log-space ordinal likelihood, seeding) are documented in
+<a href="https://github.com/tensorchiefs/tramdag/blob/main/CLAUDE.md"><code>CLAUDE.md</code></a> and pinned by tests.</p>
+<h2 id="citation">Citation<a class="headerlink" href="#citation" title="Permanent link">&para;</a></h2>
+<p>If you use <code>tramdag</code>, please cite the method paper:</p>
+<div class="highlight"><pre><span></span><code><span class="nc">@inproceedings</span><span class="p">{</span><span class="nl">sick2025tramdag</span><span class="p">,</span>
+<span class="w">  </span><span class="na">title</span><span class="w">     </span><span class="p">=</span><span class="w"> </span><span class="s">{Interpretable Neural Causal Models with TRAM-DAGs}</span><span class="p">,</span>
+<span class="w">  </span><span class="na">author</span><span class="w">    </span><span class="p">=</span><span class="w"> </span><span class="s">{Sick, Beate and D{\"u}rr, Oliver}</span><span class="p">,</span>
+<span class="w">  </span><span class="na">booktitle</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="s">{Proceedings of the 4th Conference on Causal Learning and Reasoning (CLeaR)}</span><span class="p">,</span>
+<span class="w">  </span><span class="na">series</span><span class="w">    </span><span class="p">=</span><span class="w"> </span><span class="s">{Proceedings of Machine Learning Research}</span><span class="p">,</span>
+<span class="w">  </span><span class="na">volume</span><span class="w">    </span><span class="p">=</span><span class="w"> </span><span class="s">{275}</span><span class="p">,</span>
+<span class="w">  </span><span class="na">year</span><span class="w">      </span><span class="p">=</span><span class="w"> </span><span class="s">{2025}</span><span class="p">,</span>
+<span class="p">}</span>
+</code></pre></div>
+<!-- For the stroke application (and the `magic-mrclean` cohort design) additionally:
+
+```bibtex
+@article{duerr2026stroke,
+  title  = {Estimating Individualized Treatment Effects in Acute Ischemic Stroke
+            with Causal Transformation Models (TRAM-DAG): A Multi-Centre
+            Observational Study with External RCT Validation},
+  author = {D{\"u}rr, Oliver and Herzog, Lisa and B{\"u}hler, Pascal and
+            Wegener, Susanne and Sick, Beate},
+  journal = {arXiv preprint arXiv:2606.12623},
+  year   = {2026},
+}
+``` -->
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": ".", "features": ["navigation.sections", "navigation.top", "content.code.copy", "toc.follow"], "search": "assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"provider": "mike"}}</script>
+    
+    
+      <script src="assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+        <script src="javascripts/mathjax.js"></script>
+      
+        <script src="https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-mml-chtml.js"></script>
+      
+    
+  </body>
+</html>

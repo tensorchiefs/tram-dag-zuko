@@ -1,0 +1,2033 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Interpretable Neural Causal Models (TRAM-DAGs) in PyTorch">
+      
+      
+      
+        <link rel="canonical" href="https://tensorchiefs.github.io/tramdag/main/paper-replication/">
+      
+      
+        <link rel="prev" href="../varying-coefficients/">
+      
+      
+        <link rel="next" href="../code-map/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>Paper replication - tramdag</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#paper-replication-protocol-hyperparameters-and-results-per-experiment" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+      <div data-md-color-scheme="default" data-md-component="outdated" hidden>
+        
+      </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="tramdag" class="md-header__button md-logo" aria-label="tramdag" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            tramdag
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Paper replication
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/tensorchiefs/tramdag" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    GitHub
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="tramdag" class="md-nav__button md-logo" aria-label="tramdag" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    tramdag
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/tensorchiefs/tramdag" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    GitHub
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Guides
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Guides
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../notation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Notation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../fitting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Fitting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../training-speed/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Training speed
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../scores/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Scores
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../varying-coefficients/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Varying coefficients
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Paper replication
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Paper replication
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#what-is-common-to-all-eight" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What is common to all eight
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#triangle-continuous-trianglepy-paper-sec-61-app-c3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Triangle, continuous (triangle.py) — paper Sec. 6.1, App. C.3
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#triangle-mixed-triangle_mixedpy-paper-sec-62-app-c4-app-b" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Triangle, mixed (triangle_mixed.py) — paper Sec. 6.2, App. C.4, App. B
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#vaca-cnf-benchmark-vacapy-paper-sec-5152-app-c1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        VACA / CNF benchmark (vaca.py) — paper Sec. 5.1–5.2, App. C.1
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#carefl-benchmark-careflpy-paper-sec-53-app-c2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CAREFL benchmark (carefl.py) — paper Sec. 5.3, App. C.2
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#runtime-and-the-epochs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Runtime and the epochs
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#repository-choices-the-paper-does-not-state" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Repository choices the paper does not state
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../code-map/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Code map
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../zuko-upstream/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Zuko upstream
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Notebooks
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Notebooks
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../notebooks/demo_tram_dag_colab/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    TRAM-DAG in 5 minutes — one causal model, all three rungs of Pearl's ladder
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../notebooks/intro_tram_dag/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    TRAM-DAG — a didactic introduction with
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../notebooks/additive_vs_joint_ci/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Additive vs joint complex intercept — interpreting per-parent effects
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../notebooks/varying_coefficients/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Heterogeneous treatment effects: the term
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../notebooks/classical_fit_tram_dag/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Classical fitting of all- TRAM-DAGs ()
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/tramdag/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    tramdag
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/spec/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    spec
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/flow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    flow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/transforms/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    transforms
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/conditioners/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    conditioners
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/scores/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    scores
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/callbacks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    callbacks
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#what-is-common-to-all-eight" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What is common to all eight
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#triangle-continuous-trianglepy-paper-sec-61-app-c3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Triangle, continuous (triangle.py) — paper Sec. 6.1, App. C.3
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#triangle-mixed-triangle_mixedpy-paper-sec-62-app-c4-app-b" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Triangle, mixed (triangle_mixed.py) — paper Sec. 6.2, App. C.4, App. B
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#vaca-cnf-benchmark-vacapy-paper-sec-5152-app-c1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        VACA / CNF benchmark (vaca.py) — paper Sec. 5.1–5.2, App. C.1
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#carefl-benchmark-careflpy-paper-sec-53-app-c2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CAREFL benchmark (carefl.py) — paper Sec. 5.3, App. C.2
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#runtime-and-the-epochs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Runtime and the epochs
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#repository-choices-the-paper-does-not-state" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Repository choices the paper does not state
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="paper-replication-protocol-hyperparameters-and-results-per-experiment">Paper replication — protocol, hyperparameters and results, per experiment<a class="headerlink" href="#paper-replication-protocol-hyperparameters-and-results-per-experiment" title="Permanent link">&para;</a></h1>
+<p>The eight variants under <code>experiments/paper/</code> replicate the TRAM-DAG paper
+(Sick &amp; Dürr, CLeaR 2025, arXiv:2503.16206) against its own R code
+(<code>tensorchiefs/tram-dag</code>). This page lists, for each experiment, the DGP, the
+model, every hyperparameter with its source, what deviates from the paper and
+why, and the numbers: what the paper reports, what the previous protocol of
+this repository measured, and what the current 1:1 protocol measures.</p>
+<p>Measured 2026-08-26 on <code>refactor/lean-fit</code> (seeds: DGP 42, init 7, shuffle 0)
+with the exact reference protocol — global plateau rule and Keras init; the
+2026-08-25 numbers of <code>feat/followups</code> (per-node plateau, torch init; CI run
+32878435001) are kept in the "R 1:1, torch init" column where they differ.
+"Previous" is the protocol before that branch: a 90/10 split of one draw,
+batch 512, the fit restarted in chunks (<code>fit_in_chunks</code>), and for VACA/CAREFL
+a second "polish" fit at a lower rate — a repository recipe, not the paper's.
+Its numbers come from the ground-truth files of that revision (<code>73f9f39</code>;
+<code>{max}</code> bounds were 2.5× the measurement).</p>
+<p>The paper states four training numbers — n = 40000, 500 epochs, Adam,
+Bernstein order 20 — and shows results as figures. Where it gives no number,
+the "paper" column names the figure and what it shows.</p>
+<h2 id="what-is-common-to-all-eight">What is common to all eight<a class="headerlink" href="#what-is-common-to-all-eight" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>item</th>
+<th>reference</th>
+<th>here</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>latent</td>
+<td>standard logistic, shifts added on the continuous scale, subtracted for ordinal <code>P(Y&lt;=k) = sigmoid(theta_k - shift)</code></td>
+<td>same (tests pin both signs)</td>
+</tr>
+<tr>
+<td>Bernstein basis</td>
+<td><code>len_theta</code> unconstrained coefficients, <code>to_theta</code> softplus-cumsum, domain → [0, 1] with tangent-linear extrapolation outside; the domain comes from the train <strong>5 %/95 % quantiles in the triangle scripts</strong> (<code>quantile(..., c(0.05, 0.95))</code>, the min/max lines commented out) and from <strong>min/max</strong> in the comparison scripts (<code>scale_df</code>)</td>
+<td>zuko Bernstein, <code>n_coeffs</code> unconstrained (zuko ties two control points on, so the free-parameter count matches), domain = train 5 %/95 % quantiles → [−5, 5], linear extrapolation. Triangle: a match up to the reparametrization [0,1] vs [−5,5], the tail rule and order 21 vs 19. VACA/CAREFL: quantiles instead of min/max — <strong>deviation D1</strong></td>
+</tr>
+<tr>
+<td>init</td>
+<td>triangle scripts: <code>LinearMasked</code> layers with Keras <code>random_normal</code> (N(0, 0.05²)) on weights and biases, the LS <code>beta</code> layer included; comparison scripts: <code>layer_dense</code> default, glorot-uniform weights and zero biases</td>
+<td><code>init: normal</code> (triangle) and <code>init: glorot</code> (VACA/CAREFL), <code>CausalFlowDAG(init=)</code>; torch's default init remains the framework default and was the decisive deviation under the full-batch protocol, see VACA</td>
+</tr>
+<tr>
+<td>optimizer</td>
+<td>Keras Adam, eps 1e-7</td>
+<td>torch Adam, eps 1e-8 — measured: no effect (VACA identical to four digits)</td>
+</tr>
+<tr>
+<td>seeds</td>
+<td>triangle scripts unseeded (<code>SEED = -1</code>); comparison scripts <code>dgp(..., seed=42)</code> on R's RNG</td>
+<td>not replayable in torch, so every seed is a repo choice (42 for the DGP is kept as a nod to the reference)</td>
+</tr>
+<tr>
+<td>calibrated start</td>
+<td>none</td>
+<td><code>flow.calibrate(train, marginal_init=False)</code> in <code>helpers.fit_paper</code> (framework default is True)</td>
+</tr>
+<tr>
+<td>intercept output layer</td>
+<td>Keras dense with bias</td>
+<td>bias-free — <strong>D3</strong> (the same function class; the bias adds a constant to all unconstrained coefficients)</td>
+</tr>
+<tr>
+<td>plateau rule (VACA/CAREFL)</td>
+<td><code>update_learning_rate</code>: one optimizer, reduce when the summed validation NLL has not improved for 50 epochs (strict <code>&lt;</code>), factor 0.1, min 1e-7</td>
+<td>torch <code>ReduceLROnPlateau(patience=49, threshold=0, threshold_mode="abs", factor=0.1, min_lr=1e-7)</code> on <code>sum(flow.nll(val))</code> — the same rule, verified against torch's source</td>
+</tr>
+</tbody>
+</table>
+<p>D1 (VACA/CAREFL only) and D3 remain; both were measured (below). The per-node
+plateau approximation of 2026-08-25 (D4) is gone with the lean <code>fit</code>. Two
+further repo choices are CAREFL's: a fresh 2500-row draw with a separate
+validation draw where the R run used CAREFL's file with <code>val = train</code>, and raw
+units where the R run sd-standardized x3/x4.</p>
+<h2 id="triangle-continuous-trianglepy-paper-sec-61-app-c3">Triangle, continuous (<code>triangle.py</code>) — paper Sec. 6.1, App. C.3<a class="headerlink" href="#triangle-continuous-trianglepy-paper-sec-61-app-c3" title="Permanent link">&para;</a></h2>
+<p><strong>DGP</strong> (<code>summerof24/triangle_structured_continous.R</code>): x1 ~ 0.5 N(0.25, 0.1²) + 0.5 N(0.73, 0.05²);
+h(x2 | x1) = 5 x2 + 2 x1 = u2; h(x3 | x1, x2) = 0.63 x3 − 0.2 x1 − f(x2) = u3, u ~ logistic.
+f: <code>linear</code> −0.3 x, <code>atan</code> 0.75 atan(5 (x + 0.12)), <code>sin</code> 2 sin(3x) + x.
+True weights in the flow's convention: β12 = +2, β13 = −0.2, β23 = +0.3 (linear only).</p>
+<p><strong>Model</strong>: <code>x1: SI</code>, <code>x2: SI + LS(x1)</code>, <code>x3: SI + LS(x1) + {LS(x2) | CS(x2)}</code>, Bernstein.
+CS net = reference <code>hidden_features_CS = c(2, 25, 25, 2)</code>, sigmoid (the ReLU line
+in <code>create_param_net</code> is commented out).</p>
+<table>
+<thead>
+<tr>
+<th>hyperparameter</th>
+<th>paper / R code</th>
+<th>previous</th>
+<th>now</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>train / validation</td>
+<td><code>dgp(40000)</code> / <code>dgp(40000)</code>, two draws</td>
+<td>36000 / 4000, one draw split</td>
+<td>40000 / 40000, two draws</td>
+</tr>
+<tr>
+<td>epochs</td>
+<td>500</td>
+<td>500 (in chunks of 10, Adam restarted each chunk)</td>
+<td>500, one continuous run</td>
+</tr>
+<tr>
+<td>lr</td>
+<td>0.001 (<code>optimizer_adam()</code> default)</td>
+<td>0.001</td>
+<td><strong>0.004</strong>, the CI deviation</td>
+</tr>
+<tr>
+<td>batch</td>
+<td>32 (Keras <code>fit()</code> default)</td>
+<td>512</td>
+<td><strong>256</strong>, the CI deviation</td>
+</tr>
+<tr>
+<td><code>len_theta</code> / <code>n_coeffs</code></td>
+<td>20</td>
+<td>20</td>
+<td>20</td>
+</tr>
+<tr>
+<td>schedule / early stop / init</td>
+<td>none / none, final weights / random_normal</td>
+<td>none / none / torch</td>
+<td>none / none / <code>init: normal</code></td>
+</tr>
+<tr>
+<td>coefficient read-out</td>
+<td>after every epoch (Keras loop)</td>
+<td>at chunk boundaries</td>
+<td><code>fit(after_epoch_callbacks=)</code>, every epoch</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Results</strong></p>
+<table>
+<thead>
+<tr>
+<th>variant</th>
+<th>metric</th>
+<th>paper</th>
+<th>previous</th>
+<th>paper protocol, <code>init: normal</code> (batch 32 / lr 0.001)</th>
+<th>CI config (batch 256 / lr 0.004), the pinned ground truth</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>linear-ls</td>
+<td>β12 / β13 / β23</td>
+<td>Fig. 14 trajectories; App. C.3 text: 1.98 / −0.21 / 0.26</td>
+<td>1.983 / −0.145 / 0.285</td>
+<td>1.987 / −0.170 / 0.282</td>
+<td>1.988 / −0.171 / 0.295</td>
+</tr>
+<tr>
+<td>linear-cs</td>
+<td>β13; max |ĝ − (−f)| on [−1, 1]</td>
+<td>Fig. 17: fitted CS is a straight line</td>
+<td>−0.151; 0.507</td>
+<td>−0.173; 0.122 (glorot init: 0.110, torch: 0.116)</td>
+<td>−0.178; 0.088</td>
+</tr>
+<tr>
+<td>atan-cs</td>
+<td>β13; cs max err</td>
+<td>Fig. 7 right / 15 / 16: CS on −f; text: β12 = 2.07, β13 = −0.203</td>
+<td>−0.149; 0.229</td>
+<td>−0.168; 0.059 (glorot: 0.080, torch: 0.085)</td>
+<td>−0.173; 0.077</td>
+</tr>
+<tr>
+<td>sin-cs</td>
+<td>β13; cs max err</td>
+<td>Fig. 18: CS follows the non-monotone f, saturating at the grid ends</td>
+<td>−0.185; 2.29</td>
+<td>−0.195; 1.10 (glorot: 0.997, torch: 1.016)</td>
+<td>−0.202; 1.024</td>
+</tr>
+<tr>
+<td>all</td>
+<td>|E[x3 | do(x1 = −1)] flow − DGP|</td>
+<td>Figs. 16/17: histograms overlap</td>
+<td>—</td>
+<td>0.09–0.14</td>
+<td>0.08–0.12</td>
+</tr>
+<tr>
+<td>all</td>
+<td>val NLL x3</td>
+<td>—</td>
+<td>2.4603–2.4731</td>
+<td>2.4607–2.4764</td>
+<td>2.4606–2.4764</td>
+</tr>
+</tbody>
+</table>
+<p>β13 at −0.17 instead of −0.2: x1 has sd 0.254, so SE(β13) ≈ 0.036 at n = 40000
+— inside one SE. The <code>sin-cs</code> error of 1.0 is the reference architecture's
+capacity: the two-unit bottleneck saturates at both ends of the grid exactly
+as in the paper's Fig. 18.</p>
+<h2 id="triangle-mixed-triangle_mixedpy-paper-sec-62-app-c4-app-b">Triangle, mixed (<code>triangle_mixed.py</code>) — paper Sec. 6.2, App. C.4, App. B<a class="headerlink" href="#triangle-mixed-triangle_mixedpy-paper-sec-62-app-c4-app-b" title="Permanent link">&para;</a></h2>
+<p><strong>DGP</strong> (<code>triangle_structured_mixed.R</code>): x1, x2 as above; x3 ordinal with four
+levels, cutpoints θ = (−2, 0.42, 1.02) (from the R code — the paper does not
+state them), level = #{k : u3 &gt; θ_k + 0.2 x1 + f(x2)}; f: <code>linear</code> −0.3 x,
+<code>exp</code> 0.5 exp(x). The paper adds the ordinal shift, the flow subtracts it, so
+the fitted weights are β13 = −0.2, β23 = +0.3.</p>
+<p><strong>Model</strong>: <code>x1: SI</code>, <code>x2: SI + LS(x1)</code>, <code>x3: OrdinalNode(4, LS(x1) + {LS(x2) | CS(x2)})</code>.
+CS net = reference <code>c(2, 2, 2, 2)</code>, sigmoid.</p>
+<table>
+<thead>
+<tr>
+<th>hyperparameter</th>
+<th>paper / R code</th>
+<th>previous</th>
+<th>now</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>train / validation</td>
+<td><code>dgp(40000)</code> / <code>dgp(10000)</code></td>
+<td>36000 / 4000 split</td>
+<td>40000 / 10000, two draws</td>
+</tr>
+<tr>
+<td>epochs, lr, batch, schedule, init</td>
+<td>500, 0.001, 32, none, random_normal</td>
+<td>500 (chunks of 10), 0.001, 512, torch</td>
+<td>500 continuous, none, <code>init: normal</code>; <strong>lr 0.004 / batch 256</strong>, the CI deviation</td>
+</tr>
+<tr>
+<td><code>n_coeffs</code> (x1, x2)</td>
+<td>20</td>
+<td>20</td>
+<td>20</td>
+</tr>
+<tr>
+<td>odds-ratio check (App. C.4)</td>
+<td>odds(x2 ≤ −1) under do(x1 += 1), theory e² ≈ 7.39</td>
+<td>40000 rows, seed 99</td>
+<td>same</td>
+</tr>
+<tr>
+<td>counterfactual PMF (App. B)</td>
+<td>Fig. 10 explains why point counterfactuals fail for the ordinal node</td>
+<td>2000 rows × 200 draws</td>
+<td>same</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Results</strong></p>
+<table>
+<thead>
+<tr>
+<th>variant</th>
+<th>metric</th>
+<th>paper</th>
+<th>previous</th>
+<th>paper protocol, <code>init: normal</code></th>
+<th>CI config (batch 256 / lr 0.004), pinned</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>linear-ls</td>
+<td>β12 / β13 / β23</td>
+<td>Fig. 19: 2 / −0.2 / 0.3</td>
+<td>1.983 / −0.268 / 0.322</td>
+<td>1.987 / −0.246 / 0.319</td>
+<td>1.988 / −0.243 / 0.306</td>
+</tr>
+<tr>
+<td>linear-ls</td>
+<td>odds ratio predicted / DGP</td>
+<td>e² ≈ 7.39; C.4 text: 7.74, CI [7.16, 8.38]</td>
+<td>7.26 / 7.19</td>
+<td>7.29 / 7.19</td>
+<td>7.30 / 7.19</td>
+</tr>
+<tr>
+<td>linear-ls</td>
+<td>CF PMF TV vs analytic; P(true level) flow / analytic / mode bound</td>
+<td>— (App. B qualitative)</td>
+<td>0.084; 0.714 / 0.728 / 0.806</td>
+<td>0.044; 0.718 / 0.728 / 0.806</td>
+<td>0.038</td>
+</tr>
+<tr>
+<td>exp-cs</td>
+<td>β13; cs max err</td>
+<td>Fig. 20: distributions match</td>
+<td>−0.227; 0.885</td>
+<td>−0.207; 0.142 (glorot: 0.071, torch: 0.126)</td>
+<td>−0.202; 0.107</td>
+</tr>
+<tr>
+<td>exp-cs</td>
+<td>CF PMF TV; P(true level)</td>
+<td>—</td>
+<td>0.075; 0.924 / 0.921</td>
+<td>0.023; 0.917 / 0.921</td>
+<td>0.020</td>
+</tr>
+</tbody>
+</table>
+<h2 id="vaca-cnf-benchmark-vacapy-paper-sec-5152-app-c1">VACA / CNF benchmark (<code>vaca.py</code>) — paper Sec. 5.1–5.2, App. C.1<a class="headerlink" href="#vaca-cnf-benchmark-vacapy-paper-sec-5152-app-c1" title="Permanent link">&para;</a></h2>
+<p><strong>DGP</strong> (Sanchez-Martin et al. 2022, App. E.1): x1 ~ 0.5 N(−2, 1.5) + 0.5 N(1.5, 1);
+x2 = −x1 + N(0, 1); x3 = x1 + 0.25 x2 + N(0, 1). Gaussian noise — outside the
+logistic-latent family, so the all-<code>CI</code> flow has to fit it. Analytic target:
+E[x3 | do(x2 = a)] = −0.25 + 0.25 a. The paper's Sec. 5.2 text says a ∈ {−3, −2, 0}; its Fig. 5 panels and the R code (<code>vaca_triangle.r</code>) intervene at a ∈ {−3, −1, 0} — the code is followed (the frozen <code>data/vaca/truth.json</code> holds the same three).</p>
+<p><strong>Model</strong>: <code>x1: SI</code>, <code>x2: CI(x1)</code>, <code>x3: CI(x1, x2)</code>, Bernstein <code>n_coeffs = 31</code>
+(reference M = 30, <code>len_theta = 31</code>), nets <code>dense(10, tanh) → dense(100, tanh) → dense(31)</code>
+(<code>comparison/utils.R::make_model</code>).</p>
+<table>
+<thead>
+<tr>
+<th>hyperparameter</th>
+<th>R code</th>
+<th>previous</th>
+<th>now</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>train / validation</td>
+<td>nTrain 2500 / <code>dgp(5000)</code></td>
+<td>18000 / 2000 split</td>
+<td>2500 / 5000, two draws</td>
+</tr>
+<tr>
+<td>epochs</td>
+<td>10000 (<code>Figure_Triangle_Linear_Bimodal.R</code>, the sourcing script — not in our copy of the R code, so EPOCHS/M/nTrain for VACA rest on that reading)</td>
+<td>400 in chunks of 50, then 120 "polish"</td>
+<td>10000, one run</td>
+</tr>
+<tr>
+<td>lr</td>
+<td>0.001</td>
+<td>0.01, polish 0.001</td>
+<td>0.001</td>
+</tr>
+<tr>
+<td>batch</td>
+<td>full batch (one <code>apply_gradients</code> per epoch)</td>
+<td>512</td>
+<td>2500 = n_train</td>
+</tr>
+<tr>
+<td>schedule</td>
+<td><code>update_learning_rate</code>: ReduceLROnPlateau on the summed val NLL, factor 0.1, patience 50, min_lr 1e-7, strict <code>&lt;</code></td>
+<td>none</td>
+<td>the same rule, global (torch's scheduler through <code>fit(optimizer=, after_epoch_callbacks=)</code>)</td>
+</tr>
+<tr>
+<td>input scaling</td>
+<td><code>scale_df</code>: everything min-max to [0, 1]</td>
+<td>raw</td>
+<td><code>net_input_scaling: minmax</code> (network inputs; targets D1)</td>
+</tr>
+<tr>
+<td>n_compare</td>
+<td>—</td>
+<td>50000</td>
+<td>50000</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Results</strong> — the check is the flow's error against the analytic mean, not a pinned flow value.</p>
+<table>
+<thead>
+<tr>
+<th>metric</th>
+<th>paper</th>
+<th>previous</th>
+<th>R 1:1, torch init, per-node plateau (08-25)</th>
+<th>now: R 1:1, glorot, global plateau</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>|E[x3 | do(x2 = −3)] − (−1.0)|</td>
+<td>Fig. 5: densities overlap</td>
+<td>0.037</td>
+<td>0.026</td>
+<td>0.097</td>
+</tr>
+<tr>
+<td>|E[x3 | do(x2 = −1)] − (−0.5)|</td>
+<td>Fig. 5</td>
+<td>0.012</td>
+<td>— (do(−2) was scored: 0.034)</td>
+<td>0.088</td>
+</tr>
+<tr>
+<td>|E[x3 | do(x2 = 0)] − (−0.25)|</td>
+<td>Fig. 5</td>
+<td>0.010</td>
+<td>0.077</td>
+<td>0.019</td>
+</tr>
+<tr>
+<td>sd(x1) flow vs analytic 2.0767</td>
+<td>Fig. 4: bimodal x1 fitted (the default CNF fails)</td>
+<td>2.074</td>
+<td>error 0.0077</td>
+<td>error 0.032</td>
+</tr>
+<tr>
+<td>val NLL x3</td>
+<td>—</td>
+<td>1.4356</td>
+<td>1.4351</td>
+<td>1.4496</td>
+</tr>
+</tbody>
+</table>
+<p>The 08-25 and 08-26 columns are not the same three interventions: the do(x2)
+set moved from the paper text's {−3, −2, 0} to the R code's {−3, −1, 0} (see
+the DGP paragraph above), so only do(x2 = −3) and do(x2 = 0) compare directly.
+At the earlier grid and with glorot the errors were 0.098 / 0.159 / 0.026 at
+this seed and 0.268 / 0.119 / 0.005 and 0.217 / 0.031 / 0.021 at init seeds 8
+and 9 — the spread quoted below.</p>
+<p>How the gap was traced, one change at a time under the exact protocol
+(inputs min-max scaled unless stated; do(x2) errors at the then-current grid
+−3 / −2 / 0):</p>
+<table>
+<thead>
+<tr>
+<th>variant</th>
+<th>error</th>
+<th>reading</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>raw parents into the nets</td>
+<td>0.731 / 0.426 / 0.017</td>
+<td>the tanh nets saturate: 40 % of the rows have |x1| &gt; 2, 43 % |x2| &gt; 2</td>
+</tr>
+<tr>
+<td>per-node plateau, torch init</td>
+<td>0.026 / 0.034 / 0.077</td>
+<td>the 2026-08-25 approximation</td>
+</tr>
+<tr>
+<td>global plateau (R's rule), torch init</td>
+<td>0.523 / 0.334 / 0.129</td>
+<td>the summed NLL keeps improving through x1 while x3 overfits</td>
+</tr>
+<tr>
+<td>… without any plateau</td>
+<td>0.562 / 0.354 / 0.142</td>
+<td>the rule is what stops the full-batch overfit</td>
+</tr>
+<tr>
+<td>… Adam eps 1e-7</td>
+<td>0.523 / 0.334 / 0.129</td>
+<td>no effect</td>
+</tr>
+<tr>
+<td>… Bernstein on train min/max (D1 off)</td>
+<td>0.154 / 0.012 / 0.062</td>
+<td>helps, not the cause</td>
+</tr>
+<tr>
+<td>… glorot init</td>
+<td>0.035 / 0.006 / 0.007</td>
+<td>the cause (a different random draw than the config's seed 7)</td>
+</tr>
+<tr>
+<td>… glorot + min/max</td>
+<td>0.035 / 0.056 / 0.057</td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<p>Under the exact protocol the result is <strong>seed-sensitive at the off-manifold
+point</strong> do(x2 = −3): 0.03–0.27 over four init draws, 0.005–0.026 at do(x2 = 0).
+The paper shows one run's densities. The committed bound is 2.5× the seed-7
+measurement, and this table is the honest picture.</p>
+<h2 id="carefl-benchmark-careflpy-paper-sec-53-app-c2">CAREFL benchmark (<code>carefl.py</code>) — paper Sec. 5.3, App. C.2<a class="headerlink" href="#carefl-benchmark-careflpy-paper-sec-53-app-c2" title="Permanent link">&para;</a></h2>
+<p><strong>DGP</strong> (Khemakhem et al. 2021): x1, x2 ~ Laplace(0, 1/√2); x3 = x1 + 0.5 x2³ + ε;
+x4 = −x2 + 0.5 x1² + ε, ε ~ Laplace(0, 1/√2). Counterfactuals are analytic by
+noise abduction. Observation <code>x_obs</code>: noise (2, 1.5, 1.4, −1) → (2, 1.5, 5.0875, −0.5) in the
+SCM's units; the R code's <code>xObs.csv</code> is that point divided by CAREFL's sample
+sds (6.0104, 1.9114): (2, 1.5, 0.8465, −0.2616). The paper prints (2, 1.5, 0.81,
+−0.28), slightly off it (CAREFL's own text). <strong>Before <code>feat/followups</code> the
+repository used the printed values as raw coordinates</strong>, a 4σ-off point. The R
+run also scores in sd-standardized units, so its Fig. 6 y-axis is 6× ours for
+x3 — the <code>fig6_max_abs_err</code> entries are in raw units.
+Queries: x3^cf | do(x2 = α) and x4^cf | do(x1 = α), α ∈ [−3, 3].</p>
+<p><strong>Model</strong>: <code>x1, x2: SI</code>, <code>x3, x4: CI(x1, x2)</code>, Bernstein <code>n_coeffs = 31</code>, the
+same <code>make_model</code> nets as VACA.</p>
+<table>
+<thead>
+<tr>
+<th>hyperparameter</th>
+<th>R code (<code>carefl_fig5.r</code>)</th>
+<th>previous</th>
+<th>now</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>train / validation</td>
+<td>CAREFL's own <code>data/CAREFL_CF/X.csv</code> (<code>USE_EXTERNAL_DATA = TRUE</code>), x3/x4 sd-standardized, <strong><code>val = train</code></strong> — the plateau rule watched the training NLL</td>
+<td>18000 / 2000 split</td>
+<td>2500 rows drawn from the same SCM / a separate <code>dgp(5000)</code> draw, raw units — <strong>repo choice</strong></td>
+</tr>
+<tr>
+<td>epochs</td>
+<td>7000</td>
+<td>300 in chunks of 50 + 100 polish</td>
+<td>7000</td>
+</tr>
+<tr>
+<td>lr, batch, schedule, input scaling, init</td>
+<td>0.001, full batch, plateau 0.1/50/1e-7, <code>scale_df</code>, glorot</td>
+<td>0.01→0.001, 512, none, raw, torch</td>
+<td>0.001, 2500, the same global rule, <code>minmax</code>, glorot</td>
+</tr>
+<tr>
+<td>scoring</td>
+<td>the single <code>x_obs</code>, curves over α (Fig. 6)</td>
+<td>+ 300 held-out rows at α ∈ {−1.5, 0, 1.5}</td>
+<td>same</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Results</strong></p>
+<table>
+<thead>
+<tr>
+<th>metric</th>
+<th>paper</th>
+<th>previous (wrong x_obs)</th>
+<th>R 1:1, torch init, per-node plateau (08-25)</th>
+<th>now: R 1:1, glorot, global plateau</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Fig. 6 max |x3^cf error| over α at <code>x_obs</code></td>
+<td>Fig. 6: flow tracks the DGP curve</td>
+<td>1.64</td>
+<td>1.52 (at α = 3, x3 ≈ 17)</td>
+<td>1.87 (at α = 3)</td>
+</tr>
+<tr>
+<td>Fig. 6 max |x4^cf error|</td>
+<td>Fig. 6</td>
+<td>0.38</td>
+<td>0.47</td>
+<td>0.59</td>
+</tr>
+<tr>
+<td>held-out CF MAE x3, α = −1.5 / 0 / 1.5</td>
+<td>—</td>
+<td>0.109 / 0.053 / 0.095</td>
+<td>0.177 / 0.065 / 0.123</td>
+<td>0.181 / 0.065 / 0.142 (seeds 8, 9: 0.158–0.171 / 0.069–0.084 / 0.136–0.154)</td>
+</tr>
+<tr>
+<td>held-out CF MAE x4, α = −1.5 / 0 / 1.5</td>
+<td>—</td>
+<td>0.078 / 0.059 / 0.085</td>
+<td>0.117 / 0.059 / 0.115</td>
+<td>0.204 / 0.134 / 0.162 (0.172–0.178 / 0.113–0.129 / 0.145–0.160)</td>
+</tr>
+<tr>
+<td>val NLL x3 / x4</td>
+<td>—</td>
+<td>1.376 / 1.345</td>
+<td>1.395 / 1.373</td>
+<td>1.403 / 1.419</td>
+</tr>
+</tbody>
+</table>
+<p>The previous protocol trained on 7× more rows (18000), which is why its
+held-out MAEs are lower; they are not comparable to the paper's nTrain = 2500.
+Under the exact protocol the CAREFL numbers are stable across init seeds
+(spread ≈ 0.03) and the x4 query is 1.5–2× worse than under the per-node
+approximation — the reference's rule, faithfully applied, is not the best
+optimizer for this DGP, and the paper's Fig. 6 is a visual match either way.
+With D1 switched off (Bernstein domain on train min/max, <code>RANGE_Q = 0</code>, under
+the per-node protocol): x3 MAE 0.083 / 0.038 / 0.050 (better), x4 0.143 / 0.083
+/ 0.154 (worse), val NLL 1.444 / 1.476 (worse). The quantile domain stays the
+default; a <code>range_quantile</code> knob would make R's choice available.</p>
+<h2 id="runtime-and-the-epochs">Runtime and the epochs<a class="headerlink" href="#runtime-and-the-epochs" title="Permanent link">&para;</a></h2>
+<p>Triangle: 500 epochs × 1250 steps of batch 32 — 3.2 s per epoch single-process
+at 2–4 torch threads (5.5 s at 32 threads, the step is overhead-bound), 42–69 min
+per variant on the 2-core CI runners; VACA 4.7 min, CAREFL 6.6 min; the
+workflow's ten jobs run in parallel, 70 min wall against a 300-min cap.</p>
+<p>The one deviation taken for CI runtime is the triangle <strong>batch size and learning
+rate</strong>: batch 256 at lr 0.004 instead of the paper's batch 32 at lr 0.001, the same
+500 epochs in 8× fewer optimizer steps. Measured on 2026-08-26 against the
+committed ground-truth bands (glorot init, cs max err unless noted):</p>
+<table>
+<thead>
+<tr>
+<th>batch / lr / epochs</th>
+<th>linear-ls β13</th>
+<th>linear-cs</th>
+<th>atan-cs</th>
+<th>mixed exp-cs (TV)</th>
+<th>steps vs paper</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>32 / 0.001 / 500 (paper)</strong></td>
+<td>−0.170</td>
+<td>0.110</td>
+<td>0.080</td>
+<td>0.071 (0.019)</td>
+<td>1×</td>
+</tr>
+<tr>
+<td>128 / 0.001 / 500</td>
+<td>−0.170</td>
+<td>0.170</td>
+<td>0.041</td>
+<td>0.126 (0.023)</td>
+<td>1/4</td>
+</tr>
+<tr>
+<td>128 / 0.004 / 500</td>
+<td>−0.178</td>
+<td>0.160</td>
+<td>0.094</td>
+<td>0.070 (0.014)</td>
+<td>1/4</td>
+</tr>
+<tr>
+<td>128 / 0.004 / 250</td>
+<td>−0.170</td>
+<td>0.147</td>
+<td>0.070</td>
+<td>0.131 (0.035)</td>
+<td>1/8</td>
+</tr>
+<tr>
+<td><strong>256 / 0.004 / 500 (CI)</strong></td>
+<td>−0.171</td>
+<td>0.132</td>
+<td>0.073</td>
+<td>0.072 (0.017)</td>
+<td>1/8</td>
+</tr>
+<tr>
+<td>256 / 0.008 / 500</td>
+<td>−0.181</td>
+<td>0.163</td>
+<td>0.113</td>
+<td>0.073 (0.017)</td>
+<td>1/8</td>
+</tr>
+<tr>
+<td>512 / 0.010 / 500</td>
+<td>−0.169</td>
+<td>0.183</td>
+<td>0.104</td>
+<td>0.119 (0.015)</td>
+<td>1/16</td>
+</tr>
+</tbody>
+</table>
+<p>Batch 256 / lr 0.004 is the only row that keeps every cs error within ~0.02 (linear-cs: 0.022) of the
+paper protocol; larger batches or rates bend the misspecified linear-cs curve
+(0.16–0.18) and lr 0.008 hurts atan-cs. On CI (run 32974872751) the triangle
+jobs take 7–11 min instead of 42–69, the workflow about 12 min wall instead of
+70. The grid ran with glorot init; the
+committed configs use <code>init: normal</code> (the triangle scripts' initializer), whose
+CI-config numbers are in the result tables above (cs errors 0.088 / 0.077 /
+1.024 / 0.107). The paper-protocol numbers stay in this document as the
+reference; the ground truth is pinned from the CI config.</p>
+<p>An epoch cut was measured as well: at
+100 epochs the LS coefficients are unchanged (they settle after ~40 epochs,
+Fig. 14) but the complex shift is not — cs max err 0.235 (linear-cs, 0.116 at
+500) and 0.395 (mixed exp-cs, 0.126); at 250 epochs 0.112 and 0.203. The
+paper's 500 stay.</p>
+<h2 id="repository-choices-the-paper-does-not-state">Repository choices the paper does not state<a class="headerlink" href="#repository-choices-the-paper-does-not-state" title="Permanent link">&para;</a></h2>
+<p>Seeds; the validation draw sizes for the triangle scripts (the R code's
+<code>test</code>); <code>n_compare</code>; <code>n_heldout = 300</code> and the α set {−1.5, 0, 1.5} scored
+next to the single <code>x_obs</code>; the
+mixed cutpoints from the R code; the odds-ratio sample (40000 rows) and the
+counterfactual-PMF sample (2000 rows × 200 draws).</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.sections", "navigation.top", "content.code.copy", "toc.follow"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"provider": "mike"}}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+        <script src="../javascripts/mathjax.js"></script>
+      
+        <script src="https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-mml-chtml.js"></script>
+      
+    
+  </body>
+</html>

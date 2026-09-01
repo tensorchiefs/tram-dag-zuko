@@ -1,0 +1,1419 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Interpretable Neural Causal Models (TRAM-DAGs) in PyTorch">
+      
+      
+      
+        <link rel="canonical" href="https://tensorchiefs.github.io/tramdag/main/varying-coefficients/">
+      
+      
+        <link rel="prev" href="../scores/">
+      
+      
+        <link rel="next" href="../paper-replication/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>Varying coefficients - tramdag</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#varying-coefficient-treatment-effects-vcmodifiers-t-penalty" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+      <div data-md-color-scheme="default" data-md-component="outdated" hidden>
+        
+      </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="tramdag" class="md-header__button md-logo" aria-label="tramdag" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            tramdag
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Varying coefficients
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/tensorchiefs/tramdag" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    GitHub
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="tramdag" class="md-nav__button md-logo" aria-label="tramdag" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    tramdag
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/tensorchiefs/tramdag" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    GitHub
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Guides
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Guides
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../notation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Notation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../fitting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Fitting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../training-speed/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Training speed
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../scores/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Scores
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Varying coefficients
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Varying coefficients
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#why-not-cst-x2-x3-anti-pattern" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Why not CS("T", "X2", "X3")? (anti-pattern)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#semantics" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Semantics
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#propensity-centered-vc-centertrue-r-learner-orthogonalization" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Propensity-centered VC: center=True (R-learner orthogonalization)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#validation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Validation
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../paper-replication/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Paper replication
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../code-map/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Code map
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../zuko-upstream/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Zuko upstream
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Notebooks
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Notebooks
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../notebooks/demo_tram_dag_colab/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    TRAM-DAG in 5 minutes — one causal model, all three rungs of Pearl's ladder
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../notebooks/intro_tram_dag/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    TRAM-DAG — a didactic introduction with
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../notebooks/additive_vs_joint_ci/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Additive vs joint complex intercept — interpreting per-parent effects
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../notebooks/varying_coefficients/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Heterogeneous treatment effects: the term
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../notebooks/classical_fit_tram_dag/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Classical fitting of all- TRAM-DAGs ()
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/tramdag/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    tramdag
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/spec/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    spec
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/flow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    flow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/transforms/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    transforms
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/conditioners/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    conditioners
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/scores/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    scores
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/callbacks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    callbacks
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#why-not-cst-x2-x3-anti-pattern" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Why not CS("T", "X2", "X3")? (anti-pattern)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#semantics" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Semantics
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#propensity-centered-vc-centertrue-r-learner-orthogonalization" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Propensity-centered VC: center=True (R-learner orthogonalization)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#validation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Validation
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="varying-coefficient-treatment-effects-vcmodifiers-t-penalty">Varying-coefficient treatment effects: <code>VC(*modifiers, t=, penalty=)</code><a class="headerlink" href="#varying-coefficient-treatment-effects-vcmodifiers-t-penalty" title="Permanent link">&para;</a></h1>
+<p>A <code>VC</code> term gives a node a <strong>treatment-effect head with its own bias–variance
+budget</strong> (issue #28). The term contributes</p>
+<div class="highlight"><pre><span></span><code>beta(modifiers) * x_on        with    beta(x) = beta0 + b_theta(x)
+</code></pre></div>
+<p>to the node's shift. Here <code>b_theta</code> is a deliberately small (one 16-unit
+hidden layer), <strong>penalized</strong> network. The point is not expressiveness. The
+point is that the flow estimates the effect function <em>with care</em>, not as a
+by-product:</p>
+<div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">tramdag</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">td</span>
+
+<span class="n">spec</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="s2">"X1"</span><span class="p">:</span> <span class="n">td</span><span class="o">.</span><span class="n">ContinuousNode</span><span class="p">(),</span>
+    <span class="s2">"X2"</span><span class="p">:</span> <span class="n">td</span><span class="o">.</span><span class="n">ContinuousNode</span><span class="p">(),</span>
+    <span class="s2">"X3"</span><span class="p">:</span> <span class="n">td</span><span class="o">.</span><span class="n">ContinuousNode</span><span class="p">(),</span>
+    <span class="s2">"T"</span><span class="p">:</span> <span class="n">td</span><span class="o">.</span><span class="n">OrdinalNode</span><span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="n">td</span><span class="o">.</span><span class="n">LS</span><span class="p">(</span><span class="s2">"X1"</span><span class="p">)</span> <span class="o">+</span> <span class="n">td</span><span class="o">.</span><span class="n">LS</span><span class="p">(</span><span class="s2">"X2"</span><span class="p">)),</span>
+    <span class="s2">"Y"</span><span class="p">:</span> <span class="n">td</span><span class="o">.</span><span class="n">ContinuousNode</span><span class="p">(</span>
+        <span class="n">td</span><span class="o">.</span><span class="n">CS</span><span class="p">(</span><span class="s2">"X1"</span><span class="p">,</span> <span class="s2">"X2"</span><span class="p">,</span> <span class="s2">"X3"</span><span class="p">)</span>  <span class="c1"># prognostic part g(x): as flexible as you like</span>
+        <span class="o">+</span> <span class="n">td</span><span class="o">.</span><span class="n">VC</span><span class="p">(</span><span class="s2">"X2"</span><span class="p">,</span> <span class="s2">"X3"</span><span class="p">,</span> <span class="n">t</span><span class="o">=</span><span class="s2">"T"</span><span class="p">,</span> <span class="n">penalty</span><span class="o">=</span><span class="mf">1.0</span><span class="p">)</span>  <span class="c1"># effect beta(X2, X3) * T</span>
+    <span class="p">),</span>
+<span class="p">}</span>
+<span class="n">flow</span> <span class="o">=</span> <span class="n">td</span><span class="o">.</span><span class="n">CausalFlowDAG</span><span class="p">(</span><span class="n">spec</span><span class="p">,</span> <span class="n">seed</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span>
+    <span class="n">train</span><span class="p">,</span> <span class="n">epochs</span><span class="o">=</span><span class="mi">500</span><span class="p">,</span> <span class="n">learning_rate</span><span class="o">=</span><span class="mf">1e-2</span><span class="p">,</span> <span class="n">batch_size</span><span class="o">=</span><span class="mi">512</span>
+<span class="p">)</span>  <span class="c1"># best-validation weights: callbacks.RestoreBest, see fitting.md</span>
+
+<span class="n">beta</span> <span class="o">=</span> <span class="n">flow</span><span class="o">.</span><span class="n">varying_coef</span><span class="p">(</span><span class="n">df_new</span><span class="p">,</span> <span class="s2">"Y"</span><span class="p">)</span>  <span class="c1"># (n,) array beta(x) — deterministic, y-free</span>
+<span class="n">beta0</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">flow</span><span class="o">.</span><span class="n">nodes</span><span class="p">[</span><span class="s2">"Y"</span><span class="p">]</span><span class="o">.</span><span class="n">shifts</span><span class="p">[</span><span class="s2">"T"</span><span class="p">]</span><span class="o">.</span><span class="n">beta0</span><span class="p">)</span>  <span class="c1"># interpretable main effect</span>
+</code></pre></div>
+<p><code>X2</code> and <code>X3</code> appear <strong>twice</strong>: as prognostic parents through <code>CS</code> and as
+effect modifiers through <code>VC</code>. This pattern is intended. Only the treatment
+node named by <code>t=</code> owns its edge, and a second term that declares it raises
+an error. Modifiers can repeat.</p>
+<h2 id="why-not-cst-x2-x3-anti-pattern">Why not <code>CS("T", "X2", "X3")</code>? (anti-pattern)<a class="headerlink" href="#why-not-cst-x2-x3-anti-pattern" title="Permanent link">&para;</a></h2>
+<p>For a binary treatment, the multi-parent <code>CS</code> is equivalent in
+<em>expressiveness</em>. Any shift decomposes exactly as
+<code>s(x,t) = s(x,0) + [s(x,1) − s(x,0)]·t</code>. But the <code>CS</code> form has <strong>no
+effect-specific regularization</strong>. The likelihood rewards a good average fit
+of <code>s(x,t)</code>, and nothing rewards a smooth difference between the arms. The
+read-out is thus the difference of two jointly fitted, unregularized
+networks, which amplifies noise.</p>
+<p>On the heterogeneous-effect validation DGP (see below), the <code>CS</code> reduced form reaches
+corr ≈ 0.5 against the true effect function (tramdag-simu#18 / PR #21). This
+holds <strong>even when the model is exactly in-class</strong>. The <code>VC</code> term reaches
+corr ≈ 0.99 on the same protocol (<code>tests/test_vc_term.py</code>, acceptance bar
+0.9). Causal forests and R-learners work not because they <em>target</em> the
+effect, but because they <strong>regularize</strong> it (Nie &amp; Wager 2021,
+Athey–Tibshirani–Wager 2019). <code>VC</code> brings that ingredient into the TRAM
+framework.</p>
+<h2 id="semantics">Semantics<a class="headerlink" href="#semantics" title="Permanent link">&para;</a></h2>
+<ul>
+<li><strong>Scale</strong>: <code>beta(x)</code> lives on the node's latent (log-odds) scale. The flow
+  adds it for a continuous node (<code>u = h(y) + …</code>) and subtracts it from the
+  cutpoints for an ordinal node, exactly like an <code>LS</code> weight. With no
+  modifiers, <code>VC(t="T")</code> <em>is</em> <code>LS("T")</code> (identical model, testably
+  bit-exact). Thus <code>VC</code> versus <code>LS</code> is a nested question.</li>
+<li><strong>Penalty</strong>: the fitting objective is the penalized likelihood
+  <code>Σᵢ NLLᵢ + penalty · ‖b_theta weights‖²</code> on the total-NLL scale. This is a
+  fixed Gaussian prior whose shrinkage vanishes as n grows. The penalty
+  never applies to <code>beta0</code>. <code>penalty → ∞</code> shrinks <code>b_theta</code> to the zero
+  function and recovers the classical <code>LS</code> fit. The default is
+  <code>penalty=1.0</code>. If the modifiers are many or n is small, raise the penalty.</li>
+<li><strong>Identification / centering</strong>: a constant moves freely between <code>beta0</code>
+  and <code>b_theta</code>. The head's output layer is zero-initialized
+  (<code>beta(x) = beta0</code> at step 0). After <code>fit</code>, the flow re-centers the head
+  to mean zero over the training data, which preserves the function. Thus
+  <code>beta0</code> is the main effect in the training population, the <code>Colr</code> reading
+  when <code>beta</code> is constant.</li>
+<li><strong>Warm start</strong> (optional, two lines): fit the all-<code>ls</code> version of the
+  node classically and copy the treatment weight into
+  <code>flow.nodes[node].shifts[t].beta0</code> before <code>fit</code>, so training starts at the
+  classical answer and only learns deviations. Measured on the <code>vc_hetero</code>
+  DGP: <code>beta0</code> lands within 0.15 of the truth with it, 0.16 from the zero
+  start; the recovery correlation is 0.99 either way.</li>
+<li><strong>Treatments</strong>: the treatment <code>x_on</code> can be continuous or binary (2-level)
+  ordinal. The term is linear in <code>x_on</code>. A binary ordinal enters as its 0/1
+  level, so <code>beta</code> is the identified level-1-vs-0 contrast. Multi-level
+  ordinal treatments are a planned follow-up.</li>
+<li><strong>Read-out</strong>: <code>flow.varying_coef(df, node, t=...)</code> evaluates
+  <code>beta0 + b_theta(modifiers)</code> in closed form. The result is deterministic
+  and y-free, and it needs no abduction. For a binary treatment, it equals
+  the abduct-difference <code>u(x, t=1, y) − u(x, t=0, y)</code> identically (pinned by
+  a test).</li>
+</ul>
+<h2 id="propensity-centered-vc-centertrue-r-learner-orthogonalization">Propensity-centered VC: <code>center=True</code> (R-learner orthogonalization)<a class="headerlink" href="#propensity-centered-vc-centertrue-r-learner-orthogonalization" title="Permanent link">&para;</a></h2>
+<div class="highlight"><pre><span></span><code><span class="n">td</span><span class="o">.</span><span class="n">VC</span><span class="p">(</span><span class="s2">"X2"</span><span class="p">,</span> <span class="s2">"X3"</span><span class="p">,</span> <span class="n">t</span><span class="o">=</span><span class="s2">"T"</span><span class="p">,</span> <span class="n">penalty</span><span class="o">=</span><span class="mf">1.0</span><span class="p">,</span> <span class="n">center</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="c1"># contributes  beta(x) * (t - e_hat(x))  to the shift; e_hat comes from you</span>
+</code></pre></div>
+<p>This is Robinson/R-learner centering inside the likelihood. Dandl et al.
+(2024) found treatment-centering to be <em>the</em> decisive ingredient for effect
+estimation under confounding in model-based forests. That finding reproduces
+here. The test DGP is strongly confounded, and the model deliberately
+under-specifies its prognostic part (true g(x) quadratic, model linear). On
+that DGP, the uncentered β̂ absorbs the confounded misfit. The mean
+|β̂ − τ| is ≈ 1.1–1.2, which effectively destroys the effect estimate. The
+centered β̂ stays near truth (≈ 0.1–0.3), a <strong>5–10× bias reduction</strong>
+(<code>tests/test_vc_centered.py</code>). If the prognostic part is correctly
+specified, centering changes little. Centering is insurance against the
+misspecification that you do not know you have.</p>
+<p>The naive implementations are wrong. Thus this is a <strong>two-stage frozen</strong>
+design:</p>
+<ul>
+<li><strong>Training</strong> uses <strong>out-of-fold</strong> ê that <em>you</em> compute and pass as
+  <code>fit(vc_ehat={"Y": {"T": e_oof}})</code>, one value per training row: any
+  propensity model, each fold predicted by a fit that never saw it. This is
+  the DML cross-fitting requirement — in-sample ê reintroduces the
+  own-observation bias and can be <em>worse</em> than no centering. Six lines with
+  the flow's own classical fit:</li>
+</ul>
+<div class="highlight"><pre><span></span><code><span class="n">fold_id</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">default_rng</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span><span class="o">.</span><span class="n">permutation</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">train</span><span class="p">))</span> <span class="o">%</span> <span class="mi">5</span>
+<span class="n">e_oof</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">empty</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">train</span><span class="p">))</span>
+<span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">5</span><span class="p">):</span>
+    <span class="n">proxy</span> <span class="o">=</span> <span class="n">td</span><span class="o">.</span><span class="n">CausalFlowDAG</span><span class="p">(</span><span class="n">t_spec</span><span class="p">,</span> <span class="n">seed</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>          <span class="c1"># the treatment node's spec</span>
+    <span class="n">proxy</span><span class="o">.</span><span class="n">fit_classical</span><span class="p">(</span><span class="n">train</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="n">fold_id</span> <span class="o">!=</span> <span class="n">j</span><span class="p">][[</span><span class="s2">"X"</span><span class="p">,</span> <span class="s2">"T"</span><span class="p">]])</span>
+    <span class="n">e_oof</span><span class="p">[</span><span class="n">fold_id</span> <span class="o">==</span> <span class="n">j</span><span class="p">]</span> <span class="o">=</span> <span class="n">proxy</span><span class="o">.</span><span class="n">pmf</span><span class="p">(</span><span class="n">train</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="n">fold_id</span> <span class="o">==</span> <span class="n">j</span><span class="p">],</span> <span class="s2">"T"</span><span class="p">)[:,</span> <span class="mi">1</span><span class="p">]</span>
+</code></pre></div>
+<p>The OOF values enter the outcome loss as frozen data. Thus <strong>no gradient
+  reaches the treatment node</strong> from the outcome node, and the per-node
+  factorization stays intact (pinned by a gradient-isolation test). <code>fit</code>
+  refuses a centered spec without <code>vc_ehat</code> and a <code>vc_ehat</code> that does not
+  match the spec.
+- <strong>Inference</strong> (<code>log_prob</code> / <code>sample</code> / <code>abduct</code> / <code>pmf</code> / <code>scores</code>)
+  recomputes ê from the flow's <strong>own fitted treatment node</strong>, the full-data
+  fit (the standard DML train/predict split). The computation is detached
+  and uses the current parent values. Under <code>do(T=t)</code>, the flow re-derives
+  the regressor as <code>t − ê(x)</code>. The flow caches nothing.
+- <strong>Interpretation</strong>: with centering, <code>beta0</code> is the effect at the treatment
+  margin (the observed propensities). <code>varying_coef</code> is unchanged, because
+  centering moves the regressor, not β. The LS-nesting reading applies to
+  the uncentered term only. Centering requires a binary ordinal treatment.
+  Continuous-treatment centering with E[T|x] is a follow-up. <code>center=False</code>
+  (the default) is bit-identical to the uncentered term.</p>
+<h2 id="validation">Validation<a class="headerlink" href="#validation" title="Permanent link">&para;</a></h2>
+<p>The <code>vc_hetero</code> DGP in <a href="https://github.com/tensorchiefs/tramdag/blob/main/tests/conftest.py"><code>tests/conftest.py</code></a> is a
+logistic-shift SCM with known <code>beta_true(x) = −1 + 0.8·X2 − 0.6·X3</code>. It has a
+nonlinear prognostic part and confounded assignment (X2 is confounder <em>and</em>
+modifier), which is the configuration where the <code>CS</code> reduced form fails
+hardest. Acceptance (<code>tests/test_vc_term.py</code>) requires three results:
+recovery corr ≥ 0.9 at n = 5000 (measured ≈ 0.99, min over 3 seeds 0.986), a
+fitted <code>beta0</code> that matches <code>fit_classical</code> under a large penalty, and the
+read-out identities. The centering claims are measured against the
+<code>confounded</code> DGP in the same file. Both former follow-ups have since
+shipped: propensity centering (#30) is <code>center=True</code>, documented above, and the
+per-observation scores for effect-modifier scans (#29) are <code>flow.scores</code> and
+<code>flow.effect_modifier_scan</code> — see <a href="../scores/">scores.md</a>.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.sections", "navigation.top", "content.code.copy", "toc.follow"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"provider": "mike"}}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+        <script src="../javascripts/mathjax.js"></script>
+      
+        <script src="https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-mml-chtml.js"></script>
+      
+    
+  </body>
+</html>

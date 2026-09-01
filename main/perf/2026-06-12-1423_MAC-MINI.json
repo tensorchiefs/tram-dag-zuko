@@ -1,0 +1,76 @@
+{
+  "machine": {
+    "hostname": "MAC-MINI",
+    "os": "Darwin 25.3.0",
+    "machine": "arm64",
+    "processor": "arm",
+    "cpu_count": 10,
+    "python": "3.14.3",
+    "torch": "2.12.0",
+    "tramdag": "0.2.0",
+    "cuda": null,
+    "mps": true,
+    "ram_gb": 34.4
+  },
+  "code": {
+    "tramdag": "0.2.0",
+    "git_commit": "c9d84bf",
+    "git_dirty": true
+  },
+  "epochs": 200,
+  "timestamp": "2026-06-12T14:23:42+00:00",
+  "results": [
+    {
+      "workload": "intro",
+      "device": "cpu",
+      "n": 5000,
+      "batch": 512,
+      "epochs": 200,
+      "fit_s": 6.52,
+      "epochs_per_s": 30.66,
+      "sample_100k_s": 1.8,
+      "abduct_10k_s": 0.01,
+      "final_val_nll": 5.3741,
+      "_sample_mean_x_last": 1.2477
+    },
+    {
+      "workload": "intro",
+      "device": "mps",
+      "n": 5000,
+      "batch": 512,
+      "epochs": 200,
+      "fit_s": 20.03,
+      "epochs_per_s": 9.98,
+      "sample_100k_s": 0.91,
+      "abduct_10k_s": 0.08,
+      "final_val_nll": 5.3736,
+      "_sample_mean_x_last": 1.2303
+    },
+    {
+      "workload": "large",
+      "device": "cpu",
+      "n": 50000,
+      "batch": 4096,
+      "epochs": 200,
+      "fit_s": 20.73,
+      "epochs_per_s": 9.65,
+      "sample_100k_s": 1.71,
+      "abduct_10k_s": 0.01,
+      "final_val_nll": 4.9152,
+      "_sample_mean_x_last": -0.2068
+    },
+    {
+      "workload": "large",
+      "device": "mps",
+      "n": 50000,
+      "batch": 4096,
+      "epochs": 200,
+      "fit_s": 31.6,
+      "epochs_per_s": 6.33,
+      "sample_100k_s": 0.89,
+      "abduct_10k_s": 0.06,
+      "final_val_nll": 4.9132,
+      "_sample_mean_x_last": -0.1763
+    }
+  ]
+}
