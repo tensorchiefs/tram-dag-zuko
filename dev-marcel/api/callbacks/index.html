@@ -2012,9 +2012,12 @@ optimizer with :func:<code>per_node_adam</code> (one <code>node</code>-tagged gr
 node), and give <code>fit</code> a validation set (the callback reads
 <code>flow.history["val"]</code>).</p>
 <p>A frozen node's rate is 0 but its forward/backward still runs, so the
-saving is in epochs, not per-epoch wall clock. This is the pre-0.4
-<code>fit(schedule="plateau", freeze_patience=)</code> recipe, back as an opt-in
-callback; <code>docs/training-speed.md</code> has its measurements.</p>
+saving is in epochs, not per-epoch wall clock. Do not attach a torch lr
+scheduler to the same optimizer — two controllers would steer the same
+group rates (a <code>LambdaLR</code> even resets frozen nodes to <code>initial_lr</code>).
+This is the pre-0.4 <code>fit(schedule="plateau", freeze_patience=)</code> recipe,
+back as an opt-in callback; <code>docs/training-speed.md</code> has its
+measurements.</p>
 
 
 <p><span class="doc-section-title">Parameters:</span></p>
