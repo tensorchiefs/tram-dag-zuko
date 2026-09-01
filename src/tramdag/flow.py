@@ -70,19 +70,26 @@ def _callback_list(cbs) -> list:
     return [cbs] if callable(cbs) else list(cbs)
 
 
-def _check_fit_sizes(epochs: int, batch_size: int) -> None:
-    """Reject a non-positive epoch or batch budget before anything runs."""
+def _check_fit_sizes(
+    epochs: int, batch_size: int, verbose: int, validation_batch_size: int | None
+) -> None:
+    """Reject a non-positive epoch, batch or verbose value before anything runs."""
     if epochs < 1:
         raise ValueError(f"epochs must be at least 1, got {epochs}")
     if batch_size < 1:
         raise ValueError(f"batch_size must be at least 1, got {batch_size}")
+    if verbose < 0 or int(verbose) != verbose:
+        raise ValueError(f"verbose must be a non-negative int, got {verbose!r}")
+    if validation_batch_size is not None and validation_batch_size < 1:
+        raise ValueError(
+            f"validation_batch_size must be at least 1, got {validation_batch_size}"
+        )
 
 
 def _split_validation(
     train_df: pd.DataFrame,
     validation_data: pd.DataFrame | None,
     validation_split: float | None,
-    verbose: int,
     vc_ehat: dict | None,
 ):
     """Resolve fit's validation arguments (the Keras rules).
@@ -92,8 +99,6 @@ def _split_validation(
     hidden RNG. ``vc_ehat`` rows are sliced with the same split, so the
     caller supplies propensities for the frame they passed.
     """
-    if verbose < 0 or int(verbose) != verbose:
-        raise ValueError(f"verbose must be a non-negative int, got {verbose!r}")
     if validation_split is None:
         return train_df, validation_data, vc_ehat
     if validation_data is not None:
@@ -106,12 +111,30 @@ def _split_validation(
             f"validation_split={validation_split} leaves no rows on one side "
             f"of the {len(train_df)}-row frame"
         )
-    if vc_ehat is not None:
-        vc_ehat = {
-            node: {t: np.asarray(e)[:cut] for t, e in d.items()}
-            for node, d in vc_ehat.items()
-        }
+    vc_ehat = _slice_vc_ehat(vc_ehat, len(train_df), cut)
     return train_df.iloc[:cut], train_df.iloc[cut:], vc_ehat
+
+
+def _slice_vc_ehat(vc_ehat: dict | None, n_full: int, cut: int) -> dict | None:
+    """Slice the caller's propensities with the validation split.
+
+    The rows must cover the FULL frame passed to ``fit`` — a wrong length
+    fails here instead of being silently truncated by the slice.
+    """
+    if vc_ehat is None:
+        return None
+    for node, d in vc_ehat.items():
+        for t, e in d.items():
+            if len(np.asarray(e)) != n_full:
+                raise ValueError(
+                    f"vc_ehat[{node!r}][{t!r}] has {len(np.asarray(e))} rows, "
+                    f"not the {n_full} of the frame passed to fit — supply "
+                    "propensities for that frame; the split slices them"
+                )
+    return {
+        node: {t: np.asarray(e)[:cut] for t, e in d.items()}
+        for node, d in vc_ehat.items()
+    }
 
 
 def _check_callbacks(cbs: list, args: tuple[str, ...], name: str) -> None:
@@ -1015,7 +1038,9 @@ class CausalFlowDAG(nn.Module):
             train (and calibrate — no leakage into the frozen statistics).
             Mutually exclusive with ``validation_data``.
         validation_batch_size : int | None, optional
-            Chunk size of the validation pass, by default one full batch.
+            Chunk size of the validation pass — a MEMORY ceiling for large
+            validation frames, by default one full batch (which is also the
+            fastest; chunk only when the full pass does not fit).
         verbose : int, optional
             0 (default) is silent. ``N >= 1`` prints one line every ``N``
             epochs and on the final epoch: epoch counter, summed train NLL,
@@ -1079,7 +1104,7 @@ class CausalFlowDAG(nn.Module):
         training rows; the constant moves into ``beta0``, the function is
         unchanged.
         """
-        _check_fit_sizes(epochs, batch_size)
+        _check_fit_sizes(epochs, batch_size, verbose, validation_batch_size)
         before = _callback_list(before_fit_callbacks)
         after_epoch = _callback_list(after_epoch_callbacks)
         after_fit = _callback_list(after_fit_callbacks)
@@ -1089,7 +1114,7 @@ class CausalFlowDAG(nn.Module):
         if seed is not None:
             torch.manual_seed(seed)
         train_df, validation_data, vc_ehat = _split_validation(
-            train_df, validation_data, validation_split, verbose, vc_ehat
+            train_df, validation_data, validation_split, vc_ehat
         )
         # vc_ehat is validated BEFORE calibrate: a malformed dict must fail
         # while the flow is still untouched (calibrate sets ranges and the
@@ -1116,7 +1141,9 @@ class CausalFlowDAG(nn.Module):
             )
             # every callback runs (a stop must not skip a monitoring one)
             stops = [bool(cb(self, epoch, opt)) for cb in after_epoch]
-            self._log_epoch(epoch, epochs, verbose, stopped=any(stops))
+            self._log_epoch(
+                epoch, epochs, verbose, stopped=any(stops), has_val=val_vals is not None
+            )
             if any(stops):
                 break
         for cb in after_fit:
@@ -1139,14 +1166,16 @@ class CausalFlowDAG(nn.Module):
                 self._val_nll(val_vals, validation_batch_size)
             )
 
-    def _log_epoch(self, epoch: int, epochs: int, verbose: int, stopped: bool):
+    def _log_epoch(
+        self, epoch: int, epochs: int, verbose: int, stopped: bool, has_val: bool
+    ):
         """Print one ``verbose`` progress line on the Nth and the final epoch."""
         last = stopped or epoch == epochs
         if not verbose or (epoch % verbose and not last):
             return
         line = f"epoch {epoch}/{epochs}"
         line += f"  train {sum(self.history['train'][-1].values()):.4f}"
-        if self.history.get("val"):
+        if has_val:  # THIS fit's validation, not a stale earlier one
             line += f"  val {sum(self.history['val'][-1].values()):.4f}"
         print(line)
 

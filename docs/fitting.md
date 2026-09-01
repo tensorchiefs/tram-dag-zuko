@@ -125,7 +125,9 @@ flow.fit(
 different rates — and per-node early stopping is `PerNodePlateau(patience=10,
 freeze=40)` over that optimizer: each node's rate decays on its own
 validation NLL and the fit stops when every node froze (the demo notebook
-runs this recipe end to end).
+runs this recipe end to end). It was `fit(schedule="plateau",
+freeze_patience=)` before 0.4 and is measured in
+`experiments/benchmarks/bench_training.py`.
 
 Anything else is a few lines of your own. A learning-rate schedule is torch's,
 stepped from the hook on the validation NLL `fit` already computed; the
@@ -153,12 +155,6 @@ flow.load_state_dict(best["state"])
 (One difference to `RestoreBest`: a post-fit `load_state_dict` skips the VC
 re-centering, so on a spec with a `VC` term prefer `after_fit_callbacks`.)
 
-The per-node variant — one parameter group per node, each decayed on its own
-validation NLL and frozen (rate 0) once flat — is
-`tramdag.callbacks.PerNodePlateau` over a `per_node_adam(flow, lr)` optimizer;
-it was `fit(schedule="plateau", freeze_patience=)` before 0.4, left `fit`
-because it is a training strategy, not part of the model, and is measured in
-`experiments/benchmarks/bench_training.py`.
 
 Freezing helps and parallelizing the node loop does not: freezing deletes
 whole epochs, while node-level overlap only time-slices the cores that each

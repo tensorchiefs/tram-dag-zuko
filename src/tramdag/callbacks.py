@@ -31,9 +31,13 @@ import torch
 
 # %% private functions -------------------------------------------------------------
 def _last_val(flow) -> dict[str, float]:
-    """Give the current epoch's per-node validation NLL, or fail loudly."""
+    """Give the current epoch's per-node validation NLL, or fail loudly.
+
+    A stale entry from an earlier validated fit does not count: the val
+    record must be as long as the train record, i.e. THIS epoch validated.
+    """
     val = flow.history.get("val")
-    if not val:
+    if not val or len(val) != len(flow.history["train"]):
         raise RuntimeError(
             "this callback reads flow.history['val'] — pass validation_data= "
             "or validation_split= to fit()"

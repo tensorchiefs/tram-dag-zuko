@@ -35,7 +35,6 @@
 #
 
 # %%
-import logging
 import time
 import warnings
 from pathlib import Path
@@ -49,8 +48,6 @@ from tramdag import LS, SI, CausalFlowDAG, ContinuousNode, OrdinalNode
 from tramdag.callbacks import PerNodePlateau, per_node_adam
 
 warnings.filterwarnings("ignore")
-# so fit_classical reports its iters / NLL / time
-logging.basicConfig(level=logging.INFO, format="%(message)s")
 
 # repo-relative data, whether the notebook runs from the repo root or notebooks/
 HERE = [Path.cwd(), *Path.cwd().parents]

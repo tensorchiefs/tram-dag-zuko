@@ -37,7 +37,7 @@ the "paper" column names the figure and what it shows.
 | seeds | triangle scripts unseeded (`SEED = -1`); comparison scripts `dgp(..., seed=42)` on R's RNG | not replayable in torch, so every seed is a repo choice (42 for the DGP is kept as a nod to the reference) |
 | calibrated start | none | `flow.calibrate(train, marginal_init=False)` in `helpers.fit_paper` (framework default is True) |
 | intercept output layer | Keras dense with bias | bias-free — **D3** (the same function class; the bias adds a constant to all unconstrained coefficients) |
-| plateau rule (VACA/CAREFL) | `update_learning_rate`: one optimizer, reduce when the summed validation NLL has not improved for 50 epochs (strict `<`), factor 0.1, min 1e-7 | torch `ReduceLROnPlateau(patience=49, threshold=0, threshold_mode="abs", factor=0.1, min_lr=1e-7)` on `sum(flow.nll(val))` — the same rule, verified against torch's source. CAREFL keeps it; VACA dropped it 2026-09-01 with the epoch cut (on the compressed trajectory it cannot fire inside the all-bounds window — see the tuning round) |
+| plateau rule (VACA/CAREFL) | `update_learning_rate`: one optimizer, reduce when the summed validation NLL has not improved for 50 epochs (strict `<`), factor 0.1, min 1e-7 | torch `ReduceLROnPlateau(patience=49, threshold=0, threshold_mode="abs", factor=0.1, min_lr=1e-7)` on the summed `history["val"]` entry (fit computes it) — the same rule, verified against torch's source. CAREFL keeps it; VACA dropped it 2026-09-01 with the epoch cut (on the compressed trajectory it cannot fire inside the all-bounds window — see the tuning round) |
 
 D1 (VACA/CAREFL only) and D3 remain; both were measured (below). The per-node
 plateau approximation of 2026-08-25 (D4) is gone with the lean `fit`. Two
