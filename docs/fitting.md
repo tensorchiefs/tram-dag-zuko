@@ -101,10 +101,43 @@ learning rates and freezing (a callback, below) and the all-`ls` classical fit.
   `{node: {t: array}}` with one value per training row (see
   [varying-coefficients.md](varying-coefficients.md)).
 
-### The recipes, as callbacks
+### Training strategies
 
-The shipped ones first — best-validation weights plus progress lines is one
-import:
+Every strategy below is `fit` plus a callback or a few lines of your own —
+pick by model class, each with a copy-paste example (they assume a built
+`flow = CausalFlowDAG(spec)` and pandas `train_df`/`val_df`). The empirical
+rule of thumb: **all-`ls` models train to the MLE and keep the final
+weights; flexible (CI/CS/VC) models validate and keep the best weights**
+(they overfit observational confounding at the MLE, see the finding below).
+
+| Strategy | When |
+|---|---|
+| exact MLE — [`fit_classical`](#path-b--classical-optimization-fit_classical) | all-`ls` spec; deterministic, seconds |
+| plain Adam | all-`ls` with a shift `fit_classical` refuses, quick looks |
+| multi-phase Adam | a tighter MLE without a scheduler |
+| best-validation weights — `RestoreBest` | any CI/CS/VC model; the recommended recipe (nothing is automatic — register it) |
+| … + early stopping | cap the wasted epochs after the best |
+| global plateau schedule | decaying one shared rate beats picking one |
+| per-node plateau — `PerNodePlateau` | nodes converge at different speeds; self-stopping |
+
+**Plain Adam** — one loop, constant rate, final weights:
+
+```python
+flow = CausalFlowDAG(spec, seed=0)
+flow.fit(train_df, epochs=500, learning_rate=1e-3, batch_size=256, verbose=100)
+```
+
+**Multi-phase Adam** — re-calling `fit` continues training, so decreasing
+rates are a loop. This is the `validate_ls` protocol, whose three phases land
+within ~1e-5 of statsmodels — a single converged constant-rate run gets
+~1e-3:
+
+```python
+for epochs, lr in [(800, 1e-2), (700, 1e-3), (500, 1e-4)]:
+    flow.fit(train_df, epochs=epochs, learning_rate=lr)
+```
+
+**Best-validation weights** — the flexible-model default, one import:
 
 ```python
 from tramdag.callbacks import RestoreBest
@@ -120,21 +153,48 @@ flow.fit(
 )
 ```
 
-**Per-node training**, the two requested recipes: a per-node optimizer is
-`per_node_adam(flow, lr)` — one parameter group per node, so groups can carry
-different rates — and per-node early stopping is `PerNodePlateau(patience=10,
-freeze=40)` over that optimizer: each node's rate decays on its own
-validation NLL and the fit stops when every node froze (the demo notebook
-runs this recipe end to end). It was `fit(schedule="plateau",
-freeze_patience=)` before 0.4 and is measured in
-`experiments/benchmarks/bench_training.py`.
+Both registrations matter: without `best.restore` the fit silently keeps the
+final (overfit) weights. And `validation_split` takes the LAST rows unshuffled
+— shuffle the DataFrame first if its row order means anything.
 
-Anything else is a few lines of your own. A learning-rate schedule is torch's,
-stepped from the hook on the validation NLL `fit` already computed; the
-snapshot half is what `RestoreBest` does inside, written out:
+**… plus early stopping** — `RestoreBest` already tracks the best epoch, so
+patience is one more callback (they run in list order, so `best` updates
+first):
+
+```python
+best = RestoreBest()
+patience = lambda flow, epoch, opt: epoch - best.best_epoch >= 200
+
+flow.fit(train_df, epochs=4000, validation_split=0.1,
+         after_epoch_callbacks=[best, patience],
+         after_fit_callbacks=[best.restore])
+```
+
+**Per-node plateau** — one rate per node (`per_node_adam` tags one parameter
+group per node; valid because the per-node gradients are independent), each
+decaying and finally freezing on its own validation NLL; the fit stops when
+every node froze. The demo notebook runs it end to end; before 0.4 it was
+`fit(schedule="plateau", freeze_patience=)`, measured in
+`experiments/benchmarks/bench_training.py`:
+
+```python
+from tramdag.callbacks import PerNodePlateau, per_node_adam
+
+flow.fit(train_df, epochs=4000, validation_split=0.1,
+         optimizer=per_node_adam(flow, lr=1e-2),
+         after_epoch_callbacks=[PerNodePlateau(patience=10, freeze=40)])
+```
+
+**Global plateau schedule** — anything else is a few lines of your own: a
+learning-rate schedule is torch's, stepped from the hook on the validation
+NLL `fit` already computed (so this too needs `validation_data=` or
+`validation_split=`); the snapshot half is what `RestoreBest` does inside,
+written out:
 
 ```python
 import copy
+
+import torch
 
 opt = torch.optim.Adam(flow.parameters(), lr=1e-2)
 plateau = torch.optim.lr_scheduler.ReduceLROnPlateau(opt, factor=0.3, patience=30)
@@ -154,6 +214,8 @@ flow.load_state_dict(best["state"])
 
 (One difference to `RestoreBest`: a post-fit `load_state_dict` skips the VC
 re-centering, so on a spec with a `VC` term prefer `after_fit_callbacks`.)
+
+The exact-MLE and warm-start strategies are Path B, below.
 
 
 Freezing helps and parallelizing the node loop does not: freezing deletes
