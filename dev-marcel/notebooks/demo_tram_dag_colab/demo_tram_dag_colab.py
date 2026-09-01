@@ -159,7 +159,11 @@ spec = {
 
 
 def early_stopping(patience):
-    """ReduceLROnPlateau on fit's own validation NLL, stop after `patience` flat epochs."""
+    """ReduceLROnPlateau on fit's own validation NLL, stop after `patience` flat epochs.
+
+    The stop half ships as `tramdag.callbacks.EarlyStopping`; hand-rolled here
+    to show the bare-callable hook carrying a torch scheduler.
+    """
     log = {"val": [], "sched": None}
 
     def cb(f, epoch, opt):

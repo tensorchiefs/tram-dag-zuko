@@ -1565,23 +1565,11 @@
 
     <div class="doc doc-contents first">
 
-        <p>Predefined <code>fit</code> callbacks — restore-best, early stopping, per-node plateau.</p>
-<p><code>fit</code> owns validation (<code>validation_data=</code> / <code>validation_split=</code>) and
-progress printing (<code>verbose=</code>); the callbacks here read the per-node
-validation NLL that <code>fit</code> appends to <code>flow.history["val"]</code> after every
-epoch — computed once, shared by all of them. One <code>callbacks=</code> list is the
-whole registration; each entry hooks itself into the fit::</p>
-<pre><code>from tramdag.callbacks import EarlyStopping, RestoreBest
-
-flow.fit(
-    train_df,
-    epochs=4000,
-    validation_data=val_df,
-    verbose=50,
-    callbacks=[RestoreBest(), EarlyStopping(patience=200)],
-)
-</code></pre>
-<p>A bare function in the list is an <code>on_epoch_end</code> hook; anything not
+        <p>Predefined <code>fit</code> callbacks: <code>RestoreBest</code>, <code>EarlyStopping</code>, <code>PerNodePlateau</code>.</p>
+<p><code>fit</code> owns validation and progress printing; the callbacks here read the
+per-node validation NLL that <code>fit</code> appends to <code>flow.history["val"]</code> after
+every epoch — computed once, shared by all of them. One <code>callbacks=</code> list
+is the whole registration (the <code>fit</code> docstring shows it); anything not
 covered here is a :class:<code>Callback</code> subclass of your own (docs/fitting.md).</p>
 
 
@@ -2148,9 +2136,11 @@ its stroke workload runs 30/120
     <div class="doc doc-contents ">
 
         <p>Start fresh — rates and frozen nodes never carry into the next fit.</p>
-<p>A reused optimizer's decayed (or zeroed) group rates go back to their
-remembered start values first; without that, the new baseline would
-be the old decayed rate and a frozen node would "train" at rate 0.</p>
+<p>A reused optimizer's decayed (or zeroed) group rates go back to the
+<code>initial_lr</code> that <code>per_node_adam</code> stamped on each group; without
+that, the new baseline would be the old decayed rate and a frozen
+node would "train" at rate 0. The stamp lives on the group, so a
+fresh optimizer, a fresh callback or a second flow all stay correct.</p>
 
 
     </div>

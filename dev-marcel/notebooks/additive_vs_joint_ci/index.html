@@ -1949,7 +1949,7 @@ span.linenos.special { color: #000000; background-color: #ffffc0; padding-left: 
 </style>
 <!-- End of mermaid configuration --><div class="jupyter-wrapper">
 <div class="jp-Notebook" data-jp-theme-light="true" data-jp-theme-name="JupyterLab Light">
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=c8d8267f">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=119b94cc">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -1983,7 +1983,7 @@ space, and that is precisely what <code>intercept_contributions</code> surfaces.
 </div>
 </div>
 </div><div class="jp-Cell jp-CodeCell jp-Notebook-cell jp-mod-noOutputs">
-<div class="jp-Cell jp-CodeCell jp-Notebook-cell jp-mod-noOutputs" id="cell-id=f2970ba3">
+<div class="jp-Cell jp-CodeCell jp-Notebook-cell jp-mod-noOutputs" id="cell-id=d9ef6e1f">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -2020,7 +2020,7 @@ from tramdag.callbacks import RestoreBest</div>
 </div>
 </div>
 </div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=7362233a">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=78d1e328">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -2033,7 +2033,7 @@ $\varepsilon \sim \mathrm{Logistic}(0,1)$ — a genuine <code>x1·x2</code> inte
 </div>
 </div>
 </div><div class="jp-Cell jp-CodeCell jp-Notebook-cell">
-<div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=12311fbc">
+<div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=24f7a1a5">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -2156,7 +2156,7 @@ train.head()</div>
 </div>
 </div>
 </div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=78761848">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=7ab65cf4">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -2167,7 +2167,7 @@ train.head()</div>
 </div>
 </div>
 </div><div class="jp-Cell jp-CodeCell jp-Notebook-cell">
-<div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=7c2134d7">
+<div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=aa54a320">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -2200,13 +2200,12 @@ train.head()</div>
 <span class="n">flow_add</span> <span class="o">=</span> <span class="n">make_flow</span><span class="p">(</span><span class="n">joint</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
 
 <span class="k">for</span> <span class="n">f</span> <span class="ow">in</span> <span class="p">(</span><span class="n">flow_joint</span><span class="p">,</span> <span class="n">flow_add</span><span class="p">):</span>
-    <span class="n">best</span> <span class="o">=</span> <span class="n">RestoreBest</span><span class="p">()</span>
     <span class="n">f</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span>
         <span class="n">train</span><span class="p">,</span>
         <span class="n">epochs</span><span class="o">=</span><span class="mi">1200</span><span class="p">,</span>
         <span class="n">learning_rate</span><span class="o">=</span><span class="mf">1e-2</span><span class="p">,</span>
         <span class="n">validation_data</span><span class="o">=</span><span class="n">val</span><span class="p">,</span>
-        <span class="n">callbacks</span><span class="o">=</span><span class="n">best</span><span class="p">,</span>
+        <span class="n">callbacks</span><span class="o">=</span><span class="n">RestoreBest</span><span class="p">(),</span>
     <span class="p">)</span>
 
 <span class="c1"># Both fit the data well; the joint model is only marginally better on held-out</span>
@@ -2231,13 +2230,12 @@ flow_joint = make_flow(joint=True)
 flow_add = make_flow(joint=False)
 
 for f in (flow_joint, flow_add):
-    best = RestoreBest()
     f.fit(
         train,
         epochs=1200,
         learning_rate=1e-2,
         validation_data=val,
-        callbacks=best,
+        callbacks=RestoreBest(),
     )
 
 # Both fit the data well; the joint model is only marginally better on held-out
@@ -2266,7 +2264,7 @@ val NLL  additive: 4.2018
 </div>
 </div>
 </div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=e5349097">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=ae0c2f1b">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -2279,7 +2277,7 @@ over the rows of the <code>df</code> you pass, and the decomposition is exact.</
 </div>
 </div>
 </div><div class="jp-Cell jp-CodeCell jp-Notebook-cell">
-<div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=75789244">
+<div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=872a4ea0">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -2343,7 +2341,7 @@ per-term column means (≈0)   : {'x1': 5.882978371118952e-07, 'x2': 3.983974465
 </div>
 </div>
 </div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=62ae826d">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=7ef263ee">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -2365,7 +2363,7 @@ per parent.</li>
 </div>
 </div>
 </div><div class="jp-Cell jp-CodeCell jp-Notebook-cell">
-<div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=cbf04778">
+<div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=ce7b7bda">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -2448,7 +2446,7 @@ plt.show()</div>
 </div>
 </div>
 </div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=3ac515fe">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=01314cca">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>

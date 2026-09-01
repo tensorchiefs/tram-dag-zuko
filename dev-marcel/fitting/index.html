@@ -1392,20 +1392,16 @@ learning rates and freezing (a callback, below) and the all-<code>ls</code> clas
   shipped callbacks read it there. <code>verbose=N</code> prints every Nth epoch plus
   the final one (0, the default, is silent).</li>
 <li><strong><code>callbacks=</code></strong> — one entry or a list. A
-  <a href="https://github.com/tensorchiefs/tramdag/blob/dev-marcel/src/tramdag/callbacks.py"><code>tramdag.callbacks.Callback</code></a> hooks all
-  three points of the loop: <code>on_fit_begin(flow, optimizer)</code> once after
-  calibration (the shipped callbacks reset their state here, so instances
-  are reusable), <code>on_epoch_end(flow, epoch, optimizer)</code> after every epoch,
-  once the epoch's train NLLs are in <code>flow.history["train"]</code> — every
-  callback runs each epoch, and the fit stops after an epoch in which any
-  returned <code>True</code> — and <code>on_fit_end(flow, optimizer)</code>, which runs <em>before</em>
-  the <code>VC</code> re-centering, so a hook that swaps the weights hands them to the
-  re-centering. A bare callable in the list is an <code>on_epoch_end</code> hook —
-  this is where schedules, snapshots and coefficient trajectories live. The
-  common recipes ship in <code>tramdag.callbacks</code>: <code>RestoreBest</code>
-  (best-validation weights, restored automatically), <code>EarlyStopping</code>
-  (patience on the validation NLL) and <code>PerNodePlateau</code> + <code>per_node_adam</code>
-  (per-node decay and freezing), all reading <code>history["val"]</code>.</li>
+  <a href="https://github.com/tensorchiefs/tramdag/blob/dev-marcel/src/tramdag/callbacks.py"><code>tramdag.callbacks.Callback</code></a> hooks
+  <code>on_fit_begin</code> / <code>on_epoch_end</code> / <code>on_fit_end</code> (its docstring is the
+  contract — timing, the stop rule, the VC re-centering order); a bare
+  callable in the list is an <code>on_epoch_end</code> hook, <code>cb(flow, epoch,
+  optimizer)</code>, and any <code>True</code> stops the fit — this is where schedules,
+  snapshots and coefficient trajectories live. The common recipes ship in
+  <code>tramdag.callbacks</code>: <code>RestoreBest</code> (best-validation weights, restored
+  automatically), <code>EarlyStopping</code> (patience on the validation NLL) and
+  <code>PerNodePlateau</code> + <code>per_node_adam</code> (per-node decay and freezing), all
+  reading <code>history["val"]</code>.</li>
 <li><strong><code>vc_ehat=</code></strong>: the out-of-fold propensities a centered <code>VC</code> term needs,
   <code>{node: {t: array}}</code> with one value per training row (see
   <a href="../varying-coefficients/">varying-coefficients.md</a>).</li>
@@ -1499,6 +1495,11 @@ every node froze. The demo notebook runs it end to end; before 0.4 it was
          <span class="n">optimizer</span><span class="o">=</span><span class="n">per_node_adam</span><span class="p">(</span><span class="n">flow</span><span class="p">,</span> <span class="n">lr</span><span class="o">=</span><span class="mf">1e-2</span><span class="p">),</span>
          <span class="n">callbacks</span><span class="o">=</span><span class="n">PerNodePlateau</span><span class="p">())</span>   <span class="c1"># patience=15, freeze=50</span>
 </code></pre></div>
+<p>Freezing helps and parallelizing the node loop does not: freezing deletes
+whole epochs, while node-level overlap only time-slices the cores that each
+node's batched BLAS ops already saturate — measured as contention, not speedup.
+Only when per-node kernels under-utilize the hardware (tiny nodes on a big GPU)
+could overlap pay, and there the tool is fusing same-shaped nodes, not threads.</p>
 <p><strong>Global plateau schedule</strong> — anything else is a few lines of your own: a
 learning-rate schedule is torch's, stepped from the hook on the validation
 NLL <code>fit</code> already computed (so this too needs <code>validation_data=</code> or
@@ -1527,11 +1528,6 @@ written out:</p>
 re-centering, so on a spec with a <code>VC</code> term put the restore in a <code>Callback</code>
 subclass's <code>on_fit_end</code> instead.)</p>
 <p>The exact-MLE and warm-start strategies are Path B, below.</p>
-<p>Freezing helps and parallelizing the node loop does not: freezing deletes
-whole epochs, while node-level overlap only time-slices the cores that each
-node's batched BLAS ops already saturate — measured as contention, not speedup.
-Only when per-node kernels under-utilize the hardware (tiny nodes on a big GPU)
-could overlap pay, and there the tool is fusing same-shaped nodes, not threads.</p>
 <p>Benchmarks and schedule trade-offs are in
 <a href="../training-speed/">training-speed.md</a>. The worked walkthrough is
 <a href="../notebooks/intro_tram_dag/"><code>notebooks/intro_tram_dag.py</code></a>.</p>

@@ -1322,17 +1322,17 @@ uv<span class="w"> </span>sync<span class="w">                        </span><sp
 <span class="c1"># fit() is one minibatch Adam loop with Keras-shaped extras: validation_data=</span>
 <span class="c1"># (or validation_split=0.1) records the per-epoch validation NLL in</span>
 <span class="c1"># flow.history["val"], verbose= prints progress; schedules and early stopping</span>
-<span class="c1"># attach through optimizer= and the callback hooks (docs/fitting.md)</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">tramdag.callbacks</span><span class="w"> </span><span class="kn">import</span> <span class="n">RestoreBest</span>
+<span class="c1"># attach through optimizer= and callbacks= (docs/fitting.md)</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">tramdag.callbacks</span><span class="w"> </span><span class="kn">import</span> <span class="n">EarlyStopping</span><span class="p">,</span> <span class="n">RestoreBest</span>
 
-<span class="n">best</span> <span class="o">=</span> <span class="n">RestoreBest</span><span class="p">()</span>  <span class="c1"># keep the best-validation weights</span>
 <span class="n">flow</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span>
     <span class="n">train_df</span><span class="p">,</span>
     <span class="n">epochs</span><span class="o">=</span><span class="mi">4000</span><span class="p">,</span>
     <span class="n">batch_size</span><span class="o">=</span><span class="mi">512</span><span class="p">,</span>
     <span class="n">validation_data</span><span class="o">=</span><span class="n">val_df</span><span class="p">,</span>
     <span class="n">verbose</span><span class="o">=</span><span class="mi">100</span><span class="p">,</span>
-    <span class="n">callbacks</span><span class="o">=</span><span class="p">[</span><span class="n">best</span><span class="p">],</span>
+    <span class="c1"># keep the best-validation weights; stop once the best is 200 epochs old</span>
+    <span class="n">callbacks</span><span class="o">=</span><span class="p">[</span><span class="n">RestoreBest</span><span class="p">(),</span> <span class="n">EarlyStopping</span><span class="p">(</span><span class="n">patience</span><span class="o">=</span><span class="mi">200</span><span class="p">)],</span>
 <span class="p">)</span>
 
 <span class="c1"># all-`ls` model? fit it classically instead: deterministic float64 L-BFGS,</span>
