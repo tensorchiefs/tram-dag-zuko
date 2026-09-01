@@ -125,7 +125,7 @@ always purely additive on the latent scale, and interactions exist only
 *inside* a term. Lists and `+` sums are interchangeable:
 `[LS("A"), CS("B")]` ≡ `LS("A") + CS("B")`.
 
-Two knobs on the terms:
+Three knobs on the terms:
 
 - **`transform=` on `I`** picks the basis of `h_ϑ` for a continuous node —
   `"bernstein"` (default, 20 coefficients, tails extrapolate with the boundary
@@ -133,6 +133,10 @@ Two knobs on the terms:
   slope) or `"affine"` (2 params: the latent is exactly logistic). Ordinal
   nodes have no basis: their intercept is the cutpoint vector,
   `P(x ≤ k) = σ(ϑ_k − shift)`.
+- **`input_transform=` on `CI`/`CS`/`VC`** — `"minmax"`, `"standardize"`, or
+  a callable `fn(x, train)` — transforms that term's continuous network
+  inputs with statistics frozen at the first fit; `LS` and the `VC`
+  treatment stay raw, so their coefficients keep their units.
 - **`units=` on `I`/`CS`/`VC`** sizes the term's network, e.g. `units=[16]`
   for one hidden layer of 16 neurons. The defaults match the PyTorch
   reference this package grew out of ([buehlpa/TramDag](https://github.com/buehlpa/TramDag),

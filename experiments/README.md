@@ -73,7 +73,7 @@ floors and the rejected alternatives with their numbers are in
 the reference trains in `scale_df` space and every raw-parent alternative was
 tried and measurably fails (tanh/sigmoid saturate, relu wanders or
 underfits — measured in `docs/paper-replication.md`). The triangle scripts'
-reference fits raw parents, so those configs leave it `null`.
+reference fits raw parents, so those configs leave it unset.
 
 Which paper figure each variant reproduces — and what is deliberately not
 reproduced — is listed in [`paper/PAPER_COVERAGE.md`](paper/PAPER_COVERAGE.md);

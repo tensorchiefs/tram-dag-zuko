@@ -319,10 +319,12 @@ def _check_input_transform(name: str, term: Term) -> None:
     value = term.input_transform
     if value is None:
         return
-    if term.effect == "I" and not term.parents:
+    # the parentless-SI case raises in simple_intercept(); LS is reachable
+    # only through a hand-built dict — its weight must stay in raw units
+    if term.effect == "LS":
         raise ValueError(
-            f"Node '{name}': a simple intercept has no network inputs — "
-            "input_transform= belongs on CI/CS/VC terms."
+            f"Node '{name}': a linear shift takes no input_transform — "
+            "its weight is the interpretable raw-unit coefficient."
         )
     if not (callable(value) or value in ("minmax", "standardize")):
         raise ValueError(
@@ -877,7 +879,8 @@ class Term:
         term. Keys: ``penalty`` and ``center`` (VC, see :func:`VC`);
         ``transform`` and ``transform_kwargs`` (I, the basis of the monotone
         transform, kwargs stored as sorted pairs);
-        ``units`` (hidden layers of the term's network);
+        ``units`` and ``activation`` (the term's network);
+        ``input_transform`` (I/CS/VC: the network-input transform);
         ``allow_interaction`` (multi-parent I: one joint net or one net
         per parent).
     """

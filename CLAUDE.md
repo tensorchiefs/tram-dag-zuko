@@ -97,8 +97,8 @@ See `experiments/README.md`.
 - **Parent encoding**: continuous parents enter RAW (no standardization) unless
   a term-level `input_transform=` ("minmax", "standardize", or a callable
   `fn(x, train)` over frozen train columns), which feeds that term's *network*
-  (CI/CS/VC modifiers) the train min-max scaled parent like the reference's
-  `scale_df` — LS and the VC treatment stay raw either way; ordinal
+  (CI/CS/VC modifiers) the transformed parent (minmax like the reference's
+  `scale_df`, standardize, or the callable over frozen train columns) — LS and the VC treatment stay raw either way; ordinal
   parents one-hot (all levels). With cutpoints, only shift *differences* between
   one-hot levels are identified — compare `w[k] − w[0]` against classical references.
 - **Ordinal log-prob is computed in log-space** (`logsigmoid` + stable `log1mexp`,

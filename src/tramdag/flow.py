@@ -155,10 +155,12 @@ class _InputTransform(nn.Module):
     frozen training data, never the batch's.
     """
 
-    def __init__(self, value, k: int):
+    def __init__(self, value, cols: tuple[str, ...]):
         super().__init__()
         self.kind = "callable" if callable(value) else value
         self.fn = value if callable(value) else None
+        self.cols = cols  # the term's continuous parents, in parent order
+        k = len(cols)
         if self.kind == "minmax":
             self.register_buffer("lo", torch.zeros(k))
             self.register_buffer("hi", torch.ones(k))
@@ -237,7 +239,7 @@ class _Node(nn.Module):
         self.continuous_parents = tuple(
             p for p in self.parents if isinstance(spec[p], ContinuousNode)
         )
-        self._build_input_transforms(terms, spec)
+        self.input_transforms = nn.ModuleDict()
         i_term = next((t for t in terms if t.effect == "I" and t.parents), None)
         if i_term is None:
             i_groups = []
@@ -261,35 +263,18 @@ class _Node(nn.Module):
         self._build_intercept(i_term, n_params, spec)
         self._build_shifts(terms, spec)
 
-    def _build_input_transforms(self, terms, spec: dict[str, NodeSpec]) -> None:
-        """Build the per-term network-input transforms (``input_transform=``).
+    def _add_input_transform(self, key: str, term, parents, spec) -> None:
+        """Register one term's ``input_transform`` under its net key.
 
         Keyed like the shift ModuleDict plus ``"@I"`` for the intercept term;
         identity until ``calibrate`` freezes the statistics. Only continuous
         parents transform — ordinal one-hots pass through.
         """
-        self.input_transforms = nn.ModuleDict()
-        self._transform_cols: dict[str, tuple[str, ...]] = {}
-        for term in terms:
-            if term.input_transform is None:
-                continue
-            if term.effect == "I":
-                key, ps = "@I", term.parents
-            elif term.effect == "VC":
-                key, ps = term.parents[0], tuple(term.parents[1:])
-            else:
-                key = (
-                    term.parents[0]
-                    if len(term.parents) == 1
-                    else "+".join(term.parents)
-                )
-                ps = term.parents
-            cps = tuple(p for p in ps if isinstance(spec[p], ContinuousNode))
-            if cps:
-                self.input_transforms[key] = _InputTransform(
-                    term.input_transform, len(cps)
-                )
-                self._transform_cols[key] = cps
+        if term.input_transform is None:
+            return
+        cps = tuple(p for p in parents if isinstance(spec[p], ContinuousNode))
+        if cps:
+            self.input_transforms[key] = _InputTransform(term.input_transform, cps)
 
     def _build_intercept(self, i_term, n_params: int, spec: dict[str, NodeSpec]):
         """Build the intercept module(s) from the intercept groups.
@@ -301,6 +286,8 @@ class _Node(nn.Module):
         each parent reshapes the transform independently.
         """
         i_groups = self._intercept_groups
+        if i_term is not None:
+            self._add_input_transform("@I", i_term, i_term.parents, spec)
         if not i_groups:
             self.intercept = SimpleIntercept(n_params)
             self.intercept_nets = None
@@ -346,6 +333,7 @@ class _Node(nn.Module):
                     units=term.units,
                     activation=term.activation,
                 )
+                self._add_input_transform(on, term, mods, spec)
                 self._vc_groups.append(
                     _VCGroup(
                         on,
@@ -365,6 +353,8 @@ class _Node(nn.Module):
                         feat_width, units=term.units, activation=term.activation
                     )
                 )
+                if term.effect == "CS":
+                    self._add_input_transform(key, term, ps, spec)
                 self._shift_groups.append((key, ps))
 
     def vc_column(self, g, feats: dict, vc_ehat: dict | None) -> Tensor:
@@ -383,21 +373,19 @@ class _Node(nn.Module):
 
     def set_input_stats(self, train_df: pd.DataFrame) -> None:
         """Freeze every term's input-transform statistics (``calibrate``)."""
-        for key, cps in self._transform_cols.items():
+        for tr in self.input_transforms.values():
             # a constant column fails calibrate's quantile check on the
             # parent's own node first, so the statistics are well defined
             cols = torch.stack(
                 [
                     torch.as_tensor(train_df[p].to_numpy(dtype=np.float32).copy())
-                    for p in cps
+                    for p in tr.cols
                 ],
                 dim=1,
             )
-            self.input_transforms[key].set_stats(cols)
+            tr.set_stats(cols)
 
-    def net_input(
-        self, feats: dict[str, Tensor], parents, key: str | None = None
-    ) -> Tensor:
+    def net_input(self, feats: dict[str, Tensor], parents, key: str) -> Tensor:
         """Concatenate parent features for one term's network.
 
         ``key`` names the term ("@I" for the intercept, the shift key
@@ -411,12 +399,11 @@ class _Node(nn.Module):
         """
         # no dict.get: nn.ModuleDict has no get()
         tr = self.input_transforms[key] if key in self.input_transforms else None  # noqa: SIM401
-        cps = self._transform_cols.get(key, ())
         cols = []
         for p in parents:
             x = feats[p]
-            if tr is not None and p in cps:
-                x = tr(x, cps.index(p))
+            if tr is not None and p in tr.cols:
+                x = tr(x, tr.cols.index(p))
             cols.append(x)
         return torch.cat(cols, dim=1)
 
@@ -1860,10 +1847,9 @@ class CausalFlowDAG(nn.Module):
         for name, t in ckpt["state_dict"].items():
             # a callable input_transform's train buffer is shaped at
             # calibrate; give it the checkpoint's shape before loading
-            try:
-                buf = flow.get_buffer(name)
-            except AttributeError:
+            if not name.endswith(".train_cols"):
                 continue
+            buf = flow.get_buffer(name)
             if buf.shape != t.shape:
                 mod_path, _, buf_name = name.rpartition(".")
                 flow.get_submodule(mod_path).register_buffer(

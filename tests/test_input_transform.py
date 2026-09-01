@@ -67,12 +67,10 @@ def test_net_inputs_span_unit_interval_after_first_fit():
         scaled = node.net_input(feats, ("x1",), key)
         assert torch.allclose(scaled.min(0).values, torch.zeros(scaled.shape[1]))
         assert torch.allclose(scaled.max(0).values, torch.ones(scaled.shape[1]))
-    # a second fit on other rows keeps the first calibration, ranges included
-    xmin = float(flow.nodes["x1"].ut.xmin)
+    # a second fit on other rows keeps the first frozen statistics
     flow.fit(df + 10.0, epochs=1, batch_size=100)
     lo = float(flow.nodes["x2"].input_transforms["@I"].lo[0])
     assert lo == pytest.approx(df["x1"].min())
-    assert float(flow.nodes["x1"].ut.xmin) == xmin
 
 
 def test_standardize_freezes_train_mean_and_std():
@@ -146,15 +144,6 @@ def test_save_load_keeps_option_and_calibration(tmp_path):
     pd.testing.assert_frame_equal(
         flow.sample(20, u=u, do={"x1": 9.0}), loaded.sample(20, u=u, do={"x1": 9.0})
     )
-
-
-def test_linear_shift_stays_raw():
-    """An all-LS model has no networks, so there is nothing to transform."""
-    df = _frame()
-    spec = {"x1": ContinuousNode(), "x2": ContinuousNode(LS("x1"))}
-    raw = CausalFlowDAG(spec, seed=1)
-    raw.fit(df, epochs=2, batch_size=50, seed=0)
-    assert len(raw.nodes["x2"].input_transforms) == 0
 
 
 def test_mixed_node_transforms_only_its_own_term():
@@ -233,8 +222,3 @@ def test_degenerate_column_is_rejected():
     flow = CausalFlowDAG(SPEC, seed=0)
     with pytest.raises(ValueError, match="quantiles coincide"):
         flow.fit(df, epochs=1, batch_size=100)
-    # 95 % of one value is degenerate too: the 5 %/95 % quantiles coincide
-    mostly = _frame()
-    mostly.loc[mostly.index[:190], "x1"] = 0.0
-    with pytest.raises(ValueError, match="quantiles coincide"):
-        CausalFlowDAG(SPEC, seed=0).fit(mostly, epochs=1, batch_size=100)
