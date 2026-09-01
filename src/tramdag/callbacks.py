@@ -1,23 +1,23 @@
-"""Predefined ``fit`` callbacks: best-weight restoration, per-node plateau.
+"""Predefined ``fit`` callbacks — restore-best, early stopping, per-node plateau.
 
 ``fit`` owns validation (``validation_data=`` / ``validation_split=``) and
 progress printing (``verbose=``); the callbacks here read the per-node
 validation NLL that ``fit`` appends to ``flow.history["val"]`` after every
-epoch — computed once, shared by all of them::
+epoch — computed once, shared by all of them. One ``callbacks=`` list is the
+whole registration; each entry hooks itself into the fit::
 
-    from tramdag.callbacks import RestoreBest
+    from tramdag.callbacks import EarlyStopping, RestoreBest
 
-    best = RestoreBest()
     flow.fit(
         train_df,
         epochs=4000,
         validation_data=val_df,
         verbose=50,
-        after_epoch_callbacks=[best],
-        after_fit_callbacks=[best.restore],
+        callbacks=[RestoreBest(), EarlyStopping(patience=200)],
     )
 
-Anything not covered here is a few lines of your own (docs/fitting.md).
+A bare function in the list is an ``on_epoch_end`` hook; anything not
+covered here is a :class:`Callback` subclass of your own (docs/fitting.md).
 """
 
 # %% imports ---------------------------------------------------------------------------
@@ -33,16 +33,16 @@ import torch
 def _last_val(flow) -> dict[str, float]:
     """Give the current epoch's per-node validation NLL, or fail loudly.
 
-    A stale entry from an earlier validated fit does not count: the val
-    record must be as long as the train record, i.e. THIS epoch validated.
+    A stale entry from an earlier validated fit does not count: THIS fit
+    must validate (``fit`` records that on the flow), so the last entry is
+    the current epoch's.
     """
-    val = flow.history.get("val")
-    if not val or len(val) != len(flow.history["train"]):
+    if not getattr(flow, "_fit_validated", False) or not flow.history.get("val"):
         raise RuntimeError(
             "this callback reads flow.history['val'] — pass validation_data= "
             "or validation_split= to fit()"
         )
-    return val[-1]
+    return flow.history["val"][-1]
 
 
 # %% public functions ------------------------------------------------------------------
@@ -63,52 +63,112 @@ def per_node_adam(flow, lr: float = 1e-2, **adam_kwargs) -> torch.optim.Adam:
 
 
 # %% public classes --------------------------------------------------------------------
-class RestoreBest:
-    """Keep the weights of the best summed validation NLL; ``restore`` loads them.
+class Callback:
+    """Base class of ``fit(callbacks=)`` entries — override any of the hooks.
+
+    ``on_fit_begin(flow, optimizer)`` runs once after calibration, before the
+    first epoch (the shipped callbacks reset their state here, so one
+    instance is safe to reuse across fits). ``on_epoch_end(flow, epoch,
+    optimizer)`` runs after every epoch, once the epoch's train NLLs are in
+    ``flow.history["train"]``; the fit stops after an epoch in which any
+    callback returned ``True``. ``on_fit_end(flow, optimizer)`` runs once
+    after the loop and **before** the VC re-centering, so a hook that swaps
+    the weights hands them to the re-centering.
+    """
+
+    def on_fit_begin(self, flow, optimizer) -> None:
+        """Run once before the first epoch."""
+
+    def on_epoch_end(self, flow, epoch: int, optimizer):
+        """Run after every epoch; return ``True`` to stop the fit."""
+
+    def on_fit_end(self, flow, optimizer) -> None:
+        """Run once after the loop, before the VC re-centering."""
+
+
+class RestoreBest(Callback):
+    """Keep the weights of the best summed validation NLL; restore them at the end.
 
     The key empirical finding behind it: flexible (CI/CS) models overfit
     observational confounding at the MLE and need best-validation weights to
-    recover the causal effect (docs/fitting.md). Register the instance in
-    ``after_epoch_callbacks`` and its :meth:`restore` in
-    ``after_fit_callbacks``; ``fit`` runs the latter *before* the VC
-    re-centering, so the restored weights are what gets re-centered. One
-    instance per fit and per flow — the snapshot is a full ``state_dict``.
-
-    Reads ``flow.history["val"]``, so the fit needs ``validation_data=`` or
-    ``validation_split=``.
+    recover the causal effect (docs/fitting.md). The restoration is
+    automatic (``on_fit_end``, which ``fit`` runs before the VC
+    re-centering) — registering the instance in ``callbacks=`` is the whole
+    recipe. Reads ``flow.history["val"]``, so the fit needs
+    ``validation_data=`` or ``validation_split=``.
 
     Attributes
     ----------
     best_nll, best_epoch
-        The best summed validation NLL seen and the epoch it came from.
+        The best summed validation NLL seen this fit and its epoch.
     """
 
     def __init__(self):
+        self._reset()
+
+    def _reset(self) -> None:
         self.best_nll = math.inf
         self.best_epoch = 0
         self._state = None
 
-    def __call__(self, flow, epoch: int, optimizer) -> None:
+    def on_fit_begin(self, flow, optimizer) -> None:
+        """Start fresh — the snapshot never leaks into the next fit."""
+        self._reset()
+
+    def on_epoch_end(self, flow, epoch: int, optimizer) -> None:
         """Snapshot the weights when the validation NLL improves."""
         nll = sum(_last_val(flow).values())
         if nll < self.best_nll:
             self.best_nll, self.best_epoch = nll, epoch
             self._state = copy.deepcopy(flow.state_dict())
 
-    def restore(self, flow, optimizer=None) -> None:
-        """Load the best weights back into the flow.
-
-        Raises
-        ------
-        RuntimeError
-            If no epoch has run through the callback yet.
-        """
+    def on_fit_end(self, flow, optimizer) -> None:
+        """Load the best weights back into the flow."""
         if self._state is None:
             raise RuntimeError("RestoreBest has seen no epoch; nothing to restore")
         flow.load_state_dict(self._state)
 
 
-class PerNodePlateau:
+class EarlyStopping(Callback):
+    """Stop the fit after ``patience`` epochs without validation improvement.
+
+    Tracks the summed validation NLL itself, so it composes with
+    :class:`RestoreBest` in any order — the usual pair is
+    ``callbacks=[RestoreBest(), EarlyStopping(patience=200)]``. Reads
+    ``flow.history["val"]``, so the fit needs ``validation_data=`` or
+    ``validation_split=``.
+
+    Parameters
+    ----------
+    patience : int
+        Epochs without a ``min_delta`` improvement before stopping.
+    min_delta : float, optional
+        Improvement below this is flat, by default 0.
+    """
+
+    def __init__(self, *, patience: int, min_delta: float = 0.0):
+        if patience < 1:
+            raise ValueError(f"patience must be at least 1, got {patience}")
+        self.patience, self.min_delta = patience, min_delta
+        self._reset()
+
+    def _reset(self) -> None:
+        self.best_nll = math.inf
+        self.best_epoch = 0
+
+    def on_fit_begin(self, flow, optimizer) -> None:
+        """Start fresh — patience never carries into the next fit."""
+        self._reset()
+
+    def on_epoch_end(self, flow, epoch: int, optimizer) -> bool:
+        """Give ``True`` once the last improvement is ``patience`` epochs old."""
+        nll = sum(_last_val(flow).values())
+        if nll < self.best_nll - self.min_delta:
+            self.best_nll, self.best_epoch = nll, epoch
+        return epoch - self.best_epoch >= self.patience
+
+
+class PerNodePlateau(Callback):
     """Per-node plateau decay and freezing on the validation NLL.
 
     A node's learning rate decays by ``factor`` after every ``patience``
@@ -124,16 +184,14 @@ class PerNodePlateau:
     A frozen node's rate is 0 but its forward/backward still runs, so the
     saving is in epochs, not per-epoch wall clock. This is the pre-0.4
     ``fit(schedule="plateau", freeze_patience=)`` recipe, back as an opt-in
-    callback; `docs/training-speed.md` has its measurements. One instance
-    per fit — ``frozen``/``best``/``lr0`` carry over and would stop a second
-    fit immediately.
+    callback; `docs/training-speed.md` has its measurements.
 
     Parameters
     ----------
     patience, freeze : int
-        Flat epochs before a decay, and before a decayed node freezes.
-        The training-speed benchmark runs ``patience=30, freeze=120`` on its
-        stroke workload and ``patience=15, freeze=50`` on the VACA one
+        Flat epochs before a decay, and before a decayed node freezes. The
+        defaults (15/50) are the training-speed benchmark's VACA settings;
+        its stroke workload runs 30/120
         (``experiments/benchmarks/bench_training.py``).
     min_delta : float, optional
         Improvement below this is flat, by default 1e-4.
@@ -144,8 +202,8 @@ class PerNodePlateau:
     def __init__(
         self,
         *,
-        patience: int,
-        freeze: int,
+        patience: int = 15,
+        freeze: int = 50,
         min_delta: float = 1e-4,
         factor: float = 0.3,
     ):
@@ -155,12 +213,28 @@ class PerNodePlateau:
             )
         self.patience, self.freeze = patience, freeze
         self.min_delta, self.factor = min_delta, factor
+        self._reset()
+
+    def _reset(self) -> None:
         self.lr0: dict = {}
         self.best: dict = {}
         self.bad: dict = {}
         self.frozen: set = set()
 
-    def __call__(self, flow, epoch: int, optimizer) -> bool:
+    def on_fit_begin(self, flow, optimizer) -> None:
+        """Start fresh — rates and frozen nodes never carry into the next fit.
+
+        A reused optimizer's decayed (or zeroed) group rates go back to their
+        remembered start values first; without that, the new baseline would
+        be the old decayed rate and a frozen node would "train" at rate 0.
+        """
+        if optimizer is not None:
+            for g in optimizer.param_groups:
+                if g.get("node") in self.lr0:
+                    g["lr"] = self.lr0[g["node"]]
+        self._reset()
+
+    def on_epoch_end(self, flow, epoch: int, optimizer) -> bool:
         """Step on the epoch's validation NLL; ``True`` once every node froze."""
         return self.step(_last_val(flow), optimizer)
 

@@ -143,7 +143,7 @@ plt.show()
 # flexibility). Training maximizes the exact joint likelihood with one Adam.
 # `fit` is a plain loop with Keras-shaped extras: `validation_data=` gives a
 # per-epoch validation NLL in `flow.history["val"]`, `verbose=` prints
-# progress. Strategy attaches through the callback hooks — here the shipped
+# progress. Strategy attaches through `callbacks=` — here the shipped
 # self-stopping recipe: `per_node_adam` gives every node its own parameter
 # group, and `PerNodePlateau` decays each node's rate on its own validation
 # NLL and freezes it once flat; the fit ends when the last node froze.
@@ -189,7 +189,7 @@ flow.fit(
     validation_data=val,
     verbose=25,
     optimizer=per_node_adam(flow, lr=1e-1),
-    after_epoch_callbacks=[
+    callbacks=[
         lambda f, e, opt: lr_trace.append(opt.param_groups[0]["lr"]),
         sched,
     ],
@@ -352,7 +352,7 @@ for tr in ["spline", "affine"]:
         learning_rate=1e-2,
         batch_size=4096,
         validation_data=val,
-        after_epoch_callbacks=cb,
+        callbacks=cb,
     )
     fits[tr] = f
 print("held-out NLL (lower is better):")

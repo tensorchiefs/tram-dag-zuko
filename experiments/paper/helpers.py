@@ -84,7 +84,7 @@ def fit_paper(generator, spec: dict, config: dict, out: Path, record=None):
         validation_data=val if plateau is not None else None,
         seed=config["shuffle_seed"],
         optimizer=opt,
-        after_epoch_callbacks=epoch_end,
+        callbacks=epoch_end,
     )
     fit_seconds = round(time.perf_counter() - t0, 1)
     flow.save(out / "flow.pt")

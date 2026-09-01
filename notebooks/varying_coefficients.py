@@ -166,8 +166,7 @@ flow.fit(
     batch_size=512,
     validation_data=val,
     seed=0,
-    after_epoch_callbacks=best,
-    after_fit_callbacks=best.restore,
+    callbacks=best,
 )
 print(flow.to_matrix())
 
@@ -287,8 +286,7 @@ for center in (False, True):
         batch_size=512,
         validation_data=c_val,
         seed=0,
-        after_epoch_callbacks=best,
-        after_fit_callbacks=best.restore,
+        callbacks=best,
         vc_ehat={"Y": {"T": e_oof}} if center else None,
     )
     b = fc.varying_coef(c_test, "Y")

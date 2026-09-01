@@ -324,7 +324,7 @@ def run_config(workload, phases, extra, batch, device, seed):
         def monitor(f, epoch, opt, sched=sched):
             hist["val"].append(f.history["val"][-1])  # fit computed it
             hist["time"].append(time.perf_counter() - t0)
-            return sched is not None and sched(f, epoch, opt)
+            return sched is not None and sched.on_epoch_end(f, epoch, opt)
 
         flow.fit(
             train,
@@ -332,7 +332,7 @@ def run_config(workload, phases, extra, batch, device, seed):
             batch_size=bs,
             validation_data=val,
             optimizer=opt,
-            after_epoch_callbacks=monitor,
+            callbacks=monitor,
         )
     return flow, hist
 

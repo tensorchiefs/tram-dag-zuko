@@ -73,10 +73,12 @@ See `experiments/README.md`.
   `ComplexShiftDefaultTabular` 64-128-64, `ComplexInterceptDefaultTabular` 8-8,
   `n_thetas=20`) — **not** the paper's R nets, which every `experiments/paper/`
   config sets explicitly instead.
-- `callbacks.py` — the shipped `fit` callbacks: `RestoreBest`
-  (best-validation weights, restored through `after_fit_callbacks`),
+- `callbacks.py` — the shipped `fit` callbacks on the `Callback` base
+  (`on_fit_begin`/`on_epoch_end`/`on_fit_end`, state reset at fit begin):
+  `RestoreBest` (best-validation weights, restored automatically at fit
+  end), `EarlyStopping` (patience on the validation NLL) and
   `PerNodePlateau` + `per_node_adam` (per-node lr decay and freezing, the
-  pre-0.4 plateau recipe). Both read `history["val"]`, which
+  pre-0.4 plateau recipe). All read `history["val"]`, which
   `fit(validation_data=|validation_split=)` fills per epoch; `verbose=`
   owns progress printing. Optional; `fit` itself stays one plain loop.
 - (no `utils.py` any more: `config_section` moved to
@@ -119,13 +121,14 @@ See `experiments/README.md`.
   all-`ls` model then matches statsmodels/R-polr to ~1e-3. Validation, lr
   schedules, early stopping / best-weight restoration and logging are the
   caller's, through `fit(validation_data=|validation_split=,
-  validation_batch_size=, verbose=, optimizer=, after_epoch_callbacks=,
-  before_fit_callbacks=, after_fit_callbacks=)` — fit fills
+  validation_batch_size=, verbose=, optimizer=, callbacks=)` — fit fills
   `history["val"]` per epoch and `verbose=N` prints every Nth line;
-  per-epoch callbacks get `(flow, epoch, opt)`, any `True` stops; the
-  fit-level hooks get `(flow, opt)`; `tramdag/callbacks.py` ships
-  `RestoreBest`, `PerNodePlateau`+`per_node_adam` (they read
-  `history["val"]`); `flow.calibrate(train_df, marginal_init=)`
+  `callbacks=` takes `Callback` instances
+  (`on_fit_begin`/`on_epoch_end`/`on_fit_end`; epoch hooks get
+  `(flow, epoch, opt)`, any `True` stops, `on_fit_end` runs before the VC
+  re-centering) or bare `on_epoch_end` callables; `tramdag/callbacks.py`
+  ships `RestoreBest` (auto-restores), `EarlyStopping`,
+  `PerNodePlateau`+`per_node_adam` (they read `history["val"]`); `flow.calibrate(train_df, marginal_init=)`
   takes the data-dependent state once (ranges, net min-max, calibrated start)
   and is called by the first fit; `init_marginals(train_df)` re-applies the
   calibrated start explicitly, any time. Key empirical finding (stroke storyline):
@@ -151,7 +154,7 @@ paper states only three training numbers — n=40000, 500 epochs, Bernstein
 order 20; the Adam lr 1e-3 is the R code's `optimizer_adam()` default. The configs follow the paper's own R code 1:1 where the
 framework allows: the triangle scripts train one continuous Adam run with a
 separate validation draw (40k / 10k mixed) and read the coefficients after
-every epoch (`fit(after_epoch_callbacks=)`) — at batch 256 / lr 0.004 for 300
+every epoch (`fit(callbacks=)`) — at batch 256 / lr 0.004 for 300
 epochs (linear-cs 500, mixed exp-cs 350, mixed linear-ls 200 @ lr 0.002)
 instead of the paper's 500 at Keras-default batch 32 / lr 0.001, the
 deviations taken for CI runtime (every metric kept; grid, epoch floors and

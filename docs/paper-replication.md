@@ -64,7 +64,7 @@ in `create_param_net` is commented out).
 | batch | 32 (Keras `fit()` default) | 512 | **256**, the CI deviation |
 | `len_theta` / `n_coeffs` | 20 | 20 | 20 |
 | schedule / early stop / init | none / none, final weights / random_normal | none / none / torch | none / none / `init: normal` |
-| coefficient read-out | after every epoch (Keras loop) | at chunk boundaries | `fit(after_epoch_callbacks=)`, every epoch |
+| coefficient read-out | after every epoch (Keras loop) | at chunk boundaries | `fit(callbacks=)`, every epoch |
 
 **Results**
 

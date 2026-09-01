@@ -69,8 +69,7 @@ flow.fit(
     batch_size=512,
     validation_data=val_df,
     verbose=100,
-    after_epoch_callbacks=[best],
-    after_fit_callbacks=[best.restore],
+    callbacks=[best],
 )
 
 # all-`ls` model? fit it classically instead: deterministic float64 L-BFGS,

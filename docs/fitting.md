@@ -85,18 +85,21 @@ learning rates and freezing (a callback, below) and the all-`ls` classical fit.
   `flow.history["val"]` (`validation_batch_size=` chunks the pass). The
   shipped callbacks read it there. `verbose=N` prints every Nth epoch plus
   the final one (0, the default, is silent).
-- **Callback hooks** — `after_epoch_callbacks=` takes one callable or a list,
-  each called as `cb(flow, epoch, optimizer)` after every epoch, once the
-  epoch's train NLLs are in `flow.history["train"]`; every callback runs each
-  epoch, and the fit stops after an epoch in which any returned `True`.
-  `before_fit_callbacks=` / `after_fit_callbacks=` (`cb(flow, optimizer)`)
-  bracket the loop — the after-fit hooks run *before* the `VC` re-centering,
-  so a callback that swaps weights hands them to the re-centering. This is
-  where schedules, snapshots and coefficient trajectories live. The common
-  recipes ship in [`tramdag.callbacks`](../src/tramdag/callbacks.py):
-  `RestoreBest` (best-validation weights) and `PerNodePlateau` +
-  `per_node_adam` (per-node decay and freezing), both reading
-  `history["val"]`.
+- **`callbacks=`** — one entry or a list. A
+  [`tramdag.callbacks.Callback`](../src/tramdag/callbacks.py) hooks all
+  three points of the loop: `on_fit_begin(flow, optimizer)` once after
+  calibration (the shipped callbacks reset their state here, so instances
+  are reusable), `on_epoch_end(flow, epoch, optimizer)` after every epoch,
+  once the epoch's train NLLs are in `flow.history["train"]` — every
+  callback runs each epoch, and the fit stops after an epoch in which any
+  returned `True` — and `on_fit_end(flow, optimizer)`, which runs *before*
+  the `VC` re-centering, so a hook that swaps the weights hands them to the
+  re-centering. A bare callable in the list is an `on_epoch_end` hook —
+  this is where schedules, snapshots and coefficient trajectories live. The
+  common recipes ship in `tramdag.callbacks`: `RestoreBest`
+  (best-validation weights, restored automatically), `EarlyStopping`
+  (patience on the validation NLL) and `PerNodePlateau` + `per_node_adam`
+  (per-node decay and freezing), all reading `history["val"]`.
 - **`vc_ehat=`**: the out-of-fold propensities a centered `VC` term needs,
   `{node: {t: array}}` with one value per training row (see
   [varying-coefficients.md](varying-coefficients.md)).
@@ -115,8 +118,8 @@ weights; flexible (CI/CS/VC) models validate and keep the best weights**
 | exact MLE — [`fit_classical`](#path-b--classical-optimization-fit_classical) | all-`ls` spec; deterministic, seconds |
 | plain Adam | all-`ls` with a shift `fit_classical` refuses, quick looks |
 | multi-phase Adam | a tighter MLE without a scheduler |
-| best-validation weights — `RestoreBest` | any CI/CS/VC model; the recommended recipe (nothing is automatic — register it) |
-| … + early stopping | cap the wasted epochs after the best |
+| best-validation weights — `RestoreBest` | any CI/CS/VC model; the recommended recipe (register it — fit has no default) |
+| … + early stopping — `EarlyStopping` | cap the wasted epochs after the best |
 | global plateau schedule | decaying one shared rate beats picking one |
 | per-node plateau — `PerNodePlateau` | nodes converge at different speeds; self-stopping |
 
@@ -137,37 +140,32 @@ for epochs, lr in [(800, 1e-2), (700, 1e-3), (500, 1e-4)]:
     flow.fit(train_df, epochs=epochs, learning_rate=lr)
 ```
 
-**Best-validation weights** — the flexible-model default, one import:
+**Best-validation weights** — the flexible-model default, one import, one
+registration (the restore happens automatically at fit end):
 
 ```python
 from tramdag.callbacks import RestoreBest
 
-best = RestoreBest()
 flow.fit(
     train_df,
     epochs=4000,
     validation_data=val_df,   # or validation_split=0.1
     verbose=50,
-    after_epoch_callbacks=[best],
-    after_fit_callbacks=[best.restore],
+    callbacks=RestoreBest(),
 )
 ```
 
-Both registrations matter: without `best.restore` the fit silently keeps the
-final (overfit) weights. And `validation_split` takes the LAST rows unshuffled
-— shuffle the DataFrame first if its row order means anything.
+`validation_split` takes the LAST rows unshuffled — shuffle the DataFrame
+first if its row order means anything.
 
-**… plus early stopping** — `RestoreBest` already tracks the best epoch, so
-patience is one more callback (they run in list order, so `best` updates
-first):
+**… plus early stopping** — `EarlyStopping` tracks its own best epoch, so
+the pair composes in any order:
 
 ```python
-best = RestoreBest()
-patience = lambda flow, epoch, opt: epoch - best.best_epoch >= 200
+from tramdag.callbacks import EarlyStopping, RestoreBest
 
 flow.fit(train_df, epochs=4000, validation_split=0.1,
-         after_epoch_callbacks=[best, patience],
-         after_fit_callbacks=[best.restore])
+         callbacks=[RestoreBest(), EarlyStopping(patience=200)])
 ```
 
 **Per-node plateau** — one rate per node (`per_node_adam` tags one parameter
@@ -182,7 +180,7 @@ from tramdag.callbacks import PerNodePlateau, per_node_adam
 
 flow.fit(train_df, epochs=4000, validation_split=0.1,
          optimizer=per_node_adam(flow, lr=1e-2),
-         after_epoch_callbacks=[PerNodePlateau(patience=10, freeze=40)])
+         callbacks=PerNodePlateau())   # patience=15, freeze=50
 ```
 
 **Global plateau schedule** — anything else is a few lines of your own: a
@@ -208,12 +206,13 @@ def on_epoch(flow, epoch, opt):
     return opt.param_groups[0]["lr"] < 1e-5      # stop once the rate bottomed out
 
 flow.fit(train_df, epochs=4000, batch_size=512, validation_data=val_df,
-         optimizer=opt, after_epoch_callbacks=on_epoch)
+         optimizer=opt, callbacks=on_epoch)
 flow.load_state_dict(best["state"])
 ```
 
 (One difference to `RestoreBest`: a post-fit `load_state_dict` skips the VC
-re-centering, so on a spec with a `VC` term prefer `after_fit_callbacks`.)
+re-centering, so on a spec with a `VC` term put the restore in a `Callback`
+subclass's `on_fit_end` instead.)
 
 The exact-MLE and warm-start strategies are Path B, below.
 

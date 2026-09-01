@@ -27,6 +27,7 @@ import pandas as pd
 import torch
 from torch import Tensor, nn
 
+from .callbacks import Callback
 from .conditioners import (
     ComplexIntercept,
     ComplexShift,
@@ -63,11 +64,14 @@ __all__ = ["CausalFlowDAG"]
 
 
 # %% private functions -----------------------------------------------------------------
-def _callback_list(cbs) -> list:
-    """Normalize a ``fit`` callback argument: None, one callable, or a sequence."""
-    if cbs is None:
-        return []
-    return [cbs] if callable(cbs) else list(cbs)
+class _FnCallback(Callback):
+    """A bare callable in ``callbacks=``, adapted to an ``on_epoch_end`` hook."""
+
+    def __init__(self, fn):
+        self.fn = fn
+
+    def on_epoch_end(self, flow, epoch: int, optimizer):
+        return self.fn(flow, epoch, optimizer)
 
 
 def _check_fit_sizes(
@@ -137,27 +141,51 @@ def _slice_vc_ehat(vc_ehat: dict | None, n_full: int, cut: int) -> dict | None:
     }
 
 
-def _check_callbacks(cbs: list, args: tuple[str, ...], name: str) -> None:
-    """Reject a mis-registered callback before training, not hours after it.
+def _normalize_callbacks(cbs) -> list[Callback]:
+    """Give ``callbacks=`` as a list of ``Callback``s, or fail loudly now.
 
-    The classic slip is the instance/method swap (``RestoreBest`` itself in
-    ``after_fit_callbacks`` instead of its ``restore``) — without this check
-    that only raises after the last epoch, losing the whole run.
+    A :class:`~tramdag.callbacks.Callback` instance is trusted — the base
+    class defines all three hooks. A bare callable is an ``on_epoch_end``
+    hook and must accept ``(flow, epoch, optimizer)``; checked here so a
+    wrong entry fails before the first epoch, not after the last one.
     """
+    if cbs is None:
+        return []
+    if isinstance(cbs, Callback) or callable(cbs):
+        cbs = [cbs]
+    out = []
     for cb in cbs:
-        if not callable(cb):
-            raise TypeError(f"{name}_callbacks entries must be callable, got {cb!r}")
-        try:
-            sig = inspect.signature(cb, follow_wrapped=False)
-        except (TypeError, ValueError):  # a callable without a signature
+        if isinstance(cb, Callback):
+            out.append(cb)
             continue
-        try:
-            sig.bind(*[None] * len(args))
-        except TypeError:
+        if isinstance(cb, type) and issubclass(cb, Callback):
             raise TypeError(
-                f"{name}_callbacks are called as cb({', '.join(args)}); "
-                f"{cb!r} does not accept these arguments"
-            ) from None
+                f"callbacks= got the class {cb.__name__} — instantiate it: "
+                f"{cb.__name__}()"
+            )
+        if not callable(cb):
+            raise TypeError(
+                f"callbacks entries must be Callback instances or callables, got {cb!r}"
+            )
+        _check_epoch_hook(cb)
+        out.append(_FnCallback(cb))
+    return out
+
+
+def _check_epoch_hook(cb) -> None:
+    """Reject a bare callable of the wrong arity before training starts."""
+    try:
+        sig = inspect.signature(cb, follow_wrapped=False)
+    except (TypeError, ValueError):  # a callable without a signature
+        return
+    try:
+        sig.bind(None, None, None)
+    except TypeError:
+        raise TypeError(
+            "a bare callable in callbacks= is called as "
+            f"cb(flow, epoch, optimizer); {cb!r} does not accept these "
+            "arguments — for the other hooks subclass tramdag.callbacks.Callback"
+        ) from None
 
 
 def _slice_ehat(
@@ -984,9 +1012,7 @@ class CausalFlowDAG(nn.Module):
         verbose: int = 0,
         seed: int | None = None,
         optimizer: torch.optim.Optimizer | None = None,
-        before_fit_callbacks=None,
-        after_epoch_callbacks=None,
-        after_fit_callbacks=None,
+        callbacks=None,
         vc_ehat: dict | None = None,
     ) -> CausalFlowDAG:
         """Fit all nodes jointly by maximum likelihood — one minibatch Adam loop.
@@ -998,19 +1024,17 @@ class CausalFlowDAG(nn.Module):
         matches ``statsmodels`` and R ``polr``. A second ``fit`` call
         continues the training. Everything else — validation monitoring,
         learning-rate schedules, early stopping, best-weight restoration,
-        logging — is the caller's, through ``optimizer`` and the callback
-        hooks; :mod:`tramdag.callbacks` ships the common recipes::
+        logging — is the caller's, through ``optimizer`` and ``callbacks``;
+        :mod:`tramdag.callbacks` ships the common recipes::
 
-            from tramdag.callbacks import RestoreBest
+            from tramdag.callbacks import EarlyStopping, RestoreBest
 
-            best = RestoreBest()
             flow.fit(
                 train_df,
                 epochs=4000,
                 validation_data=val_df,
                 verbose=50,
-                after_epoch_callbacks=[best],
-                after_fit_callbacks=[best.restore],
+                callbacks=[RestoreBest(), EarlyStopping(patience=200)],
             )
 
         Parameters
@@ -1054,22 +1078,15 @@ class CausalFlowDAG(nn.Module):
             Any torch optimizer over ``flow.parameters()``; the default is
             ``Adam(lr=learning_rate)``. Build it yourself to attach a
             ``torch.optim.lr_scheduler`` or to continue with its state.
-        before_fit_callbacks : callable | list[callable] | None, optional
-            Each called as ``cb(flow, optimizer)`` once, after calibration
-            and before the first epoch.
-        after_epoch_callbacks : callable | list[callable] | None, optional
-            Each called as ``cb(flow, epoch, optimizer)`` after every epoch
-            (``epoch`` counts from 1), once the epoch's train NLLs are in
-            ``flow.history["train"]``. All of them run each epoch; the fit
-            stops after an epoch in which any returned ``True``
-            (``len(flow.history["train"])`` says how many epochs ran). Use them
-            for schedules, snapshots and coefficient trajectories —
-            :mod:`tramdag.callbacks` ships ``RestoreBest`` and
-            ``PerNodePlateau``, both reading ``history["val"]``.
-        after_fit_callbacks : callable | list[callable] | None, optional
-            Each called as ``cb(flow, optimizer)`` once, after the loop and
-            **before** the VC re-centering — so a callback that swaps the
-            weights (``RestoreBest.restore``) hands them to the re-centering.
+        callbacks : Callback | callable | list | None, optional
+            One entry or a list. A :class:`~tramdag.callbacks.Callback`
+            hooks all three points of the fit — its docstring is the
+            contract (begin/epoch/end timing, the stop rule, the VC
+            re-centering order). A bare callable is an ``on_epoch_end``
+            hook, ``cb(flow, epoch, optimizer)`` — use it for schedules and
+            coefficient trajectories. :mod:`tramdag.callbacks` ships
+            ``RestoreBest``, ``EarlyStopping`` and ``PerNodePlateau``, all
+            reading ``history["val"]``.
         vc_ehat : dict | None, optional
             Out-of-fold propensities ``{node: {t: array}}`` for every centered
             ``VC`` term, one value per training row; required when the spec
@@ -1105,12 +1122,7 @@ class CausalFlowDAG(nn.Module):
         unchanged.
         """
         _check_fit_sizes(epochs, batch_size, verbose, validation_batch_size)
-        before = _callback_list(before_fit_callbacks)
-        after_epoch = _callback_list(after_epoch_callbacks)
-        after_fit = _callback_list(after_fit_callbacks)
-        _check_callbacks(before, ("flow", "optimizer"), "before_fit")
-        _check_callbacks(after_epoch, ("flow", "epoch", "optimizer"), "after_epoch")
-        _check_callbacks(after_fit, ("flow", "optimizer"), "after_fit")
+        cbs = _normalize_callbacks(callbacks)
         if seed is not None:
             torch.manual_seed(seed)
         train_df, validation_data, vc_ehat = _split_validation(
@@ -1126,6 +1138,9 @@ class CausalFlowDAG(nn.Module):
         val_vals = (
             self._tensorize(validation_data) if validation_data is not None else None
         )
+        # the shipped callbacks check this: an unvalidated fit in between must
+        # not let them read a stale history["val"] entry as the current epoch
+        self._fit_validated = val_vals is not None
         opt = optimizer or torch.optim.Adam(self.parameters(), lr=learning_rate)
         penalized = [
             nd.shifts[g.on]
@@ -1133,21 +1148,21 @@ class CausalFlowDAG(nn.Module):
             for g in nd._vc_groups
             if g.mods and nd.shifts[g.on].penalty > 0
         ]
-        for cb in before:
-            cb(self, opt)
+        for cb in cbs:
+            cb.on_fit_begin(self, opt)
         for epoch in range(1, epochs + 1):
             self._epoch_pass(
                 vals, ehat, opt, batch_size, penalized, val_vals, validation_batch_size
             )
             # every callback runs (a stop must not skip a monitoring one)
-            stops = [bool(cb(self, epoch, opt)) for cb in after_epoch]
+            stops = [bool(cb.on_epoch_end(self, epoch, opt)) for cb in cbs]
             self._log_epoch(
                 epoch, epochs, verbose, stopped=any(stops), has_val=val_vals is not None
             )
             if any(stops):
                 break
-        for cb in after_fit:
-            cb(self, opt)  # before the re-centering: restored weights re-center too
+        for cb in cbs:
+            cb.on_fit_end(self, opt)  # before re-centering: restored weights re-center
         self._recenter_vc(vals)
         self.eval()
         return self

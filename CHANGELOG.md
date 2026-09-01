@@ -5,23 +5,27 @@
 ### Changed (breaking) — `fit` is one loop, the strategies are yours
 
 `CausalFlowDAG.fit` shrank from 18 keyword arguments to a minibatch Adam loop
-with an `optimizer=` hook and three callback lists (`flow.py` 2089 → ~1750
-lines, the shipped recipes in their own `callbacks.py`). Three independent reviews of the
+with an `optimizer=` hook and one `callbacks=` list (the shipped recipes in
+their own `callbacks.py`). Three independent reviews of the
 file agreed on the cut: what left was training *strategy* — choices tuned on
 this repository's own DGPs — not the TRAM-DAG model, and each of them had a
 default the paper replication or the tests had to switch off.
 
 - **`fit(train_df, *, epochs, learning_rate=1e-2, batch_size=512, seed=None,
-  optimizer=None, before_fit_callbacks=None, after_epoch_callbacks=None,
-  after_fit_callbacks=None, vc_ehat=None)`.** One optimizer over all
+  optimizer=None, callbacks=None, vc_ehat=None)`.** One optimizer over all
   parameters (the per-node NLLs have independent gradients, so this equals
   per-node training); `optimizer=` takes any torch optimizer, which is how a
-  `torch.optim.lr_scheduler` attaches. Each callback argument takes one
-  callable or a list. After-epoch callbacks run as `cb(flow, epoch,
-  optimizer)` after every epoch — all of them, every epoch — and the fit
-  stops after an epoch in which any returned `True`; the fit-level hooks run
-  as `cb(flow, optimizer)` once around the loop, the after-fit ones before
-  the VC re-centering (so restored weights get re-centered). `flow.history`
+  `torch.optim.lr_scheduler` attaches. `callbacks=` takes one entry or a
+  list: a `tramdag.callbacks.Callback` hooks `on_fit_begin(flow,
+  optimizer)`, `on_epoch_end(flow, epoch, optimizer)` and `on_fit_end(flow,
+  optimizer)`; a bare callable is an `on_epoch_end` hook. Epoch hooks run
+  after every epoch — all of them, every epoch — and the fit stops after an
+  epoch in which any returned `True`; `on_fit_end` runs before the VC
+  re-centering (so restored weights get re-centered). (The three-list shape
+  this section first shipped as — `before_fit_callbacks=` /
+  `after_epoch_callbacks=` / `after_fit_callbacks=` — collapsed into
+  `callbacks=` before release, after a usability review flagged the
+  two-hook `RestoreBest` registration as a silent footgun.) `flow.history`
   holds the per-node train NLL per epoch — and, with validation configured,
   the per-node validation NLL under `"val"`. `epochs` is a required
   keyword.
@@ -39,7 +43,7 @@ default the paper replication or the tests had to switch off.
   (`tramdag.callbacks.RestoreBest`, or a six-line snapshot callback);
   `verbose` and the `tramdag.flow` logger — `verbose=` also returned,
   Keras-style (below), and the module logger stayed gone;
-  `epoch_callback` (now `after_epoch_callbacks`, receives the
+  `epoch_callback` (now an entry in `callbacks=`, receives the
   optimizer); `marginal_init` (moved to `calibrate`); `vc_warm_start` and
   the hidden classical proxy fit (two lines of user code, see
   `docs/varying-coefficients.md`; measured on `vc_hetero`: `beta0` 0.16
@@ -175,17 +179,20 @@ default the paper replication or the tests had to switch off.
   is silent — no progress bars). A `validation_split` slices `vc_ehat`
   with the same cut.
 - **`tramdag.callbacks`** — the common training recipes as shipped, opt-in
-  callbacks: `RestoreBest` (best-validation weights, restored through
-  `after_fit_callbacks` — the recipe the stroke finding needs, since
-  flexible CI/CS models overfit confounding at the MLE) and
-  `PerNodePlateau` with `per_node_adam` (per-node lr decay and freezing on
-  each node's own validation NLL, the pre-0.4 `fit(schedule="plateau")`
-  strategy). Both read `history["val"]`, so a fit that registers them
-  needs `validation_data=`/`validation_split=` — the NLL is computed once,
+  callbacks on a small `Callback` base (`on_fit_begin` / `on_epoch_end` /
+  `on_fit_end`, each resetting its state at fit begin so instances are
+  reusable): `RestoreBest` (best-validation weights, restored
+  automatically at fit end — the recipe the stroke finding needs, since
+  flexible CI/CS models overfit confounding at the MLE), `EarlyStopping`
+  (`patience=` epochs without validation improvement; tracks its own best,
+  so it composes with `RestoreBest` in any order) and `PerNodePlateau`
+  with `per_node_adam` (per-node lr decay and freezing on each node's own
+  validation NLL, the pre-0.4 `fit(schedule="plateau")` strategy; its
+  `patience`/`freeze` now default to the benchmark's 15/50). All read
+  `history["val"]`, so a fit that registers them needs
+  `validation_data=`/`validation_split=` — the NLL is computed once,
   shared. An earlier `Logger` callback existed briefly and dissolved into
-  `verbose=`. `fit` itself stays one plain loop; the callbacks are
-  ordinary `(flow, epoch, optimizer)` callables you could have written
-  yourself.
+  `verbose=`. `fit` itself stays one plain loop.
 - **`src/tramdag/py.typed` ships (PEP 561)** — the package is fully
   annotated, and pip users' type checkers now see the inline types.
 - **`CausalFlowDAG(spec, init="glorot")`** — Keras' `Dense` default
@@ -557,8 +564,8 @@ default the paper replication or the tests had to switch off.
 
 - **No progress output from the package.** `fit` and `fit_classical`
   print and log nothing (the `verbose=` gate and the `tramdag.flow`
-  logger of an intermediate state are gone); an after-epoch callback
-  (e.g. `tramdag.callbacks.Logger`) reports what you want, `fit_classical` returns its report dict.
+  logger of an intermediate state are gone); `verbose=` or a bare
+  `on_epoch_end` callable reports what you want, `fit_classical` returns its report dict.
 
 - **The node formula argument is `terms`, not `transformation`.**
   `ContinuousNode(terms=...)` / `OrdinalNode(levels, terms=...)`, and the
@@ -583,7 +590,7 @@ default the paper replication or the tests had to switch off.
   executed notebooks, so its math is real math.
 
 - `experiments/paper/helpers.py`: the per-epoch coefficient read-out is
-  `fit(after_epoch_callbacks=)` inside one `fit_paper(generator, spec, config, out,
+  `fit(callbacks=)` inside one `fit_paper(generator, spec, config, out,
   record)` call — there is no chunked or snapshotting fit helper any more.
 
 - **Every complexity hotspot is dissolved into named stages** — `fit`
