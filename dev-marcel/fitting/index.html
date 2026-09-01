@@ -1384,6 +1384,13 @@ learning rates and freezing (a callback, below) and the all-<code>ls</code> clas
   resets every Bernstein/ordinal simple intercept to its column's marginal
   (spline and affine have no calibrated start), any time — e.g. to
   restart a trained or loaded flow (<code>calibrate</code> won't, it is once-only).</li>
+<li><strong>Validation, Keras-shaped</strong> — <code>validation_data=</code> (a DataFrame) or
+  <code>validation_split=</code> (a float: the LAST fraction of <code>train_df</code>, no shuffle,
+  and only the head calibrates — no leakage) makes <code>fit</code> compute the
+  per-node validation NLL after every epoch, once, into
+  <code>flow.history["val"]</code> (<code>validation_batch_size=</code> chunks the pass). The
+  shipped callbacks read it there. <code>verbose=N</code> prints every Nth epoch plus
+  the final one (0, the default, is silent).</li>
 <li><strong>Callback hooks</strong> — <code>after_epoch_callbacks=</code> takes one callable or a list,
   each called as <code>cb(flow, epoch, optimizer)</code> after every epoch, once the
   epoch's train NLLs are in <code>flow.history["train"]</code>; every callback runs each
@@ -1391,60 +1398,60 @@ learning rates and freezing (a callback, below) and the all-<code>ls</code> clas
   <code>before_fit_callbacks=</code> / <code>after_fit_callbacks=</code> (<code>cb(flow, optimizer)</code>)
   bracket the loop — the after-fit hooks run <em>before</em> the <code>VC</code> re-centering,
   so a callback that swaps weights hands them to the re-centering. This is
-  where validation (<code>flow.nll(val_df)</code>), schedules, snapshots, logging and
-  coefficient trajectories live. The common recipes ship in
-  <a href="https://github.com/tensorchiefs/tramdag/blob/dev-marcel/src/tramdag/callbacks.py"><code>tramdag.callbacks</code></a>: <code>Logger</code> (epoch lines),
-  <code>RestoreBest</code> (best-validation weights), <code>PerNodePlateau</code> + <code>per_node_adam</code>
-  (per-node decay and freezing).</li>
+  where schedules, snapshots and coefficient trajectories live. The common
+  recipes ship in <a href="https://github.com/tensorchiefs/tramdag/blob/dev-marcel/src/tramdag/callbacks.py"><code>tramdag.callbacks</code></a>:
+  <code>RestoreBest</code> (best-validation weights) and <code>PerNodePlateau</code> +
+  <code>per_node_adam</code> (per-node decay and freezing), both reading
+  <code>history["val"]</code>.</li>
 <li><strong><code>vc_ehat=</code></strong>: the out-of-fold propensities a centered <code>VC</code> term needs,
   <code>{node: {t: array}}</code> with one value per training row (see
   <a href="../varying-coefficients/">varying-coefficients.md</a>).</li>
 </ul>
 <h3 id="the-recipes-as-callbacks">The recipes, as callbacks<a class="headerlink" href="#the-recipes-as-callbacks" title="Permanent link">&para;</a></h3>
-<p>The shipped ones first — best-validation weights plus progress lines is two
-imports:</p>
-<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">tramdag.callbacks</span><span class="w"> </span><span class="kn">import</span> <span class="n">Logger</span><span class="p">,</span> <span class="n">RestoreBest</span>
+<p>The shipped ones first — best-validation weights plus progress lines is one
+import:</p>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">tramdag.callbacks</span><span class="w"> </span><span class="kn">import</span> <span class="n">RestoreBest</span>
 
-<span class="n">best</span> <span class="o">=</span> <span class="n">RestoreBest</span><span class="p">(</span><span class="n">val_df</span><span class="p">)</span>
+<span class="n">best</span> <span class="o">=</span> <span class="n">RestoreBest</span><span class="p">()</span>
 <span class="n">flow</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span>
     <span class="n">train_df</span><span class="p">,</span>
     <span class="n">epochs</span><span class="o">=</span><span class="mi">4000</span><span class="p">,</span>
-    <span class="n">after_epoch_callbacks</span><span class="o">=</span><span class="p">[</span><span class="n">Logger</span><span class="p">(</span><span class="n">val_df</span><span class="p">,</span> <span class="n">every</span><span class="o">=</span><span class="mi">50</span><span class="p">),</span> <span class="n">best</span><span class="p">],</span>
+    <span class="n">validation_data</span><span class="o">=</span><span class="n">val_df</span><span class="p">,</span>   <span class="c1"># or validation_split=0.1</span>
+    <span class="n">verbose</span><span class="o">=</span><span class="mi">50</span><span class="p">,</span>
+    <span class="n">after_epoch_callbacks</span><span class="o">=</span><span class="p">[</span><span class="n">best</span><span class="p">],</span>
     <span class="n">after_fit_callbacks</span><span class="o">=</span><span class="p">[</span><span class="n">best</span><span class="o">.</span><span class="n">restore</span><span class="p">],</span>
 <span class="p">)</span>
 </code></pre></div>
+<p><strong>Per-node training</strong>, the two requested recipes: a per-node optimizer is
+<code>per_node_adam(flow, lr)</code> — one parameter group per node, so groups can carry
+different rates — and per-node early stopping is <code>PerNodePlateau(patience=10,
+freeze=40)</code> over that optimizer: each node's rate decays on its own
+validation NLL and the fit stops when every node froze (the demo notebook
+runs this recipe end to end). It was <code>fit(schedule="plateau",
+freeze_patience=)</code> before 0.4 and is measured in
+<code>experiments/benchmarks/bench_training.py</code>.</p>
 <p>Anything else is a few lines of your own. A learning-rate schedule is torch's,
-stepped from the hook; the snapshot half of this snippet is what <code>RestoreBest</code>
-does inside, written out:</p>
+stepped from the hook on the validation NLL <code>fit</code> already computed; the
+snapshot half is what <code>RestoreBest</code> does inside, written out:</p>
 <div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">copy</span>
 
 <span class="n">opt</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">optim</span><span class="o">.</span><span class="n">Adam</span><span class="p">(</span><span class="n">flow</span><span class="o">.</span><span class="n">parameters</span><span class="p">(),</span> <span class="n">lr</span><span class="o">=</span><span class="mf">1e-2</span><span class="p">)</span>
-
-<span class="c1"># a learning-rate schedule: torch's, on the validation NLL</span>
 <span class="n">plateau</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">optim</span><span class="o">.</span><span class="n">lr_scheduler</span><span class="o">.</span><span class="n">ReduceLROnPlateau</span><span class="p">(</span><span class="n">opt</span><span class="p">,</span> <span class="n">factor</span><span class="o">=</span><span class="mf">0.3</span><span class="p">,</span> <span class="n">patience</span><span class="o">=</span><span class="mi">30</span><span class="p">)</span>
-
-<span class="c1"># best-validation weights (early stopping) — RestoreBest, spelled out</span>
 <span class="n">best</span> <span class="o">=</span> <span class="p">{</span><span class="s2">"nll"</span><span class="p">:</span> <span class="nb">float</span><span class="p">(</span><span class="s2">"inf"</span><span class="p">),</span> <span class="s2">"state"</span><span class="p">:</span> <span class="kc">None</span><span class="p">}</span>
 
 <span class="k">def</span><span class="w"> </span><span class="nf">on_epoch</span><span class="p">(</span><span class="n">flow</span><span class="p">,</span> <span class="n">epoch</span><span class="p">,</span> <span class="n">opt</span><span class="p">):</span>
-    <span class="n">nll</span> <span class="o">=</span> <span class="nb">sum</span><span class="p">(</span><span class="n">flow</span><span class="o">.</span><span class="n">nll</span><span class="p">(</span><span class="n">val_df</span><span class="p">)</span><span class="o">.</span><span class="n">values</span><span class="p">())</span>
+    <span class="n">nll</span> <span class="o">=</span> <span class="nb">sum</span><span class="p">(</span><span class="n">flow</span><span class="o">.</span><span class="n">history</span><span class="p">[</span><span class="s2">"val"</span><span class="p">][</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">values</span><span class="p">())</span>   <span class="c1"># fit computed it</span>
     <span class="n">plateau</span><span class="o">.</span><span class="n">step</span><span class="p">(</span><span class="n">nll</span><span class="p">)</span>
     <span class="k">if</span> <span class="n">nll</span> <span class="o">&lt;</span> <span class="n">best</span><span class="p">[</span><span class="s2">"nll"</span><span class="p">]:</span>
         <span class="n">best</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">nll</span><span class="o">=</span><span class="n">nll</span><span class="p">,</span> <span class="n">state</span><span class="o">=</span><span class="n">copy</span><span class="o">.</span><span class="n">deepcopy</span><span class="p">(</span><span class="n">flow</span><span class="o">.</span><span class="n">state_dict</span><span class="p">()))</span>
     <span class="k">return</span> <span class="n">opt</span><span class="o">.</span><span class="n">param_groups</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="s2">"lr"</span><span class="p">]</span> <span class="o">&lt;</span> <span class="mf">1e-5</span>      <span class="c1"># stop once the rate bottomed out</span>
 
-<span class="n">flow</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">train_df</span><span class="p">,</span> <span class="n">epochs</span><span class="o">=</span><span class="mi">4000</span><span class="p">,</span> <span class="n">batch_size</span><span class="o">=</span><span class="mi">512</span><span class="p">,</span> <span class="n">optimizer</span><span class="o">=</span><span class="n">opt</span><span class="p">,</span>
-         <span class="n">after_epoch_callbacks</span><span class="o">=</span><span class="n">on_epoch</span><span class="p">)</span>
+<span class="n">flow</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">train_df</span><span class="p">,</span> <span class="n">epochs</span><span class="o">=</span><span class="mi">4000</span><span class="p">,</span> <span class="n">batch_size</span><span class="o">=</span><span class="mi">512</span><span class="p">,</span> <span class="n">validation_data</span><span class="o">=</span><span class="n">val_df</span><span class="p">,</span>
+         <span class="n">optimizer</span><span class="o">=</span><span class="n">opt</span><span class="p">,</span> <span class="n">after_epoch_callbacks</span><span class="o">=</span><span class="n">on_epoch</span><span class="p">)</span>
 <span class="n">flow</span><span class="o">.</span><span class="n">load_state_dict</span><span class="p">(</span><span class="n">best</span><span class="p">[</span><span class="s2">"state"</span><span class="p">])</span>
 </code></pre></div>
 <p>(One difference to <code>RestoreBest</code>: a post-fit <code>load_state_dict</code> skips the VC
 re-centering, so on a spec with a <code>VC</code> term prefer <code>after_fit_callbacks</code>.)</p>
-<p>The per-node variant — one parameter group per node, each decayed on its own
-validation NLL and frozen (rate 0) once flat — is
-<code>tramdag.callbacks.PerNodePlateau</code> over a <code>per_node_adam(flow, lr)</code> optimizer;
-it was <code>fit(schedule="plateau", freeze_patience=)</code> before 0.4, left <code>fit</code>
-because it is a training strategy, not part of the model, and is measured in
-<code>experiments/benchmarks/bench_training.py</code>.</p>
 <p>Freezing helps and parallelizing the node loop does not: freezing deletes
 whole epochs, while node-level overlap only time-slices the cores that each
 node's batched BLAS ops already saturate — measured as contention, not speedup.

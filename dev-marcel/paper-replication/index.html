@@ -1366,7 +1366,7 @@ the "paper" column names the figure and what it shows.</p>
 <tr>
 <td>plateau rule (VACA/CAREFL)</td>
 <td><code>update_learning_rate</code>: one optimizer, reduce when the summed validation NLL has not improved for 50 epochs (strict <code>&lt;</code>), factor 0.1, min 1e-7</td>
-<td>torch <code>ReduceLROnPlateau(patience=49, threshold=0, threshold_mode="abs", factor=0.1, min_lr=1e-7)</code> on <code>sum(flow.nll(val))</code> — the same rule, verified against torch's source. CAREFL keeps it; VACA dropped it 2026-09-01 with the epoch cut (on the compressed trajectory it cannot fire inside the all-bounds window — see the tuning round)</td>
+<td>torch <code>ReduceLROnPlateau(patience=49, threshold=0, threshold_mode="abs", factor=0.1, min_lr=1e-7)</code> on the summed <code>history["val"]</code> entry (fit computes it) — the same rule, verified against torch's source. CAREFL keeps it; VACA dropped it 2026-09-01 with the epoch cut (on the compressed trajectory it cannot fire inside the all-bounds window — see the tuning round)</td>
 </tr>
 </tbody>
 </table>

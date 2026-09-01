@@ -35,7 +35,6 @@
 #
 
 # %%
-import logging
 import time
 import warnings
 from pathlib import Path
@@ -49,8 +48,6 @@ from tramdag import LS, SI, CausalFlowDAG, ContinuousNode, OrdinalNode
 from tramdag.callbacks import PerNodePlateau, per_node_adam
 
 warnings.filterwarnings("ignore")
-# so fit_classical reports its iters / NLL / time
-logging.basicConfig(level=logging.INFO, format="%(message)s")
 
 # repo-relative data, whether the notebook runs from the repo root or notebooks/
 HERE = [Path.cwd(), *Path.cwd().parents]
@@ -525,11 +522,12 @@ for node, parents in flow_c.ls_coefficients().items():
 flow_a = CausalFlowDAG(spec_vaca, seed=0)
 t0 = time.perf_counter()
 # the pre-0.4 fit(schedule="plateau", freeze_patience=) recipe, now a callback
-sched = PerNodePlateau(df, patience=15, freeze=60)
+sched = PerNodePlateau(patience=15, freeze=60)
 flow_a.fit(
     df,
     epochs=2000,
     batch_size=4096,
+    validation_data=df,
     optimizer=per_node_adam(flow_a, lr=1e-1),
     after_epoch_callbacks=sched,
 )

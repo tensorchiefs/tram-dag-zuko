@@ -1067,34 +1067,6 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#tramdag.callbacks.Logger" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Logger
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Logger">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#tramdag.callbacks.Logger.__call__" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        __call__
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-        
-          <li class="md-nav__item">
   <a href="#tramdag.callbacks.RestoreBest" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1243,34 +1215,6 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#tramdag.callbacks.Logger" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Logger
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Logger">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#tramdag.callbacks.Logger.__call__" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        __call__
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-        
-          <li class="md-nav__item">
   <a href="#tramdag.callbacks.RestoreBest" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1399,18 +1343,20 @@
 
     <div class="doc doc-contents first">
 
-        <p>Predefined <code>fit</code> callbacks: logging, best-weight restoration, per-node plateau.</p>
-<p><code>fit</code> stays one plain loop; everything here is optional and attaches through
-its hooks (<code>after_epoch_callbacks=</code>, <code>after_fit_callbacks=</code>). Each callback
-is self-contained — it computes its own validation NLL — so they compose in any
-order::</p>
-<pre><code>from tramdag.callbacks import Logger, RestoreBest
+        <p>Predefined <code>fit</code> callbacks: best-weight restoration, per-node plateau.</p>
+<p><code>fit</code> owns validation (<code>validation_data=</code> / <code>validation_split=</code>) and
+progress printing (<code>verbose=</code>); the callbacks here read the per-node
+validation NLL that <code>fit</code> appends to <code>flow.history["val"]</code> after every
+epoch — computed once, shared by all of them::</p>
+<pre><code>from tramdag.callbacks import RestoreBest
 
-best = RestoreBest(val_df)
+best = RestoreBest()
 flow.fit(
     train_df,
     epochs=4000,
-    after_epoch_callbacks=[Logger(val_df, every=50), best],
+    validation_data=val_df,
+    verbose=50,
+    after_epoch_callbacks=[best],
     after_fit_callbacks=[best.restore],
 )
 </code></pre>
@@ -1439,119 +1385,6 @@ flow.fit(
 
 
 
-<h3 id="tramdag.callbacks.Logger" class="doc doc-heading">
-            <span class="doc doc-object-name doc-class-name">Logger</span>
-
-
-<a href="#tramdag.callbacks.Logger" class="headerlink" title="Permanent link">&para;</a></h3>
-
-
-    <div class="doc doc-contents ">
-
-
-
-        <p>Print the summed train NLL — and validation NLL, when given — per epoch.</p>
-
-
-<p><span class="doc-section-title">Parameters:</span></p>
-    <table>
-      <thead>
-        <tr>
-          <th>Name</th>
-          <th>Type</th>
-          <th>Description</th>
-          <th>Default</th>
-        </tr>
-      </thead>
-      <tbody>
-          <tr class="doc-section-item">
-            <td>
-                <code>val_df</code>
-            </td>
-            <td>
-                  <code><span title="pandas.DataFrame">DataFrame</span> | None</code>
-            </td>
-            <td>
-              <div class="doc-md-description">
-                <p>Validation rows; their summed NLL joins the line when given.</p>
-              </div>
-            </td>
-            <td>
-                  <code>None</code>
-            </td>
-          </tr>
-          <tr class="doc-section-item">
-            <td>
-                <code>every</code>
-            </td>
-            <td>
-                  <code><span title="int">int</span></code>
-            </td>
-            <td>
-              <div class="doc-md-description">
-                <p>Print every that-many epochs, by default 1.</p>
-              </div>
-            </td>
-            <td>
-                  <code>1</code>
-            </td>
-          </tr>
-      </tbody>
-    </table>
-
-
-
-
-
-
-
-
-
-
-
-<div class="doc doc-children">
-
-
-
-
-
-
-
-
-
-
-<div class="doc doc-object doc-function">
-
-
-<h4 id="tramdag.callbacks.Logger.__call__" class="doc doc-heading">
-            <span class="doc doc-object-name doc-function-name">__call__</span>
-
-
-<a href="#tramdag.callbacks.Logger.__call__" class="headerlink" title="Permanent link">&para;</a></h4>
-<div class="doc-signature highlight"><pre><span></span><code><span class="nf">__call__</span><span class="p">(</span><span class="n">flow</span><span class="p">,</span> <span class="n">epoch</span><span class="p">,</span> <span class="n">optimizer</span><span class="p">)</span>
-</code></pre></div>
-
-    <div class="doc doc-contents ">
-
-        <p>Print the epoch line.</p>
-
-
-    </div>
-
-</div>
-
-
-
-  </div>
-
-    </div>
-
-</div>
-
-<div class="doc doc-object doc-class">
-
-
-
 <h3 id="tramdag.callbacks.RestoreBest" class="doc doc-heading">
             <span class="doc doc-object-name doc-class-name">RestoreBest</span>
 
@@ -1571,6 +1404,8 @@ recover the causal effect (docs/fitting.md). Register the instance in
 <code>after_fit_callbacks</code>; <code>fit</code> runs the latter <em>before</em> the VC
 re-centering, so the restored weights are what gets re-centered. One
 instance per fit and per flow — the snapshot is a full <code>state_dict</code>.</p>
+<p>Reads <code>flow.history["val"]</code>, so the fit needs <code>validation_data=</code> or
+<code>validation_split=</code>.</p>
 
 
 <p><span class="doc-section-title">Attributes:</span></p>
@@ -1711,7 +1546,8 @@ start and stayed flat for <code>freeze</code> epochs the node leaves training
 (rate 0). The callback stops the fit when every node has left. Valid
 because the per-node NLLs have independent gradients — build the
 optimizer with :func:<code>per_node_adam</code> (one <code>node</code>-tagged group per
-node).</p>
+node), and give <code>fit</code> a validation set (the callback reads
+<code>flow.history["val"]</code>).</p>
 <p>A frozen node's rate is 0 but its forward/backward still runs, so the
 saving is in epochs, not per-epoch wall clock. This is the pre-0.4
 <code>fit(schedule="plateau", freeze_patience=)</code> recipe, back as an opt-in
@@ -1731,23 +1567,6 @@ fit immediately.</p>
         </tr>
       </thead>
       <tbody>
-          <tr class="doc-section-item">
-            <td>
-                <code>val_df</code>
-            </td>
-            <td>
-                  <code><span title="pandas.DataFrame">DataFrame</span> | None</code>
-            </td>
-            <td>
-              <div class="doc-md-description">
-                <p>Validation rows. Omit only when stepping manually through
-:meth:<code>step</code> with your own NLL dict.</p>
-              </div>
-            </td>
-            <td>
-                  <code>None</code>
-            </td>
-          </tr>
           <tr class="doc-section-item">
             <td>
                 <code>patience</code>
@@ -1855,7 +1674,7 @@ stroke workload and <code>patience=15, freeze=50</code> on the VACA one
 
     <div class="doc doc-contents ">
 
-        <p>Step on <code>flow.nll(val_df)</code>; <code>True</code> once every node is frozen.</p>
+        <p>Step on the epoch's validation NLL; <code>True</code> once every node froze.</p>
 
 
     </div>

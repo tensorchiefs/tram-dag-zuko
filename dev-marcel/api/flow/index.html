@@ -2194,6 +2194,10 @@ read) — only ordinal intercepts re-read the rows.</p>
     <span class="n">epochs</span><span class="p">,</span>
     <span class="n">learning_rate</span><span class="o">=</span><span class="mf">0.01</span><span class="p">,</span>
     <span class="n">batch_size</span><span class="o">=</span><span class="mi">512</span><span class="p">,</span>
+    <span class="n">validation_data</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+    <span class="n">validation_split</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+    <span class="n">validation_batch_size</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+    <span class="n">verbose</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span>
     <span class="n">seed</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
     <span class="n">optimizer</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
     <span class="n">before_fit_callbacks</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
@@ -2215,13 +2219,15 @@ continues the training. Everything else — validation monitoring,
 learning-rate schedules, early stopping, best-weight restoration,
 logging — is the caller's, through <code>optimizer</code> and the callback
 hooks; :mod:<code>tramdag.callbacks</code> ships the common recipes::</p>
-<pre><code>from tramdag.callbacks import Logger, RestoreBest
+<pre><code>from tramdag.callbacks import RestoreBest
 
-best = RestoreBest(val_df)
+best = RestoreBest()
 flow.fit(
     train_df,
     epochs=4000,
-    after_epoch_callbacks=[Logger(val_df, every=50), best],
+    validation_data=val_df,
+    verbose=50,
+    after_epoch_callbacks=[best],
     after_fit_callbacks=[best.restore],
 )
 </code></pre>
@@ -2308,6 +2314,81 @@ full-batch step per epoch.</p>
           </tr>
           <tr class="doc-section-item">
             <td>
+                <code>validation_data</code>
+            </td>
+            <td>
+                  <code><span title="pandas.DataFrame">DataFrame</span> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Validation rows, one column per node. When given (or split off),
+the per-node validation NLL is computed after every epoch and
+appended to <code>flow.history["val"]</code> — once, centrally; the
+shipped callbacks read it there.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>validation_split</code>
+            </td>
+            <td>
+                  <code><span title="float">float</span> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Keras' rule: the LAST fraction of <code>train_df</code> becomes the
+validation set, without shuffling, and only the remaining rows
+train (and calibrate — no leakage into the frozen statistics).
+Mutually exclusive with <code>validation_data</code>.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>validation_batch_size</code>
+            </td>
+            <td>
+                  <code><span title="int">int</span> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Chunk size of the validation pass — a MEMORY ceiling for large
+validation frames, by default one full batch (which is also the
+fastest; chunk only when the full pass does not fit).</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>verbose</code>
+            </td>
+            <td>
+                  <code><span title="int">int</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>0 (default) is silent. <code>N &gt;= 1</code> prints one line every <code>N</code>
+epochs and on the final epoch: epoch counter, summed train NLL,
+summed validation NLL when validation is configured. No
+progress bars.</p>
+              </div>
+            </td>
+            <td>
+                  <code>0</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
                 <code>seed</code>
             </td>
             <td>
@@ -2373,9 +2454,9 @@ and before the first epoch.</p>
 <code>flow.history["train"]</code>. All of them run each epoch; the fit
 stops after an epoch in which any returned <code>True</code>
 (<code>len(flow.history["train"])</code> says how many epochs ran). Use them
-for validation (<code>flow.nll(val_df)</code>), schedules, snapshots and
-coefficient trajectories — :mod:<code>tramdag.callbacks</code> ships
-<code>Logger</code>, <code>RestoreBest</code> and <code>PerNodePlateau</code>.</p>
+for schedules, snapshots and coefficient trajectories —
+:mod:<code>tramdag.callbacks</code> ships <code>RestoreBest</code> and
+<code>PerNodePlateau</code>, both reading <code>history["val"]</code>.</p>
               </div>
             </td>
             <td>
@@ -2460,8 +2541,10 @@ has one (see docs/varying-coefficients.md).</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>If <code>epochs</code> or <code>batch_size</code> is below 1, or <code>vc_ehat</code> does
-not match the centered VC terms of the spec.</p>
+                <p>If <code>epochs</code> or <code>batch_size</code> is below 1, <code>verbose</code> is
+negative, both validation arguments are given, the split leaves
+an empty side, or <code>vc_ehat</code> does not match the centered VC
+terms of the spec.</p>
               </div>
             </td>
           </tr>

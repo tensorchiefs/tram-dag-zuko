@@ -1319,17 +1319,20 @@ uv<span class="w"> </span>sync<span class="w">                        </span><sp
 <span class="c1"># train_df / val_df: DataFrames with one column per node</span>
 <span class="n">flow</span> <span class="o">=</span> <span class="n">CausalFlowDAG</span><span class="p">(</span><span class="n">spec</span><span class="p">)</span>  <span class="c1"># validates acyclicity, builds the flow</span>
 
-<span class="c1"># fit() is one minibatch Adam loop; validation, schedules and early stopping</span>
-<span class="c1"># attach through optimizer= and the callback hooks — the common recipes ship</span>
-<span class="c1"># in tramdag.callbacks (docs/fitting.md)</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">tramdag.callbacks</span><span class="w"> </span><span class="kn">import</span> <span class="n">Logger</span><span class="p">,</span> <span class="n">RestoreBest</span>
+<span class="c1"># fit() is one minibatch Adam loop with Keras-shaped extras: validation_data=</span>
+<span class="c1"># (or validation_split=0.1) records the per-epoch validation NLL in</span>
+<span class="c1"># flow.history["val"], verbose= prints progress; schedules and early stopping</span>
+<span class="c1"># attach through optimizer= and the callback hooks (docs/fitting.md)</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">tramdag.callbacks</span><span class="w"> </span><span class="kn">import</span> <span class="n">RestoreBest</span>
 
-<span class="n">best</span> <span class="o">=</span> <span class="n">RestoreBest</span><span class="p">(</span><span class="n">val_df</span><span class="p">)</span>  <span class="c1"># keep the best-validation weights</span>
+<span class="n">best</span> <span class="o">=</span> <span class="n">RestoreBest</span><span class="p">()</span>  <span class="c1"># keep the best-validation weights</span>
 <span class="n">flow</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span>
     <span class="n">train_df</span><span class="p">,</span>
     <span class="n">epochs</span><span class="o">=</span><span class="mi">4000</span><span class="p">,</span>
     <span class="n">batch_size</span><span class="o">=</span><span class="mi">512</span><span class="p">,</span>
-    <span class="n">after_epoch_callbacks</span><span class="o">=</span><span class="p">[</span><span class="n">Logger</span><span class="p">(</span><span class="n">val_df</span><span class="p">,</span> <span class="n">every</span><span class="o">=</span><span class="mi">100</span><span class="p">),</span> <span class="n">best</span><span class="p">],</span>
+    <span class="n">validation_data</span><span class="o">=</span><span class="n">val_df</span><span class="p">,</span>
+    <span class="n">verbose</span><span class="o">=</span><span class="mi">100</span><span class="p">,</span>
+    <span class="n">after_epoch_callbacks</span><span class="o">=</span><span class="p">[</span><span class="n">best</span><span class="p">],</span>
     <span class="n">after_fit_callbacks</span><span class="o">=</span><span class="p">[</span><span class="n">best</span><span class="o">.</span><span class="n">restore</span><span class="p">],</span>
 <span class="p">)</span>
 
