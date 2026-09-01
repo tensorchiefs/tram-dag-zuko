@@ -100,8 +100,7 @@ config in `experiments/paper/` states `units=` and `activation=` itself.
 
 | Name | Role |
 |---|---|
-| [`RestoreBest`][tramdag.callbacks.RestoreBest] | Snapshots the weights of the best summed validation NLL (read from `history["val"]`) and restores them automatically at fit end, before the VC re-centering. |
-| [`EarlyStopping`][tramdag.callbacks.EarlyStopping] | Stops the fit after `patience` epochs without validation improvement; tracks its own best, so it composes with `RestoreBest` in any order. |
+| [`EarlyStopping`][tramdag.callbacks.EarlyStopping] | Snapshots the weights of the best summed validation NLL (read from `history["val"]`) and restores them automatically at fit end, before the VC re-centering; an optional `patience` also stops the fit once the best is that many epochs old. |
 | [`PerNodePlateau`][tramdag.callbacks.PerNodePlateau] | Per-node lr decay and freezing on each node's own validation NLL (from `history["val"]`); stops the fit once every node froze. The pre-0.4 `fit(schedule="plateau")` recipe, opt-in. `step(nll, opt)` for a hand-computed NLL. |
 | [`per_node_adam()`][tramdag.callbacks.per_node_adam] | Adam with one `node`-tagged parameter group per node — the optimizer `PerNodePlateau` needs. |
 
@@ -123,7 +122,7 @@ default you can read at the call site. Nothing numeric is buried.
 |---|---|---|
 | learning rate, batch size | `fit()` | 1e-2 / 512 (in-repo callers state them explicitly anyway) |
 | validation, progress | `fit(validation_data=, validation_split=, validation_batch_size=, verbose=)` | per-node val NLL into `history["val"]` each epoch; `verbose=N` prints every Nth + final epoch (default 0, silent) |
-| schedules, early stopping | `fit(optimizer=, callbacks=)` | `tramdag.callbacks` ships `RestoreBest`, `EarlyStopping`, `PerNodePlateau`; anything else is torch's `lr_scheduler` and a few lines of callback ([fitting.md](fitting.md)) |
+| schedules, early stopping | `fit(optimizer=, callbacks=)` | `tramdag.callbacks` ships `EarlyStopping`, `PerNodePlateau`; anything else is torch's `lr_scheduler` and a few lines of callback ([fitting.md](fitting.md)) |
 | calibrated init | `calibrate(marginal_init=)` | True (pure init, MLE unchanged; `False` = zuko's zero start; called by the first fit) |
 | VC stage-1 propensities | `fit(vc_ehat=)` | required for a centered VC term, out of fold, computed by the caller |
 | VC penalty and centering | `VC(penalty=, center=)` | 1.0 / False (centering needs `fit(vc_ehat=)`) |

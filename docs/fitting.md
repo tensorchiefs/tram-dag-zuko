@@ -92,10 +92,9 @@ learning rates and freezing (a callback, below) and the all-`ls` classical fit.
   callable in the list is an `on_epoch_end` hook, `cb(flow, epoch,
   optimizer)`, and any `True` stops the fit — this is where schedules,
   snapshots and coefficient trajectories live. The common recipes ship in
-  `tramdag.callbacks`: `RestoreBest` (best-validation weights, restored
-  automatically), `EarlyStopping` (patience on the validation NLL) and
-  `PerNodePlateau` + `per_node_adam` (per-node decay and freezing), all
-  reading `history["val"]`.
+  `tramdag.callbacks`: `EarlyStopping` (best-validation weights restored
+  automatically; optional patience) and `PerNodePlateau` + `per_node_adam`
+  (per-node decay and freezing), all reading `history["val"]`.
 - **`vc_ehat=`**: the out-of-fold propensities a centered `VC` term needs,
   `{node: {t: array}}` with one value per training row (see
   [varying-coefficients.md](varying-coefficients.md)).
@@ -114,8 +113,8 @@ weights; flexible (CI/CS/VC) models validate and keep the best weights**
 | exact MLE — `fit_classical` (Path B, below) | all-`ls` spec; deterministic, seconds |
 | plain Adam | all-`ls` with a shift `fit_classical` refuses, quick looks |
 | multi-phase Adam | a tighter MLE without a scheduler |
-| best-validation weights — `RestoreBest` | any CI/CS/VC model; the recommended recipe (register it — fit has no default) |
-| … + early stopping — `EarlyStopping` | cap the wasted epochs after the best |
+| best-validation weights — `EarlyStopping()` | any CI/CS/VC model; the recommended recipe (register it — fit has no default) |
+| … + patience — `EarlyStopping(patience=)` | also stop once the best is that many epochs old |
 | global plateau schedule | decaying one shared rate beats picking one |
 | per-node plateau — `PerNodePlateau` | nodes converge at different speeds; self-stopping |
 
@@ -137,31 +136,30 @@ for epochs, lr in [(800, 1e-2), (700, 1e-3), (500, 1e-4)]:
 ```
 
 **Best-validation weights** — the flexible-model default, one import, one
-registration (the restore happens automatically at fit end):
+registration (the restore happens automatically at fit end; without
+`patience` the fit runs its full budget):
 
 ```python
-from tramdag.callbacks import RestoreBest
+from tramdag.callbacks import EarlyStopping
 
 flow.fit(
     train_df,
     epochs=4000,
     validation_data=val_df,   # or validation_split=0.1
     verbose=50,
-    callbacks=RestoreBest(),
+    callbacks=EarlyStopping(),
 )
 ```
 
 `validation_split` takes the LAST rows unshuffled — shuffle the DataFrame
 first if its row order means anything.
 
-**… plus early stopping** — `EarlyStopping` tracks its own best epoch, so
-the pair composes in any order:
+**… plus patience** — the same callback also stops the fit once the best
+epoch is `patience` old:
 
 ```python
-from tramdag.callbacks import EarlyStopping, RestoreBest
-
 flow.fit(train_df, epochs=4000, validation_split=0.1,
-         callbacks=[RestoreBest(), EarlyStopping(patience=200)])
+         callbacks=EarlyStopping(patience=200))
 ```
 
 **Per-node plateau** — one rate per node (`per_node_adam` tags one parameter
@@ -188,7 +186,7 @@ could overlap pay, and there the tool is fusing same-shaped nodes, not threads.
 **Global plateau schedule** — anything else is a few lines of your own: a
 learning-rate schedule is torch's, stepped from the hook on the validation
 NLL `fit` already computed (so this too needs `validation_data=` or
-`validation_split=`); the snapshot half is what `RestoreBest` does inside,
+`validation_split=`); the snapshot half is what `EarlyStopping` does inside,
 written out:
 
 ```python
@@ -212,7 +210,7 @@ flow.fit(train_df, epochs=4000, batch_size=512, validation_data=val_df,
 flow.load_state_dict(best["state"])
 ```
 
-(One difference to `RestoreBest`: a post-fit `load_state_dict` skips the VC
+(One difference to `EarlyStopping`: a post-fit `load_state_dict` skips the VC
 re-centering, so on a spec with a `VC` term put the restore in a `Callback`
 subclass's `on_fit_end` instead.)
 

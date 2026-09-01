@@ -60,7 +60,7 @@ flow = CausalFlowDAG(spec)  # validates acyclicity, builds the flow
 # (or validation_split=0.1) records the per-epoch validation NLL in
 # flow.history["val"], verbose= prints progress; schedules and early stopping
 # attach through optimizer= and callbacks= (docs/fitting.md)
-from tramdag.callbacks import EarlyStopping, RestoreBest
+from tramdag.callbacks import EarlyStopping
 
 flow.fit(
     train_df,
@@ -69,7 +69,7 @@ flow.fit(
     validation_data=val_df,
     verbose=100,
     # keep the best-validation weights; stop once the best is 200 epochs old
-    callbacks=[RestoreBest(), EarlyStopping(patience=200)],
+    callbacks=[EarlyStopping(patience=200)],
 )
 
 # all-`ls` model? fit it classically instead: deterministic float64 L-BFGS,

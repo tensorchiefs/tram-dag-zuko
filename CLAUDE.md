@@ -75,8 +75,8 @@ See `experiments/README.md`.
   config sets explicitly instead.
 - `callbacks.py` — the shipped `fit` callbacks on the `Callback` base
   (`on_fit_begin`/`on_epoch_end`/`on_fit_end`, state reset at fit begin):
-  `RestoreBest` (best-validation weights, restored automatically at fit
-  end), `EarlyStopping` (patience on the validation NLL) and
+  `EarlyStopping` (best-validation weights restored automatically at fit
+  end; optional stopping `patience`) and
   `PerNodePlateau` + `per_node_adam` (per-node lr decay and freezing, the
   pre-0.4 plateau recipe). All read `history["val"]`, which
   `fit(validation_data=|validation_split=)` fills per epoch; `verbose=`
@@ -127,14 +127,14 @@ See `experiments/README.md`.
   (`on_fit_begin`/`on_epoch_end`/`on_fit_end`; epoch hooks get
   `(flow, epoch, opt)`, any `True` stops, `on_fit_end` runs before the VC
   re-centering) or bare `on_epoch_end` callables; `tramdag/callbacks.py`
-  ships `RestoreBest` (auto-restores), `EarlyStopping`,
+  ships `EarlyStopping` (auto-restores best weights; optional patience),
   `PerNodePlateau`+`per_node_adam` (they read `history["val"]`); `flow.calibrate(train_df, marginal_init=)`
   takes the data-dependent state once (ranges, net min-max, calibrated start)
   and is called by the first fit; `init_marginals(train_df)` re-applies the
   calibrated start explicitly, any time. Key empirical finding (stroke storyline):
   **flexible (CI/CS) models overfit observational confounding at the MLE and
   need best-validation weights to recover the causal effect; all-`ls` models
-  don't** — `callbacks.RestoreBest` now, see docs/fitting.md.
+  don't** — `callbacks.EarlyStopping` now, see docs/fitting.md.
 
 ## Ground truth & reference numbers
 
