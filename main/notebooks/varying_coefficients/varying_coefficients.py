@@ -38,7 +38,7 @@ import numpy as np
 import pandas as pd
 
 from tramdag import CS, LS, VC, CausalFlowDAG, ContinuousNode, I, OrdinalNode
-from tramdag.callbacks import RestoreBest
+from tramdag.callbacks import EarlyStopping
 
 plt.rcParams["figure.dpi"] = 110
 
@@ -165,7 +165,7 @@ flow.fit(
     batch_size=512,
     validation_data=val,
     seed=0,
-    callbacks=RestoreBest(),
+    callbacks=EarlyStopping(),  # keep the best-validation weights
 )
 print(flow.to_matrix())
 
@@ -284,7 +284,7 @@ for center in (False, True):
         batch_size=512,
         validation_data=c_val,
         seed=0,
-        callbacks=RestoreBest(),
+        callbacks=EarlyStopping(),  # keep the best-validation weights
         vc_ehat={"Y": {"T": e_oof}} if center else None,
     )
     b = fc.varying_coef(c_test, "Y")

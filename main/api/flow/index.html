@@ -2217,14 +2217,14 @@ continues the training. Everything else — validation monitoring,
 learning-rate schedules, early stopping, best-weight restoration,
 logging — is the caller's, through <code>optimizer</code> and <code>callbacks</code>;
 :mod:<code>tramdag.callbacks</code> ships the common recipes::</p>
-<pre><code>from tramdag.callbacks import EarlyStopping, RestoreBest
+<pre><code>from tramdag.callbacks import EarlyStopping
 
 flow.fit(
     train_df,
     epochs=4000,
     validation_data=val_df,
     verbose=50,
-    callbacks=[RestoreBest(), EarlyStopping(patience=200)],
+    callbacks=EarlyStopping(patience=200),
 )
 </code></pre>
 
@@ -2434,7 +2434,7 @@ contract (begin/epoch/end timing, the stop rule, the VC
 re-centering order). A bare callable is an <code>on_epoch_end</code>
 hook, <code>cb(flow, epoch, optimizer)</code> — use it for schedules and
 coefficient trajectories. :mod:<code>tramdag.callbacks</code> ships
-<code>RestoreBest</code>, <code>EarlyStopping</code> and <code>PerNodePlateau</code>, all
+<code>EarlyStopping</code> and <code>PerNodePlateau</code>, all
 reading <code>history["val"]</code>.</p>
               </div>
             </td>

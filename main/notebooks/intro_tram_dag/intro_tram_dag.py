@@ -717,7 +717,7 @@ plt.show()
 #   confounding, so the MLE (the final weights `fit` keeps) is the right
 #   target. Under observational confounding, flexible (`I`/`CS`) models can
 #   *overfit the confounding* at the MLE and need best-validation weights
-#   (`tramdag.callbacks.RestoreBest`) to recover
+#   (`tramdag.callbacks.EarlyStopping`) to recover
 #   the causal effect. See `docs/fitting.md`.
 # * **Validation against classical models** — an all-`LS` flow trained to
 #   convergence *is* the classical proportional-odds MLE

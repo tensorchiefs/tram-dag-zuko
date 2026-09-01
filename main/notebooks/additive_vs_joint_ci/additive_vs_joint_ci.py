@@ -47,7 +47,7 @@ import numpy as np
 import pandas as pd
 
 from tramdag import CI, CausalFlowDAG, ContinuousNode
-from tramdag.callbacks import RestoreBest
+from tramdag.callbacks import EarlyStopping
 
 # %% [markdown]
 # ## The data
@@ -100,7 +100,7 @@ for f in (flow_joint, flow_add):
         epochs=1200,
         learning_rate=1e-2,
         validation_data=val,
-        callbacks=RestoreBest(),
+        callbacks=EarlyStopping(),  # keep the best-validation weights
     )
 
 # Both fit the data well; the joint model is only marginally better on held-out

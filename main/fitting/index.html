@@ -1398,10 +1398,9 @@ learning rates and freezing (a callback, below) and the all-<code>ls</code> clas
   callable in the list is an <code>on_epoch_end</code> hook, <code>cb(flow, epoch,
   optimizer)</code>, and any <code>True</code> stops the fit — this is where schedules,
   snapshots and coefficient trajectories live. The common recipes ship in
-  <code>tramdag.callbacks</code>: <code>RestoreBest</code> (best-validation weights, restored
-  automatically), <code>EarlyStopping</code> (patience on the validation NLL) and
-  <code>PerNodePlateau</code> + <code>per_node_adam</code> (per-node decay and freezing), all
-  reading <code>history["val"]</code>.</li>
+  <code>tramdag.callbacks</code>: <code>EarlyStopping</code> (best-validation weights restored
+  automatically; optional patience) and <code>PerNodePlateau</code> + <code>per_node_adam</code>
+  (per-node decay and freezing), all reading <code>history["val"]</code>.</li>
 <li><strong><code>vc_ehat=</code></strong>: the out-of-fold propensities a centered <code>VC</code> term needs,
   <code>{node: {t: array}}</code> with one value per training row (see
   <a href="../varying-coefficients/">varying-coefficients.md</a>).</li>
@@ -1434,12 +1433,12 @@ weights; flexible (CI/CS/VC) models validate and keep the best weights</strong>
 <td>a tighter MLE without a scheduler</td>
 </tr>
 <tr>
-<td>best-validation weights — <code>RestoreBest</code></td>
+<td>best-validation weights — <code>EarlyStopping()</code></td>
 <td>any CI/CS/VC model; the recommended recipe (register it — fit has no default)</td>
 </tr>
 <tr>
-<td>… + early stopping — <code>EarlyStopping</code></td>
-<td>cap the wasted epochs after the best</td>
+<td>… + patience — <code>EarlyStopping(patience=)</code></td>
+<td>also stop once the best is that many epochs old</td>
 </tr>
 <tr>
 <td>global plateau schedule</td>
@@ -1463,25 +1462,24 @@ within ~1e-5 of statsmodels — a single converged constant-rate run gets
     <span class="n">flow</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">train_df</span><span class="p">,</span> <span class="n">epochs</span><span class="o">=</span><span class="n">epochs</span><span class="p">,</span> <span class="n">learning_rate</span><span class="o">=</span><span class="n">lr</span><span class="p">)</span>
 </code></pre></div>
 <p><strong>Best-validation weights</strong> — the flexible-model default, one import, one
-registration (the restore happens automatically at fit end):</p>
-<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">tramdag.callbacks</span><span class="w"> </span><span class="kn">import</span> <span class="n">RestoreBest</span>
+registration (the restore happens automatically at fit end; without
+<code>patience</code> the fit runs its full budget):</p>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">tramdag.callbacks</span><span class="w"> </span><span class="kn">import</span> <span class="n">EarlyStopping</span>
 
 <span class="n">flow</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span>
     <span class="n">train_df</span><span class="p">,</span>
     <span class="n">epochs</span><span class="o">=</span><span class="mi">4000</span><span class="p">,</span>
     <span class="n">validation_data</span><span class="o">=</span><span class="n">val_df</span><span class="p">,</span>   <span class="c1"># or validation_split=0.1</span>
     <span class="n">verbose</span><span class="o">=</span><span class="mi">50</span><span class="p">,</span>
-    <span class="n">callbacks</span><span class="o">=</span><span class="n">RestoreBest</span><span class="p">(),</span>
+    <span class="n">callbacks</span><span class="o">=</span><span class="n">EarlyStopping</span><span class="p">(),</span>
 <span class="p">)</span>
 </code></pre></div>
 <p><code>validation_split</code> takes the LAST rows unshuffled — shuffle the DataFrame
 first if its row order means anything.</p>
-<p><strong>… plus early stopping</strong> — <code>EarlyStopping</code> tracks its own best epoch, so
-the pair composes in any order:</p>
-<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">tramdag.callbacks</span><span class="w"> </span><span class="kn">import</span> <span class="n">EarlyStopping</span><span class="p">,</span> <span class="n">RestoreBest</span>
-
-<span class="n">flow</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">train_df</span><span class="p">,</span> <span class="n">epochs</span><span class="o">=</span><span class="mi">4000</span><span class="p">,</span> <span class="n">validation_split</span><span class="o">=</span><span class="mf">0.1</span><span class="p">,</span>
-         <span class="n">callbacks</span><span class="o">=</span><span class="p">[</span><span class="n">RestoreBest</span><span class="p">(),</span> <span class="n">EarlyStopping</span><span class="p">(</span><span class="n">patience</span><span class="o">=</span><span class="mi">200</span><span class="p">)])</span>
+<p><strong>… plus patience</strong> — the same callback also stops the fit once the best
+epoch is <code>patience</code> old:</p>
+<div class="highlight"><pre><span></span><code><span class="n">flow</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">train_df</span><span class="p">,</span> <span class="n">epochs</span><span class="o">=</span><span class="mi">4000</span><span class="p">,</span> <span class="n">validation_split</span><span class="o">=</span><span class="mf">0.1</span><span class="p">,</span>
+         <span class="n">callbacks</span><span class="o">=</span><span class="n">EarlyStopping</span><span class="p">(</span><span class="n">patience</span><span class="o">=</span><span class="mi">200</span><span class="p">))</span>
 </code></pre></div>
 <p><strong>Per-node plateau</strong> — one rate per node (<code>per_node_adam</code> tags one parameter
 group per node; valid because the per-node gradients are independent), each
@@ -1503,7 +1501,7 @@ could overlap pay, and there the tool is fusing same-shaped nodes, not threads.<
 <p><strong>Global plateau schedule</strong> — anything else is a few lines of your own: a
 learning-rate schedule is torch's, stepped from the hook on the validation
 NLL <code>fit</code> already computed (so this too needs <code>validation_data=</code> or
-<code>validation_split=</code>); the snapshot half is what <code>RestoreBest</code> does inside,
+<code>validation_split=</code>); the snapshot half is what <code>EarlyStopping</code> does inside,
 written out:</p>
 <div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">copy</span>
 
@@ -1524,7 +1522,7 @@ written out:</p>
          <span class="n">optimizer</span><span class="o">=</span><span class="n">opt</span><span class="p">,</span> <span class="n">callbacks</span><span class="o">=</span><span class="n">on_epoch</span><span class="p">)</span>
 <span class="n">flow</span><span class="o">.</span><span class="n">load_state_dict</span><span class="p">(</span><span class="n">best</span><span class="p">[</span><span class="s2">"state"</span><span class="p">])</span>
 </code></pre></div>
-<p>(One difference to <code>RestoreBest</code>: a post-fit <code>load_state_dict</code> skips the VC
+<p>(One difference to <code>EarlyStopping</code>: a post-fit <code>load_state_dict</code> skips the VC
 re-centering, so on a spec with a <code>VC</code> term put the restore in a <code>Callback</code>
 subclass's <code>on_fit_end</code> instead.)</p>
 <p>The exact-MLE and warm-start strategies are Path B, below.</p>
