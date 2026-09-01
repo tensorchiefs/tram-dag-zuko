@@ -1332,8 +1332,7 @@ uv<span class="w"> </span>sync<span class="w">                        </span><sp
     <span class="n">batch_size</span><span class="o">=</span><span class="mi">512</span><span class="p">,</span>
     <span class="n">validation_data</span><span class="o">=</span><span class="n">val_df</span><span class="p">,</span>
     <span class="n">verbose</span><span class="o">=</span><span class="mi">100</span><span class="p">,</span>
-    <span class="n">after_epoch_callbacks</span><span class="o">=</span><span class="p">[</span><span class="n">best</span><span class="p">],</span>
-    <span class="n">after_fit_callbacks</span><span class="o">=</span><span class="p">[</span><span class="n">best</span><span class="o">.</span><span class="n">restore</span><span class="p">],</span>
+    <span class="n">callbacks</span><span class="o">=</span><span class="p">[</span><span class="n">best</span><span class="p">],</span>
 <span class="p">)</span>
 
 <span class="c1"># all-`ls` model? fit it classically instead: deterministic float64 L-BFGS,</span>

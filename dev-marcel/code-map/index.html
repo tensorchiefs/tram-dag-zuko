@@ -1494,7 +1494,7 @@ config in <code>experiments/paper/</code> states <code>units=</code> and <code>a
 </tr>
 <tr>
 <td><a class="autorefs autorefs-internal" title="fit" href="../api/flow/#tramdag.flow.CausalFlowDAG.fit"><code>fit()</code></a></td>
-<td>Joint maximum likelihood: one minibatch Adam loop over all parameters (exact per node, because the NLL decomposes), final weights kept. Keras-shaped validation (<code>validation_data=</code>/<code>validation_split=</code> fill <code>history["val"]</code> per epoch, <code>validation_batch_size=</code> chunks the pass) and progress (<code>verbose=</code>). Hooks: <code>optimizer=</code> (any torch optimizer, for schedulers), <code>after_epoch_callbacks=</code> (one callable or a list, <code>cb(flow, epoch, opt)</code> after every epoch and after the validation pass, any <code>True</code> stops) and <code>before_fit_callbacks=</code>/<code>after_fit_callbacks=</code> around the loop; the recipes in <code>callbacks.py</code> read <code>history["val"]</code>. <code>vc_ehat=</code> carries the out-of-fold propensities of centered VC terms. A second call continues training.</td>
+<td>Joint maximum likelihood: one minibatch Adam loop over all parameters (exact per node, because the NLL decomposes), final weights kept. Keras-shaped validation (<code>validation_data=</code>/<code>validation_split=</code> fill <code>history["val"]</code> per epoch, <code>validation_batch_size=</code> chunks the pass) and progress (<code>verbose=</code>). Hooks: <code>optimizer=</code> (any torch optimizer, for schedulers) and <code>callbacks=</code> (one entry or a list; a <code>Callback</code> hooks <code>on_fit_begin</code>/<code>on_epoch_end</code>/<code>on_fit_end</code>, a bare callable is an <code>on_epoch_end</code> hook <code>cb(flow, epoch, opt)</code> — any <code>True</code> stops); the recipes in <code>callbacks.py</code> read <code>history["val"]</code>. <code>vc_ehat=</code> carries the out-of-fold propensities of centered VC terms. A second call continues training.</td>
 </tr>
 <tr>
 <td><a class="autorefs autorefs-internal" title="fit_classical" href="../api/flow/#tramdag.flow.CausalFlowDAG.fit_classical"><code>fit_classical()</code></a></td>
@@ -1617,7 +1617,11 @@ config in <code>experiments/paper/</code> states <code>units=</code> and <code>a
 <tbody>
 <tr>
 <td><a class="autorefs autorefs-internal" title="RestoreBest" href="../api/callbacks/#tramdag.callbacks.RestoreBest"><code>RestoreBest</code></a></td>
-<td>Snapshots the weights of the best summed validation NLL (read from <code>history["val"]</code>); <code>restore</code> (registered in <code>after_fit_callbacks</code>) loads them back before the VC re-centering.</td>
+<td>Snapshots the weights of the best summed validation NLL (read from <code>history["val"]</code>) and restores them automatically at fit end, before the VC re-centering.</td>
+</tr>
+<tr>
+<td><a class="autorefs autorefs-internal" title="EarlyStopping" href="../api/callbacks/#tramdag.callbacks.EarlyStopping"><code>EarlyStopping</code></a></td>
+<td>Stops the fit after <code>patience</code> epochs without validation improvement; tracks its own best, so it composes with <code>RestoreBest</code> in any order.</td>
 </tr>
 <tr>
 <td><a class="autorefs autorefs-internal" title="PerNodePlateau" href="../api/callbacks/#tramdag.callbacks.PerNodePlateau"><code>PerNodePlateau</code></a></td>
@@ -1660,8 +1664,8 @@ default you can read at the call site. Nothing numeric is buried.</p>
 </tr>
 <tr>
 <td>schedules, early stopping</td>
-<td><code>fit(optimizer=, after_epoch_callbacks=)</code></td>
-<td><code>tramdag.callbacks</code> ships <code>RestoreBest</code>, <code>PerNodePlateau</code>; anything else is torch's <code>lr_scheduler</code> and a few lines of callback (<a href="../fitting/">fitting.md</a>)</td>
+<td><code>fit(optimizer=, callbacks=)</code></td>
+<td><code>tramdag.callbacks</code> ships <code>RestoreBest</code>, <code>EarlyStopping</code>, <code>PerNodePlateau</code>; anything else is torch's <code>lr_scheduler</code> and a few lines of callback (<a href="../fitting/">fitting.md</a>)</td>
 </tr>
 <tr>
 <td>calibrated init</td>

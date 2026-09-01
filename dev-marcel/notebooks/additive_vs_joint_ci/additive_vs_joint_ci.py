@@ -101,8 +101,7 @@ for f in (flow_joint, flow_add):
         epochs=1200,
         learning_rate=1e-2,
         validation_data=val,
-        after_epoch_callbacks=best,
-        after_fit_callbacks=best.restore,
+        callbacks=best,
     )
 
 # Both fit the data well; the joint model is only marginally better on held-out

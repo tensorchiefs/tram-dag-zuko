@@ -529,7 +529,7 @@ flow_a.fit(
     batch_size=4096,
     validation_data=df,
     optimizer=per_node_adam(flow_a, lr=1e-1),
-    after_epoch_callbacks=sched,
+    callbacks=sched,
 )
 t_adam = time.perf_counter() - t0
 

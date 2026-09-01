@@ -2200,9 +2200,7 @@ read) — only ordinal intercepts re-read the rows.</p>
     <span class="n">verbose</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span>
     <span class="n">seed</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
     <span class="n">optimizer</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
-    <span class="n">before_fit_callbacks</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
-    <span class="n">after_epoch_callbacks</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
-    <span class="n">after_fit_callbacks</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+    <span class="n">callbacks</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
     <span class="n">vc_ehat</span><span class="o">=</span><span class="kc">None</span>
 <span class="p">)</span>
 </code></pre></div>
@@ -2217,18 +2215,16 @@ convergence reproduces the classical maximum-likelihood estimate and
 matches <code>statsmodels</code> and R <code>polr</code>. A second <code>fit</code> call
 continues the training. Everything else — validation monitoring,
 learning-rate schedules, early stopping, best-weight restoration,
-logging — is the caller's, through <code>optimizer</code> and the callback
-hooks; :mod:<code>tramdag.callbacks</code> ships the common recipes::</p>
-<pre><code>from tramdag.callbacks import RestoreBest
+logging — is the caller's, through <code>optimizer</code> and <code>callbacks</code>;
+:mod:<code>tramdag.callbacks</code> ships the common recipes::</p>
+<pre><code>from tramdag.callbacks import EarlyStopping, RestoreBest
 
-best = RestoreBest()
 flow.fit(
     train_df,
     epochs=4000,
     validation_data=val_df,
     verbose=50,
-    after_epoch_callbacks=[best],
-    after_fit_callbacks=[best.restore],
+    callbacks=[RestoreBest(), EarlyStopping(patience=200)],
 )
 </code></pre>
 
@@ -2425,56 +2421,21 @@ shuffling. Weight initialization is seeded at construction
           </tr>
           <tr class="doc-section-item">
             <td>
-                <code>before_fit_callbacks</code>
+                <code>callbacks</code>
             </td>
             <td>
-                  <code><span title="callable">callable</span> | <span title="list">list</span>[<span title="callable">callable</span>] | None</code>
-            </td>
-            <td>
-              <div class="doc-md-description">
-                <p>Each called as <code>cb(flow, optimizer)</code> once, after calibration
-and before the first epoch.</p>
-              </div>
-            </td>
-            <td>
-                  <code>None</code>
-            </td>
-          </tr>
-          <tr class="doc-section-item">
-            <td>
-                <code>after_epoch_callbacks</code>
-            </td>
-            <td>
-                  <code><span title="callable">callable</span> | <span title="list">list</span>[<span title="callable">callable</span>] | None</code>
+                  <code><a class="autorefs autorefs-internal" title="Callback (tramdag.callbacks.Callback)" href="../callbacks/#tramdag.callbacks.Callback">Callback</a> | <span title="callable">callable</span> | <span title="list">list</span> | None</code>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Each called as <code>cb(flow, epoch, optimizer)</code> after every epoch
-(<code>epoch</code> counts from 1), once the epoch's train NLLs are in
-<code>flow.history["train"]</code>. All of them run each epoch; the fit
-stops after an epoch in which any returned <code>True</code>
-(<code>len(flow.history["train"])</code> says how many epochs ran). Use them
-for schedules, snapshots and coefficient trajectories —
-:mod:<code>tramdag.callbacks</code> ships <code>RestoreBest</code> and
-<code>PerNodePlateau</code>, both reading <code>history["val"]</code>.</p>
-              </div>
-            </td>
-            <td>
-                  <code>None</code>
-            </td>
-          </tr>
-          <tr class="doc-section-item">
-            <td>
-                <code>after_fit_callbacks</code>
-            </td>
-            <td>
-                  <code><span title="callable">callable</span> | <span title="list">list</span>[<span title="callable">callable</span>] | None</code>
-            </td>
-            <td>
-              <div class="doc-md-description">
-                <p>Each called as <code>cb(flow, optimizer)</code> once, after the loop and
-<strong>before</strong> the VC re-centering — so a callback that swaps the
-weights (<code>RestoreBest.restore</code>) hands them to the re-centering.</p>
+                <p>One entry or a list. A :class:<code>~tramdag.callbacks.Callback</code>
+hooks all three points of the fit — its docstring is the
+contract (begin/epoch/end timing, the stop rule, the VC
+re-centering order). A bare callable is an <code>on_epoch_end</code>
+hook, <code>cb(flow, epoch, optimizer)</code> — use it for schedules and
+coefficient trajectories. :mod:<code>tramdag.callbacks</code> ships
+<code>RestoreBest</code>, <code>EarlyStopping</code> and <code>PerNodePlateau</code>, all
+reading <code>history["val"]</code>.</p>
               </div>
             </td>
             <td>
