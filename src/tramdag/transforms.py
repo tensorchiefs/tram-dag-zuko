@@ -67,7 +67,9 @@ _U_EPS = 1e-7
 
 
 # %% private functions -----------------------------------------------------------------
-def _bounds(theta_tilde: Tensor, shift: Tensor, y: Tensor) -> tuple[Tensor, Tensor]:
+def ordinal_bounds(
+    theta_tilde: Tensor, shift: Tensor, y: Tensor
+) -> tuple[Tensor, Tensor]:
     """Give the shifted cutpoint interval of each observed level."""
     cut = ordinal_cutpoints(theta_tilde) - shift.view(-1, 1)
     idx = torch.arange(theta_tilde.shape[0], device=theta_tilde.device)
@@ -221,7 +223,7 @@ def ordinal_log_prob(theta_tilde: Tensor, shift: Tensor, y: Tensor) -> Tensor:
     initialised node freezes at its starting values forever. The log-space form
     keeps the gradient non-zero, so such a node recovers.
     """
-    lower, upper = _bounds(theta_tilde, shift, y)
+    lower, upper = ordinal_bounds(theta_tilde, shift, y)
     ls = torch.nn.functional.logsigmoid
     # Pick the better-conditioned side per element by *flipping the inputs*
     # rather than by computing both sides and discarding one: the survival
@@ -303,7 +305,7 @@ def ordinal_abduct(
     Tensor
         The latents, shape ``(n,)``.
     """
-    lower, upper = _bounds(theta_tilde, shift, y)
+    lower, upper = ordinal_bounds(theta_tilde, shift, y)
     u_lo, u_hi = torch.sigmoid(lower), torch.sigmoid(upper)
     u = u_lo + (u_hi - u_lo) * torch.rand(
         lower.shape, device=lower.device, generator=generator

@@ -18,7 +18,11 @@ from .spec import (
     complex_shift,
     intercept,
     linear_shift,
+    node_parents,
     simple_intercept,
+    spec_from_dict,
+    spec_to_dict,
+    validate_and_sort,
     varying_coefficient,
 )
 
@@ -38,7 +42,11 @@ __all__ = [
     "complex_shift",
     "intercept",
     "linear_shift",
+    "node_parents",
     "simple_intercept",
+    "spec_from_dict",
+    "spec_to_dict",
+    "validate_and_sort",
     "varying_coefficient",
 ]
 __version__ = version("tramdag")

@@ -36,7 +36,7 @@ import torch
 
 from .conditioners import LinearShift
 from .spec import OrdinalNode
-from .transforms import _bounds
+from .transforms import ordinal_bounds
 
 # %% global variables ------------------------------------------------------------------
 __all__ = ["effect_modifier_scan", "node_scores", "sup_bb_pvalue"]
@@ -58,7 +58,7 @@ def _dl_ds(
     if nd.kind == "continuous":
         z0, _ = nd.ut.forward(theta, x)
         return 1.0 - 2.0 * torch.sigmoid(z0 + shift)
-    lower, upper = _bounds(theta, shift, x)  # already include -s
+    lower, upper = ordinal_bounds(theta, shift, x)  # already include -s
     sl, su = torch.sigmoid(lower), torch.sigmoid(upper)
     return (sl * (1 - sl) - su * (1 - su)) / (su - sl)
 

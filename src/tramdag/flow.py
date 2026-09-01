@@ -626,6 +626,9 @@ class CausalFlowDAG(nn.Module):
         # taken once, by calibrate(); a checkpoint carries the flag
         self.register_buffer("calibrated", torch.tensor(False))
         self.history: dict = {"train": []}  # per-node mean train NLL per epoch
+        self._fit_validated = (
+            False  # True while the LAST fit validated (callbacks read it)
+        )
         self.meta: dict = {}  # provenance attached at save() (version, time)
         self.to(self.device)
 

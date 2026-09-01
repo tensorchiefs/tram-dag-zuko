@@ -785,7 +785,9 @@ def spec_to_dict(spec: dict[str, NodeSpec]) -> dict:
     dropped — so a term serializes as its three fields and nothing else.
     The result is JSON-safe: tuples become lists, and :func:`spec_from_dict`
     turns them back, so a spec round-trips through ``json`` as well as
-    through ``torch.save``.
+    through ``torch.save`` — except when a term carries a *callable*
+    ``input_transform``, which serializes only through pickle
+    (``torch.save``) and only as a module-level function.
 
     Parameters
     ----------
