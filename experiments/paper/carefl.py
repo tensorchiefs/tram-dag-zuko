@@ -37,7 +37,11 @@ def build_spec(config: dict) -> dict:
     inherited from a framework default.
     """
     basis = dict(transform=config["transform"], n_coeffs=config["n_coeffs"])
-    net = dict(units=config["intercept_units"], activation=config["activation"])
+    net = dict(
+        units=config["intercept_units"],
+        activation=config["activation"],
+        input_transform=config["input_transform"],
+    )
     return {
         "x1": ContinuousNode([SI(**basis)]),
         "x2": ContinuousNode([SI(**basis)]),

@@ -16,6 +16,7 @@ Causal queries:
 from __future__ import annotations
 
 import inspect
+import pickle
 import time
 from datetime import datetime, timezone
 from pathlib import Path
@@ -144,6 +145,49 @@ def _is_classical_term(term) -> bool:
 
 
 # %% private classes -------------------------------------------------------------------
+class _InputTransform(nn.Module):
+    """One term's frozen network-input transform.
+
+    ``calibrate`` takes the statistics from the training rows once:
+    ``"minmax"`` freezes per-column lo/hi, ``"standardize"`` mean/std, and a
+    callable keeps the raw training columns and is applied per batch as
+    ``fn(x, train)`` — so train statistics inside the callable are always the
+    frozen training data, never the batch's.
+    """
+
+    def __init__(self, value, k: int):
+        super().__init__()
+        self.kind = "callable" if callable(value) else value
+        self.fn = value if callable(value) else None
+        if self.kind == "minmax":
+            self.register_buffer("lo", torch.zeros(k))
+            self.register_buffer("hi", torch.ones(k))
+        elif self.kind == "standardize":
+            self.register_buffer("mean", torch.zeros(k))
+            self.register_buffer("std", torch.ones(k))
+        else:  # callable: the raw train columns, shaped at calibrate
+            self.register_buffer("train_cols", torch.zeros(0, k))
+
+    def set_stats(self, cols: Tensor) -> None:
+        """Freeze the statistics from the raw ``(n_train, k)`` train columns."""
+        if self.kind == "minmax":
+            self.lo.copy_(cols.min(0).values)
+            self.hi.copy_(cols.max(0).values)
+        elif self.kind == "standardize":
+            self.mean.copy_(cols.mean(0))
+            self.std.copy_(cols.std(0))
+        else:
+            self._buffers["train_cols"] = cols.detach().to(self.train_cols.device)
+
+    def forward(self, x: Tensor, i: int) -> Tensor:
+        """Transform one continuous parent column ``(n, 1)``."""
+        if self.kind == "minmax":
+            return (x - self.lo[i]) / (self.hi[i] - self.lo[i])
+        if self.kind == "standardize":
+            return (x - self.mean[i]) / self.std[i]
+        return self.fn(x, self.train_cols[:, i : i + 1])
+
+
 class _VCGroup(NamedTuple):
     """Bookkeeping for one VC term of a node.
 
@@ -185,7 +229,6 @@ class _Node(nn.Module):
         self,
         node: NodeSpec,
         spec: dict[str, NodeSpec],
-        net_input_scaling: str | None = None,
     ):
         super().__init__()
         self.kind = node.kind
@@ -194,12 +237,7 @@ class _Node(nn.Module):
         self.continuous_parents = tuple(
             p for p in self.parents if isinstance(spec[p], ContinuousNode)
         )
-        # min-max of every continuous parent on the training rows, for the
-        # network inputs (net_input_scaling="minmax"); identity until fit
-        k = len(self.continuous_parents)
-        self.register_buffer("net_lo", torch.zeros(k))
-        self.register_buffer("net_hi", torch.ones(k))
-        self.net_input_scaling = net_input_scaling
+        self._build_input_transforms(terms, spec)
         i_term = next((t for t in terms if t.effect == "I" and t.parents), None)
         if i_term is None:
             i_groups = []
@@ -222,6 +260,36 @@ class _Node(nn.Module):
             n_params = node.levels - 1
         self._build_intercept(i_term, n_params, spec)
         self._build_shifts(terms, spec)
+
+    def _build_input_transforms(self, terms, spec: dict[str, NodeSpec]) -> None:
+        """Build the per-term network-input transforms (``input_transform=``).
+
+        Keyed like the shift ModuleDict plus ``"@I"`` for the intercept term;
+        identity until ``calibrate`` freezes the statistics. Only continuous
+        parents transform — ordinal one-hots pass through.
+        """
+        self.input_transforms = nn.ModuleDict()
+        self._transform_cols: dict[str, tuple[str, ...]] = {}
+        for term in terms:
+            if term.input_transform is None:
+                continue
+            if term.effect == "I":
+                key, ps = "@I", term.parents
+            elif term.effect == "VC":
+                key, ps = term.parents[0], tuple(term.parents[1:])
+            else:
+                key = (
+                    term.parents[0]
+                    if len(term.parents) == 1
+                    else "+".join(term.parents)
+                )
+                ps = term.parents
+            cps = tuple(p for p in ps if isinstance(spec[p], ContinuousNode))
+            if cps:
+                self.input_transforms[key] = _InputTransform(
+                    term.input_transform, len(cps)
+                )
+                self._transform_cols[key] = cps
 
     def _build_intercept(self, i_term, n_params: int, spec: dict[str, NodeSpec]):
         """Build the intercept module(s) from the intercept groups.
@@ -313,30 +381,42 @@ class _Node(nn.Module):
             t = t - vc_ehat[g.on].view(-1, 1)
         return t
 
-    def set_net_range(self, train_df: pd.DataFrame) -> None:
-        """Take the network-input min-max from the training rows (``calibrate``)."""
-        if self.net_input_scaling is None:
-            return
-        for i, p in enumerate(self.continuous_parents):
-            # min < max is guaranteed: a constant column fails calibrate's
-            # quantile check on the parent's own node first
-            self.net_lo[i] = float(train_df[p].min())
-            self.net_hi[i] = float(train_df[p].max())
+    def set_input_stats(self, train_df: pd.DataFrame) -> None:
+        """Freeze every term's input-transform statistics (``calibrate``)."""
+        for key, cps in self._transform_cols.items():
+            # a constant column fails calibrate's quantile check on the
+            # parent's own node first, so the statistics are well defined
+            cols = torch.stack(
+                [
+                    torch.as_tensor(train_df[p].to_numpy(dtype=np.float32).copy())
+                    for p in cps
+                ],
+                dim=1,
+            )
+            self.input_transforms[key].set_stats(cols)
 
-    def net_input(self, feats: dict[str, Tensor], parents) -> Tensor:
-        """Concatenate parent features for a network, scaled when configured.
+    def net_input(
+        self, feats: dict[str, Tensor], parents, key: str | None = None
+    ) -> Tensor:
+        """Concatenate parent features for one term's network.
 
-        Every network input goes through here — training and the read-outs
-        (``varying_coef``, ``intercept_contributions``) alike — so the model
-        seen at inference is the model that was fitted. Linear shifts and the
-        VC treatment column are not network inputs and never pass through.
+        ``key`` names the term ("@I" for the intercept, the shift key
+        otherwise); a term with an ``input_transform`` gets its continuous
+        parent columns transformed with the statistics frozen at
+        ``calibrate``. Every network input goes through here — training and
+        the read-outs (``varying_coef``, ``intercept_contributions``) alike —
+        so the model seen at inference is the model that was fitted. Linear
+        shifts and the VC treatment column are not network inputs and never
+        pass through.
         """
+        # no dict.get: nn.ModuleDict has no get()
+        tr = self.input_transforms[key] if key in self.input_transforms else None  # noqa: SIM401
+        cps = self._transform_cols.get(key, ())
         cols = []
         for p in parents:
             x = feats[p]
-            if self.net_input_scaling == "minmax" and p in self.continuous_parents:
-                i = self.continuous_parents.index(p)
-                x = (x - self.net_lo[i]) / (self.net_hi[i] - self.net_lo[i])
+            if tr is not None and p in cps:
+                x = tr(x, cps.index(p))
             cols.append(x)
         return torch.cat(cols, dim=1)
 
@@ -344,13 +424,13 @@ class _Node(nn.Module):
         """Evaluate the intercept: the transform parameters, shape ``(n, P)``."""
         if self.intercept_nets is not None:  # additive complex intercept
             return sum(
-                net(self.net_input(feats, grp))
+                net(self.net_input(feats, grp, "@I"))
                 for net, grp in zip(
                     self.intercept_nets, self._intercept_groups, strict=True
                 )
             )
         if self.ci_parents:  # single or joint complex intercept
-            return self.intercept(self.net_input(feats, self.ci_parents))
+            return self.intercept(self.net_input(feats, self.ci_parents, "@I"))
         return self.intercept(n)  # simple (free) intercept
 
     def _vc_shift(self, g, feats: dict, vc_ehat: dict | None) -> Tensor:
@@ -362,7 +442,7 @@ class _Node(nn.Module):
                 "term without its propensity."
             )
         t = self.vc_column(g, feats, vc_ehat)
-        mod_feat = self.net_input(feats, g.mods) if g.mods else None
+        mod_feat = self.net_input(feats, g.mods, g.on) if g.mods else None
         return self.shifts[g.on](t, mod_feat)
 
     def theta_shift(
@@ -400,7 +480,7 @@ class _Node(nn.Module):
             feat = (  # a linear shift stays raw: its weight is the paper's beta
                 torch.cat([feats[p] for p in ps], dim=1)
                 if isinstance(module, LinearShift)
-                else self.net_input(feats, ps)
+                else self.net_input(feats, ps, key)
             )
             shift = shift + module(feat)
         for g in self._vc_groups:
@@ -424,14 +504,6 @@ class CausalFlowDAG(nn.Module):
         initialization happens at construction, so this is the one knob
         for a reproducible model. ``fit(seed=...)`` only seeds the
         minibatch shuffling.
-    net_input_scaling : str | None, optional
-        ``"minmax"`` feeds every network (complex intercepts, complex shifts,
-        VC modifiers) its continuous parents scaled to ``[0, 1]`` by the
-        training min and max, the way the paper's reference implementation
-        does; raw parents (default ``None``) saturate a tanh net whenever
-        ``|x| > 2``. Linear shifts and the VC treatment stay raw, so their
-        coefficients keep their units. Set by ``calibrate``; stored in
-        the checkpoint.
     init : str, optional
         Weight initialization of every linear layer (the LS weights and the
         CI/CS/VC networks): ``"torch"`` (default, ``nn.Linear``'s
@@ -451,14 +523,9 @@ class CausalFlowDAG(nn.Module):
         spec: dict[str, NodeSpec],
         device: str = "cpu",
         seed: int | None = None,
-        net_input_scaling: str | None = None,
         init: str = "torch",
     ):
         super().__init__()
-        if net_input_scaling not in (None, "minmax"):
-            raise ValueError(
-                f"net_input_scaling must be None or 'minmax', got {net_input_scaling!r}"
-            )
         if init not in ("torch", "glorot", "normal"):
             raise ValueError(
                 f"init must be 'torch', 'glorot' or 'normal', got {init!r}"
@@ -467,10 +534,9 @@ class CausalFlowDAG(nn.Module):
             torch.manual_seed(seed)
         self.spec = spec
         self.order = validate_and_sort(spec)
-        self.net_input_scaling = net_input_scaling
         self.init = init
         self.nodes = nn.ModuleDict(
-            {name: _Node(spec[name], spec, net_input_scaling) for name in self.order}
+            {name: _Node(spec[name], spec) for name in self.order}
         )
         self._apply_init(init)
         self.device = torch.device(device)
@@ -695,9 +761,10 @@ class CausalFlowDAG(nn.Module):
 
         Per continuous node the transform's domain: the train ``RANGE_Q`` /
         ``1 - RANGE_Q`` quantiles map onto ``[-5, 5]`` (the min-max scaling
-        of the original implementation, made robust to outliers). With
-        ``net_input_scaling="minmax"`` the min and max of every continuous
-        parent, for the networks. With ``marginal_init`` a calibrated start:
+        of the original implementation, made robust to outliers). The
+        statistics of every term-level ``input_transform=`` (minmax lo/hi,
+        standardize mean/std, a callable's frozen train columns). With
+        ``marginal_init`` a calibrated start:
         a Bernstein simple intercept starts at the data marginal instead of
         zuko's default (about 2.5x too steep), an ordinal simple intercept at
         the marginal class log-odds. The optimum is unchanged, the path to
@@ -722,7 +789,7 @@ class CausalFlowDAG(nn.Module):
             node = self.nodes[name]
             if node.kind == "ordinal":
                 self._check_levels(name, train_df)
-            node.set_net_range(train_df)
+            node.set_input_stats(train_df)
             if node.kind == "continuous":
                 self._set_range(name, train_df)
         self.calibrated.fill_(True)
@@ -1041,7 +1108,7 @@ class CausalFlowDAG(nn.Module):
                     continue
                 if feats is None:
                     feats = self._features(values)
-                nd.shifts[g.on].recenter(nd.net_input(feats, g.mods))
+                nd.shifts[g.on].recenter(nd.net_input(feats, g.mods, g.on))
 
     @torch.no_grad()
     def varying_coef(
@@ -1109,7 +1176,7 @@ class CausalFlowDAG(nn.Module):
         mod_feat = None
         if mods:
             feats = self._features(self._tensorize(df, mods))
-            mod_feat = nd.net_input(feats, mods)
+            mod_feat = nd.net_input(feats, mods, t)
         return nd.shifts[t].beta(mod_feat, len(df)).cpu().numpy()
 
     def _is_classical(self) -> bool:
@@ -1260,7 +1327,7 @@ class CausalFlowDAG(nn.Module):
         parents: dict[str, tuple] = {}
         baseline = None
         for net, grp in zip(nets, groups, strict=True):
-            raw = net(nd.net_input(feats, grp))  # (n, P)
+            raw = net(nd.net_input(feats, grp, "@I"))  # (n, P)
             mean = raw.mean(dim=0, keepdim=True)  # (1, P)
             label = "+".join(grp)
             contributions[label] = (raw - mean).cpu().numpy()
@@ -1748,17 +1815,23 @@ class CausalFlowDAG(nn.Module):
             "saved_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
             "device": str(self.device),
         }
-        torch.save(
-            {
-                "spec": spec_to_dict(self.spec),
-                "net_input_scaling": self.net_input_scaling,
-                "init": self.init,
-                "state_dict": self.state_dict(),
-                "history": self.history,
-                "meta": meta,
-            },
-            path,
-        )
+        try:
+            torch.save(
+                {
+                    "spec": spec_to_dict(self.spec),
+                    "init": self.init,
+                    "state_dict": self.state_dict(),
+                    "history": self.history,
+                    "meta": meta,
+                },
+                path,
+            )
+        except (pickle.PicklingError, AttributeError) as err:
+            raise ValueError(
+                "the spec does not serialize: a callable input_transform "
+                "must be a picklable module-level function — use "
+                "'minmax'/'standardize', or def the function at module level."
+            ) from err
 
     @classmethod
     def load(cls, path: str | Path, device: str = "cpu") -> CausalFlowDAG:
@@ -1782,9 +1855,20 @@ class CausalFlowDAG(nn.Module):
         flow = cls(
             spec_from_dict(ckpt["spec"]),
             device=device,
-            net_input_scaling=ckpt.get("net_input_scaling"),
             init=ckpt.get("init", "torch"),
         )
+        for name, t in ckpt["state_dict"].items():
+            # a callable input_transform's train buffer is shaped at
+            # calibrate; give it the checkpoint's shape before loading
+            try:
+                buf = flow.get_buffer(name)
+            except AttributeError:
+                continue
+            if buf.shape != t.shape:
+                mod_path, _, buf_name = name.rpartition(".")
+                flow.get_submodule(mod_path).register_buffer(
+                    buf_name, torch.empty_like(t)
+                )
         flow.load_state_dict(ckpt["state_dict"])  # includes the `calibrated` flag
         flow.history = ckpt["history"]
         flow.meta = ckpt["meta"]

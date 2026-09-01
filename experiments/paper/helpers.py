@@ -52,12 +52,7 @@ def fit_paper(generator, spec: dict, config: dict, out: Path, record=None):
     """
     train = generator.observational(config["n_train"])
     val = generator.observational(config["n_val"], seed_offset=1)
-    flow = CausalFlowDAG(
-        spec,
-        seed=config["init_seed"],
-        net_input_scaling=config["net_input_scaling"],
-        init=config["init"],
-    )
+    flow = CausalFlowDAG(spec, seed=config["init_seed"], init=config["init"])
     flow.calibrate(train, marginal_init=False)
     opt = torch.optim.Adam(flow.parameters(), lr=config["learning_rate"])
     plateau = None
@@ -147,7 +142,7 @@ def cs_curve_error(
     x = torch.as_tensor(grid, dtype=torch.float32).view(-1, 1)
     nd = flow.nodes["x3"]
     with torch.no_grad():
-        fitted = nd.shifts["x2"](nd.net_input({"x2": x}, ("x2",))).numpy().ravel()
+        fitted = nd.shifts["x2"](nd.net_input({"x2": x}, ("x2",), "x2")).numpy().ravel()
     return plot_cs_curve(
         grid,
         fitted=fitted,

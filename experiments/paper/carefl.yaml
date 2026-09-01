@@ -31,7 +31,7 @@
 #     fig6 curve ends and the do(x2)=+1.5 MAE live in the sparse x2 tail,
 #     which minibatch gradients underweight — cf_mae_x3_do_x2_+1.5 0.40
 #     (bound 0.35), fig6_max_abs_err_x3 5.9 (bound 4.7);
-#   * `activation: relu` + `net_input_scaling: null` (undoing the scale_df
+#   * `activation: relu` + raw parents (undoing the scale_df
 #     workaround; sigmoid saturates on raw Laplace parents just like tanh, so
 #     relu is the only real raw-input candidate): x3 underfits (val NLL 1.46
 #     vs pin 1.403+-0.05) and the fitted x4 Bernstein tail is fragile — one
@@ -67,7 +67,7 @@ variants:
     dgp_seed: 42                # repo choice
     init_seed: 7                # repo choice
     init: glorot                # Keras Dense default: glorot_uniform, zero bias
-    net_input_scaling: minmax   # comparison/utils.R::scale_df: parents scaled to [0, 1]
+    input_transform: minmax     # per CI term: comparison/utils.R::scale_df — parents scaled to [0, 1]
     shuffle_seed: 0             # full batch: the shuffle seed has no effect
     n_heldout: 300              # typical rows scored next to the single x_obs
     heldout_seed_offset: 999    # seed offset of the held-out draw

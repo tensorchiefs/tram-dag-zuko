@@ -13,7 +13,7 @@
 #     dense(len_theta), M = 30 so len_theta = 31; final weights;
 #   * weights start from Keras' Dense default, glorot_uniform / zero bias
 #     (`init: glorot`, make_model's layer_dense);
-#   * net_input_scaling: minmax (comparison/utils.R::scale_df) — kept, see below.
+#   * input_transform: minmax on the CI terms (comparison/utils.R::scale_df) — kept, see below.
 # CI-runtime deviation (repo decision 2026-09-01), documented in
 # docs/paper-replication.md: the reference runs 10000 epochs at lr 0.001 with
 # ReduceLROnPlateau on the summed validation NLL (update_learning_rate) —
@@ -37,7 +37,7 @@
 # interventional bounds — its optima carry a systematic -0.11 common-mode
 # offset of the do(x2) means (observational fit fine, off-manifold
 # decomposition biased), 2.4x the do(x2=+0) bound. Dropping
-# `net_input_scaling` fails likewise: with raw parents (span ~[-6, 5]) a relu
+# dropping the input transform fails likewise: with raw parents (span ~[-6, 5]) a relu
 # net's do(x2=-3) error wanders 0.17-0.45 and holds its bound only at
 # isolated epochs; tanh on raw parents saturates outright (0.731, CLAUDE.md).
 # The reference's scale_df + tanh stays.
@@ -66,7 +66,7 @@ variants:
     dgp_seed: 42                # repo choice
     init_seed: 7                # repo choice
     init: glorot                # Keras Dense default: glorot_uniform, zero bias
-    net_input_scaling: minmax   # comparison/utils.R::scale_df: raw parents saturate tanh
+    input_transform: minmax     # per CI term: comparison/utils.R::scale_df — raw parents saturate tanh
     shuffle_seed: 0             # full batch: the shuffle seed has no effect
     sample_seed: 1
     n_compare: 50000            # rows per interventional panel (Fig. 5)

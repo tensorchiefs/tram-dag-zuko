@@ -182,17 +182,20 @@ default the paper replication or the tests had to switch off.
   difference). `init="normal"` is Keras' `RandomNormal` (sd 0.05 on weights
   and biases), the paper's triangle scripts' initializer. The VACA/CAREFL
   configs set glorot, the triangle configs normal. Stored in the checkpoint.
-- **`CausalFlowDAG(spec, net_input_scaling="minmax")`** — feeds every network
-  (complex intercept, complex shift, VC modifiers) its continuous parents
-  scaled to `[0, 1]` by the training min and max, the way the paper's
-  comparison scripts do (`comparison/utils.R::scale_df`); linear shifts and
-  the VC treatment stay raw, so `ls_coefficients` keep their units. Raw
-  parents saturate a tanh net whenever `|x| > 2` — 40% of the VACA rows —
-  which is why the VACA/CAREFL replications under the exact reference
-  protocol were 2–20× off the paper: `do(x2=-3)` error 0.731 → 0.098 with
-  the option on (0.026 under the earlier per-node plateau approximation). Default off; calibrated at the first `fit`, stored in the
-  checkpoint (the buffers are part of every node's state, so checkpoints
-  saved before this change do not load — refit).
+- **`CI/CS/VC(input_transform=)`** — every term's network chooses its own
+  input transform: `"minmax"`, `"standardize"`, or a callable `fn(x, train)`
+  that receives the frozen raw training column (never the batch's — batch
+  statistics would encode the same value differently per call). Statistics
+  freeze at `calibrate` and live in per-term buffers, so they checkpoint;
+  a callable must be a picklable module-level function to `save` (a lambda
+  raises with instructions). Linear shifts and the VC treatment stay raw,
+  so `ls_coefficients` keep their units. This replaces the earlier
+  flow-level `CausalFlowDAG(net_input_scaling=)` draft of the same idea
+  (one setting for ALL nets); its motivation carries over unchanged — raw
+  parents saturate a tanh net whenever `|x| > 2` (40% of the VACA rows),
+  which put the VACA/CAREFL replications 2-20x off the paper until the
+  minmax transform (`do(x2=-3)` error 0.731 -> 0.098). Default off;
+  checkpoints saved under the flow-level draft do not load — refit.
 - **`init_marginals(train_df)`** — the calibrated start as an explicit,
   repeatable step: resets every Bernstein/ordinal simple intercept to its
   column's marginal (spline and affine have no calibrated start)

@@ -95,7 +95,8 @@ See `experiments/README.md`.
   `P(Y<=k) = sigmoid(theta_k − shift)` (shift SUBTRACTED). Both follow the original TRAM-DAG
   conventions; tests pin them.
 - **Parent encoding**: continuous parents enter RAW (no standardization) unless
-  `CausalFlowDAG(spec, net_input_scaling="minmax")`, which feeds the *networks*
+  a term-level `input_transform=` ("minmax", "standardize", or a callable
+  `fn(x, train)` over frozen train columns), which feeds that term's *network*
   (CI/CS/VC modifiers) the train min-max scaled parent like the reference's
   `scale_df` — LS and the VC treatment stay raw either way; ordinal
   parents one-hot (all levels). With cutpoints, only shift *differences* between
@@ -170,7 +171,7 @@ plateau protocol and scores 0.096/0.080/0.022 under the tuned 4800-epoch
 config). Known, documented deviations: the triangle scripts also
 use 5%/95% quantiles for the Bernstein domain (a match), the comparison
 scripts min-max (`scale_df`) — we keep the quantiles there and scale the
-*network inputs* min-max (`net_input_scaling: minmax`; raw parents saturate
+*network inputs* min-max (`input_transform: minmax` on the CI terms; raw parents saturate
 the tanh nets: `do(x2=-3)` error 0.731 → 0.098, and the 2026-09-01 relu/sigmoid
 raw-parent attempts fail too); a bias-free intercept
 output layer; Adam eps 1e-8 vs Keras 1e-7 (no effect);

@@ -129,7 +129,7 @@ E[x3 | do(x2 = a)] = −0.25 + 0.25 a. The paper's Sec. 5.2 text says a ∈ {−
 | lr | 0.001 | 0.01, polish 0.001 | **0.002** — the CI deviation |
 | batch | full batch (one `apply_gradients` per epoch) | 512 | 2500 = n_train |
 | schedule | `update_learning_rate`: ReduceLROnPlateau on the summed val NLL, factor 0.1, patience 50, min_lr 1e-7, strict `<` | none | **none** — dropped 2026-09-01 with the epoch cut: on the lr-0.002 trajectory the summed val NLL keeps strictly improving past the all-bounds window (x1 still converging), so the rule cannot fire inside it |
-| input scaling | `scale_df`: everything min-max to [0, 1] | raw | `net_input_scaling: minmax` (network inputs; targets D1) |
+| input scaling | `scale_df`: everything min-max to [0, 1] | raw | `input_transform: minmax` on the CI terms (network inputs; targets D1) |
 | n_compare | — | 50000 | 50000 |
 
 **Results** — the check is the flow's error against the analytic mean, not a pinned flow value.
@@ -261,11 +261,11 @@ epochs — the round below.
 ## The 2026-09-01 tuning round
 
 The frame (repo decision 2026-09-01): the *data, model and init* stay the reference's;
-allowed were dropping `net_input_scaling`, trying sigmoid/relu activations,
+allowed were dropping the network-input scaling, trying sigmoid/relu activations,
 and tuning lr / batch size / epochs for CI runtime. Outcome: the triangle
 scripts already ran raw parents + sigmoid (their reference does), so they
 comply by construction and only their epochs moved; VACA and CAREFL **keep
-tanh + `net_input_scaling: minmax`** because every alternative was tried and
+tanh + min-max network inputs (`input_transform: minmax`)** because every alternative was tried and
 measurably fails. Every tuned variant's ground truth was re-pinned from its
 final run (centers to the run, `{max}` at 2.5x; `fit_seconds` waits for the
 next CI measurement) — **the bounds and pins quoted in this section are the

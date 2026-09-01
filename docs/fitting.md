@@ -69,7 +69,7 @@ learning rates and freezing (a callback, below) and the all-`ls` classical fit.
   penalty.
 - **`calibrate(train_df, marginal_init=True)`**, called by the first `fit`:
   the transform ranges from the train 5%/95% quantiles (each Bernstein/spline
-  domain), the network-input min-max under `net_input_scaling="minmax"`, and
+  domain), the statistics of every term-level `input_transform=`, and
   the calibrated start — Bernstein nodes at the linear map onto the latent
   5%/95% quantiles, ordinal cutpoints at the empirical class log-odds, a pure
   init that leaves the MLE unchanged. Call it yourself to switch the start
