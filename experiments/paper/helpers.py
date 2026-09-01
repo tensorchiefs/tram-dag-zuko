@@ -20,7 +20,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import torch
 
-from tramdag import CS, LS, CausalFlowDAG
+from tramdag import CS, LS, CausalFlowDAG, shift_curve
 
 
 # %% public functions ------------------------------------------------------------------
@@ -142,10 +142,7 @@ def cs_curve_error(
 ) -> float:
     """Plot the fitted x3 complex shift against the true curve, give the max error."""
     grid = np.linspace(config["grid_low"], config["grid_high"], config["grid_points"])
-    x = torch.as_tensor(grid, dtype=torch.float32).view(-1, 1)
-    nd = flow.nodes["x3"]
-    with torch.no_grad():
-        fitted = nd.shifts["x2"](nd.net_input({"x2": x}, ("x2",), "x2")).numpy().ravel()
+    fitted = shift_curve(flow, "x3", "x2", grid)
     return plot_cs_curve(
         grid,
         fitted=fitted,

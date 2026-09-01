@@ -25,12 +25,12 @@ import torch
 from torch import Tensor, nn
 
 from . import fitting as _fitting
-from .conditioners import LinearShift, SimpleIntercept, VaryingCoef
+from . import readouts as _readouts
+from .conditioners import SimpleIntercept, VaryingCoef
 from .nodes import (
     _init_linear,
     _is_classical_term,
     _Node,
-    _term_cells,
 )
 from .scores import effect_modifier_scan as _effect_modifier_scan
 from .scores import node_scores as _node_scores
@@ -771,34 +771,7 @@ class CausalFlowDAG(nn.Module):
             If the node has no VC term, or if ``t`` is omitted while the
             node has several VC terms.
         """
-        nd = self._node(node)
-        vcs = {g.on: g.mods for g in nd._vc_groups}
-        if not vcs:
-            raise ValueError(f"node {node!r} has no VC term.")
-        if t is None:
-            if len(vcs) > 1:
-                raise ValueError(
-                    f"node {node!r} has several VC terms ({sorted(vcs)}). "
-                    "Pass t=<treatment name>."
-                )
-            t = next(iter(vcs))
-        if t not in vcs:
-            raise KeyError(
-                f"node {node!r} has no VC term on {t!r} (has {sorted(vcs)})."
-            )
-        mods = vcs[t]
-        mod_feat = None
-        if mods:
-            feats = self._features(self._tensorize(df, mods))
-            mod_feat = nd.net_input(feats, mods, t)
-        return nd.shifts[t].beta(mod_feat, len(df)).cpu().numpy()
-
-    def _is_classical(self) -> bool:
-        return all(
-            _is_classical_term(term)
-            for node in self.spec.values()
-            for term in node.terms
-        )
+        return _readouts.varying_coef(self, df, node, t=t)
 
     def ls_coefficients(self) -> dict[str, dict[str, np.ndarray]]:
         """Give the per-node linear-shift weights.
@@ -808,7 +781,7 @@ class CausalFlowDAG(nn.Module):
 
         Only ``LS`` terms have a weight to give. A node's ``CS`` and ``VC``
         shifts are networks, so they are skipped — reading them needs
-        :meth:`varying_coef` or an evaluation of the network itself.
+        :meth:`varying_coef` or an evaluation of the network itflow.
 
         Returns
         -------
@@ -816,16 +789,7 @@ class CausalFlowDAG(nn.Module):
             The weights, as ``{node: {parent: array}}``. A node without
             linear-shift terms is absent.
         """
-        out: dict[str, dict[str, np.ndarray]] = {}
-        for name in self.order:
-            linear = {
-                parent: module.weight.detach().cpu().numpy().ravel().copy()
-                for parent, module in self.nodes[name].shifts.items()
-                if isinstance(module, LinearShift)
-            }
-            if linear:
-                out[name] = linear
-        return out
+        return _readouts.ls_coefficients(self)
 
     def to_matrix(self) -> pd.DataFrame:
         """Give the labeled adjacency matrix of term effects.
@@ -842,13 +806,7 @@ class CausalFlowDAG(nn.Module):
             as a suffix. When several terms share a cell, their tags join
             with ``"+"``.
         """
-        m = pd.DataFrame("", index=list(self.order), columns=list(self.order))
-        for child in self.order:
-            for term in self.spec[child].terms:
-                for p, tag in _term_cells(term):  # a VC modifier may share its
-                    cur = m.loc[p, child]  # cell with a prognostic term -> "+"
-                    m.loc[p, child] = f"{cur}+{tag}" if cur else tag
-        return m
+        return _readouts.to_matrix(self)
 
     @torch.no_grad()
     def intercept_contributions(self, df: pd.DataFrame, node: str) -> dict:
@@ -917,41 +875,9 @@ class CausalFlowDAG(nn.Module):
         parameter space, where the model sums the additive terms before the
         monotonicity constraint. They are exact partial effects on those
         parameters, but not, in general, an additive shift of the curve
-        itself.
+        itflow.
         """
-        nd = self._node(node)
-        groups = nd._intercept_groups
-        if not groups:
-            raise ValueError(
-                f"node {node!r} has no complex-intercept (I) terms with parents. "
-                "Its intercept is unconditional, so there is nothing to decompose."
-            )
-        missing = [p for p in nd.ci_parents if p not in df.columns]
-        if missing:
-            raise KeyError(f"df is missing intercept-parent column(s): {missing}")
-
-        feats = self._features(self._tensorize(df, nd.ci_parents))
-        # one net per group: the additive case stores them in intercept_nets;
-        # a single (possibly joint) I-term is the lone `intercept` network.
-        nets = (
-            list(nd.intercept_nets) if nd.intercept_nets is not None else [nd.intercept]
-        )
-
-        contributions: dict[str, np.ndarray] = {}
-        parents: dict[str, tuple] = {}
-        baseline = None
-        for net, grp in zip(nets, groups, strict=True):
-            raw = net(nd.net_input(feats, grp, "@I"))  # (n, P)
-            mean = raw.mean(dim=0, keepdim=True)  # (1, P)
-            label = "+".join(grp)
-            contributions[label] = (raw - mean).cpu().numpy()
-            parents[label] = grp
-            baseline = mean if baseline is None else baseline + mean
-        return {
-            "baseline": baseline.cpu().numpy().ravel(),
-            "contributions": contributions,
-            "parents": parents,
-        }
+        return _readouts.intercept_contributions(self, df, node)
 
     @torch.no_grad()
     def design_matrix(
@@ -984,17 +910,14 @@ class CausalFlowDAG(nn.Module):
         pd.DataFrame
             One column per encoded feature, indexed like ``df``.
         """
-        nd = self._node(node)
-        feats = self._features(self._tensorize(df, nd.parents))
-        cols: dict[str, np.ndarray] = {}
-        for p in nd.parents:
-            arr = feats[p].cpu().numpy()
-            if arr.shape[1] == 1:  # continuous parent: raw
-                cols[p] = arr[:, 0]
-            else:
-                for k in range(1 if drop_first else 0, arr.shape[1]):
-                    cols[f"{p}[{k}]"] = arr[:, k]
-        return pd.DataFrame(cols, index=df.index)
+        return _readouts.design_matrix(self, df, node, drop_first=drop_first)
+
+    def _is_classical(self) -> bool:
+        return all(
+            _is_classical_term(term)
+            for node in self.spec.values()
+            for term in node.terms
+        )
 
     @torch.no_grad()
     def sample(

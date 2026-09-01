@@ -4,6 +4,7 @@
 from importlib.metadata import version
 
 from .flow import CausalFlowDAG
+from .readouts import shift_curve
 from .spec import (
     CI,
     CS,
@@ -43,6 +44,7 @@ __all__ = [
     "intercept",
     "linear_shift",
     "node_parents",
+    "shift_curve",
     "simple_intercept",
     "spec_from_dict",
     "spec_to_dict",
