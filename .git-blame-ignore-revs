@@ -1,7 +1,0 @@
-# Bulk reformatting commits. Ignore them in blame:
-#   git config blame.ignoreRevsFile .git-blame-ignore-revs
-
-# style: sort imports
-e175342805d523c37839a0e1f5ff650193dc3d03
-# style: apply ruff-format
-fd8cf880a43a0d385945ecdf0c864057d011e44b

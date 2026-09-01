@@ -4,7 +4,7 @@
 (24 GB), torch 2.12.0+cu130 · 2026-06-15.
 **Goal (from `MISSION_autoresearch.md`):** find changes that make `CausalFlowDAG`
 training **faster to a fixed quality target** (time-to-target as defined in
-`experiments/bench_training.py`), with rigor — falsifiable hypotheses, ≥3 seeds,
+`experiments/benchmarks/bench_training.py`), with rigor — falsifiable hypotheses, ≥3 seeds,
 opt-in library changes, full suite green before any confirmed win.
 **Outcome:** 7 experiments (#0 baseline + 6 hypotheses). **One confirmed,
 broadly-safe win** — a calibrated marginal-init — shipped as opt-in
@@ -99,6 +99,7 @@ productive search is essentially complete.
 Full lab notebook on the run branch: `docs/research/RESEARCH_LOG.md` (per-experiment
 hypothesis/numbers/verdict), `IDEAS.md` (ranked backlog, re-ranked after each
 experiment), `LEADERBOARD.md`, baseline CSVs in `docs/research/baseline/`, perf
-fingerprint in `docs/perf/`. Diagnostic scripts: `experiments/profile_epoch.py`,
-`sweep_threads.py`, `probe_compile.py`, `exp_warmstart.py`,
-`exp_ordinal_warmstart.py`, `probe_feat_cache.py`.
+fingerprint in `docs/perf/`. The diagnostic scripts of the run
+(`profile_epoch.py`, `sweep_threads.py`, `probe_compile.py`,
+`exp_warmstart.py`, `exp_ordinal_warmstart.py`, `probe_feat_cache.py`) stayed on
+the run branch and are not in this tree.

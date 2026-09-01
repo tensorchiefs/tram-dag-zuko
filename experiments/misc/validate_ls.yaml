@@ -1,0 +1,37 @@
+# Hyperparameters of the classical-MLE validation (validate_ls.py).
+#
+# Every value the script uses is in this file: it reads no defaults of its
+# own.
+
+cohort_and_model: &cohort_and_model
+  cohort: magic-mrclean/ls   # frozen synthetic cohort with a known true effect
+  init_seed: 0               # flow weight initialization
+  shuffle_seed: 0            # minibatch shuffling of the first Adam phase
+  batch_size: 256
+  good_outcome_levels: 3     # a "good" outcome is level 0, 1 or 2
+  # the model, stated rather than inherited from the framework
+  transform: bernstein       # basis of the continuous nodes
+  n_coeffs: 20               # unconstrained coefficients (zuko ties two
+                             # more control points on, so order 21)
+  # the ordinal nodes' level counts, matching the frozen cohort's columns
+  levels_mrs_pre: 6
+  levels_treatment: 2
+  levels_outcome: 7
+  # the Adam route trains to tight convergence in decreasing steps;
+  # the classical route ignores these and uses L-BFGS instead
+  phases:
+  - [4000, 0.01]
+  - [2000, 0.001]
+  - [1000, 0.0001]
+  classical_max_iter: 400
+
+variants:
+  # multi-phase Adam, trained to the training-data maximum likelihood
+  adam:
+    <<: *cohort_and_model
+    fitter: adam
+
+  # float64 full-batch L-BFGS: the deterministic exact-MLE route
+  classical:
+    <<: *cohort_and_model
+    fitter: classical

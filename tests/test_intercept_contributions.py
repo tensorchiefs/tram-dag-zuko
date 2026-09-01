@@ -7,6 +7,7 @@ zero column-mean over the centering data; and (c) purely post-hoc — it changes
 nothing about the model or its outputs.
 """
 
+# %% imports ---------------------------------------------------------------------------
 import numpy as np
 import pandas as pd
 import pytest
@@ -15,6 +16,7 @@ import torch
 from tramdag import LS, CausalFlowDAG, ContinuousNode, I, OrdinalNode
 
 
+# %% private functions -----------------------------------------------------------------
 def _data(n=400, seed=0):
     rng = np.random.default_rng(seed)
     x1 = rng.normal(size=n)
@@ -28,18 +30,18 @@ def _additive_ci_flow():
     spec = {
         "x1": ContinuousNode(),
         "x2": ContinuousNode(),
-        "x3": ContinuousNode(terms=[I("x1"), I("x2")]),
+        "x3": ContinuousNode([I("x1", "x2", allow_interaction=False)]),
     }  # additive CI
     return CausalFlowDAG(spec, seed=1)
 
 
-# ------------------------------------------------ exactness of the decomposition
+# %% public functions ------------------------------------------------------------------
 def test_baseline_plus_contributions_reproduces_theta():
     flow = _additive_ci_flow()
     df = _data()
-    flow._set_ranges(df)  # not needed for theta, but exercises the realistic path
+    flow.calibrate(df)  # not needed for theta, but exercises the realistic path
 
-    res = flow.intercept_contributions("x3", df)
+    res = flow.intercept_contributions(df, "x3")
     # reconstruct theta from the centered components + baseline
     recon = res["baseline"][None, :] + sum(res["contributions"].values())
 
@@ -49,18 +51,17 @@ def test_baseline_plus_contributions_reproduces_theta():
     with torch.no_grad():
         theta = sum(
             net(torch.cat([feats[p] for p in grp], dim=1))
-            for net, grp in zip(nd.intercept_nets, nd._intercept_groups)
+            for net, grp in zip(nd.intercept_nets, nd._intercept_groups, strict=True)
         )
     np.testing.assert_allclose(recon, theta.numpy(), rtol=1e-5, atol=1e-5)
 
 
-# ------------------------------------------------------ sum-to-zero per parameter
 def test_contributions_are_mean_centered():
     flow = _additive_ci_flow()
     df = _data()
-    res = flow.intercept_contributions("x3", df)
+    res = flow.intercept_contributions(df, "x3")
     assert set(res["contributions"]) == {"x1", "x2"}
-    for label, contrib in res["contributions"].items():
+    for contrib in res["contributions"].values():
         # each column (transform parameter) averages to ~0 over the rows
         np.testing.assert_allclose(contrib.mean(axis=0), 0.0, atol=1e-6)
 
@@ -68,7 +69,7 @@ def test_contributions_are_mean_centered():
 def test_shapes_and_parents():
     flow = _additive_ci_flow()
     df = _data(n=123)
-    res = flow.intercept_contributions("x3", df)
+    res = flow.intercept_contributions(df, "x3")
     P = flow.nodes["x3"].ut.n_params
     assert res["baseline"].shape == (P,)
     for contrib in res["contributions"].values():
@@ -76,35 +77,35 @@ def test_shapes_and_parents():
     assert res["parents"] == {"x1": ("x1",), "x2": ("x2",)}
 
 
-# ------------------------------------------------------------------ ordinal node
 def test_ordinal_additive_ci():
     spec = {
         "x1": ContinuousNode(),
         "x2": ContinuousNode(),
-        "y": OrdinalNode(levels=4, terms=[I("x1"), I("x2")]),
+        "y": OrdinalNode(4, [I("x1", "x2", allow_interaction=False)]),
     }
     flow = CausalFlowDAG(spec, seed=2)
     df = _data()
     df["y"] = np.random.default_rng(3).integers(0, 4, len(df)).astype(float)
-    res = flow.intercept_contributions("y", df)
+    res = flow.intercept_contributions(df, "y")
     assert res["baseline"].shape == (3,)  # levels - 1 cutpoint params
     for contrib in res["contributions"].values():
         np.testing.assert_allclose(contrib.mean(axis=0), 0.0, atol=1e-6)
 
 
-# --------------------------------------- transform-agnostic (spline / affine too)
 @pytest.mark.parametrize(
-    "transform,P", [("bernstein", None), ("spline", 3 * 8 - 1), ("affine", 2)]
+    ("transform", "P"), [("bernstein", None), ("spline", 3 * 8 - 1), ("affine", 2)]
 )
 def test_works_for_any_continuous_transform(transform, P):
     spec = {
         "x1": ContinuousNode(),
         "x2": ContinuousNode(),
-        "x3": ContinuousNode(terms=[I("x1"), I("x2")], transform=transform),
+        "x3": ContinuousNode(
+            [I("x1", "x2", allow_interaction=False, transform=transform)]
+        ),
     }
     flow = CausalFlowDAG(spec, seed=5)
     df = _data()
-    res = flow.intercept_contributions("x3", df)
+    res = flow.intercept_contributions(df, "x3")
     if P is not None:
         assert res["baseline"].shape == (P,)
     # exactness + sum-to-zero hold in unconstrained theta-space regardless of transform
@@ -114,52 +115,50 @@ def test_works_for_any_continuous_transform(transform, P):
     with torch.no_grad():
         theta = sum(
             net(torch.cat([feats[p] for p in grp], dim=1))
-            for net, grp in zip(nd.intercept_nets, nd._intercept_groups)
+            for net, grp in zip(nd.intercept_nets, nd._intercept_groups, strict=True)
         )
     np.testing.assert_allclose(recon, theta.numpy(), rtol=1e-5, atol=1e-5)
     for contrib in res["contributions"].values():
         np.testing.assert_allclose(contrib.mean(axis=0), 0.0, atol=1e-6)
 
 
-# -------------------------------------------------------------------- guard rails
 def test_raises_on_node_without_complex_intercept():
     spec = {
         "x1": ContinuousNode(),
-        "x2": ContinuousNode(terms=[LS("x1")]),
+        "x2": ContinuousNode([LS("x1")]),
     }  # shift only, no I-term
     flow = CausalFlowDAG(spec, seed=0)
     df = _data()
     with pytest.raises(ValueError, match="no complex-intercept"):
-        flow.intercept_contributions("x2", df)
+        flow.intercept_contributions(df, "x2")
     # source node (unconditional simple intercept) also has nothing to decompose
     with pytest.raises(ValueError, match="no complex-intercept"):
-        flow.intercept_contributions("x1", df)
+        flow.intercept_contributions(df, "x1")
 
 
 def test_raises_on_unknown_node():
     flow = _additive_ci_flow()
     with pytest.raises(KeyError):
-        flow.intercept_contributions("nope", _data())
+        flow.intercept_contributions(_data(), "nope")
 
 
 def test_raises_on_missing_parent_column():
     flow = _additive_ci_flow()
     df = _data().drop(columns=["x2"])
     with pytest.raises(KeyError, match="missing intercept-parent"):
-        flow.intercept_contributions("x3", df)
+        flow.intercept_contributions(df, "x3")
 
 
-# ------------------------------------------------------- single joint complex CI
 def test_joint_complex_intercept_single_component():
     # I("x1","x2") is one pooled network -> one centered component over both
     spec = {
         "x1": ContinuousNode(),
         "x2": ContinuousNode(),
-        "x3": ContinuousNode(terms=[I("x1", "x2")]),
+        "x3": ContinuousNode([I("x1", "x2")]),
     }
     flow = CausalFlowDAG(spec, seed=4)
     df = _data()
-    res = flow.intercept_contributions("x3", df)
+    res = flow.intercept_contributions(df, "x3")
     assert set(res["contributions"]) == {"x1+x2"}
     assert res["parents"] == {"x1+x2": ("x1", "x2")}
     recon = res["baseline"][None, :] + res["contributions"]["x1+x2"]
@@ -170,14 +169,13 @@ def test_joint_complex_intercept_single_component():
     np.testing.assert_allclose(recon, theta.numpy(), rtol=1e-5, atol=1e-5)
 
 
-# ---------------------------------------------------------- purely post-hoc / pure
 def test_does_not_mutate_model_outputs():
     flow = _additive_ci_flow()
     df = _data()
     before = flow.log_prob(df).detach().numpy().copy()
     params_before = [p.detach().clone() for p in flow.parameters()]
-    flow.intercept_contributions("x3", df)
+    flow.intercept_contributions(df, "x3")
     after = flow.log_prob(df).detach().numpy()
     np.testing.assert_array_equal(before, after)
-    for a, b in zip(params_before, flow.parameters()):
+    for a, b in zip(params_before, flow.parameters(), strict=True):
         assert torch.equal(a, b)

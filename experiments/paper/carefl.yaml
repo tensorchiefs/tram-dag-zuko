@@ -1,0 +1,59 @@
+# Hyperparameters of the CAREFL counterfactual benchmark (carefl.py).
+#
+# Every value the script uses is in this file; it reads no defaults of its own.
+#
+# Protocol = the reference implementation's own comparison run
+# (tensorchiefs/tram-dag, comparison/utils.R with carefl_fig5.r:
+# EPOCHS = 7000), reproduced 1:1 where the framework allows:
+#   * nTrain = 2500 with a separate dgp(5000) validation draw — a repo choice:
+#     carefl_fig5.r sets USE_EXTERNAL_DATA = TRUE, trains on CAREFL's own
+#     data/CAREFL_CF/X.csv and watches the *training* NLL (val = train), with
+#     x3/x4 sd-standardized; we draw from the same SCM and score in raw units;
+#   * one full-batch gradient step per epoch (train_step: one apply_gradients
+#     over all rows), 7000 epochs, Adam at lr 0.001;
+#   * update_learning_rate: ReduceLROnPlateau on the summed validation NLL,
+#     factor 0.1, patience 50, min_lr 1e-7, no min_delta (strict <);
+#   * make_model: one net per node, dense(10, tanh) -> dense(100, tanh) ->
+#     dense(len_theta), M = 30 so len_theta = 31; final weights, no early stop.
+# The plateau rule is torch's ReduceLROnPlateau on the summed validation NLL,
+# global like the reference's update_learning_rate, and the weights start from
+# Keras' Dense default, glorot_uniform / zero bias (`init: glorot`, make_model's
+# layer_dense) — under this full-batch protocol the init decides the fit: at
+# the config's seed the VACA do(x2) errors are 0.097/0.088/0.019 with glorot
+# (measured 2026-08-26 at the R code's -3/-1/0 grid), against 0.52/0.33/0.13
+# with torch's default init (at the earlier -3/-2/0 grid).
+# Known deviations, all framework-level and documented in CLAUDE.md: the
+# Bernstein domain comes from the train 5%/95% quantiles, not min-max to [0,
+# 1] (scale_df); the intercept net's output layer has no bias (Keras dense has
+# one); Adam eps 1e-8 vs 1e-7 (measured: no effect); the reference seeds R's
+# RNG with 42, which torch cannot replay, so every seed below is a repo
+# choice.
+#
+variants:
+  # all conditionals complex intercepts
+  flexible:
+    n_train: 2500               # nTrain
+    n_val: 5000                 # val = dgp(5000)
+    epochs: 7000
+    learning_rate: 0.001
+    batch_size: 2500            # = n_train: one full-batch step per epoch
+    schedule: plateau           # update_learning_rate
+    plateau_patience: 50
+    plateau_factor: 0.1
+    plateau_min_lr: 1.0e-7
+    min_delta: 0.0
+    transform: bernstein
+    # M = 30, len_theta = M + 1 = 31 unconstrained coefficients; zuko ties two
+    # extra control points on (order 32 against the reference's 30); the
+    # free-parameter count is what matches
+    n_coeffs: 31
+    intercept_units: [10, 100]  # make_model's two dense layers
+    activation: tanh            # make_model's activation
+    dgp_seed: 42                # repo choice
+    init_seed: 7                # repo choice
+    init: glorot                # Keras Dense default: glorot_uniform, zero bias
+    net_input_scaling: minmax   # comparison/utils.R::scale_df: parents scaled to [0, 1]
+    shuffle_seed: 0             # full batch: the shuffle seed has no effect
+    n_heldout: 300              # typical rows scored next to the single x_obs
+    heldout_seed_offset: 999    # seed offset of the held-out draw
+    alphas_scored: [-1.5, 0.0, 1.5]

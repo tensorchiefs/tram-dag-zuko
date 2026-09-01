@@ -2,42 +2,68 @@ name: CI
 
 on:
   push:
-    branches: [main, dev-*]   # both contributors' dev branches
+    branches:
+    - main
+    - dev-*
   pull_request:
-  workflow_dispatch:        # manual full-suite run from the Actions tab
+  workflow_dispatch:
   schedule:
-  - cron: 17 3 * * *        # nightly full suite (03:17 UTC)
+  - cron: 17 3 * * *     # nightly full suite (03:17 UTC)
 
-# Note: the default linux torch wheel bundles CUDA and is large; the uv cache
-# (keyed on uv.lock) makes every run after the first fast. We deliberately do
-# NOT pin linux to the cpu-only torch index in uv.lock — GPU machines (the
-# research rack) share that lock file.
+# The default Linux torch wheel bundles CUDA and is large. uv's cache,
+# keyed on uv.lock, keeps subsequent runs fast. We deliberately do not
+# pin Linux to the CPU-only torch index in uv.lock because GPU machines
+# (the research rack) share that lock file.
 
 jobs:
-  fast:
-    name: fast tests (PRs and pushes)
-    if: github.event_name == 'push' || github.event_name == 'pull_request'
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-    steps:
-    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1
-    - uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9   # v9.0.0
-      with:
-        enable-cache: true
-    - run: uv sync
-    - name: unit + generator tests (slow fit tests excluded)
-      run: uv run pytest tests/ -q -m "not slow"
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        platform:
+        - ubuntu-latest
+        - windows-latest
+        - macos-latest
+        python-version:
+        - '3.10'
+        - '3.11'
+        - '3.12'
+        - '3.13'
+        - '3.14'
 
-  full:
-    name: full suite (nightly / manual)
-    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.platform }}
+    # a torch hang would otherwise burn the 6-hour default per matrix job;
+    # the nightly slow suite needs the headroom, the fast run needs minutes
     timeout-minutes: 120
+
     steps:
     - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1
-    - uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9   # v9.0.0
+
+    - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d   # v10.0.1
       with:
+        python-version: ${{ matrix.python-version }}
         enable-cache: true
-    - run: uv sync
-    - name: complete test suite incl. fit/training tests
-      run: uv run pytest tests/ -q
+
+    # --no-default-groups: dev is a default group, and it now pulls the
+    # editor/docs tooling too (144 packages against 45 for test alone)
+    - run: >-
+        uv sync --no-default-groups --group test
+        --python ${{ matrix.python-version }}
+
+    # no path argument: testpaths in pyproject covers tests/ and the
+    # per-area experiment checks, and both are meant to run here
+    - name: Tests
+      shell: bash
+      # torch opens as many intra-op threads as the box reports, and -n auto
+      # already runs one worker per vCPU: uncapped, a single worker was
+      # measured at 41 min CPU after 9 min wall without finishing, while the
+      # capped run does the whole not-slow suite in under a minute
+      env:
+        OMP_NUM_THREADS: '1'
+        # uv run would otherwise re-sync the default dev group the sync
+        # step above deliberately skipped
+        UV_NO_DEFAULT_GROUPS: '1'
+      # --cov gate: [tool.coverage] in pyproject sets source and fail_under
+      run: >-
+        uv run pytest -q -n auto --cov
+        ${{ (github.event_name != 'schedule' && github.event_name != 'workflow_dispatch') && '-m "not slow"' || '' }}

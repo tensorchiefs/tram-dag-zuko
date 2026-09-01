@@ -15,20 +15,24 @@
 # # Additive vs joint complex intercept — interpreting per-parent effects
 #
 # A node whose transform parameters depend on its parents (a **complex
-# intercept**, `I`) can group those parents two ways:
+# intercept**, `CI`) can group those parents two ways:
 #
-# - **joint** — `terms=[I("x1", "x2")]`: *one* network over both parents. It can
+# - **joint** — `CI("x1", "x2")`: *one* network over both parents. It can
 #   represent **interactions** (the effect of `x1` may depend on `x2`), but the
-#   two parents are entangled in one black box.
-# - **additive** — `terms=[I("x1"), I("x2")]`: *one network per parent*, summed
-#   in unconstrained parameter space, `theta(pa) = net_1(x1) + net_2(x2)`. Each
-#   parent reshapes the transform **independently** — a separable, GAM-like
-#   structure.
+#   two parents are entangled in one black box. This is the default.
+# - **additive** — `CI("x1", "x2", allow_interaction=False)`: *one network per
+#   parent*, summed in unconstrained parameter space,
+#   `theta(pa) = net_1(x1) + net_2(x2)`. Each parent reshapes the transform
+#   **independently** — a separable, GAM-like structure.
+#
+# The grouping is said with the flag, not by writing two terms: a node takes at
+# most **one** intercept term with parents, so `[CI("x1"), CI("x2")]` is an
+# error. That keeps a term list purely additive on the latent scale.
 #
 # The additive form is the interpretable one: you can ask "what does `x1`
 # *alone* do?". The catch (issue #20) is that the additive sum is identified only
 # up to a constant moving between the nets, so the **raw** per-parent outputs are
-# not comparable. `flow.intercept_contributions(node, data)` resolves this with a
+# not comparable. `flow.intercept_contributions(data, node)` resolves this with a
 # sum-to-zero (mean-centering) constraint and returns each parent's centered
 # contribution.
 
@@ -41,12 +45,9 @@
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import torch
 
-from tramdag import CausalFlowDAG, ContinuousNode, I
-
-torch.manual_seed(0)
-
+from tramdag import CI, CausalFlowDAG, ContinuousNode
+from tramdag.callbacks import RestoreBest
 
 # %% [markdown]
 # ## The data
@@ -83,18 +84,25 @@ def make_flow(joint: bool):
     spec = {
         "x1": ContinuousNode(),
         "x2": ContinuousNode(),
-        "x3": ContinuousNode(terms=[I("x1", "x2")] if joint else [I("x1"), I("x2")]),
+        "x3": ContinuousNode(
+            [CI("x1", "x2")] if joint else [CI("x1", "x2", allow_interaction=False)]
+        ),
     }
     return CausalFlowDAG(spec, seed=0)
 
 
 flow_joint = make_flow(joint=True)
 flow_add = make_flow(joint=False)
-# flow_add.fit(train, val, epochs=10, learning_rate=1e-2, verbose=0)
-# TC: Using a net with I("x1"), I("x2") adds the coefficients of the two nets together (see theta_shift in flow.py)
 
 for f in (flow_joint, flow_add):
-    f.fit(train, val, epochs=1200, learning_rate=1e-2, verbose=0, restore_best=True)
+    best = RestoreBest(val)
+    f.fit(
+        train,
+        epochs=1200,
+        learning_rate=1e-2,
+        after_epoch_callbacks=best,
+        after_fit_callbacks=best.restore,
+    )
 
 # Both fit the data well; the joint model is only marginally better on held-out
 # likelihood. A flexible additive Bernstein intercept can *mimic* a lot of
@@ -108,25 +116,17 @@ print("val NLL  additive:", round(sum(flow_add.nll(val).values()), 4))
 #
 # It returns each `I`-term's mean-centered (sum-to-zero) contribution to the
 # transform parameters `theta`, plus the absorbed `baseline`. The centering is
-# over the rows of the `data` you pass, and the decomposition is exact.
+# over the rows of the `df` you pass, and the decomposition is exact.
 
 # %%
-res_add = flow_add.intercept_contributions("x3", train)
-res_joint = flow_joint.intercept_contributions("x3", train)
+res_add = flow_add.intercept_contributions(train, "x3")
+res_joint = flow_joint.intercept_contributions(train, "x3")
 
 print("additive terms :", list(res_add["contributions"]))  # 'x1', 'x2' — separable
 print("joint terms    :", list(res_joint["contributions"]))  # 'x1+x2' — inseparable
 
-# exactness: baseline + sum of contributions reproduces theta; centering: ~0 means
-nd = flow_add.nodes["x3"]
-feats = flow_add._features(flow_add._tensorize(train))
-with torch.no_grad():
-    theta = sum(
-        net(torch.cat([feats[p] for p in g], 1))
-        for net, g in zip(nd.intercept_nets, nd._intercept_groups)
-    ).numpy()
-recon = res_add["baseline"][None] + sum(res_add["contributions"].values())
-print("max |reconstruction - theta| :", np.abs(recon - theta).max())
+# the decomposition is exact (baseline + contributions == theta, pinned by the
+# test suite); the centering is easy to see here: every column mean is ~0
 print(
     "per-term column means (≈0)   :",
     {k: float(np.abs(v.mean(0)).max()) for k, v in res_add["contributions"].items()},
@@ -156,8 +156,8 @@ x1v, x2v = train["x1"].values, train["x2"].values
 
 fig, axes = plt.subplots(1, 2, figsize=(11, 4.2), sharey=True)
 o1, o2 = np.argsort(x1v), np.argsort(x2v)
-axes[0].plot(x1v[o1], c1[o1, k], color="#1b9e77", lw=2.5, label="I(x1)  vs x1")
-axes[0].plot(x2v[o2], c2[o2, k], color="#d95f02", lw=2.5, label="I(x2)  vs x2")
+axes[0].plot(x1v[o1], c1[o1, k], color="#1b9e77", lw=2.5, label="net(x1)  vs x1")
+axes[0].plot(x2v[o2], c2[o2, k], color="#d95f02", lw=2.5, label="net(x2)  vs x2")
 axes[0].axhline(0, color="0.7", lw=0.8)
 axes[0].set_title("additive — separable per-parent curves")
 axes[0].set_xlabel("parent value")
@@ -177,8 +177,8 @@ plt.show()
 #
 # | you want… | use | what you get |
 # |---|---|---|
-# | a per-parent partial-effect plot ("what does `x1` do?") | **additive** `I("x1") + I("x2")` | `intercept_contributions` → exact, mean-centered, **separable** components |
-# | interactions between parents in the transform | **joint** `I("x1", "x2")` | one entangled network — flexible, **not** separable |
+# | a per-parent partial-effect plot ("what does `x1` do?") | **additive** `CI("x1", "x2", allow_interaction=False)` | `intercept_contributions` → exact, mean-centered, **separable** components |
+# | interactions between parents in the transform | **joint** `CI("x1", "x2")` | one entangled network — flexible, **not** separable |
 #
 # Both give correct likelihoods and L1/L2/L3 causal queries — the choice is about
 # *interpretability*, not correctness, and (as the near-equal NLLs show) you
@@ -191,5 +191,3 @@ plt.show()
 # space (where the additive terms are summed, before the monotonicity
 # constraint), so they are exact partial effects on the parameters but not, in
 # general, an additive split of the curve `h` itself.
-
-# %%

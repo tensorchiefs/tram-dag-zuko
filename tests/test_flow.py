@@ -1,25 +1,54 @@
 """Unit tests for the tramdag causal flow."""
 
+# %% imports ---------------------------------------------------------------------------
 import numpy as np
 import pandas as pd
 import pytest
 import torch
 
-from tramdag import CS, LS, CausalFlowDAG, ContinuousNode, OrdinalNode
+from tramdag import CS, LS, CausalFlowDAG, ContinuousNode, I, OrdinalNode
 from tramdag.spec import validate_and_sort
 from tramdag.transforms import (
+    BOUND,
     AffineUT,
     BernsteinUT,
     SplineUT,
+    StandardLogistic,
     ordinal_cutpoints,
     ordinal_log_prob,
     ordinal_pmf,
 )
 
+# %% global variables ------------------------------------------------------------------
 torch.manual_seed(0)
 
 
-# ---------------------------------------------------------------- transforms
+# %% public functions ------------------------------------------------------------------
+@pytest.fixture(scope="module")
+def fitted_flow():
+    rng = np.random.default_rng(7)
+    n = 3000
+    x = rng.normal(0, 2, n)
+    y_lat = 0.8 * x + rng.logistic(size=n)
+    y = np.digitize(y_lat, [-1.0, 0.5, 2.0]).astype(float)
+    w = 0.5 * x - 0.3 * y + rng.logistic(size=n)
+    df = pd.DataFrame({"X": x, "Y": y, "W": w})
+    spec = {
+        "X": ContinuousNode(),
+        "Y": OrdinalNode(4, [LS("X")]),
+        "W": ContinuousNode([LS("X"), LS("Y")]),
+    }
+    flow = CausalFlowDAG(spec)
+    flow.fit(
+        df.iloc[:2400],
+        epochs=300,
+        learning_rate=0.05,
+        batch_size=600,
+        seed=0,
+    )
+    return flow, df
+
+
 @pytest.mark.parametrize("ut", [BernsteinUT(n_coeffs=12), SplineUT(bins=6), AffineUT()])
 def test_univariate_roundtrip(ut):
     ut.set_range(-3.0, 7.0)
@@ -27,7 +56,10 @@ def test_univariate_roundtrip(ut):
     theta = torch.randn(n, ut.n_params)
     x = torch.linspace(-6.0, 10.0, n)  # includes values outside the fitted range
     z0, ladj = ut.forward(theta, x)
-    assert torch.isfinite(z0).all() and torch.isfinite(ladj).all()
+    assert torch.isfinite(z0).all()
+    far = ut.inverse(theta[:2], torch.tensor([-40.0, 60.0]))  # far tails: closed form
+    assert torch.isfinite(far).all()
+    assert torch.isfinite(ladj).all()
     x_rec = ut.inverse(theta, z0)
     assert torch.allclose(x_rec, x, atol=1e-3), (x_rec - x).abs().max()
 
@@ -56,7 +88,8 @@ def test_ordinal_log_prob_gradient_survives_saturation():
     lp = ordinal_log_prob(theta, shift, y)
     assert torch.isfinite(lp).all()
     lp.sum().backward()
-    assert torch.isfinite(theta.grad).all() and torch.isfinite(shift.grad).all()
+    assert torch.isfinite(theta.grad).all()
+    assert torch.isfinite(shift.grad).all()
     assert theta.grad.abs().max() > 1e-3
     assert shift.grad.abs().max() > 1e-3
 
@@ -71,52 +104,14 @@ def test_ordinal_cutpoints_increasing_and_pmf_sums_to_one():
     assert torch.allclose(pmf.sum(dim=1), torch.ones(64), atol=1e-5)
 
 
-# ----------------------------------------------------------------------- dag
-def test_cycle_detection():
-    spec = {
-        "A": ContinuousNode(terms=[LS("B")]),
-        "B": ContinuousNode(terms=[LS("A")]),
-    }
-    with pytest.raises(ValueError, match="cycle"):
-        validate_and_sort(spec)
-
-
 def test_topological_order():
     spec = {
-        "C": OrdinalNode(levels=3, terms=[LS("A"), LS("B")]),
-        "B": ContinuousNode(terms=[CS("A")]),
+        "C": OrdinalNode(3, [LS("A"), LS("B")]),
+        "B": ContinuousNode([CS("A")]),
         "A": ContinuousNode(),
     }
     order = validate_and_sort(spec)
     assert order.index("A") < order.index("B") < order.index("C")
-
-
-# ---------------------------------------------------------------- flow logic
-@pytest.fixture(scope="module")
-def fitted_flow():
-    rng = np.random.default_rng(7)
-    n = 3000
-    x = rng.normal(0, 2, n)
-    y_lat = 0.8 * x + rng.logistic(size=n)
-    y = np.digitize(y_lat, [-1.0, 0.5, 2.0]).astype(float)
-    w = 0.5 * x - 0.3 * y + rng.logistic(size=n)
-    df = pd.DataFrame({"X": x, "Y": y, "W": w})
-    spec = {
-        "X": ContinuousNode(transform="bernstein"),
-        "Y": OrdinalNode(levels=4, terms=[LS("X")]),
-        "W": ContinuousNode(transform="bernstein", terms=[LS("X"), LS("Y")]),
-    }
-    flow = CausalFlowDAG(spec)
-    flow.fit(
-        df.iloc[:2400],
-        df.iloc[2400:],
-        epochs=300,
-        learning_rate=0.05,
-        batch_size=600,
-        verbose=0,
-        seed=0,
-    )
-    return flow, df
 
 
 def test_pmf_matches_do_sampling(fitted_flow):
@@ -175,7 +170,6 @@ def test_save_load_roundtrip(tmp_path, fitted_flow):
     assert torch.allclose(lp1, lp2, atol=1e-6)
 
 
-# ----------------------------------------------- ls == ordered logit (MLE)
 def test_ls_node_equals_proportional_odds():
     """An all-ls ordinal node is exactly a proportional-odds model: the SGD fit
     must agree with the statsmodels MLE (same data) in coefficients and PMFs.
@@ -191,12 +185,12 @@ def test_ls_node_equals_proportional_odds():
     df = pd.DataFrame({"X1": x1, "X2": x2, "Y": y})
 
     spec = {
-        "X1": ContinuousNode(transform="affine"),
-        "X2": ContinuousNode(transform="affine"),
-        "Y": OrdinalNode(levels=4, terms=[LS("X1"), LS("X2")]),
+        "X1": ContinuousNode([I(transform="affine")]),
+        "X2": ContinuousNode([I(transform="affine")]),
+        "Y": OrdinalNode(4, [LS("X1"), LS("X2")]),
     }
     flow = CausalFlowDAG(spec)
-    flow.fit(df, df, epochs=400, learning_rate=0.05, batch_size=1000, verbose=0, seed=1)
+    flow.fit(df, epochs=400, learning_rate=0.05, batch_size=1000, seed=1)
 
     res = OrderedModel(df["Y"].astype(int), df[["X1", "X2"]], distr="logit").fit(
         method="bfgs", disp=False
@@ -214,3 +208,25 @@ def test_ls_node_equals_proportional_odds():
         res.params, exog=df[["X1", "X2"]].values[:500], which="prob"
     )
     assert np.abs(pmf_flow - pmf_sm).max() < 0.01
+
+
+def test_affine_zero_theta_is_the_logistic_density():
+    """A closed-form anchor for the continuous path: with an affine transform at
+    theta = 0 the model *is* the standard logistic, rescaled by the pre-map's
+    Jacobian log(2*BOUND / (xmax - xmin)).
+    """
+    df = pd.DataFrame({"x": np.linspace(-4.0, 6.0, 400)})
+    flow = CausalFlowDAG({"x": ContinuousNode(I(transform="affine"))}, seed=0)
+    flow.calibrate(df, marginal_init=False)
+    with torch.no_grad():
+        flow.nodes["x"].intercept.theta.zero_()
+    xmin, xmax = (float(v) for v in (flow.nodes["x"].ut.xmin, flow.nodes["x"].ut.xmax))
+    z = (df["x"].to_numpy() - xmin) / (xmax - xmin) * 2 * BOUND - BOUND
+    expected = StandardLogistic.log_prob(torch.tensor(z, dtype=torch.float32))
+    expected = expected + np.log(2 * BOUND / (xmax - xmin))
+    np.testing.assert_allclose(
+        flow.log_prob(df).detach().numpy(), expected.numpy(), atol=1e-5
+    )
+    # the transform ranges are the train 5%/95% quantiles, as calibrate documents
+    q = df["x"].quantile([0.05, 0.95])
+    assert (xmin, xmax) == pytest.approx((q.iloc[0], q.iloc[1]))

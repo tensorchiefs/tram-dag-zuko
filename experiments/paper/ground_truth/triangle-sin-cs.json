@@ -1,0 +1,31 @@
+{
+  "_note": "Protocol = the paper's R code 1:1 up to the CI batch/lr deviation (see the YAML header): measured 2026-08-26 on the refactor/lean-fit branch. As triangle-atan-cs with a second nonlinear f. sin has two turning points on the grid, and the reference shift net (hidden_features_CS = c(2, 25, 25, 2), sigmoid) has a 2-unit input bottleneck: it tracks -f(x2) through the middle and saturates at both ends, so cs_curve_max_abs_err sits where the plateaus start (|x2| > 0.75) rather than near zero. That is the reference architecture's capacity, not a fit failure -- the paper's own claim is made with atan, which is monotone on the grid, and triangle-atan-cs recovers it. mean_x3_flow_do_x1 stays unpinned on purpose: the DGP center plus the abs-err bound covers it.",
+  "beta12": {
+    "value": 1.98747980594635,
+    "atol": 0.05
+  },
+  "beta13": {
+    "value": -0.2020704299211502,
+    "atol": 0.05,
+    "why": "weakly identified: the coefficient multiplies the mixture x1 (sd 0.254 vs unit-scale siblings) \u2014 see the _note and docs/paper-replication.md"
+  },
+  "val_nll_x3": {
+    "value": 2.476681709289551,
+    "atol": 0.05
+  },
+  "cs_curve_max_abs_err": {
+    "max": 2.561
+  },
+  "mean_x3_dgp_do_x1": {
+    "value": 2.1092599399621044,
+    "atol": 1e-06,
+    "why": "a deterministic seeded DGP draw, like the other analytic entries; only numpy's last-bit drift moves it"
+  },
+  "mean_x3_abs_err_do_x1": {
+    "max": 0.3028
+  },
+  "fit_seconds": {
+    "max": 1765,
+    "why": "3x the 2-core CI runner measurement (588 s, 2026-08-31): shared-runner wall clock is noisy, so this is a gross-regression tripwire (a lost no_grad, an accidental O(n^2)), not a benchmark"
+  }
+}

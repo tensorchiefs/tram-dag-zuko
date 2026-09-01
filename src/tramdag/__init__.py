@@ -1,42 +1,44 @@
-"""tramdag — Interpretable Neural Causal Models (TRAM-DAGs) in PyTorch.
+"""Interpretable Neural Causal Models (TRAM-DAGs) in PyTorch."""
 
-.. include:: ../../README.md
-"""
-
+# %% imports ---------------------------------------------------------------------------
 from importlib.metadata import version
 
-from . import simulations
-from .env import machine_info
 from .flow import CausalFlowDAG
 from .spec import (
+    CI,
     CS,
     LS,
+    SI,
     VC,
     ContinuousNode,
-    CShift,
     I,
-    Intercept,
-    LinShift,
     OrdinalNode,
     Term,
-    term,
+    complex_intercept,
+    complex_shift,
+    intercept,
+    linear_shift,
+    simple_intercept,
+    varying_coefficient,
 )
 
+# %% global variables ------------------------------------------------------------------
 __all__ = [
+    "CI",
+    "CS",
+    "LS",
+    "SI",
+    "VC",
     "CausalFlowDAG",
     "ContinuousNode",
-    "OrdinalNode",
-    "machine_info",
-    "simulations",
-    # term-formula notation
-    "Term",
     "I",
-    "LS",
-    "CS",
-    "VC",
-    "term",
-    "Intercept",
-    "LinShift",
-    "CShift",
+    "OrdinalNode",
+    "Term",
+    "complex_intercept",
+    "complex_shift",
+    "intercept",
+    "linear_shift",
+    "simple_intercept",
+    "varying_coefficient",
 ]
 __version__ = version("tramdag")

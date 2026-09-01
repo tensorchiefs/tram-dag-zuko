@@ -1,4 +1,4 @@
-"""Tests for ``fit(marginal_init=True)`` — calibrated initialization of each
+"""Tests for ``calibrate(marginal_init=True)`` — calibrated initialization of each
 *unconditional* (root) node's transform to the empirical marginal.
 
 What it guarantees:
@@ -11,8 +11,8 @@ What it guarantees:
   optimum (so the exact-MLE property is preserved).
 """
 
+# %% imports ---------------------------------------------------------------------------
 import math
-from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -23,10 +23,31 @@ from tramdag import LS, CausalFlowDAG, ContinuousNode, I, OrdinalNode
 from tramdag.conditioners import ComplexIntercept, SimpleIntercept
 from tramdag.transforms import BernsteinUT, ordinal_marginal_init_theta, ordinal_pmf
 
-DATA = Path(__file__).resolve().parents[1] / "data"
+
+# %% private functions -----------------------------------------------------------------
+def _mixed_flow_and_df():
+    """Flow with a Bernstein root, an ordinal root, and a continuous node whose
+    parent enters as `ci` (so its intercept is a ComplexIntercept, not a root).
+    """
+    spec = {
+        "x1": ContinuousNode(),  # Bernstein root
+        "y": OrdinalNode(levels=4),  # ordinal root
+        "x2": ContinuousNode([I("x1")]),  # ci -> ComplexIntercept
+    }
+    torch.manual_seed(0)
+    flow = CausalFlowDAG(spec)
+    rng = np.random.default_rng(0)
+    df = pd.DataFrame(
+        {
+            "x1": rng.normal(size=400),
+            "y": rng.integers(0, 4, size=400).astype(float),
+            "x2": rng.normal(size=400),
+        }
+    )
+    return flow, df
 
 
-# ------------------------------------------------------------------ fast
+# %% public functions ------------------------------------------------------------------
 def test_bernstein_marginal_init_is_calibrated_logistic_map():
     """marginal_init θ maps the pre-scaled domain onto [logit .05, logit .95]."""
     ut = BernsteinUT()
@@ -46,28 +67,6 @@ def test_ordinal_marginal_init_reproduces_class_frequencies():
     np.testing.assert_allclose(pmf, counts / counts.sum(), atol=1e-4)
 
 
-def _mixed_flow_and_df():
-    """Flow with a Bernstein root, an ordinal root, and a continuous node whose
-    parent enters as `ci` (so its intercept is a ComplexIntercept, not a root).
-    """
-    spec = {
-        "x1": ContinuousNode(),  # Bernstein root
-        "y": OrdinalNode(levels=4),  # ordinal root
-        "x2": ContinuousNode(terms=[I("x1")]),  # ci -> ComplexIntercept
-    }
-    torch.manual_seed(0)
-    flow = CausalFlowDAG(spec)
-    rng = np.random.default_rng(0)
-    df = pd.DataFrame(
-        {
-            "x1": rng.normal(size=400),
-            "y": rng.integers(0, 4, size=400).astype(float),
-            "x2": rng.normal(size=400),
-        }
-    )
-    return flow, df
-
-
 def test_marginal_init_only_touches_unconditional_roots():
     flow, df = _mixed_flow_and_df()
     # sanity: the ci node really has a ComplexIntercept
@@ -81,7 +80,7 @@ def test_marginal_init_only_touches_unconditional_roots():
         for k, v in flow.nodes["x2"].intercept.state_dict().items()
     }
 
-    flow._set_ranges(df, marginal_init=True)
+    flow.calibrate(df, marginal_init=True)
 
     # the two roots are now calibrated (changed from their zero init)...
     assert not torch.allclose(flow.nodes["x1"].intercept.theta.detach(), root_x1_before)
@@ -96,38 +95,76 @@ def test_marginal_init_only_touches_unconditional_roots():
         assert torch.equal(v.detach(), ci_before[k]), f"ci param {k} changed"
 
 
-def test_marginal_init_off_by_default_leaves_roots_at_zero():
+def test_marginal_init_on_by_default_calibrates_roots():
     flow, df = _mixed_flow_and_df()
-    flow._set_ranges(df)  # marginal_init defaults to False
+    flow.calibrate(df, marginal_init=False)  # zuko's zero start, on request
     assert torch.allclose(
         flow.nodes["x1"].intercept.theta.detach(),
         torch.zeros_like(flow.nodes["x1"].intercept.theta),
     )
 
 
-# ------------------------------------------------------------------ slow
 @pytest.mark.slow
-def test_marginal_init_is_pure_init_same_optimum():
+def test_marginal_init_is_pure_init_same_optimum(ls_chain):
     """A marginal-init fit and a default fit converge to the same NLL — proving
     it only moves the starting point, not the optimum.
     """
-    obs = pd.read_csv(DATA / "vaca" / "obs.csv")[["x1", "x2"]]
-    spec = {"x1": ContinuousNode(), "x2": ContinuousNode(terms=[LS("x1")])}
+    obs = ls_chain["draw"](5000, 11)[["x1", "x2"]]
+    spec = {"x1": ContinuousNode(), "x2": ContinuousNode([LS("x1")])}
 
     def converged_nll(marginal_init):
-        torch.manual_seed(0)
-        flow = CausalFlowDAG(spec)
-        flow.fit(
-            obs,
-            epochs=1500,
-            learning_rate=1e-2,
-            batch_size=512,
-            verbose=0,
-            schedule="plateau",
-            plateau_patience=15,
-            freeze_patience=60,
-            marginal_init=marginal_init,
-        )
+        flow = CausalFlowDAG(spec, seed=0)
+        flow.calibrate(obs, marginal_init=marginal_init)
+        flow.fit(obs, epochs=1500, learning_rate=1e-2, batch_size=512)
         return sum(flow.nll(obs).values())
 
     np.testing.assert_allclose(converged_nll(True), converged_nll(False), atol=1e-2)
+
+
+def test_marginal_init_does_not_reset_a_loaded_model(tmp_path):
+    """A loaded model is trained, so re-fitting must not re-initialize it.
+
+    The ``calibrated`` flag is a buffer, so it travels in the checkpoint; a
+    second ``fit`` (or an explicit ``calibrate``) is a no-op on the start.
+    """
+    rng = np.random.default_rng(0)
+    df = pd.DataFrame({"y": rng.integers(0, 4, 400).astype(float)})
+    flow = CausalFlowDAG({"y": OrdinalNode(4)}, seed=0)
+    flow.fit(df, epochs=5, learning_rate=1e-2, batch_size=128)
+    flow.save(tmp_path / "m.pt")
+    loaded = CausalFlowDAG.load(tmp_path / "m.pt")
+
+    before = loaded.nodes["y"].intercept.theta.detach().clone()
+    loaded.calibrate(df, marginal_init=True)
+    # lr 0: the epoch runs (and would recalibrate, if the flag were lost)
+    # without moving any weight
+    loaded.fit(df, epochs=1, learning_rate=0.0, batch_size=128)
+    assert torch.equal(before, loaded.nodes["y"].intercept.theta.detach())
+
+
+def test_init_marginals_is_explicit_and_repeatable():
+    """``init_marginals`` re-applies the calibrated start on a trained flow
+    (unlike ``calibrate``, which is once-only), touches only simple
+    intercepts, and calibrates a fresh flow's ranges itself.
+    """
+    flow, df = _mixed_flow_and_df()
+    flow.init_marginals(df)  # fresh flow: takes the ranges too
+    assert bool(flow.calibrated)
+    start = flow.nodes["x1"].intercept.theta.detach().clone()
+    start_y = flow.nodes["y"].intercept.theta.detach().clone()
+
+    flow.fit(df, epochs=5, learning_rate=1e-2, batch_size=128)
+    assert not torch.equal(start, flow.nodes["x1"].intercept.theta.detach())
+    ci_fitted = [p.detach().clone() for p in flow.nodes["x2"].intercept.parameters()]
+
+    flow.init_marginals(df)  # explicit restart at the marginal
+    np.testing.assert_allclose(
+        start.numpy(), flow.nodes["x1"].intercept.theta.detach().numpy(), atol=1e-6
+    )
+    np.testing.assert_allclose(
+        start_y.numpy(), flow.nodes["y"].intercept.theta.detach().numpy(), atol=1e-6
+    )
+    for fitted, after in zip(
+        ci_fitted, flow.nodes["x2"].intercept.parameters(), strict=True
+    ):
+        assert torch.equal(fitted, after.detach())  # ci intercept: never re-inited

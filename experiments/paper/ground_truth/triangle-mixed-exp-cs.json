@@ -1,0 +1,53 @@
+{
+  "_note": "Protocol = the paper's R code 1:1 up to the CI batch/lr deviation (see the YAML header): measured 2026-08-26 on the refactor/lean-fit branch. As triangle-mixed-linear-ls with a nonlinear f on the ordinal node. The cf_* entries score ordinal counterfactuals against the analytic counterfactual law (paper App. B): an observed level pins the latent to an interval, so only a distribution is identified, cf_prob_true_level_analytic is what predicting that law scores (E[sum p_i^2]) and cf_prob_true_level_mode_bound is the most any prediction can score (always naming the modal level) -- both are expectations while the metric is one finite draw, so neither is a per-run ceiling; the flow sitting slightly above the analytic reference means it is sharper than the identifiable law, not better than it. cf_pmf_tv_vs_analytic is the metric that cannot be gamed that way. odds_ratio_predicted is exp(beta12), which this file already pins, so it cannot fail on its own -- it is here because it is the paper's convention-free number, not as a second check. mean_x3_flow_do_x1 stays unpinned on purpose: the DGP center plus the abs-err bound covers it.",
+  "beta12": {
+    "value": 1.98747980594635,
+    "atol": 0.05
+  },
+  "beta13": {
+    "value": -0.2024223506450653,
+    "atol": 0.05,
+    "why": "weakly identified: the coefficient multiplies the mixture x1 (sd 0.254 vs unit-scale siblings) \u2014 see the _note and docs/paper-replication.md"
+  },
+  "val_nll_x3": {
+    "value": 1.1901270151138306,
+    "atol": 0.05
+  },
+  "cs_curve_max_abs_err": {
+    "max": 0.2686
+  },
+  "mean_x3_dgp_do_x1": {
+    "value": 1.2624,
+    "atol": 0.05
+  },
+  "mean_x3_abs_err_do_x1": {
+    "max": 0.03975
+  },
+  "odds_ratio_predicted": {
+    "value": 7.29712040997889,
+    "atol": 0.5
+  },
+  "odds_ratio_dgp": {
+    "value": 7.189438678974828,
+    "atol": 1e-09
+  },
+  "cf_pmf_tv_vs_analytic": {
+    "max": 0.05079
+  },
+  "cf_prob_true_level_flow": {
+    "value": 0.916965,
+    "atol": 0.03
+  },
+  "cf_prob_true_level_analytic": {
+    "value": 0.9208898876903038,
+    "atol": 1e-09
+  },
+  "cf_prob_true_level_mode_bound": {
+    "value": 0.9543207588397901,
+    "atol": 1e-09
+  },
+  "fit_seconds": {
+    "max": 1402,
+    "why": "3x the 2-core CI runner measurement (467 s, 2026-08-31): shared-runner wall clock is noisy, so this is a gross-regression tripwire (a lost no_grad, an accidental O(n^2)), not a benchmark"
+  }
+}

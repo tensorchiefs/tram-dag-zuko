@@ -7,11 +7,26 @@ truth**.
 
 | notebook | what it is |
 |---|---|
-| `intro_tram_dag.py` | didactic walkthrough of the TRAM-DAG model (SI/CI/LS/CS, L1–L3, all claims checked against a hand-built SCM) |
-| `transforms_tram_dag.py` | choosing the per-node transform (Bernstein / spline / affine) on the intro SCM: per-node NLL diagnosis, recovered h-curves, mixing transforms per node, capacity sweep, and why misspecification bends tail-risk do() queries |
-| `classical_fit_tram_dag.py` | `fit_classical` for all-`ls` models: deterministic float64 L-BFGS vs Adam (bimodal demo), exact equivalence to statsmodels ordered-logit (stroke) with an R `tram::Colr` snippet, and the classical→further-training warm-start handoff |
-| `additive_vs_joint_ci.py` | additive (`I("x1")+I("x2")`) vs joint (`I("x1","x2")`) complex intercept: why the two fit alike yet differ structurally, and how `flow.intercept_contributions` extracts exact, mean-centered, separable per-parent partial effects (issue #20) |
-| `demo_tram_dag_colab.py` | 5-minute showcase on the paper's bimodal VACA benchmark, GPU-ready ([open in Colab](https://colab.research.google.com/github/tensorchiefs/tramdag/blob/main/notebooks/demo_tram_dag_colab.ipynb)) |
+| `intro_tram_dag.py` | didactic walkthrough of the TRAM-DAG model (SI/LS/CS, L1–L3, all claims checked against a hand-built SCM; complex intercepts are the one component it does not exercise — see `additive_vs_joint_ci.py`) |
+| `demo_tram_dag_colab.py` | 5-minute showcase on the paper's bimodal VACA benchmark ([open in Colab](https://colab.research.google.com/github/tensorchiefs/tramdag/blob/main/notebooks/demo_tram_dag_colab.ipynb)) |
+| `additive_vs_joint_ci.py` | joint vs additive complex intercept, and reading per-parent effects out of the additive one with `intercept_contributions` |
+| `varying_coefficients.py` | heterogeneous treatment effects: the `VC` head, `varying_coef`, the modifier scan and propensity centering, all scored against a known `beta(x)` |
+| `classical_fit_tram_dag.py` | `fit_classical` on all-`ls` models, opening with plain logistic regression on `MASS::birthwt` (a 2-level ordinal node) checked against R `glm`: determinism, the exact MLE against `statsmodels` / R, and the classical-fit-then-keep-training warm start |
+
+`classical_fit_tram_dag.R` is not a notebook. It is the R half of
+`classical_fit_tram_dag.py` — every classical reference that notebook hard-codes,
+fitted in one script so the numbers can be re-checked instead of trusted. It
+needs `tram`, which CI does not install, so it is run by hand:
+`Rscript notebooks/classical_fit_tram_dag.R` from the repo root.
+
+Every notebook here is executed by the docs workflow — on pushes to `main` and
+`dev-*` branches — which is what keeps them working against the current API. A
+notebook that is not in that workflow's executed-notebook loop does not belong
+in this directory. On a feature branch, run one by hand:
+`MPLBACKEND=Agg uv run python notebooks/<name>.py`.
+
+Data a notebook reads lives in `notebooks/data/` — see its README for
+provenance.
 
 ## Rules
 
@@ -42,16 +57,8 @@ paired to the `.py` so your interactive edits flow back into the tracked `.py`.
 
 The cleanest way needs no `.ipynb` at all — in JupyterLab/Jupyter Notebook,
 right-click the `.py` → *Open With* → *Notebook*. Edits save straight back to the
-`.py`; there is nothing to clean up.
-
-If you'd rather click around in a real `.ipynb`, pair the two and sync edits back:
-
-```bash
-# one-time: create intro_tram_dag.ipynb paired to the .py
-uv run jupytext --set-formats ipynb,py:percent notebooks/intro_tram_dag.py
-# ...edit the .ipynb in Jupyter, then push changes into the .py:
-uv run jupytext --sync notebooks/intro_tram_dag.ipynb
-```
+`.py`; there is nothing to clean up. (jupytext can also pair a real `.ipynb` to
+the `.py` — `--set-formats ipynb,py:percent`, then `--sync` — if you prefer.)
 
 The paired `.ipynb` stays git-ignored. Note that `--set-formats` adds `ipynb` to
 the `.py` header — revert that one-line header change before committing (the

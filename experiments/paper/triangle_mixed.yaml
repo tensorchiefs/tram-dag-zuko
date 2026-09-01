@@ -1,0 +1,84 @@
+# Hyperparameters of the mixed-data triangle replication (triangle_mixed.py).
+#
+# Every value the script uses is in this file; it reads no defaults of its own.
+#
+# Protocol = the paper's own code, summerof24/triangle_structured_mixed.R
+# (tensorchiefs/tram-dag), reproduced 1:1 where the framework allows:
+#   * train = dgp(40000), test = dgp(10000): two separate draws, no split;
+#   * 500 epochs, optimizer_adam() = Keras Adam at lr 0.001, Keras fit() with
+#     its default batch size 32, shuffled; one compiled model, so one
+#     continuous optimizer run — the coefficients are read after every epoch
+#     (batch and lr are the one deviation below, for CI runtime);
+#   * len_theta = 20, hidden_features_I = hidden_features_CS = c(2, 2, 2, 2),
+#     sigmoid activations (create_param_net; its ReLU line is commented out);
+#   * ordinal cutpoints theta_k = c(-2, 0.42, 1.02), which this repository's
+#     generator reproduces;
+#   * no learning-rate schedule, no early stopping, final weights.
+# Matched on purpose: the Bernstein domain comes from the train 5%/95%
+# quantiles, as in the R script (quantile(..., c(0.05, 0.95)); its min/max
+# lines are commented out), and every linear layer starts from Keras'
+# random_normal, sd 0.05, on weights and biases (`init: normal`, the
+# LinearMasked layers). A simple intercept's theta is not a linear layer: it
+# starts at zero here (marginal_init=False), as `bernp$beta` does in R.
+# Known deviations, documented in CLAUDE.md: a [-5, 5] instead of a [0, 1]
+# domain (a reparametrization), zuko's tied end control points instead of the
+# reference's tangent extrapolation, order 21 vs 19 at equal free parameters;
+# the R script runs unseeded, so every seed below is a repo choice.
+
+paper_protocol: &paper_protocol
+  n_train: 40000          # dgp(40000)
+  n_val: 10000            # test = dgp(10000), a separate draw
+  epochs: 500             # num_epochs
+  # CI-runtime deviation, documented in docs/paper-replication.md: the paper
+  # trains at Keras' default batch 32 with optimizer_adam()'s lr 0.001; 500
+  # epochs of that are 42-69 min per variant on the CI runners. Batch 256 with
+  # the lr scaled 4x runs the same 500 epochs in 8x fewer steps and keeps every
+  # ground-truth metric. The grid ran with glorot init (measured 2026-08-26:
+  # cs max err linear-cs 0.132 vs 0.110, atan-cs 0.073 vs 0.080, mixed exp-cs
+  # 0.072 vs 0.071; batch 512 / lr 0.01 and lr 0.008 degrade the cs curves,
+  # batch 128 / lr 0.001 too); this config's own numbers are in ground_truth/.
+  learning_rate: 0.004    # paper: 0.001 (optimizer_adam() default)
+  batch_size: 256         # paper: 32 (Keras fit() default)
+  schedule:               # the reference has no schedule
+  transform: bernstein
+  # len_theta = 20 unconstrained coefficients; zuko ties two more control
+  # points on (order 21 against the reference's 19); the free-parameter count
+  # is what matches
+  n_coeffs: 20
+  dgp_seed: 42
+  init_seed: 7
+  init: normal                # LinearMasked: random_normal weights and biases (sd 0.05)
+  net_input_scaling:          # the triangle scripts feed the nets raw parents
+  shuffle_seed: 0
+  sample_seed: 0          # sampling for the distribution comparisons
+  n_compare: 10000        # rows per distribution panel (Fig. 9/20)
+  do_x1: -1.0             # the paper's L2 query, do(x1 = -1)
+  grid_low: -1.0          # x2 grid of the complex-shift overlay
+  grid_high: 1.0
+  grid_points: 81
+  levels: 4               # ordinal levels of x3, stored 0..3
+  odds_ratio_threshold: -1.0   # App. C.4 looks at odds(x2 <= -1)
+  odds_ratio_n: 40000          # rows of the shared-latent DGP comparison
+  odds_ratio_seed: 99
+  cf_n: 2000                   # rows scored for ordinal counterfactuals, App. B
+  cf_draws: 200                # abduction draws averaged into a per-row PMF
+  cf_seed: 1000
+
+# the shift network, from the reference; only a complex-shift variant has one
+reference_net: &reference_net
+  shift_units: [2, 2, 2, 2]     # hidden_features_CS
+  activation: sigmoid           # create_param_net
+
+variants:
+  # the paper's headline mixed case (Fig. 9/19 + the C.4 odds-ratio check);
+  # the only variant with a true beta23 (+0.3 in the flow's convention)
+  linear-ls:
+    <<: *paper_protocol
+    f: linear
+    shift: ls
+
+  # a nonlinear f on the ordinal node: the complex shift must recover -f(x2)
+  exp-cs:
+    <<: [*paper_protocol, *reference_net]
+    f: exp
+    shift: cs

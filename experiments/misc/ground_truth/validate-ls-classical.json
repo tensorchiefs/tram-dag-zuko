@@ -1,0 +1,72 @@
+{
+  "_note": "Same comparison through float64 L-BFGS. It agrees on the well-identified coefficients and the ATE, but drifts on rare one-hot levels along near-zero-curvature directions, hence the looser tolerances. max_abs_diff_named_coefs is the precision claim (Age, NIHSSa, treatment contrast, ~1e-3). max_abs_diff_flow_vs_statsmodels also spans the mRS_pre level contrasts, and level 5 has 7 of 1275 rows -- where two optimizers stop on it differs by ~0.1 between machines (0.028 here, 0.113 on the CI runner), so its bound is a sanity check. The flow's L-BFGS lands on a flat ridge (mRS_pre level 5 has 7 of 1275 rows), so its coefficients move by ~0.02 across machines while statsmodels and R do not; the {max} entries with a \"why\" carry that spread.",
+  "coef_Age_flow": {
+    "value": 0.053949128836393356,
+    "atol": 0.03,
+    "why": "1.5x the ~0.02 cross-machine spread the _note records \u2014 0.05 would let a near-zero Age coefficient pass"
+  },
+  "coef_Age_statsmodels": {
+    "value": 0.05255252284332864,
+    "atol": 0.0001
+  },
+  "coef_Age_r": {
+    "value": 0.0525524746811871,
+    "atol": 0.0001
+  },
+  "coef_NIHSSa_flow": {
+    "value": 0.16382162272930145,
+    "atol": 0.05
+  },
+  "coef_NIHSSa_statsmodels": {
+    "value": 0.16298912417364875,
+    "atol": 0.0001
+  },
+  "coef_NIHSSa_r": {
+    "value": 0.162988956157133,
+    "atol": 0.0001
+  },
+  "coef_T_flow": {
+    "value": -0.9397529363632202,
+    "atol": 0.05
+  },
+  "coef_T_statsmodels": {
+    "value": -0.9424177297583866,
+    "atol": 0.0001
+  },
+  "coef_T_r": {
+    "value": -0.942416795232296,
+    "atol": 0.0001
+  },
+  "max_abs_diff_flow_vs_statsmodels": {
+    "max": 0.25,
+    "why": "the maximum is over the mRS_pre level contrasts, and level 5 has 7 of 1275 rows: two optimizers place it ~0.1 apart across machines (0.028 here, 0.113 on the CI runner). max_abs_diff_named_coefs is the precision claim"
+  },
+  "ate_flow": {
+    "value": 0.14158333837985992,
+    "atol": 0.01
+  },
+  "ate_statsmodels": {
+    "value": 0.14284264382211473,
+    "atol": 0.0001
+  },
+  "ate_true": {
+    "value": 0.13212599999999997,
+    "atol": 1e-09
+  },
+  "ate_naive_observational": {
+    "value": 0.254998719108005,
+    "atol": 1e-09
+  },
+  "ate_abs_diff_flow_vs_statsmodels": {
+    "max": 0.01,
+    "why": "0.0013 here, 0.0006 and 0.0032 on two CI runners \u2014 the same cross-machine L-BFGS spread; ate_flow's own atol 0.01 is the tighter claim"
+  },
+  "max_abs_diff_named_coefs": {
+    "max": 0.05,
+    "why": "the same flat ridge as max_abs_diff_flow_vs_statsmodels reaches the named coefficients too: measured 0.0027 here (unchanged at 2 and 8 OMP threads) against 0.0018 and 0.0165 on two CI runners of the same image. L-BFGS in float64 is deterministic per machine, so the spread is the BLAS kernel, not the seed. The precision claim the file makes is coef_*_flow within atol 0.05 of R and statsmodels, and the ATE below"
+  },
+  "fit_seconds": {
+    "max": 28,
+    "why": "3x the 2-core CI runner measurement (10 s, 2026-08-31): shared-runner wall clock is noisy, so this is a gross-regression tripwire (a lost no_grad, an accidental O(n^2)), not a benchmark"
+  }
+}

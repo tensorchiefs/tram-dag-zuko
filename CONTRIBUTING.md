@@ -11,16 +11,17 @@ With [direnv](https://direnv.net/), `.envrc` activates `.venv` on `cd`.
 ## Tests
 
 ```bash
-uv run pytest tests/ -q -m "not slow"   # unit + contract tests (~2 min)
-uv run pytest tests/ -q                 # everything, incl. the fits
+uv run pytest -q -m "not slow"          # the fast subset
+uv run pytest -q                        # everything, incl. the long fits
 uv run pytest tests/test_flow.py -q     # one file
 ```
 
-Tests that train a flow are marked `@pytest.mark.slow`. CI runs the fast
-subset on every push and pull request, and the full suite nightly.
+Run `pytest` with no path: `testpaths` in `pyproject.toml` then picks up both
+`tests/` and the per-area `experiments/*/tests/`.
 
-What the suite guarantees, and where each reference number comes from, is
-documented in [`tests/README.md`](tests/README.md). Two rules matter most:
+What the suite guarantees, what `slow` marks, how CI splits the runs, and
+where each reference number comes from is documented in
+[`tests/README.md`](tests/README.md). Two rules matter most:
 
 - `data/` is a **contract**. A new seed or changed equations means a new
   folder, never an edit in place.
@@ -34,24 +35,48 @@ uvx ruff check .        # report
 uvx ruff format --diff  # what formatting would change
 ```
 
-Rules live in `pyproject.toml`: `I`/`E`/`F`/`D`/`UP` at 88 columns, numpy
-docstring convention. Docstrings are not required in `tests/`,
+Rules live in `pyproject.toml`: ruff's default set plus the extras listed
+under `extend-select`, at 88 columns with the numpy docstring convention.
+Cognitive complexity is gated by the complexipy hooks (`src/` at 15;
+`experiments/`, `notebooks/` and `tests/` at 10). Docstrings are not required in `tests/`,
 `experiments/` or `notebooks/`.
 
-`.pre-commit-config.yaml` exists but the hooks are **not installed yet**:
-the ruff hooks reformat every file they touch, and the repository has not
-had its one-off `ruff format` sweep. Installing them now would mix
-formatting noise into unrelated diffs. Once the sweep has landed:
+The hooks in `.pre-commit-config.yaml` are enforced by
+`.github/workflows/pre-commit.yaml` on every push and pull request. Install
+them locally so a push cannot fail on formatting:
 
 ```bash
-pre-commit install --install-hooks
+pre-commit install --install-hooks -t pre-commit -t commit-msg -t pre-push
 ```
+
+## Module layout
+
+Every Python module reads in the same order, separated by `# %%` markers
+padded with dashes to column 88:
+
+```python
+# %% imports ---------------------------------------------------------------------------
+# %% global variables ------------------------------------------------------------------
+# %% private functions -----------------------------------------------------------------
+# %% public functions ------------------------------------------------------------------
+# %% private classes -------------------------------------------------------------------
+# %% public classes --------------------------------------------------------------------
+# %% alias -----------------------------------------------------------------------------
+# %% main ------------------------------------------------------------------------------
+```
+
+A module carries only the sections it has. These eight are the only section
+names; there are no sub-section banners of any other kind. Notebooks are
+jupytext `py:percent` files and keep their narrative cell structure instead.
 
 ## Notebooks
 
 `notebooks/*.py` are [jupytext](https://github.com/mwouts/jupytext)
-percent-format files and are the source of truth. Do not edit or commit
-`.ipynb` — see [`notebooks/README.md`](notebooks/README.md).
+percent-format files and are the source of truth. Edit those, never an
+`.ipynb`. One `.ipynb` is tracked on purpose —
+`demo_tram_dag_colab.ipynb`, because the README's Colab badge links to it —
+and it is regenerated from the `.py`; see
+[`notebooks/README.md`](notebooks/README.md).
 
 ## Conventions worth knowing
 

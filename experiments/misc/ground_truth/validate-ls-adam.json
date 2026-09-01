@@ -1,0 +1,71 @@
+{
+  "_note": "The exactness anchor: an all-ls outcome node IS an ordered-logit model, so the flow's MLE must equal statsmodels. Multi-phase Adam without RestoreBest (final weights) reaches it to ~4e-4.",
+  "coef_Age_flow": {
+    "value": 0.052562274038791656,
+    "atol": 0.005
+  },
+  "coef_Age_statsmodels": {
+    "value": 0.05255252284332864,
+    "atol": 0.0001
+  },
+  "coef_Age_r": {
+    "value": 0.0525524746811871,
+    "atol": 0.0001
+  },
+  "coef_NIHSSa_flow": {
+    "value": 0.16300678253173828,
+    "atol": 0.005
+  },
+  "coef_NIHSSa_statsmodels": {
+    "value": 0.16298912417364875,
+    "atol": 0.0001
+  },
+  "coef_NIHSSa_r": {
+    "value": 0.162988956157133,
+    "atol": 0.0001
+  },
+  "coef_T_flow": {
+    "value": -0.9424288272857666,
+    "atol": 0.005
+  },
+  "coef_T_statsmodels": {
+    "value": -0.9424177297583866,
+    "atol": 0.0001
+  },
+  "coef_T_r": {
+    "value": -0.942416795232296,
+    "atol": 0.0001
+  },
+  "max_abs_diff_flow_vs_statsmodels": {
+    "max": 0.004348,
+    "why": "a floor, not a multiple: this Adam fit agrees to 4.3e-04, far below the 1e-3 that any comparison in this repo claims, and nothing has measured its cross-machine spread. Tightening to 2.5x a 1e-5 measurement would fail on another machine for no reason"
+  },
+  "ate_flow": {
+    "value": 0.14285694062709808,
+    "atol": 0.002
+  },
+  "ate_statsmodels": {
+    "value": 0.14284264382211473,
+    "atol": 0.0001
+  },
+  "ate_true": {
+    "value": 0.13212599999999997,
+    "atol": 1e-09
+  },
+  "ate_naive_observational": {
+    "value": 0.254998719108005,
+    "atol": 1e-09
+  },
+  "ate_abs_diff_flow_vs_statsmodels": {
+    "max": 0.001,
+    "why": "a floor, not a multiple: this Adam fit agrees to 1.4e-05, far below the 1e-3 that any comparison in this repo claims, and nothing has measured its cross-machine spread. Tightening to 2.5x a 1e-5 measurement would fail on another machine for no reason"
+  },
+  "max_abs_diff_named_coefs": {
+    "max": 0.001,
+    "why": "a floor, not a multiple: this Adam fit agrees to 1.8e-05, far below the 1e-3 that any comparison in this repo claims, and nothing has measured its cross-machine spread. Tightening to 2.5x a 1e-5 measurement would fail on another machine for no reason"
+  },
+  "fit_seconds": {
+    "max": 590,
+    "why": "3x the 2-core CI runner measurement (197 s, 2026-08-31): shared-runner wall clock is noisy, so this is a gross-regression tripwire (a lost no_grad, an accidental O(n^2)), not a benchmark"
+  }
+}
