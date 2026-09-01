@@ -176,9 +176,12 @@ class PerNodePlateau(Callback):
     ``flow.history["val"]``).
 
     A frozen node's rate is 0 but its forward/backward still runs, so the
-    saving is in epochs, not per-epoch wall clock. This is the pre-0.4
-    ``fit(schedule="plateau", freeze_patience=)`` recipe, back as an opt-in
-    callback; `docs/training-speed.md` has its measurements.
+    saving is in epochs, not per-epoch wall clock. Do not attach a torch lr
+    scheduler to the same optimizer — two controllers would steer the same
+    group rates (a ``LambdaLR`` even resets frozen nodes to ``initial_lr``).
+    This is the pre-0.4 ``fit(schedule="plateau", freeze_patience=)`` recipe,
+    back as an opt-in callback; `docs/training-speed.md` has its
+    measurements.
 
     Parameters
     ----------
@@ -242,7 +245,13 @@ class PerNodePlateau(Callback):
                     "PerNodePlateau needs one 'node'-tagged parameter group "
                     "per node — build the optimizer with per_node_adam(flow, lr)"
                 )
-            self.lr0.setdefault(g["node"], g.get("initial_lr", g["lr"]))
+            lr0 = self.lr0.setdefault(g["node"], g.get("initial_lr", g["lr"]))
+            if lr0 == 0.0:
+                raise ValueError(
+                    f"node {g['node']!r} starts at learning rate 0 — build a "
+                    "fresh per_node_adam(flow, lr): its initial_lr stamp lets "
+                    "a reused optimizer restore its rates"
+                )
             if g["node"] not in self.frozen:
                 self._step_node(g, nll[g["node"]])
         return len(self.frozen) == len(optimizer.param_groups)

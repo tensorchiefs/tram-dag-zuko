@@ -111,7 +111,7 @@ weights; flexible (CI/CS/VC) models validate and keep the best weights**
 
 | Strategy | When |
 |---|---|
-| exact MLE — [`fit_classical`](#path-b--classical-optimization-fit_classical) | all-`ls` spec; deterministic, seconds |
+| exact MLE — `fit_classical` (Path B, below) | all-`ls` spec; deterministic, seconds |
 | plain Adam | all-`ls` with a shift `fit_classical` refuses, quick looks |
 | multi-phase Adam | a tighter MLE without a scheduler |
 | best-validation weights — `RestoreBest` | any CI/CS/VC model; the recommended recipe (register it — fit has no default) |
