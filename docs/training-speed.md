@@ -35,7 +35,9 @@ flow.fit(train_df, epochs=2000, learning_rate=1e-3, batch_size=512)  # 2nd phase
 ```
 
 is still the exact-MLE path (`experiments/misc/validate_ls.py` runs a three-phase variant
-of it, 4000/2000/1000 epochs at 1e-2/1e-3/1e-4, batch 256). `fit` keeps the
+of it, 800/700/500 epochs at 1e-2/1e-3/1e-4, batch 256 — cut from
+4000/2000/1000 in 2026-09: the same MLE, named-coef gap to statsmodels 1.6e-5
+vs 1.8e-5, ~3.5x less wall clock). `fit` keeps the
 final weights. The guard test
 `tests/test_fit_hooks.py::test_torch_plateau_scheduler_preserves_exact_mle` shows
 that a schedule through the hooks still lands the all-`ls` fit on the classical
@@ -124,7 +126,7 @@ decade. This is why the two-phase recipe existed.
 ## Recommendation
 
 The everyday recipe is the global-plateau callback in
-[fitting.md](fitting.md#the-recipes-as-callbacks) with a generous `epochs`
+[fitting.md](fitting.md#training-strategies) with a generous `epochs`
 ceiling; the per-node self-stopping variant is
 `tramdag.callbacks.PerNodePlateau`. One finding became a package default:
 `epochs` has no default, because Finding 6 is precisely that a fixed budget

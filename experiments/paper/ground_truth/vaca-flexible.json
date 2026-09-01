@@ -1,27 +1,27 @@
 {
-  "_note": "Protocol = the paper's R code 1:1 (see the YAML header): measured 2026-08-26 on the refactor/lean-fit branch. Paper Sec. 5.1-5.2. The interventional means are analytic (E[x3|do(x2=a)] = -0.25 + 0.25a), so what is checked is the flow's error against them, not a pinned flow value: a center plus an error bound on the same number gave two windows that could disagree. do(x2=-3) is off-manifold extrapolation, which is why its error is the largest of the three. Exact reference protocol since 2026-08-26 (global ReduceLROnPlateau, glorot init): the do(x2=-3) error is seed-sensitive \u2014 0.098 at the config's init seed 7, 0.268 / 0.217 at seeds 8 / 9 \u2014 so the bound is 2.5x the seed-7 value and docs/paper-replication.md holds the spread.",
+  "_note": "Protocol = the paper's R code 1:1 (see the YAML header): measured 2026-08-26 on the refactor/lean-fit branch. Paper Sec. 5.1-5.2. The interventional means are analytic (E[x3|do(x2=a)] = -0.25 + 0.25a), so what is checked is the flow's error against them, not a pinned flow value: a center plus an error bound on the same number gave two windows that could disagree. do(x2=-3) is off-manifold extrapolation, which is why its error is the largest of the three. Exact reference protocol since 2026-08-26 (global ReduceLROnPlateau, glorot init): the do(x2=-3) error is seed-sensitive \u2014 0.098 at the config's init seed 7, 0.268 / 0.217 at seeds 8 / 9 \u2014 so the bound is 2.5x the seed-7 value and docs/paper-replication.md holds the spread. Re-pinned 2026-09-01 from the tuned protocol (fewer epochs; see the YAML header).",
   "val_nll_x3": {
-    "value": 1.4495913982391357,
+    "value": 1.4427012205123901,
     "atol": 0.05
   },
   "mean_x3_abs_err_do_x2_-3": {
-    "max": 0.2432
+    "max": 0.2409
   },
   "mean_x3_abs_err_do_x2_-1": {
-    "max": 0.2194
+    "max": 0.1997
   },
   "mean_x3_abs_err_do_x2_+0": {
-    "max": 0.04659
+    "max": 0.05567
   },
   "std_x1_abs_err": {
-    "max": 0.07999
+    "max": 0.1009
   },
   "std_x1_flow": {
-    "value": 2.0766559657295187,
+    "value": 2.0363011360168457,
     "atol": 0.07999
   },
   "fit_seconds": {
-    "max": 1066,
-    "why": "3x the 2-core CI runner measurement (355 s, 2026-08-31): shared-runner wall clock is noisy, so this is a gross-regression tripwire (a lost no_grad, an accidental O(n^2)), not a benchmark"
+    "max": 414,
+    "why": "3x the 2-core CI runner measurement (138 s, 2026-09-01, tuned protocol): shared-runner wall clock is noisy, so this is a gross-regression tripwire, not a benchmark"
   }
 }

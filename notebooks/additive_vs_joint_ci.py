@@ -95,13 +95,12 @@ flow_joint = make_flow(joint=True)
 flow_add = make_flow(joint=False)
 
 for f in (flow_joint, flow_add):
-    best = RestoreBest(val)
     f.fit(
         train,
         epochs=1200,
         learning_rate=1e-2,
-        after_epoch_callbacks=best,
-        after_fit_callbacks=best.restore,
+        validation_data=val,
+        callbacks=RestoreBest(),
     )
 
 # Both fit the data well; the joint model is only marginally better on held-out

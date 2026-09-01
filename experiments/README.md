@@ -27,8 +27,7 @@ cd experiments
 uv run python -m paper.triangle atan-cs        # fit + figures + metrics
 uv run python -m check paper triangle-atan-cs  # vs ground truth
 uv run python -m paper.check_data              # frozen data regenerates
-uv run pytest experiments                      # the area checks (seconds)
-uv run pytest experiments/tests                                  # the shared check.py
+uv run pytest .                                # the area checks (seconds)
 ```
 
 Every run writes to `<area>/results/<name>/`: `metrics.json` (the numbers CI
@@ -60,17 +59,21 @@ carries its own copy of the bimodal DGP. `benchmarks/tests/` pins that copy to
 the maintained generator, because a drifted copy would silently make the
 collected `final_val_nll` values incomparable.
 
-Runtime and the one CI deviation: the triangle configs run the paper's 500
-epochs at batch 256 / lr 0.004 instead of batch 32 / lr 0.001 — 8× fewer
-steps, every metric kept; the selection grid, per-job timings and the
-epoch-cut measurement are in `docs/paper-replication.md`. Locally, run
-variants one or two at a time (`OMP_NUM_THREADS=2`; the step is
-overhead-bound).
+Runtime and the CI deviations (re-tuned 2026-09-01): the triangle configs run
+batch 256 / lr 0.004 for 300 epochs (`linear-cs` 500, mixed `exp-cs` 350,
+mixed `linear-ls` 200 @ lr 0.002) instead of the paper's 500 at batch 32 / lr
+0.001, VACA runs 4800 full-batch epochs @ lr 0.002 with no schedule and CAREFL
+3000 @ 0.002 with the plateau rule (reference: 10000 / 7000 @ 0.001, both with
+plateau) — every ground-truth metric kept. The selection grid, the epoch
+floors and the rejected alternatives with their numbers are in
+`docs/paper-replication.md`; locally, run variants one or two at a time
+(`OMP_NUM_THREADS=2`; the step is overhead-bound).
 
-`vaca.py` and `carefl.py` set `net_input_scaling: minmax` because the
-reference trains in `scale_df` space; why it matters is measured in
-`docs/paper-replication.md`. The triangle scripts fit raw parents, so those
-configs leave it `null`.
+`vaca.py` and `carefl.py` keep `net_input_scaling: minmax` and tanh because
+the reference trains in `scale_df` space and every raw-parent alternative was
+tried and measurably fails (tanh/sigmoid saturate, relu wanders or
+underfits — measured in `docs/paper-replication.md`). The triangle scripts'
+reference fits raw parents, so those configs leave it unset.
 
 Which paper figure each variant reproduces — and what is deliberately not
 reproduced — is listed in [`paper/PAPER_COVERAGE.md`](paper/PAPER_COVERAGE.md);

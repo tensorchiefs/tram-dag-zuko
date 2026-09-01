@@ -73,10 +73,14 @@ See `experiments/README.md`.
   `ComplexShiftDefaultTabular` 64-128-64, `ComplexInterceptDefaultTabular` 8-8,
   `n_thetas=20`) — **not** the paper's R nets, which every `experiments/paper/`
   config sets explicitly instead.
-- `callbacks.py` — the shipped `fit` callbacks: `Logger`, `RestoreBest`
-  (best-validation weights, restored through `after_fit_callbacks`),
+- `callbacks.py` — the shipped `fit` callbacks on the `Callback` base
+  (`on_fit_begin`/`on_epoch_end`/`on_fit_end`, state reset at fit begin):
+  `RestoreBest` (best-validation weights, restored automatically at fit
+  end), `EarlyStopping` (patience on the validation NLL) and
   `PerNodePlateau` + `per_node_adam` (per-node lr decay and freezing, the
-  pre-0.4 plateau recipe). Optional; `fit` itself stays one plain loop.
+  pre-0.4 plateau recipe). All read `history["val"]`, which
+  `fit(validation_data=|validation_split=)` fills per epoch; `verbose=`
+  owns progress printing. Optional; `fit` itself stays one plain loop.
 - (no `utils.py` any more: `config_section` moved to
   `experiments/common.py`, `machine_info` to
   `experiments/benchmarks/perf_machine.py` — each next to its only caller, so
@@ -95,9 +99,10 @@ See `experiments/README.md`.
   `P(Y<=k) = sigmoid(theta_k − shift)` (shift SUBTRACTED). Both follow the original TRAM-DAG
   conventions; tests pin them.
 - **Parent encoding**: continuous parents enter RAW (no standardization) unless
-  `CausalFlowDAG(spec, net_input_scaling="minmax")`, which feeds the *networks*
-  (CI/CS/VC modifiers) the train min-max scaled parent like the reference's
-  `scale_df` — LS and the VC treatment stay raw either way; ordinal
+  a term-level `input_transform=` ("minmax", "standardize", or a callable
+  `fn(x, train)` over frozen train columns), which feeds that term's *network*
+  (CI/CS/VC modifiers) the transformed parent (minmax like the reference's
+  `scale_df`, standardize, or the callable over frozen train columns) — LS and the VC treatment stay raw either way; ordinal
   parents one-hot (all levels). With cutpoints, only shift *differences* between
   one-hot levels are identified — compare `w[k] − w[0]` against classical references.
 - **Ordinal log-prob is computed in log-space** (`logsigmoid` + stable `log1mexp`,
@@ -115,10 +120,15 @@ See `experiments/README.md`.
 - **`fit` keeps the final weights and is one minibatch Adam loop** — an
   all-`ls` model then matches statsmodels/R-polr to ~1e-3. Validation, lr
   schedules, early stopping / best-weight restoration and logging are the
-  caller's, through `fit(optimizer=, after_epoch_callbacks=, before_fit_callbacks=,
-  after_fit_callbacks=)` (per-epoch callbacks get `(flow, epoch, opt)`, any `True`
-  stops; the fit-level hooks get `(flow, opt)`); `tramdag/callbacks.py` ships
-  `Logger`, `RestoreBest`, `PerNodePlateau`+`per_node_adam`; `flow.calibrate(train_df, marginal_init=)`
+  caller's, through `fit(validation_data=|validation_split=,
+  validation_batch_size=, verbose=, optimizer=, callbacks=)` — fit fills
+  `history["val"]` per epoch and `verbose=N` prints every Nth line;
+  `callbacks=` takes `Callback` instances
+  (`on_fit_begin`/`on_epoch_end`/`on_fit_end`; epoch hooks get
+  `(flow, epoch, opt)`, any `True` stops, `on_fit_end` runs before the VC
+  re-centering) or bare `on_epoch_end` callables; `tramdag/callbacks.py`
+  ships `RestoreBest` (auto-restores), `EarlyStopping`,
+  `PerNodePlateau`+`per_node_adam` (they read `history["val"]`); `flow.calibrate(train_df, marginal_init=)`
   takes the data-dependent state once (ranges, net min-max, calibrated start)
   and is called by the first fit; `init_marginals(train_df)` re-applies the
   calibrated start explicitly, any time. Key empirical finding (stroke storyline):
@@ -144,26 +154,35 @@ paper states only three training numbers — n=40000, 500 epochs, Bernstein
 order 20; the Adam lr 1e-3 is the R code's `optimizer_adam()` default. The configs follow the paper's own R code 1:1 where the
 framework allows: the triangle scripts train one continuous Adam run with a
 separate validation draw (40k / 10k mixed) and read the coefficients after
-every epoch (`fit(after_epoch_callbacks=)`) — at batch 256 / lr 0.004 instead of the
-paper's Keras-default batch 32 / lr 0.001, the one deviation taken for CI
-runtime (8× fewer steps, every metric kept; the grid is in
-docs/paper-replication.md); the
-VACA/CAREFL comparisons take one full-batch step per epoch on nTrain = 2500
-for 10000 / 7000 epochs with the reference's ReduceLROnPlateau (factor 0.1,
-patience 50, min_lr 1e-7) — torch's scheduler on the summed validation NLL,
-global as in `update_learning_rate`. Seeds: the triangle scripts run
+every epoch (`fit(callbacks=)`) — at batch 256 / lr 0.004 for 300
+epochs (linear-cs 500, mixed exp-cs 350, mixed linear-ls 200 @ lr 0.002)
+instead of the paper's 500 at Keras-default batch 32 / lr 0.001, the
+deviations taken for CI runtime (every metric kept; grid, epoch floors and
+the 2026-09-01 tuning round in docs/paper-replication.md); the
+VACA/CAREFL comparisons take one full-batch step per epoch on nTrain = 2500 —
+VACA 4800 epochs at lr 0.002 with no schedule, CAREFL 3000 at lr 0.002 with
+the reference's ReduceLROnPlateau (factor 0.1, patience 50, min_lr 1e-7;
+torch's scheduler on the summed validation NLL, global as in
+`update_learning_rate`) — against the reference's 10000 / 7000 at lr 0.001
+with plateau, the same CI-runtime deviation (VACA's rule cannot fire inside
+the compressed run's all-bounds window, so it is dropped there; minibatch and
+raw-parent alternatives measurably fail, see docs/paper-replication.md).
+Seeds: the triangle scripts run
 unseeded, the comparison scripts seed R's RNG with 42 (not replayable in
 torch), so every seed here is a repo choice. Init follows each reference:
 `init: normal` (Keras `random_normal`, the triangle scripts' `LinearMasked`
 layers) and `init: glorot` (Keras `Dense`, `make_model`) — under the
 full-batch protocol the init decides the fit (VACA do(x2) errors
 0.52/0.33/0.13 with torch's default init, 0.098/0.159/0.026 with glorot at
-the config's seed — both measured on the earlier −3/−2/0 grid; the shipped
-−3/−1/0 grid scores 0.097/0.088/0.019 with glorot). Known, documented deviations: the triangle scripts also
+the config's seed — both measured on the earlier −3/−2/0 grid; on the shipped
+−3/−1/0 grid glorot scored 0.097/0.088/0.019 under the old 10000-epoch
+plateau protocol and scores 0.096/0.080/0.022 under the tuned 4800-epoch
+config). Known, documented deviations: the triangle scripts also
 use 5%/95% quantiles for the Bernstein domain (a match), the comparison
 scripts min-max (`scale_df`) — we keep the quantiles there and scale the
-*network inputs* min-max (`net_input_scaling: minmax`; raw parents saturate
-the tanh nets: `do(x2=-3)` error 0.731 → 0.098); a bias-free intercept
+*network inputs* min-max (`input_transform: minmax` on the CI terms; raw parents saturate
+the tanh nets: `do(x2=-3)` error 0.731 → 0.098, and the 2026-09-01 relu/sigmoid
+raw-parent attempts fail too); a bias-free intercept
 output layer; Adam eps 1e-8 vs Keras 1e-7 (no effect);
 `calibrate(marginal_init=False)` in `helpers.py::fit_paper` (`validate_ls`
 keeps the default); CAREFL trains on a fresh 2500-row draw with a separate
@@ -201,7 +220,7 @@ extra control points on, so `n_coeffs=20` is order 21 where the reference's
   rows are scored next to it because one point is a noisy yardstick.
 - **`validate_ls`** (`experiments/misc/data/magic-mrclean/ls`, seed 7, n=1275, full data,
   final weights): flow = statsmodels = R polr at Age 0.0526, NIHSSa 0.1630,
-  T −0.9424; ATE +0.1429 vs +0.1428, true ATE +0.132. The R reference
+  T −0.9424; ATE +0.1428 vs +0.1428, true ATE +0.132. The R reference
   (`fit_ls.R`, needs `tram`/`MASS`) has its outputs committed under `ref_ls/`, so
   nothing needs R installed.
 - Committed expectations live in `experiments/<area>/ground_truth/<name>.json`;
@@ -226,9 +245,10 @@ extra control points on, so `n_coeffs=20` is order 21 where the reference's
 - `experiments/misc/data/magic-mrclean/ls` has no generator here (it left with the
   stroke storyline); it is frozen input data. Recover the generator from
   `pre-experiments-cut` if it ever needs regenerating.
-- Fit checks for the paper DGPs train on the paper protocol (n=40k, 500 epochs),
+- Fit checks for the paper DGPs train on the paper protocol (n=40k; epochs per
+  the tuned configs, 200-500),
   not the frozen n=5k CSVs — β13 multiplies x1, whose two mixture components sit at 0.25 and 0.73
-  (sd 0.254, against 0.375 for x2 and 2.918 for x3), so it is
+  (sd 0.254, against 0.375 for x2 and 2.918 for x3), so it
   is too weakly identified at n=5k.
 
 ## Roadmap notes

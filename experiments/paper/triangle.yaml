@@ -8,7 +8,7 @@
 #   * 500 epochs, optimizer_adam() = Keras Adam at lr 0.001, Keras fit() with
 #     its default batch size 32, shuffled; one compiled model, so one
 #     continuous optimizer run — the coefficients are read after every epoch
-#     (batch and lr are the one deviation below, for CI runtime);
+#     (epochs, batch and lr are the deviations below, for CI runtime);
 #   * len_theta = 20, hidden_features_I = hidden_features_CS = c(2, 25, 25, 2),
 #     sigmoid activations (create_param_net; its ReLU line is commented out);
 #   * no learning-rate schedule, no early stopping, final weights.
@@ -26,15 +26,21 @@
 paper_protocol: &paper_protocol
   n_train: 40000          # dgp(40000)
   n_val: 40000            # test = dgp(40000), a separate draw
-  epochs: 500             # num_epochs
-  # CI-runtime deviation, documented in docs/paper-replication.md: the paper
-  # trains at Keras' default batch 32 with optimizer_adam()'s lr 0.001; 500
-  # epochs of that are 42-69 min per variant on the CI runners. Batch 256 with
-  # the lr scaled 4x runs the same 500 epochs in 8x fewer steps and keeps every
-  # ground-truth metric. The grid ran with glorot init (measured 2026-08-26:
-  # cs max err linear-cs 0.132 vs 0.110, atan-cs 0.073 vs 0.080, mixed exp-cs
-  # 0.072 vs 0.071; batch 512 / lr 0.01 and lr 0.008 degrade the cs curves,
-  # batch 128 / lr 0.001 too); this config's own numbers are in ground_truth/.
+  # CI-runtime deviations, documented in docs/paper-replication.md: the paper
+  # trains 500 epochs at Keras' default batch 32 with optimizer_adam()'s lr
+  # 0.001; that is 42-69 min per variant on the CI runners. Batch 256 with the
+  # lr scaled 4x runs in 8x fewer steps and keeps every ground-truth metric.
+  # The grid ran with glorot init (measured 2026-08-26: cs max err linear-cs
+  # 0.132 vs 0.110, atan-cs 0.073 vs 0.080, mixed exp-cs 0.072 vs 0.071;
+  # batch 512 / lr 0.01 and lr 0.008 degrade the cs curves, batch 128 /
+  # lr 0.001 too). Epochs 300 instead of 500 is a further runtime cut
+  # (measured 2026-09-01: every metric within its ground-truth bound; 150
+  # epochs is not enough — the do(x1) error fails on atan, 0.235 > 0.206;
+  # linear-cs keeps 500 below — at 300 its curve visibly flattens past
+  # |x2| > 0.5, max err 0.140 vs 0.088, because the DGP line spans only
+  # +-0.3 and the sigmoid net's slow tail convergence is half of that);
+  # this config's own numbers are in ground_truth/.
+  epochs: 300             # paper: 500 (num_epochs)
   learning_rate: 0.004    # paper: 0.001 (optimizer_adam() default)
   batch_size: 256         # paper: 32 (Keras fit() default)
   schedule:               # the reference has no schedule
@@ -46,7 +52,8 @@ paper_protocol: &paper_protocol
   dgp_seed: 42
   init_seed: 7
   init: normal                # LinearMasked: random_normal weights and biases (sd 0.05)
-  net_input_scaling:          # the triangle scripts feed the nets raw parents
+  # no input_transform on any term: the triangle scripts feed the nets raw
+  # parents, matching the reference (repo decision 2026-09-01)
   shuffle_seed: 0
   sample_seed: 0          # sampling for the distribution comparisons
   n_compare: 10000        # rows per distribution panel (Fig. 16/17)
@@ -58,7 +65,9 @@ paper_protocol: &paper_protocol
 # the shift network, from the reference; only a complex-shift variant has one
 reference_net: &reference_net
   shift_units: [2, 25, 25, 2]   # hidden_features_CS
-  activation: sigmoid           # create_param_net
+  activation: sigmoid           # create_param_net; relu measured 2026-09-01:
+                                # the 2-unit input bottleneck dies (beta13
+                                # +0.53, cs curve err 1.42 on atan) — keep sigmoid
 
 variants:
   # the linear DGP is the only one with a true beta23 (+0.3) to recover
@@ -74,6 +83,7 @@ variants:
     <<: [*paper_protocol, *reference_net]
     f: linear
     shift: cs
+    epochs: 500             # not 300: see the epochs note above
 
   # the headline complex-shift experiment (Fig. 7/15/16)
   atan-cs:

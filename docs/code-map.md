@@ -16,7 +16,7 @@ are the same object, so `LS is linear_shift`.
 | [`complex_intercept()`][tramdag.spec.complex_intercept] / [`CI`][tramdag.spec.complex_intercept] | The parent-conditioned intercept — the paper's CI: the parents reshape the monotone transform. Needs at least one parent. Also carries `units=` and `allow_interaction=` (joint vs. additive multi-parent intercept). |
 | [`intercept()`][tramdag.spec.intercept] / [`I`][tramdag.spec.intercept] | The fallback: dispatches on its arguments to `SI` (no parents) or `CI` (parents). The bare names `I` and `SI` in a term list both mean the simple intercept. |
 | [`linear_shift()`][tramdag.spec.linear_shift] / [`LS`][tramdag.spec.linear_shift] | Linear shift `beta * x` — the interpretable log-odds coefficient. Exactly one parent. |
-| [`complex_shift()`][tramdag.spec.complex_shift] / [`CS`][tramdag.spec.complex_shift] | Complex shift: an MLP `g(x)`, additive on the latent scale. Several parents form one joint network. |
+| [`complex_shift()`][tramdag.spec.complex_shift] / [`CS`][tramdag.spec.complex_shift] | Complex shift: an NN `g(x)`, additive on the latent scale. Several parents form one joint network. |
 | [`varying_coefficient()`][tramdag.spec.varying_coefficient] / [`VC`][tramdag.spec.varying_coefficient] | Varying-coefficient shift `(beta0 + b_theta(mods)) * x_t` — the penalized treatment-effect head (issue #28). `center=` adds propensity centering (issue #30). |
 | [`ContinuousNode`][tramdag.spec.ContinuousNode] | Continuous variable: monotone 1-D transform plus shifts. `terms` is the first positional argument. |
 | [`OrdinalNode`][tramdag.spec.OrdinalNode] | Ordinal variable with `levels` classes: ordered logit (cutpoints) plus shifts. |
@@ -53,11 +53,11 @@ config in `experiments/paper/` states `units=` and `activation=` itself.
 | Name | Term | Role |
 |---|---|---|
 | [`SimpleIntercept`][tramdag.conditioners.SimpleIntercept] | bare `I` | Free parameter vector; no parents. |
-| [`ComplexIntercept`][tramdag.conditioners.ComplexIntercept] | `I(...)` | 8-8 ReLU MLP from parent features to the transform parameters. |
+| [`ComplexIntercept`][tramdag.conditioners.ComplexIntercept] | `I(...)` | 8-8 ReLU NN from parent features to the transform parameters. |
 | [`LinearShift`][tramdag.conditioners.LinearShift] | `LS` | `Linear(n, 1, bias=False)`. `.weight` is the interpretable coefficient; no bias because the intercept slot owns the constant. |
-| [`ComplexShift`][tramdag.conditioners.ComplexShift] | `CS` | 64-128-64 ReLU MLP to one shift value. |
+| [`ComplexShift`][tramdag.conditioners.ComplexShift] | `CS` | 64-128-64 ReLU NN to one shift value. |
 | [`VaryingCoef`][tramdag.conditioners.VaryingCoef] | `VC` | `beta0 + b_theta(mods)` with a zero-initialized output layer and the L2 hook `l2()`. `beta()` evaluates the effect, `recenter()` re-splits `beta0`/`b_theta` after training (function-preserving). |
-| (`_mlp`) | — | The one MLP builder: a stack of the given `units` with the term's `activation` (relu by default), then a bias-free output layer. |
+| (`_nn`) | — | The one NN builder: a stack of the given `units` with the term's `activation` (relu by default), then a bias-free output layer. |
 
 ## `flow.py` — the model
 
@@ -66,7 +66,7 @@ config in `experiments/paper/` states `units=` and `activation=` itself.
 | [`CausalFlowDAG`][tramdag.flow.CausalFlowDAG] | The flow: one `_Node` per variable in topological order. Construction seeds the weights (`seed=` is the reproducibility knob). |
 | [`calibrate()`][tramdag.flow.CausalFlowDAG.calibrate] | Once, from the training rows: transform ranges (train 5%/95% quantiles onto the domain), network-input min-max, the calibrated start (`marginal_init=True`). Called by the first fit; a checkpoint carries the flag. |
 | [`init_marginals()`][tramdag.flow.CausalFlowDAG.init_marginals] | The calibrated start as an explicit step, callable any time: resets every simple intercept to its column's marginal (Bernstein map / ordinal class log-odds; spline and affine have no calibrated start). Not once-guarded — on a trained flow it restarts those intercepts. Calibrates a fresh flow's ranges itself. |
-| [`fit()`][tramdag.flow.CausalFlowDAG.fit] | Joint maximum likelihood: one minibatch Adam loop over all parameters (exact per node, because the NLL decomposes), final weights kept. Hooks: `optimizer=` (any torch optimizer, for schedulers), `after_epoch_callbacks=` (one callable or a list, `cb(flow, epoch, opt)` after every epoch, any `True` stops) and `before_fit_callbacks=`/`after_fit_callbacks=` around the loop — validation, schedules, early stopping and logging attach here; the common recipes ship in `callbacks.py`. `vc_ehat=` carries the out-of-fold propensities of centered VC terms. A second call continues training. |
+| [`fit()`][tramdag.flow.CausalFlowDAG.fit] | Joint maximum likelihood: one minibatch Adam loop over all parameters (exact per node, because the NLL decomposes), final weights kept. Keras-shaped validation (`validation_data=`/`validation_split=` fill `history["val"]` per epoch, `validation_batch_size=` chunks the pass) and progress (`verbose=`). Hooks: `optimizer=` (any torch optimizer, for schedulers) and `callbacks=` (one entry or a list; a `Callback` hooks `on_fit_begin`/`on_epoch_end`/`on_fit_end`, a bare callable is an `on_epoch_end` hook `cb(flow, epoch, opt)` — any `True` stops); the recipes in `callbacks.py` read `history["val"]`. `vc_ehat=` carries the out-of-fold propensities of centered VC terms. A second call continues training. |
 | [`fit_classical()`][tramdag.flow.CausalFlowDAG.fit_classical] | Float64 full-batch L-BFGS for all-`ls` specs: deterministic, exact MLE, matches `statsmodels`/R `polr`. Refuses flexible specs. |
 | [`sample()`][tramdag.flow.CausalFlowDAG.sample] | Observational, interventional (`do=`, graph mutilation) and counterfactual (`u=`) sampling. |
 | [`abduct()`][tramdag.flow.CausalFlowDAG.abduct] | Pearl step 1: recover the latents. Continuous exactly, ordinal by truncated draw. |
@@ -100,9 +100,9 @@ config in `experiments/paper/` states `units=` and `activation=` itself.
 
 | Name | Role |
 |---|---|
-| [`Logger`][tramdag.callbacks.Logger] | Prints one line per `every` epochs: summed train NLL, plus validation NLL when `val_df` is given. |
-| [`RestoreBest`][tramdag.callbacks.RestoreBest] | Snapshots the weights of the best summed validation NLL per epoch; `restore` (registered in `after_fit_callbacks`) loads them back before the VC re-centering. |
-| [`PerNodePlateau`][tramdag.callbacks.PerNodePlateau] | Per-node lr decay and freezing on each node's own validation NLL; stops the fit once every node froze. The pre-0.4 `fit(schedule="plateau")` recipe, opt-in. `step(nll, opt)` for a hand-computed NLL. |
+| [`RestoreBest`][tramdag.callbacks.RestoreBest] | Snapshots the weights of the best summed validation NLL (read from `history["val"]`) and restores them automatically at fit end, before the VC re-centering. |
+| [`EarlyStopping`][tramdag.callbacks.EarlyStopping] | Stops the fit after `patience` epochs without validation improvement; tracks its own best, so it composes with `RestoreBest` in any order. |
+| [`PerNodePlateau`][tramdag.callbacks.PerNodePlateau] | Per-node lr decay and freezing on each node's own validation NLL (from `history["val"]`); stops the fit once every node froze. The pre-0.4 `fit(schedule="plateau")` recipe, opt-in. `step(nll, opt)` for a hand-computed NLL. |
 | [`per_node_adam()`][tramdag.callbacks.per_node_adam] | Adam with one `node`-tagged parameter group per node — the optimizer `PerNodePlateau` needs. |
 
 ## What is *not* in the package
@@ -122,7 +122,8 @@ default you can read at the call site. Nothing numeric is buried.
 | Knob | Where | Default |
 |---|---|---|
 | learning rate, batch size | `fit()` | 1e-2 / 512 (in-repo callers state them explicitly anyway) |
-| schedules, early stopping, logging | `fit(optimizer=, after_epoch_callbacks=)` | `tramdag.callbacks` ships `Logger`, `RestoreBest`, `PerNodePlateau`; anything else is torch's `lr_scheduler` and a few lines of callback ([fitting.md](fitting.md)) |
+| validation, progress | `fit(validation_data=, validation_split=, validation_batch_size=, verbose=)` | per-node val NLL into `history["val"]` each epoch; `verbose=N` prints every Nth + final epoch (default 0, silent) |
+| schedules, early stopping | `fit(optimizer=, callbacks=)` | `tramdag.callbacks` ships `RestoreBest`, `EarlyStopping`, `PerNodePlateau`; anything else is torch's `lr_scheduler` and a few lines of callback ([fitting.md](fitting.md)) |
 | calibrated init | `calibrate(marginal_init=)` | True (pure init, MLE unchanged; `False` = zuko's zero start; called by the first fit) |
 | VC stage-1 propensities | `fit(vc_ehat=)` | required for a centered VC term, out of fold, computed by the caller |
 | VC penalty and centering | `VC(penalty=, center=)` | 1.0 / False (centering needs `fit(vc_ehat=)`) |
@@ -133,4 +134,4 @@ default you can read at the call site. Nothing numeric is buried.
 | transform basis | `I(transform=, **kwargs)` (extra kwargs go to the transform class) | `"bernstein"`, `n_coeffs=20` unconstrained coefficients (zuko ties two more control points on, so order 21); spline `bins=8` = zuko's NSF default (the domain is fixed at [-5, 5], `transforms.BOUND`) |
 | shuffling / weight init | `fit(seed=)` / `CausalFlowDAG(seed=)` | init happens at construction — the constructor seed is the reproducibility knob |
 | weight init | `CausalFlowDAG(init=)` | `"torch"` (`nn.Linear` Kaiming-uniform); `"glorot"` = Keras `Dense` default, glorot-uniform weights and zero biases — the paper's reference; decisive under its full-batch protocol |
-| network inputs | `CausalFlowDAG(net_input_scaling=)` | `None` (raw parents); `"minmax"` scales the continuous parents of every net (CI/CS/VC modifiers) to [0, 1] by the training min–max, the reference's `scale_df` — LS and the VC treatment stay raw |
+| network inputs | `CI/CS/VC(input_transform=)` | `None` (raw parents); `"minmax"` / `"standardize"` transform that term's continuous parents with statistics frozen at `calibrate`, and a callable `fn(x, train)` gets the frozen raw train column — LS and the VC treatment stay raw |

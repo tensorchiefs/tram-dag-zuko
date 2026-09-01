@@ -322,17 +322,17 @@ def run_config(workload, phases, extra, batch, device, seed):
         sched = PerNodePlateau(**phase_extra) if phase_extra else None
 
         def monitor(f, epoch, opt, sched=sched):
-            nll = f.nll(val)  # computed once, shared with the schedule
-            hist["val"].append(nll)
+            hist["val"].append(f.history["val"][-1])  # fit computed it
             hist["time"].append(time.perf_counter() - t0)
-            return sched is not None and sched.step(nll, opt)
+            return sched is not None and sched.on_epoch_end(f, epoch, opt)
 
         flow.fit(
             train,
             epochs=epochs,
             batch_size=bs,
+            validation_data=val,
             optimizer=opt,
-            after_epoch_callbacks=monitor,
+            callbacks=monitor,
         )
     return flow, hist
 

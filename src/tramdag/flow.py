@@ -16,6 +16,7 @@ Causal queries:
 from __future__ import annotations
 
 import inspect
+import pickle
 import time
 from datetime import datetime, timezone
 from pathlib import Path
@@ -26,6 +27,7 @@ import pandas as pd
 import torch
 from torch import Tensor, nn
 
+from .callbacks import Callback
 from .conditioners import (
     ComplexIntercept,
     ComplexShift,
@@ -62,34 +64,128 @@ __all__ = ["CausalFlowDAG"]
 
 
 # %% private functions -----------------------------------------------------------------
-def _callback_list(cbs) -> list:
-    """Normalize a ``fit`` callback argument: None, one callable, or a sequence."""
+class _FnCallback(Callback):
+    """A bare callable in ``callbacks=``, adapted to an ``on_epoch_end`` hook."""
+
+    def __init__(self, fn):
+        self.fn = fn
+
+    def on_epoch_end(self, flow, epoch: int, optimizer):
+        return self.fn(flow, epoch, optimizer)
+
+
+def _check_fit_sizes(
+    epochs: int, batch_size: int, verbose: int, validation_batch_size: int | None
+) -> None:
+    """Reject a non-positive epoch, batch or verbose value before anything runs."""
+    if epochs < 1:
+        raise ValueError(f"epochs must be at least 1, got {epochs}")
+    if batch_size < 1:
+        raise ValueError(f"batch_size must be at least 1, got {batch_size}")
+    if verbose < 0 or int(verbose) != verbose:
+        raise ValueError(f"verbose must be a non-negative int, got {verbose!r}")
+    if validation_batch_size is not None and validation_batch_size < 1:
+        raise ValueError(
+            f"validation_batch_size must be at least 1, got {validation_batch_size}"
+        )
+
+
+def _split_validation(
+    train_df: pd.DataFrame,
+    validation_data: pd.DataFrame | None,
+    validation_split: float | None,
+    vc_ehat: dict | None,
+):
+    """Resolve fit's validation arguments (the Keras rules).
+
+    ``validation_split`` takes the LAST fraction of ``train_df`` as
+    validation without shuffling, exactly like Keras — deterministic, no
+    hidden RNG. ``vc_ehat`` rows are sliced with the same split, so the
+    caller supplies propensities for the frame they passed.
+    """
+    if validation_split is None:
+        return train_df, validation_data, vc_ehat
+    if validation_data is not None:
+        raise ValueError("pass validation_data OR validation_split, not both")
+    if not 0.0 < validation_split < 1.0:
+        raise ValueError(f"validation_split must be in (0, 1), got {validation_split}")
+    cut = round(len(train_df) * (1.0 - validation_split))
+    if cut < 1 or cut >= len(train_df):
+        raise ValueError(
+            f"validation_split={validation_split} leaves no rows on one side "
+            f"of the {len(train_df)}-row frame"
+        )
+    vc_ehat = _slice_vc_ehat(vc_ehat, len(train_df), cut)
+    return train_df.iloc[:cut], train_df.iloc[cut:], vc_ehat
+
+
+def _slice_vc_ehat(vc_ehat: dict | None, n_full: int, cut: int) -> dict | None:
+    """Slice the caller's propensities with the validation split.
+
+    The rows must cover the FULL frame passed to ``fit`` — a wrong length
+    fails here instead of being silently truncated by the slice.
+    """
+    if vc_ehat is None:
+        return None
+    for node, d in vc_ehat.items():
+        for t, e in d.items():
+            if len(np.asarray(e)) != n_full:
+                raise ValueError(
+                    f"vc_ehat[{node!r}][{t!r}] has {len(np.asarray(e))} rows, "
+                    f"not the {n_full} of the frame passed to fit — supply "
+                    "propensities for that frame; the split slices them"
+                )
+    return {
+        node: {t: np.asarray(e)[:cut] for t, e in d.items()}
+        for node, d in vc_ehat.items()
+    }
+
+
+def _normalize_callbacks(cbs) -> list[Callback]:
+    """Give ``callbacks=`` as a list of ``Callback``s, or fail loudly now.
+
+    A :class:`~tramdag.callbacks.Callback` instance is trusted — the base
+    class defines all three hooks. A bare callable is an ``on_epoch_end``
+    hook and must accept ``(flow, epoch, optimizer)``; checked here so a
+    wrong entry fails before the first epoch, not after the last one.
+    """
     if cbs is None:
         return []
-    return [cbs] if callable(cbs) else list(cbs)
-
-
-def _check_callbacks(cbs: list, args: tuple[str, ...], name: str) -> None:
-    """Reject a mis-registered callback before training, not hours after it.
-
-    The classic slip is the instance/method swap (``RestoreBest`` itself in
-    ``after_fit_callbacks`` instead of its ``restore``) — without this check
-    that only raises after the last epoch, losing the whole run.
-    """
+    if isinstance(cbs, Callback) or callable(cbs):
+        cbs = [cbs]
+    out = []
     for cb in cbs:
-        if not callable(cb):
-            raise TypeError(f"{name}_callbacks entries must be callable, got {cb!r}")
-        try:
-            sig = inspect.signature(cb, follow_wrapped=False)
-        except (TypeError, ValueError):  # a callable without a signature
+        if isinstance(cb, Callback):
+            out.append(cb)
             continue
-        try:
-            sig.bind(*[None] * len(args))
-        except TypeError:
+        if isinstance(cb, type) and issubclass(cb, Callback):
             raise TypeError(
-                f"{name}_callbacks are called as cb({', '.join(args)}); "
-                f"{cb!r} does not accept these arguments"
-            ) from None
+                f"callbacks= got the class {cb.__name__} — instantiate it: "
+                f"{cb.__name__}()"
+            )
+        if not callable(cb):
+            raise TypeError(
+                f"callbacks entries must be Callback instances or callables, got {cb!r}"
+            )
+        _check_epoch_hook(cb)
+        out.append(_FnCallback(cb))
+    return out
+
+
+def _check_epoch_hook(cb) -> None:
+    """Reject a bare callable of the wrong arity before training starts."""
+    try:
+        sig = inspect.signature(cb, follow_wrapped=False)
+    except (TypeError, ValueError):  # a callable without a signature
+        return
+    try:
+        sig.bind(None, None, None)
+    except TypeError:
+        raise TypeError(
+            "a bare callable in callbacks= is called as "
+            f"cb(flow, epoch, optimizer); {cb!r} does not accept these "
+            "arguments — for the other hooks subclass tramdag.callbacks.Callback"
+        ) from None
 
 
 def _slice_ehat(
@@ -144,6 +240,51 @@ def _is_classical_term(term) -> bool:
 
 
 # %% private classes -------------------------------------------------------------------
+class _InputTransform(nn.Module):
+    """One term's frozen network-input transform.
+
+    ``calibrate`` takes the statistics from the training rows once:
+    ``"minmax"`` freezes per-column lo/hi, ``"standardize"`` mean/std, and a
+    callable keeps the raw training columns and is applied per batch as
+    ``fn(x, train)`` — so train statistics inside the callable are always the
+    frozen training data, never the batch's.
+    """
+
+    def __init__(self, value, cols: tuple[str, ...]):
+        super().__init__()
+        self.kind = "callable" if callable(value) else value
+        self.fn = value if callable(value) else None
+        self.cols = cols  # the term's continuous parents, in parent order
+        k = len(cols)
+        if self.kind == "minmax":
+            self.register_buffer("lo", torch.zeros(k))
+            self.register_buffer("hi", torch.ones(k))
+        elif self.kind == "standardize":
+            self.register_buffer("mean", torch.zeros(k))
+            self.register_buffer("std", torch.ones(k))
+        else:  # callable: the raw train columns, shaped at calibrate
+            self.register_buffer("train_cols", torch.zeros(0, k))
+
+    def set_stats(self, cols: Tensor) -> None:
+        """Freeze the statistics from the raw ``(n_train, k)`` train columns."""
+        if self.kind == "minmax":
+            self.lo.copy_(cols.min(0).values)
+            self.hi.copy_(cols.max(0).values)
+        elif self.kind == "standardize":
+            self.mean.copy_(cols.mean(0))
+            self.std.copy_(cols.std(0))
+        else:
+            self._buffers["train_cols"] = cols.detach().to(self.train_cols.device)
+
+    def forward(self, x: Tensor, i: int) -> Tensor:
+        """Transform one continuous parent column ``(n, 1)``."""
+        if self.kind == "minmax":
+            return (x - self.lo[i]) / (self.hi[i] - self.lo[i])
+        if self.kind == "standardize":
+            return (x - self.mean[i]) / self.std[i]
+        return self.fn(x, self.train_cols[:, i : i + 1])
+
+
 class _VCGroup(NamedTuple):
     """Bookkeeping for one VC term of a node.
 
@@ -185,7 +326,6 @@ class _Node(nn.Module):
         self,
         node: NodeSpec,
         spec: dict[str, NodeSpec],
-        net_input_scaling: str | None = None,
     ):
         super().__init__()
         self.kind = node.kind
@@ -194,12 +334,7 @@ class _Node(nn.Module):
         self.continuous_parents = tuple(
             p for p in self.parents if isinstance(spec[p], ContinuousNode)
         )
-        # min-max of every continuous parent on the training rows, for the
-        # network inputs (net_input_scaling="minmax"); identity until fit
-        k = len(self.continuous_parents)
-        self.register_buffer("net_lo", torch.zeros(k))
-        self.register_buffer("net_hi", torch.ones(k))
-        self.net_input_scaling = net_input_scaling
+        self.input_transforms = nn.ModuleDict()
         i_term = next((t for t in terms if t.effect == "I" and t.parents), None)
         if i_term is None:
             i_groups = []
@@ -223,6 +358,19 @@ class _Node(nn.Module):
         self._build_intercept(i_term, n_params, spec)
         self._build_shifts(terms, spec)
 
+    def _add_input_transform(self, key: str, term, parents, spec) -> None:
+        """Register one term's ``input_transform`` under its net key.
+
+        Keyed like the shift ModuleDict plus ``"@I"`` for the intercept term;
+        identity until ``calibrate`` freezes the statistics. Only continuous
+        parents transform — ordinal one-hots pass through.
+        """
+        if term.input_transform is None:
+            return
+        cps = tuple(p for p in parents if isinstance(spec[p], ContinuousNode))
+        if cps:
+            self.input_transforms[key] = _InputTransform(term.input_transform, cps)
+
     def _build_intercept(self, i_term, n_params: int, spec: dict[str, NodeSpec]):
         """Build the intercept module(s) from the intercept groups.
 
@@ -233,6 +381,8 @@ class _Node(nn.Module):
         each parent reshapes the transform independently.
         """
         i_groups = self._intercept_groups
+        if i_term is not None:
+            self._add_input_transform("@I", i_term, i_term.parents, spec)
         if not i_groups:
             self.intercept = SimpleIntercept(n_params)
             self.intercept_nets = None
@@ -278,6 +428,7 @@ class _Node(nn.Module):
                     units=term.units,
                     activation=term.activation,
                 )
+                self._add_input_transform(on, term, mods, spec)
                 self._vc_groups.append(
                     _VCGroup(
                         on,
@@ -297,6 +448,8 @@ class _Node(nn.Module):
                         feat_width, units=term.units, activation=term.activation
                     )
                 )
+                if term.effect == "CS":
+                    self._add_input_transform(key, term, ps, spec)
                 self._shift_groups.append((key, ps))
 
     def vc_column(self, g, feats: dict, vc_ehat: dict | None) -> Tensor:
@@ -313,30 +466,39 @@ class _Node(nn.Module):
             t = t - vc_ehat[g.on].view(-1, 1)
         return t
 
-    def set_net_range(self, train_df: pd.DataFrame) -> None:
-        """Take the network-input min-max from the training rows (``calibrate``)."""
-        if self.net_input_scaling is None:
-            return
-        for i, p in enumerate(self.continuous_parents):
-            # min < max is guaranteed: a constant column fails calibrate's
-            # quantile check on the parent's own node first
-            self.net_lo[i] = float(train_df[p].min())
-            self.net_hi[i] = float(train_df[p].max())
+    def set_input_stats(self, train_df: pd.DataFrame) -> None:
+        """Freeze every term's input-transform statistics (``calibrate``)."""
+        for tr in self.input_transforms.values():
+            # a constant column fails calibrate's quantile check on the
+            # parent's own node first, so the statistics are well defined
+            cols = torch.stack(
+                [
+                    torch.as_tensor(train_df[p].to_numpy(dtype=np.float32).copy())
+                    for p in tr.cols
+                ],
+                dim=1,
+            )
+            tr.set_stats(cols)
 
-    def net_input(self, feats: dict[str, Tensor], parents) -> Tensor:
-        """Concatenate parent features for a network, scaled when configured.
+    def net_input(self, feats: dict[str, Tensor], parents, key: str) -> Tensor:
+        """Concatenate parent features for one term's network.
 
-        Every network input goes through here — training and the read-outs
-        (``varying_coef``, ``intercept_contributions``) alike — so the model
-        seen at inference is the model that was fitted. Linear shifts and the
-        VC treatment column are not network inputs and never pass through.
+        ``key`` names the term ("@I" for the intercept, the shift key
+        otherwise); a term with an ``input_transform`` gets its continuous
+        parent columns transformed with the statistics frozen at
+        ``calibrate``. Every network input goes through here — training and
+        the read-outs (``varying_coef``, ``intercept_contributions``) alike —
+        so the model seen at inference is the model that was fitted. Linear
+        shifts and the VC treatment column are not network inputs and never
+        pass through.
         """
+        # no dict.get: nn.ModuleDict has no get()
+        tr = self.input_transforms[key] if key in self.input_transforms else None  # noqa: SIM401
         cols = []
         for p in parents:
             x = feats[p]
-            if self.net_input_scaling == "minmax" and p in self.continuous_parents:
-                i = self.continuous_parents.index(p)
-                x = (x - self.net_lo[i]) / (self.net_hi[i] - self.net_lo[i])
+            if tr is not None and p in tr.cols:
+                x = tr(x, tr.cols.index(p))
             cols.append(x)
         return torch.cat(cols, dim=1)
 
@@ -344,13 +506,13 @@ class _Node(nn.Module):
         """Evaluate the intercept: the transform parameters, shape ``(n, P)``."""
         if self.intercept_nets is not None:  # additive complex intercept
             return sum(
-                net(self.net_input(feats, grp))
+                net(self.net_input(feats, grp, "@I"))
                 for net, grp in zip(
                     self.intercept_nets, self._intercept_groups, strict=True
                 )
             )
         if self.ci_parents:  # single or joint complex intercept
-            return self.intercept(self.net_input(feats, self.ci_parents))
+            return self.intercept(self.net_input(feats, self.ci_parents, "@I"))
         return self.intercept(n)  # simple (free) intercept
 
     def _vc_shift(self, g, feats: dict, vc_ehat: dict | None) -> Tensor:
@@ -362,7 +524,7 @@ class _Node(nn.Module):
                 "term without its propensity."
             )
         t = self.vc_column(g, feats, vc_ehat)
-        mod_feat = self.net_input(feats, g.mods) if g.mods else None
+        mod_feat = self.net_input(feats, g.mods, g.on) if g.mods else None
         return self.shifts[g.on](t, mod_feat)
 
     def theta_shift(
@@ -400,7 +562,7 @@ class _Node(nn.Module):
             feat = (  # a linear shift stays raw: its weight is the paper's beta
                 torch.cat([feats[p] for p in ps], dim=1)
                 if isinstance(module, LinearShift)
-                else self.net_input(feats, ps)
+                else self.net_input(feats, ps, key)
             )
             shift = shift + module(feat)
         for g in self._vc_groups:
@@ -424,14 +586,6 @@ class CausalFlowDAG(nn.Module):
         initialization happens at construction, so this is the one knob
         for a reproducible model. ``fit(seed=...)`` only seeds the
         minibatch shuffling.
-    net_input_scaling : str | None, optional
-        ``"minmax"`` feeds every network (complex intercepts, complex shifts,
-        VC modifiers) its continuous parents scaled to ``[0, 1]`` by the
-        training min and max, the way the paper's reference implementation
-        does; raw parents (default ``None``) saturate a tanh net whenever
-        ``|x| > 2``. Linear shifts and the VC treatment stay raw, so their
-        coefficients keep their units. Set by ``calibrate``; stored in
-        the checkpoint.
     init : str, optional
         Weight initialization of every linear layer (the LS weights and the
         CI/CS/VC networks): ``"torch"`` (default, ``nn.Linear``'s
@@ -451,14 +605,9 @@ class CausalFlowDAG(nn.Module):
         spec: dict[str, NodeSpec],
         device: str = "cpu",
         seed: int | None = None,
-        net_input_scaling: str | None = None,
         init: str = "torch",
     ):
         super().__init__()
-        if net_input_scaling not in (None, "minmax"):
-            raise ValueError(
-                f"net_input_scaling must be None or 'minmax', got {net_input_scaling!r}"
-            )
         if init not in ("torch", "glorot", "normal"):
             raise ValueError(
                 f"init must be 'torch', 'glorot' or 'normal', got {init!r}"
@@ -467,10 +616,9 @@ class CausalFlowDAG(nn.Module):
             torch.manual_seed(seed)
         self.spec = spec
         self.order = validate_and_sort(spec)
-        self.net_input_scaling = net_input_scaling
         self.init = init
         self.nodes = nn.ModuleDict(
-            {name: _Node(spec[name], spec, net_input_scaling) for name in self.order}
+            {name: _Node(spec[name], spec) for name in self.order}
         )
         self._apply_init(init)
         self.device = torch.device(device)
@@ -695,9 +843,10 @@ class CausalFlowDAG(nn.Module):
 
         Per continuous node the transform's domain: the train ``RANGE_Q`` /
         ``1 - RANGE_Q`` quantiles map onto ``[-5, 5]`` (the min-max scaling
-        of the original implementation, made robust to outliers). With
-        ``net_input_scaling="minmax"`` the min and max of every continuous
-        parent, for the networks. With ``marginal_init`` a calibrated start:
+        of the original implementation, made robust to outliers). The
+        statistics of every term-level ``input_transform=`` (minmax lo/hi,
+        standardize mean/std, a callable's frozen train columns). With
+        ``marginal_init`` a calibrated start:
         a Bernstein simple intercept starts at the data marginal instead of
         zuko's default (about 2.5x too steep), an ordinal simple intercept at
         the marginal class log-odds. The optimum is unchanged, the path to
@@ -722,7 +871,7 @@ class CausalFlowDAG(nn.Module):
             node = self.nodes[name]
             if node.kind == "ordinal":
                 self._check_levels(name, train_df)
-            node.set_net_range(train_df)
+            node.set_input_stats(train_df)
             if node.kind == "continuous":
                 self._set_range(name, train_df)
         self.calibrated.fill_(True)
@@ -857,11 +1006,13 @@ class CausalFlowDAG(nn.Module):
         epochs: int,
         learning_rate: float = 1e-2,
         batch_size: int = 512,
+        validation_data: pd.DataFrame | None = None,
+        validation_split: float | None = None,
+        validation_batch_size: int | None = None,
+        verbose: int = 0,
         seed: int | None = None,
         optimizer: torch.optim.Optimizer | None = None,
-        before_fit_callbacks=None,
-        after_epoch_callbacks=None,
-        after_fit_callbacks=None,
+        callbacks=None,
         vc_ehat: dict | None = None,
     ) -> CausalFlowDAG:
         """Fit all nodes jointly by maximum likelihood — one minibatch Adam loop.
@@ -873,17 +1024,17 @@ class CausalFlowDAG(nn.Module):
         matches ``statsmodels`` and R ``polr``. A second ``fit`` call
         continues the training. Everything else — validation monitoring,
         learning-rate schedules, early stopping, best-weight restoration,
-        logging — is the caller's, through ``optimizer`` and the callback
-        hooks; :mod:`tramdag.callbacks` ships the common recipes::
+        logging — is the caller's, through ``optimizer`` and ``callbacks``;
+        :mod:`tramdag.callbacks` ships the common recipes::
 
-            from tramdag.callbacks import Logger, RestoreBest
+            from tramdag.callbacks import EarlyStopping, RestoreBest
 
-            best = RestoreBest(val_df)
             flow.fit(
                 train_df,
                 epochs=4000,
-                after_epoch_callbacks=[Logger(val_df, every=50), best],
-                after_fit_callbacks=[best.restore],
+                validation_data=val_df,
+                verbose=50,
+                callbacks=[RestoreBest(), EarlyStopping(patience=200)],
             )
 
         Parameters
@@ -900,6 +1051,25 @@ class CausalFlowDAG(nn.Module):
         batch_size : int, optional
             Rows per gradient step, by default 512. ``len(train_df)`` is one
             full-batch step per epoch.
+        validation_data : pd.DataFrame | None, optional
+            Validation rows, one column per node. When given (or split off),
+            the per-node validation NLL is computed after every epoch and
+            appended to ``flow.history["val"]`` — once, centrally; the
+            shipped callbacks read it there.
+        validation_split : float | None, optional
+            Keras' rule: the LAST fraction of ``train_df`` becomes the
+            validation set, without shuffling, and only the remaining rows
+            train (and calibrate — no leakage into the frozen statistics).
+            Mutually exclusive with ``validation_data``.
+        validation_batch_size : int | None, optional
+            Chunk size of the validation pass — a MEMORY ceiling for large
+            validation frames, by default one full batch (which is also the
+            fastest; chunk only when the full pass does not fit).
+        verbose : int, optional
+            0 (default) is silent. ``N >= 1`` prints one line every ``N``
+            epochs and on the final epoch: epoch counter, summed train NLL,
+            summed validation NLL when validation is configured. No
+            progress bars.
         seed : int | None, optional
             Seeds torch's global RNG before the loop, for the minibatch
             shuffling. Weight initialization is seeded at construction
@@ -908,22 +1078,15 @@ class CausalFlowDAG(nn.Module):
             Any torch optimizer over ``flow.parameters()``; the default is
             ``Adam(lr=learning_rate)``. Build it yourself to attach a
             ``torch.optim.lr_scheduler`` or to continue with its state.
-        before_fit_callbacks : callable | list[callable] | None, optional
-            Each called as ``cb(flow, optimizer)`` once, after calibration
-            and before the first epoch.
-        after_epoch_callbacks : callable | list[callable] | None, optional
-            Each called as ``cb(flow, epoch, optimizer)`` after every epoch
-            (``epoch`` counts from 1), once the epoch's train NLLs are in
-            ``flow.history["train"]``. All of them run each epoch; the fit
-            stops after an epoch in which any returned ``True``
-            (``len(flow.history["train"])`` says how many epochs ran). Use them
-            for validation (``flow.nll(val_df)``), schedules, snapshots and
-            coefficient trajectories — :mod:`tramdag.callbacks` ships
-            ``Logger``, ``RestoreBest`` and ``PerNodePlateau``.
-        after_fit_callbacks : callable | list[callable] | None, optional
-            Each called as ``cb(flow, optimizer)`` once, after the loop and
-            **before** the VC re-centering — so a callback that swaps the
-            weights (``RestoreBest.restore``) hands them to the re-centering.
+        callbacks : Callback | callable | list | None, optional
+            One entry or a list. A :class:`~tramdag.callbacks.Callback`
+            hooks all three points of the fit — its docstring is the
+            contract (begin/epoch/end timing, the stop rule, the VC
+            re-centering order). A bare callable is an ``on_epoch_end``
+            hook, ``cb(flow, epoch, optimizer)`` — use it for schedules and
+            coefficient trajectories. :mod:`tramdag.callbacks` ships
+            ``RestoreBest``, ``EarlyStopping`` and ``PerNodePlateau``, all
+            reading ``history["val"]``.
         vc_ehat : dict | None, optional
             Out-of-fold propensities ``{node: {t: array}}`` for every centered
             ``VC`` term, one value per training row; required when the spec
@@ -937,8 +1100,10 @@ class CausalFlowDAG(nn.Module):
         Raises
         ------
         ValueError
-            If ``epochs`` or ``batch_size`` is below 1, or ``vc_ehat`` does
-            not match the centered VC terms of the spec.
+            If ``epochs`` or ``batch_size`` is below 1, ``verbose`` is
+            negative, both validation arguments are given, the split leaves
+            an empty side, or ``vc_ehat`` does not match the centered VC
+            terms of the spec.
         TypeError
             If a callback does not accept its hook's arguments — checked
             before the first epoch, so a mis-registered callback cannot
@@ -956,21 +1121,26 @@ class CausalFlowDAG(nn.Module):
         training rows; the constant moves into ``beta0``, the function is
         unchanged.
         """
-        if epochs < 1:
-            raise ValueError(f"epochs must be at least 1, got {epochs}")
-        if batch_size < 1:
-            raise ValueError(f"batch_size must be at least 1, got {batch_size}")
-        before = _callback_list(before_fit_callbacks)
-        after_epoch = _callback_list(after_epoch_callbacks)
-        after_fit = _callback_list(after_fit_callbacks)
-        _check_callbacks(before, ("flow", "optimizer"), "before_fit")
-        _check_callbacks(after_epoch, ("flow", "epoch", "optimizer"), "after_epoch")
-        _check_callbacks(after_fit, ("flow", "optimizer"), "after_fit")
+        _check_fit_sizes(epochs, batch_size, verbose, validation_batch_size)
+        cbs = _normalize_callbacks(callbacks)
         if seed is not None:
             torch.manual_seed(seed)
-        ehat = self._vc_ehat_train(train_df, vc_ehat)  # validate before calibrating
+        train_df, validation_data, vc_ehat = _split_validation(
+            train_df, validation_data, validation_split, vc_ehat
+        )
+        # vc_ehat is validated BEFORE calibrate: a malformed dict must fail
+        # while the flow is still untouched (calibrate sets ranges and the
+        # marginal start — a half-mutated flow after an error would be worse
+        # than no fit at all)
+        ehat = self._vc_ehat_train(train_df, vc_ehat)
         self.calibrate(train_df)
         vals = self._tensorize(train_df)
+        val_vals = (
+            self._tensorize(validation_data) if validation_data is not None else None
+        )
+        # the shipped callbacks check this: an unvalidated fit in between must
+        # not let them read a stale history["val"] entry as the current epoch
+        self._fit_validated = val_vals is not None
         opt = optimizer or torch.optim.Adam(self.parameters(), lr=learning_rate)
         penalized = [
             nd.shifts[g.on]
@@ -978,23 +1148,66 @@ class CausalFlowDAG(nn.Module):
             for g in nd._vc_groups
             if g.mods and nd.shifts[g.on].penalty > 0
         ]
-        for cb in before:
-            cb(self, opt)
+        for cb in cbs:
+            cb.on_fit_begin(self, opt)
         for epoch in range(1, epochs + 1):
-            self.train()
-            self.history["train"].append(
-                self._fit_epoch(vals, ehat, opt, batch_size, penalized)
+            self._epoch_pass(
+                vals, ehat, opt, batch_size, penalized, val_vals, validation_batch_size
             )
-            self.eval()
-            # every callback runs (a stop must not skip the logger)
-            stops = [bool(cb(self, epoch, opt)) for cb in after_epoch]
+            # every callback runs (a stop must not skip a monitoring one)
+            stops = [bool(cb.on_epoch_end(self, epoch, opt)) for cb in cbs]
+            self._log_epoch(
+                epoch, epochs, verbose, stopped=any(stops), has_val=val_vals is not None
+            )
             if any(stops):
                 break
-        for cb in after_fit:
-            cb(self, opt)  # before the re-centering: restored weights re-center too
+        for cb in cbs:
+            cb.on_fit_end(self, opt)  # before re-centering: restored weights re-center
         self._recenter_vc(vals)
         self.eval()
         return self
+
+    def _epoch_pass(
+        self, vals, ehat, opt, batch_size, penalized, val_vals, validation_batch_size
+    ) -> None:
+        """Run one training epoch and, when configured, the validation pass."""
+        self.train()
+        self.history["train"].append(
+            self._fit_epoch(vals, ehat, opt, batch_size, penalized)
+        )
+        self.eval()
+        if val_vals is not None:
+            self.history.setdefault("val", []).append(
+                self._val_nll(val_vals, validation_batch_size)
+            )
+
+    def _log_epoch(
+        self, epoch: int, epochs: int, verbose: int, stopped: bool, has_val: bool
+    ):
+        """Print one ``verbose`` progress line on the Nth and the final epoch."""
+        last = stopped or epoch == epochs
+        if not verbose or (epoch % verbose and not last):
+            return
+        line = f"epoch {epoch}/{epochs}"
+        line += f"  train {sum(self.history['train'][-1].values()):.4f}"
+        if has_val:  # THIS fit's validation, not a stale earlier one
+            line += f"  val {sum(self.history['val'][-1].values()):.4f}"
+        print(line)
+
+    def _val_nll(
+        self, vals: dict[str, Tensor], batch_size: int | None
+    ) -> dict[str, float]:
+        """Give the per-node mean validation NLL, chunked by validation batch size."""
+        n = len(next(iter(vals.values())))
+        chunk = batch_size or n
+        acc = dict.fromkeys(self.order, 0.0)
+        with torch.no_grad():
+            for start in range(0, n, chunk):
+                batch = {k: v[start : start + chunk] for k, v in vals.items()}
+                weight = len(next(iter(batch.values()))) / n
+                for k, v in self.node_log_prob(batch).items():
+                    acc[k] += float(-v.mean()) * weight
+        return acc
 
     def _fit_epoch(
         self,
@@ -1037,7 +1250,7 @@ class CausalFlowDAG(nn.Module):
                     continue
                 if feats is None:
                     feats = self._features(values)
-                nd.shifts[g.on].recenter(nd.net_input(feats, g.mods))
+                nd.shifts[g.on].recenter(nd.net_input(feats, g.mods, g.on))
 
     @torch.no_grad()
     def varying_coef(
@@ -1105,7 +1318,7 @@ class CausalFlowDAG(nn.Module):
         mod_feat = None
         if mods:
             feats = self._features(self._tensorize(df, mods))
-            mod_feat = nd.net_input(feats, mods)
+            mod_feat = nd.net_input(feats, mods, t)
         return nd.shifts[t].beta(mod_feat, len(df)).cpu().numpy()
 
     def _is_classical(self) -> bool:
@@ -1256,7 +1469,7 @@ class CausalFlowDAG(nn.Module):
         parents: dict[str, tuple] = {}
         baseline = None
         for net, grp in zip(nets, groups, strict=True):
-            raw = net(nd.net_input(feats, grp))  # (n, P)
+            raw = net(nd.net_input(feats, grp, "@I"))  # (n, P)
             mean = raw.mean(dim=0, keepdim=True)  # (1, P)
             label = "+".join(grp)
             contributions[label] = (raw - mean).cpu().numpy()
@@ -1331,7 +1544,7 @@ class CausalFlowDAG(nn.Module):
         This method is valid only when every edge is ``ls``, because each
         node-conditional is then a classical transformation model. Any other
         model raises. For a ``cs`` or ``ci`` model use :meth:`fit`, where
-        the minibatch noise also regularizes the MLPs.
+        the minibatch noise also regularizes the NNs.
 
         Parameters
         ----------
@@ -1387,6 +1600,9 @@ class CausalFlowDAG(nn.Module):
                 "flexible models."
             )
         self.calibrate(train_df, marginal_init=False)  # L-BFGS needs no warm start
+        # a callback used manually afterwards must not read a pre-classical
+        # validation entry as current — this fit computes none
+        self._fit_validated = False
 
         self.double()  # parameters + buffers (xmin/xmax) -> float64, one call
         t0 = time.perf_counter()
@@ -1744,17 +1960,23 @@ class CausalFlowDAG(nn.Module):
             "saved_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
             "device": str(self.device),
         }
-        torch.save(
-            {
-                "spec": spec_to_dict(self.spec),
-                "net_input_scaling": self.net_input_scaling,
-                "init": self.init,
-                "state_dict": self.state_dict(),
-                "history": self.history,
-                "meta": meta,
-            },
-            path,
-        )
+        try:
+            torch.save(
+                {
+                    "spec": spec_to_dict(self.spec),
+                    "init": self.init,
+                    "state_dict": self.state_dict(),
+                    "history": self.history,
+                    "meta": meta,
+                },
+                path,
+            )
+        except (pickle.PicklingError, AttributeError) as err:
+            raise ValueError(
+                "the spec does not serialize: a callable input_transform "
+                "must be a picklable module-level function — use "
+                "'minmax'/'standardize', or def the function at module level."
+            ) from err
 
     @classmethod
     def load(cls, path: str | Path, device: str = "cpu") -> CausalFlowDAG:
@@ -1778,9 +2000,19 @@ class CausalFlowDAG(nn.Module):
         flow = cls(
             spec_from_dict(ckpt["spec"]),
             device=device,
-            net_input_scaling=ckpt.get("net_input_scaling"),
             init=ckpt.get("init", "torch"),
         )
+        for name, t in ckpt["state_dict"].items():
+            # a callable input_transform's train buffer is shaped at
+            # calibrate; give it the checkpoint's shape before loading
+            if not name.endswith(".train_cols"):
+                continue
+            buf = flow.get_buffer(name)
+            if buf.shape != t.shape:
+                mod_path, _, buf_name = name.rpartition(".")
+                flow.get_submodule(mod_path).register_buffer(
+                    buf_name, torch.empty_like(t)
+                )
         flow.load_state_dict(ckpt["state_dict"])  # includes the `calibrated` flag
         flow.history = ckpt["history"]
         flow.meta = ckpt["meta"]

@@ -23,7 +23,7 @@ object, so use whichever reads better:
   continuous node; extra keyword arguments go straight to the transform
   class (``SI(transform="spline", bins=16)``).
 - :func:`LS` — *linear shift*: ``beta * x`` (one interpretable weight), one parent.
-- :func:`CS` — *complex shift*: an additive MLP ``g(x)`` on the latent scale.
+- :func:`CS` — *complex shift*: an additive NN ``g(x)`` on the latent scale.
 - :func:`VC` — *varying-coefficient shift*: ``beta(modifiers) * x_on`` with
   ``beta(x) = beta0 + b_theta(x)`` and ``b_theta`` a small, **penalized** network
   — a treatment-effect head with its own bias–variance budget (issue #28).
@@ -88,6 +88,7 @@ _OPTION_DEFAULTS = {
     "units": None,  # I/CS/VC: hidden layers of the term's network
     "activation": None,  # I/CS/VC: hidden activation of that network
     "allow_interaction": True,  # I: one joint net, or one net per parent
+    "input_transform": None,  # I/CS/VC: the term's network-input transform
 }
 
 
@@ -302,9 +303,34 @@ def _check_term(name: str, term: Term, spec: dict[str, NodeSpec]) -> tuple[str, 
     for p in term.parents:
         if p not in spec:
             raise ValueError(f"Node '{name}': unknown parent '{p}'.")
+    _check_input_transform(name, term)
     if term.effect == "VC":
         return _check_vc_term(name, term, spec)
     return term.parents
+
+
+def _check_input_transform(name: str, term: Term) -> None:
+    """Reject a malformed ``input_transform`` before anything is built.
+
+    Allowed: ``None``, ``"minmax"``, ``"standardize"``, or a callable
+    ``fn(x, train)`` applied per continuous parent column (``train`` is
+    that column's raw training data, frozen at ``calibrate``).
+    """
+    value = term.input_transform
+    if value is None:
+        return
+    # the parentless-SI case raises in simple_intercept(); LS is reachable
+    # only through a hand-built dict — its weight must stay in raw units
+    if term.effect == "LS":
+        raise ValueError(
+            f"Node '{name}': a linear shift takes no input_transform — "
+            "its weight is the interpretable raw-unit coefficient."
+        )
+    if not (callable(value) or value in ("minmax", "standardize")):
+        raise ValueError(
+            f"Node '{name}': input_transform must be 'minmax', 'standardize' "
+            f"or a callable fn(x, train), got {value!r}."
+        )
 
 
 def _check_node(name: str, node: NodeSpec, spec: dict[str, NodeSpec]) -> None:
@@ -375,7 +401,9 @@ def _kahn_sort(spec: dict[str, NodeSpec]) -> list[str]:
 
 
 # %% public functions ------------------------------------------------------------------
-def simple_intercept(transform: str | None = None, **transform_kwargs) -> Term:
+def simple_intercept(
+    transform: str | None = None, input_transform=None, **transform_kwargs
+) -> Term:
     """Build the simple-intercept baseline term — the paper's SI.
 
     ``SI`` is the exported alias of this function. The term's transform
@@ -402,6 +430,11 @@ def simple_intercept(transform: str | None = None, **transform_kwargs) -> Term:
     Term
         The intercept term.
     """
+    if input_transform is not None:
+        raise ValueError(
+            "a simple intercept has no network inputs — input_transform= "
+            "belongs on CI/CS/VC terms."
+        )
     kw = tuple(sorted(transform_kwargs.items())) or None
     return Term("I", (), _options(transform=transform, transform_kwargs=kw))
 
@@ -411,6 +444,7 @@ def complex_intercept(
     allow_interaction: bool = True,
     units: list[int] | tuple[int, ...] | None = None,
     activation: str | None = None,
+    input_transform=None,
     transform: str | None = None,
     **transform_kwargs,
 ) -> Term:
@@ -467,6 +501,7 @@ def complex_intercept(
             transform_kwargs=kw,
             units=tuple(units) if units is not None else None,
             activation=activation,
+            input_transform=input_transform,
             allow_interaction=bool(allow_interaction) or len(parents) < 2,
         ),
     )
@@ -527,8 +562,9 @@ def complex_shift(
     *parents: str,
     units: list[int] | tuple[int, ...] | None = None,
     activation: str | None = None,
+    input_transform=None,
 ) -> Term:
-    """Build a complex-shift term: an additive MLP ``g(x)``.
+    """Build a complex-shift term: an additive NN ``g(x)``.
 
     ``CS`` is the exported alias of this function, the notation of the
     docs and the paper.
@@ -560,6 +596,7 @@ def complex_shift(
         _options(
             units=tuple(units) if units else None,
             activation=activation,
+            input_transform=input_transform,
         ),
     )
 
@@ -571,6 +608,7 @@ def varying_coefficient(
     center: bool = False,
     units: list[int] | tuple[int, ...] | None = None,
     activation: str | None = None,
+    input_transform=None,
 ) -> Term:
     """Build a varying-coefficient shift term ``beta(modifiers) * x_t``.
 
@@ -580,7 +618,7 @@ def varying_coefficient(
     This is the treatment-effect term of issue #28:
     ``VC("X2", "X3", t="T")`` is ``(beta0 + b_theta(x2, x3)) * x_t``.
 
-    ``beta(x) = beta0 + b_theta(x)``, with ``b_theta`` a small MLP whose
+    ``beta(x) = beta0 + b_theta(x)``, with ``b_theta`` a small NN whose
     weights carry the L2 ``penalty``. The fitting objective is the
     penalized NLL ``sum_i nll_i + penalty * ||b_theta weights||^2`` on the
     total-likelihood scale. That is a fixed Gaussian prior whose shrinkage
@@ -666,6 +704,7 @@ def varying_coefficient(
             center=center,
             units=tuple(units) if units else None,
             activation=activation,
+            input_transform=input_transform,
         ),
     )
 
@@ -840,7 +879,8 @@ class Term:
         term. Keys: ``penalty`` and ``center`` (VC, see :func:`VC`);
         ``transform`` and ``transform_kwargs`` (I, the basis of the monotone
         transform, kwargs stored as sorted pairs);
-        ``units`` (hidden layers of the term's network);
+        ``units`` and ``activation`` (the term's network);
+        ``input_transform`` (I/CS/VC: the network-input transform);
         ``allow_interaction`` (multi-parent I: one joint net or one net
         per parent).
     """

@@ -8,7 +8,7 @@
 #   * 500 epochs, optimizer_adam() = Keras Adam at lr 0.001, Keras fit() with
 #     its default batch size 32, shuffled; one compiled model, so one
 #     continuous optimizer run — the coefficients are read after every epoch
-#     (batch and lr are the one deviation below, for CI runtime);
+#     (batch, lr and the epoch count are the deviations below, for CI runtime);
 #   * len_theta = 20, hidden_features_I = hidden_features_CS = c(2, 2, 2, 2),
 #     sigmoid activations (create_param_net; its ReLU line is commented out);
 #   * ordinal cutpoints theta_k = c(-2, 0.42, 1.02), which this repository's
@@ -28,11 +28,20 @@
 paper_protocol: &paper_protocol
   n_train: 40000          # dgp(40000)
   n_val: 10000            # test = dgp(10000), a separate draw
-  epochs: 500             # num_epochs
+  # CI-runtime deviation (2026-09-01): the paper trains 500 epochs, but the
+  # coefficient trajectories are flat from ~epoch 50 (see
+  # results/*/plots/coefficients.png). The slow parts are the 2-unit sigmoid
+  # CS net and the do(x1) mean (measured, cs variant: cs_curve_max_abs_err
+  # 0.344/0.177/0.156 and mean_x3_abs_err_do_x1 0.033/0.060/0.022 at
+  # 100/250/350 epochs vs 0.107/0.016 at 500), so the cs variant trains 350
+  # epochs and the pure-ls variant 200 — every ground-truth metric holds.
+  # relu instead of sigmoid was tried and rejected: the 2-unit relu net dies
+  # at this init (cs err 0.859, beta13 -0.055).
+  epochs: 350             # paper: 500 (num_epochs)
   # CI-runtime deviation, documented in docs/paper-replication.md: the paper
   # trains at Keras' default batch 32 with optimizer_adam()'s lr 0.001; 500
   # epochs of that are 42-69 min per variant on the CI runners. Batch 256 with
-  # the lr scaled 4x runs the same 500 epochs in 8x fewer steps and keeps every
+  # the lr scaled 4x takes 8x fewer steps per epoch and keeps every
   # ground-truth metric. The grid ran with glorot init (measured 2026-08-26:
   # cs max err linear-cs 0.132 vs 0.110, atan-cs 0.073 vs 0.080, mixed exp-cs
   # 0.072 vs 0.071; batch 512 / lr 0.01 and lr 0.008 degrade the cs curves,
@@ -48,7 +57,7 @@ paper_protocol: &paper_protocol
   dgp_seed: 42
   init_seed: 7
   init: normal                # LinearMasked: random_normal weights and biases (sd 0.05)
-  net_input_scaling:          # the triangle scripts feed the nets raw parents
+  # no input_transform on any term: the triangle scripts feed the nets raw parents
   shuffle_seed: 0
   sample_seed: 0          # sampling for the distribution comparisons
   n_compare: 10000        # rows per distribution panel (Fig. 9/20)
@@ -67,13 +76,19 @@ paper_protocol: &paper_protocol
 # the shift network, from the reference; only a complex-shift variant has one
 reference_net: &reference_net
   shift_units: [2, 2, 2, 2]     # hidden_features_CS
-  activation: sigmoid           # create_param_net
+  activation: sigmoid           # create_param_net (relu dies at 2 units, see above)
 
 variants:
   # the paper's headline mixed case (Fig. 9/19 + the C.4 odds-ratio check);
   # the only variant with a true beta23 (+0.3 in the flow's convention)
   linear-ls:
     <<: *paper_protocol
+    epochs: 200             # no CS net to wait for; at 100 the weakly
+                            # identified beta13 sits 57% into its tolerance
+                            # (-0.271 vs the pinned -0.243), at 200 it is safe
+    learning_rate: 0.002    # reads the weakly identified beta13/beta23 out
+                            # slightly closer to the 500-epoch pins than lr
+                            # 0.004 does (beta23 0.333 vs 0.337, pin 0.306)
     f: linear
     shift: ls
 

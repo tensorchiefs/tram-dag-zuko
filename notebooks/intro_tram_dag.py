@@ -91,7 +91,7 @@
 #   bends with the parent, which permits interactions beyond additive shifts.
 # * **Linear shift (LS):** $\beta_{51} x_1 + \beta_{52} x_2$. This gives one
 #   interpretable number per parent.
-# * **Complex shift (CS):** $g(x_4)$, an unrestricted (MLP) function of the
+# * **Complex shift (CS):** $g(x_4)$, an unrestricted (NN) function of the
 #   parent. It stays *additive* on the latent scale.
 #
 # so that **sampling** (the inverse direction) must invert only the intercept.
@@ -114,7 +114,7 @@
 # | SI — baseline $h_{\boldsymbol{\vartheta}}(x_i)$, constant $\boldsymbol{\vartheta}$ | automatic: every node owns a monotone transform (`bernstein` / `spline` / `affine`); with no intercept term its $\boldsymbol{\vartheta}$ is a free parameter vector |
 # | CI — $\boldsymbol{\vartheta}$ depends on parents | `I("X1")` (several `I(...)` parents feed **one joint** network → interactions) |
 # | LS — $\beta_{ij} x_j$ | `LS("X1")` (a single weight, no bias) |
-# | CS — $g_{ik}(x_k)$ | `CS("X1")` (64-128-64 MLP, additive) |
+# | CS — $g_{ik}(x_k)$ | `CS("X1")` (64-128-64 NN, additive) |
 #
 # `I(...)` dispatches on its arguments: no parents → a simple intercept (`SI`),
 # parents → a complex intercept (`CI`). The explicit names work too.
@@ -131,7 +131,7 @@
 # | `None` / `[SI()]` (source) | $h_{\boldsymbol{\vartheta}}(x_3)$ | `SimpleIntercept` — $\boldsymbol{\vartheta}$ a free vector |
 # | `[CI("X1")]` | $h_{\boldsymbol{\vartheta}(x_1)}(x_3)$ | `ComplexIntercept` — **no shift term**; $\boldsymbol{\vartheta}$ (the whole shape) bends with $x_1$ |
 # | `[LS("X1")]` | $h_{\boldsymbol{\vartheta}}(x_3) + \beta\,x_1$ | `LinearShift` — **one number** $\beta$ |
-# | `[CS("X1")]` | $h_{\boldsymbol{\vartheta}}(x_3) + g_1(x_1)$ | `ComplexShift` — additive MLP $g_1$ |
+# | `[CS("X1")]` | $h_{\boldsymbol{\vartheta}}(x_3) + g_1(x_1)$ | `ComplexShift` — additive NN $g_1$ |
 # | `LS("X1") + CS("X2")` | $h_{\boldsymbol{\vartheta}}(x_3) + \beta x_1 + g_2(x_2)$ | one `LinearShift` + one `ComplexShift` (the model fitted below) |
 # | `[CS("X1", "X2")]` | $h_{\boldsymbol{\vartheta}}(x_3) + g_{1,2}(x_1, x_2)$ | **one joint** `ComplexShift` — an interaction in the shift |
 # | `CS("X1") + CS("X2")` | $h_{\boldsymbol{\vartheta}}(x_3) + g_1(x_1) + g_2(x_2)$ | two **additive** `ComplexShift`s |
@@ -160,7 +160,6 @@ import pandas as pd
 import torch
 
 from tramdag import CS, LS, CausalFlowDAG, ContinuousNode, OrdinalNode
-from tramdag.callbacks import Logger
 
 plt.rcParams["figure.dpi"] = 110
 
@@ -311,8 +310,8 @@ plt.show()
 # negative log-likelihood **decomposes per node**
 # ($\log p(x) = \sum_i \log p(x_i \mid \mathrm{pa}(x_i))$). Thus one Adam
 # optimizer trains all nodes at once. `fit` keeps the final weights — for
-# this unconfounded DGP the MLE is the right target. Progress printing is a
-# shipped callback (`tramdag.callbacks.Logger`).
+# this unconfounded DGP the MLE is the right target. Progress printing is
+# `fit`'s own `verbose=` (Keras-style; 0 = silent, N = every Nth epoch).
 
 # %%
 spec = {
@@ -325,13 +324,7 @@ spec = {
 flow = CausalFlowDAG(
     spec, seed=1
 )  # seed here too, for the Bernsteins' initial uniform knots
-flow.fit(
-    train_df,
-    epochs=800,
-    learning_rate=1e-2,
-    batch_size=20000,
-    after_epoch_callbacks=Logger(every=200),
-)
+flow.fit(train_df, epochs=800, learning_rate=1e-2, batch_size=20000, verbose=200)
 flow.fit(train_df, epochs=300, learning_rate=1e-3, batch_size=512)  # polish
 flow.nll(val_df)
 

@@ -52,6 +52,7 @@ import scipy.stats as st  # for KDE plots only (preinstalled on Colab)
 import torch
 
 from tramdag import CausalFlowDAG, ContinuousNode, I
+from tramdag.callbacks import PerNodePlateau, per_node_adam
 
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 plt.rcParams["figure.dpi"] = 110
@@ -140,11 +141,14 @@ plt.show()
 # Each node gets a monotone Bernstein transform. The terms say how parents
 # enter (`I(...)` = the parents control the transform parameters, for maximal
 # flexibility). Training maximizes the exact joint likelihood with one Adam.
-# `fit` is a plain loop; validation, the learning-rate schedule and early
-# stopping are a few lines of your own through `after_epoch_callbacks=` — here torch's
-# `ReduceLROnPlateau` on the validation NLL, and a stop after 30 flat epochs.
-# (Predefined callbacks live in `tramdag.callbacks`; we roll our own to show
-# the hook.)
+# `fit` is a plain loop with Keras-shaped extras: `validation_data=` gives a
+# per-epoch validation NLL in `flow.history["val"]`, `verbose=` prints
+# progress. Strategy attaches through `callbacks=` — here the shipped
+# self-stopping recipe: `per_node_adam` gives every node its own parameter
+# group, and `PerNodePlateau` decays each node's rate on its own validation
+# NLL and freezes it once flat; the fit ends when the last node froze.
+# (Section 6 shows the hand-rolled alternative: torch's `ReduceLROnPlateau`
+# through the same hook.)
 
 # %%
 spec = {
@@ -154,50 +158,66 @@ spec = {
 }
 
 
-def early_stopping(val, patience):
-    """Validation NLL per epoch, ReduceLROnPlateau, stop after `patience` flat epochs."""
-    log = {"val": [], "lr": []}
+def early_stopping(patience):
+    """ReduceLROnPlateau on fit's own validation NLL, stop after `patience` flat epochs.
+
+    The stop half ships as `tramdag.callbacks.EarlyStopping`; hand-rolled here
+    to show the bare-callable hook carrying a torch scheduler.
+    """
+    log = {"val": [], "sched": None}
 
     def cb(f, epoch, opt):
-        if not log["lr"]:
+        if log["sched"] is None:
             # built lazily: the optimizer only exists once fit() runs
             log["sched"] = torch.optim.lr_scheduler.ReduceLROnPlateau(
                 opt, factor=0.3, patience=patience // 3
             )
-        nll = sum(f.nll(val).values())
+        nll = sum(f.history["val"][-1].values())  # fit computed it
         log["val"].append(nll)
-        log["lr"].append(opt.param_groups[0]["lr"])
         log["sched"].step(nll)
         return len(log["val"]) - int(np.argmin(log["val"])) > patience
 
-    return log, cb
+    return cb
 
 
 torch.manual_seed(0)
 flow = CausalFlowDAG(spec, device=DEVICE)
-log, cb = early_stopping(val, patience=30)
+lr_trace = []  # x1's learning rate per epoch, for the plot below
+
+sched = PerNodePlateau(patience=10, freeze=40)
 t0 = time.perf_counter()
 flow.fit(
-    train, epochs=400, learning_rate=1e-1, batch_size=4096, after_epoch_callbacks=cb
+    train,
+    epochs=400,
+    batch_size=4096,
+    validation_data=val,
+    verbose=25,
+    optimizer=per_node_adam(flow, lr=1e-1),
+    callbacks=[
+        lambda f, e, opt: lr_trace.append(opt.param_groups[0]["lr"]),
+        sched,
+    ],
 )
 t_fit = time.perf_counter() - t0
 print(
     f"\nfitted on {DEVICE} in {t_fit:.1f}s "
-    f"({len(log['val'])} epochs, then the callback stopped it)"
+    f"({len(flow.history['val'])} epochs, then every node had frozen)"
 )
 
 # %% [markdown]
-# `fit` records the per-node train NLL; the callback recorded the validation
-# NLL and the learning rate. Watch the plateau rule step the rate down:
+# `fit` records the per-node train AND validation NLL (`history["val"]` —
+# `validation_data=` did that); the one-line callback kept x1's learning
+# rate. Watch the per-node plateau rule step that rate down until the node
+# freezes (rate 0):
 
 # %%
-ep = np.arange(1, len(log["val"]) + 1)
+ep = np.arange(1, len(flow.history["val"]) + 1)
 tot_tr = np.array([sum(d.values()) for d in flow.history["train"]])
-tot_va = np.array(log["val"])
+tot_va = np.array([sum(d.values()) for d in flow.history["val"]])
 fig, ax = plt.subplots(figsize=(7.5, 3.6))
 ax.plot(ep, tot_tr, label="train NLL (total)")
 ax.plot(ep, tot_va, label="val NLL (total)")
-for e in np.nonzero(np.diff(log["lr"]) < 0)[0] + 1:
+for e in np.nonzero(np.diff(lr_trace) < 0)[0] + 1:
     ax.axvline(e, ls="--", lw=1, color="gray")
 ax.set_ylim(tot_va.min() - 0.02, tot_va.min() + 0.6)  # zoom past the initial drop
 ax.set_xlabel("epoch"), ax.set_ylabel("NLL"), ax.legend()
@@ -329,9 +349,14 @@ fits = {"bernstein": flow}  # already trained above
 for tr in ["spline", "affine"]:
     torch.manual_seed(0)
     f = CausalFlowDAG(make_spec(tr), device=DEVICE)
-    _, cb = early_stopping(val, patience=30)
+    cb = early_stopping(patience=30)
     f.fit(
-        train, epochs=400, learning_rate=1e-2, batch_size=4096, after_epoch_callbacks=cb
+        train,
+        epochs=400,
+        learning_rate=1e-2,
+        batch_size=4096,
+        validation_data=val,
+        callbacks=cb,
     )
     fits[tr] = f
 print("held-out NLL (lower is better):")

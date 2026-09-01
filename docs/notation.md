@@ -34,7 +34,7 @@ $\boldsymbol{\vartheta}$.
 | $h_{\boldsymbol{\vartheta}}$ | the monotone transformation of a node | the `I` term; `theta` in docstrings |
 | $\vartheta_k$ | the ordinal cutpoints, elements of $\boldsymbol{\vartheta}$ | `ordinal_cutpoints` |
 | $\beta$ | a linear-shift coefficient; $e^\beta$ is an odds ratio | `LS`; `flow.ls_coefficients()` |
-| $g_j$ | a complex shift, an MLP of one term's parents | `CS` |
+| $g_j$ | a complex shift, an NN of one term's parents | `CS` |
 | $\beta_0$ | the constant treatment effect of a `VC` term | `beta0` |
 | $b_{\boldsymbol{\Theta}}$ | the penalized effect-modification network | the `VC` net; `units=` sets its layers |
 | $\lambda$ | the L2 weight on $b_{\boldsymbol{\Theta}}$ | `penalty=` |

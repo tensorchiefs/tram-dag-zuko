@@ -4,6 +4,9 @@ site_url: https://tensorchiefs.github.io/tramdag/
 repo_url: https://github.com/tensorchiefs/tramdag
 edit_uri: blob/main/
 docs_dir: docs
+exclude_docs: |
+  __pycache__/
+  *.pyc
 
 theme:
   name: material

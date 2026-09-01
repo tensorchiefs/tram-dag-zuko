@@ -20,10 +20,10 @@ and none of them relies on the defaults here.
 Conditioner           Architecture                                 Term
 ===================== ============================================ ======
 ``LinearShift``       ``Linear(n, 1, bias=False)``                 ``LS``
-``ComplexShift``      64-128-64 ReLU MLP to 1, no bias             ``CS``
-``ComplexIntercept``  8-8 ReLU MLP to ``n_params``, bias-free out  ``I``
+``ComplexShift``      64-128-64 ReLU NN to 1, no bias             ``CS``
+``ComplexIntercept``  8-8 ReLU NN to ``n_params``, bias-free out  ``I``
 ``SimpleIntercept``   free parameter vector, no parent             none
-``VaryingCoef``       ``beta0`` + penalized 16-unit MLP            ``VC``
+``VaryingCoef``       ``beta0`` + penalized 16-unit NN            ``VC``
 ===================== ============================================ ======
 
 ``ComplexShift`` and ``ComplexIntercept`` correspond to
@@ -52,7 +52,7 @@ DEFAULT_ACTIVATION = "relu"
 
 
 # %% private functions -----------------------------------------------------------------
-def _mlp(
+def _nn(
     n_in: int,
     units: tuple[int, ...],
     n_out: int,
@@ -60,7 +60,7 @@ def _mlp(
     activation: str | None = None,
     zero_init_last: bool = False,
 ) -> nn.Sequential:
-    """Build the one MLP shape every conditioner uses.
+    """Build the one NN shape every conditioner uses.
 
     Hidden layers of the given ``units``, each followed by ``activation``,
     then a bias-free output layer.
@@ -167,7 +167,7 @@ class ComplexIntercept(nn.Module):
         activation: str | None = None,
     ):
         super().__init__()
-        self.net = _mlp(n_features, units or (8, 8), n_params, activation=activation)
+        self.net = _nn(n_features, units or (8, 8), n_params, activation=activation)
 
     def forward(self, x: Tensor) -> Tensor:
         """Map parent features to transform parameters.
@@ -222,7 +222,7 @@ class LinearShift(nn.Module):
 
 
 class ComplexShift(nn.Module):
-    """Additive shift ``g(x)`` from an MLP, still additive on the latent scale.
+    """Additive shift ``g(x)`` from an NN, still additive on the latent scale.
 
     Parameters
     ----------
@@ -244,7 +244,7 @@ class ComplexShift(nn.Module):
         activation: str | None = None,
     ):
         super().__init__()
-        self.net = _mlp(n_features, units or (64, 128, 64), 1, activation=activation)
+        self.net = _nn(n_features, units or (64, 128, 64), 1, activation=activation)
 
     def forward(self, x: Tensor) -> Tensor:
         """Compute the shift contribution.
@@ -318,7 +318,7 @@ class VaryingCoef(nn.Module):
         self.register_buffer("center", torch.zeros(()))
         if n_features > 0:
             # zero-initialised output: beta(x) == beta0 at init
-            self.net = _mlp(
+            self.net = _nn(
                 n_features,
                 units or (16,),
                 1,

@@ -158,15 +158,14 @@ spec = {
     "Y": ContinuousNode([CS("X1", "X2", "X3"), VC("X2", "X3", t="T")]),
 }
 flow = CausalFlowDAG(spec, seed=0)
-best = RestoreBest(val)
 flow.fit(
     train,
     epochs=300,
     learning_rate=1e-2,
     batch_size=512,
+    validation_data=val,
     seed=0,
-    after_epoch_callbacks=best,
-    after_fit_callbacks=best.restore,
+    callbacks=RestoreBest(),
 )
 print(flow.to_matrix())
 
@@ -278,15 +277,14 @@ for center in (False, True):
         "Y": ContinuousNode([LS("X"), VC("X", center=center, t="T")]),
     }
     fc = CausalFlowDAG(spec_c, seed=0)
-    best = RestoreBest(c_val)
     fc.fit(
         c_train,
         epochs=250,
         learning_rate=1e-2,
         batch_size=512,
+        validation_data=c_val,
         seed=0,
-        after_epoch_callbacks=best,
-        after_fit_callbacks=best.restore,
+        callbacks=RestoreBest(),
         vc_ehat={"Y": {"T": e_oof}} if center else None,
     )
     b = fc.varying_coef(c_test, "Y")

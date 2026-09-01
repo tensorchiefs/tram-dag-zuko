@@ -56,18 +56,20 @@ spec = {  # the spec IS the labelled DAG
 # train_df / val_df: DataFrames with one column per node
 flow = CausalFlowDAG(spec)  # validates acyclicity, builds the flow
 
-# fit() is one minibatch Adam loop; validation, schedules and early stopping
-# attach through optimizer= and the callback hooks — the common recipes ship
-# in tramdag.callbacks (docs/fitting.md)
-from tramdag.callbacks import Logger, RestoreBest
+# fit() is one minibatch Adam loop with Keras-shaped extras: validation_data=
+# (or validation_split=0.1) records the per-epoch validation NLL in
+# flow.history["val"], verbose= prints progress; schedules and early stopping
+# attach through optimizer= and callbacks= (docs/fitting.md)
+from tramdag.callbacks import EarlyStopping, RestoreBest
 
-best = RestoreBest(val_df)  # keep the best-validation weights
 flow.fit(
     train_df,
     epochs=4000,
     batch_size=512,
-    after_epoch_callbacks=[Logger(val_df, every=100), best],
-    after_fit_callbacks=[best.restore],
+    validation_data=val_df,
+    verbose=100,
+    # keep the best-validation weights; stop once the best is 200 epochs old
+    callbacks=[RestoreBest(), EarlyStopping(patience=200)],
 )
 
 # all-`ls` model? fit it classically instead: deterministic float64 L-BFGS,
@@ -111,21 +113,21 @@ intercept term `I` plus any number of shifts (notation:
 | term | math | what gets built | interpretability |
 |---|---|---|---|
 | `I()` / bare `I` / omitted | `h_ϑ(x)` — constant ϑ | `SimpleIntercept`: one free parameter vector, no network | the baseline transform |
-| `I("A")` | `h_ϑ(a)(x)` — ϑ bends with the parent | `ComplexIntercept`: MLP `[8, 8] → n_params` | the parent reshapes the whole distribution; no single coefficient |
-| `I("A","B")` (default `allow_interaction=True`) | `h_ϑ(a,b)(x)` | **one joint** MLP over both parents — they interact in ϑ | maximal flexibility |
-| `I("A","B", allow_interaction=False)` | `h_ϑ(a)+ϑ(b)(x)` | one MLP **per parent**, parameter vectors summed in coefficient space | per-parent partial effects via `flow.intercept_contributions` |
+| `I("A")` | `h_ϑ(a)(x)` — ϑ bends with the parent | `ComplexIntercept`: NN `[8, 8] → n_params` | the parent reshapes the whole distribution; no single coefficient |
+| `I("A","B")` (default `allow_interaction=True`) | `h_ϑ(a,b)(x)` | **one joint** NN over both parents — they interact in ϑ | maximal flexibility |
+| `I("A","B", allow_interaction=False)` | `h_ϑ(a)+ϑ(b)(x)` | one NN **per parent**, parameter vectors summed in coefficient space | per-parent partial effects via `flow.intercept_contributions` |
 | `LS("A")` | `β·a` | `Linear(width, 1)`, no bias — **one parameter per feature column** (one for a continuous parent, `levels` for a one-hot ordinal) | `exp(β)` is an odds ratio |
-| `CS("A")` | `g(a)`, additive | `ComplexShift`: MLP `[64, 128, 64] → 1` | plot `g` |
-| `CS("A","B")` | `g(a,b)` — joint | one MLP over the concatenated features | interaction *in the shift* |
-| `CS("A") + CS("B")` | `g₁(a) + g₂(b)` | two MLPs, scalars added | GAM-style, each effect plottable |
-| `VC("A","B", t="T")` | `(β₀ + b_Θ(a,b))·x_t` | scalar `β₀` + zero-initialised penalized MLP `[16] → 1`; the treatment value multiplies, it never enters the net | `β₀` ≈ constant effect, `flow.varying_coef` reads `β(x)` |
+| `CS("A")` | `g(a)`, additive | `ComplexShift`: NN `[64, 128, 64] → 1` | plot `g` |
+| `CS("A","B")` | `g(a,b)` — joint | one NN over the concatenated features | interaction *in the shift* |
+| `CS("A") + CS("B")` | `g₁(a) + g₂(b)` | two NNs, scalars added | GAM-style, each effect plottable |
+| `VC("A","B", t="T")` | `(β₀ + b_Θ(a,b))·x_t` | scalar `β₀` + zero-initialised penalized NN `[16] → 1`; the treatment value multiplies, it never enters the net | `β₀` ≈ constant effect, `flow.varying_coef` reads `β(x)` |
 
 A node takes **at most one `I` term with parents** — a term list is therefore
 always purely additive on the latent scale, and interactions exist only
 *inside* a term. Lists and `+` sums are interchangeable:
 `[LS("A"), CS("B")]` ≡ `LS("A") + CS("B")`.
 
-Two knobs on the terms:
+Three knobs on the terms:
 
 - **`transform=` on `I`** picks the basis of `h_ϑ` for a continuous node —
   `"bernstein"` (default, 20 coefficients, tails extrapolate with the boundary
@@ -133,6 +135,10 @@ Two knobs on the terms:
   slope) or `"affine"` (2 params: the latent is exactly logistic). Ordinal
   nodes have no basis: their intercept is the cutpoint vector,
   `P(x ≤ k) = σ(ϑ_k − shift)`.
+- **`input_transform=` on `CI`/`CS`/`VC`** — `"minmax"`, `"standardize"`, or
+  a callable `fn(x, train)` — transforms that term's continuous network
+  inputs with statistics frozen at the first fit; `LS` and the `VC`
+  treatment stay raw, so their coefficients keep their units.
 - **`units=` on `I`/`CS`/`VC`** sizes the term's network, e.g. `units=[16]`
   for one hidden layer of 16 neurons. The defaults match the PyTorch
   reference this package grew out of ([buehlpa/TramDag](https://github.com/buehlpa/TramDag),
@@ -145,7 +151,7 @@ one-hot (`levels` columns). Abduction is exact for continuous nodes and
 truncated-logistic for ordinal ones, so `flow.sample(u=flow.abduct(df))`
 reproduces `df` exactly / level-exactly.
 
-There are two ways to fit the model: a stochastic optimizer (`fit`) and the classical route (`fit_classical`). For all-`ls` models — where each node-conditional is a classical transformation model — the classical fit is deterministic and takes seconds (measured ~10 s vs ~200 s for Adam on the CI runner); see [`docs/fitting.md`](docs/fitting.md).
+There are two ways to fit the model: a stochastic optimizer (`fit`) and the classical route (`fit_classical`). For all-`ls` models — where each node-conditional is a classical transformation model — the classical fit is deterministic and takes seconds (measured ~10 s vs ~200 s for Adam on the CI runner — before the 2026-09 epoch cut made the Adam route ~3.5x faster; CI re-measures on the next push); see [`docs/fitting.md`](docs/fitting.md).
 
 ## Validation
 

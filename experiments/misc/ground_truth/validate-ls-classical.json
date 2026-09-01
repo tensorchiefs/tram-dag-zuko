@@ -66,7 +66,7 @@
     "why": "the same flat ridge as max_abs_diff_flow_vs_statsmodels reaches the named coefficients too: measured 0.0027 here (unchanged at 2 and 8 OMP threads) against 0.0018 and 0.0165 on two CI runners of the same image. L-BFGS in float64 is deterministic per machine, so the spread is the BLAS kernel, not the seed. The precision claim the file makes is coef_*_flow within atol 0.05 of R and statsmodels, and the ATE below"
   },
   "fit_seconds": {
-    "max": 28,
-    "why": "3x the 2-core CI runner measurement (10 s, 2026-08-31): shared-runner wall clock is noisy, so this is a gross-regression tripwire (a lost no_grad, an accidental O(n^2)), not a benchmark"
+    "max": 21,
+    "why": "3x the 2-core CI runner measurement (7 s, 2026-09-01, tuned protocol): shared-runner wall clock is noisy, so this is a gross-regression tripwire, not a benchmark"
   }
 }

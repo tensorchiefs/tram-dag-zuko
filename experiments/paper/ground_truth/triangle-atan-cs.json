@@ -1,20 +1,20 @@
 {
-  "_note": "Protocol = the paper's R code 1:1 up to the CI batch/lr deviation (see the YAML header): measured 2026-08-26 on the refactor/lean-fit branch. Paper Fig. 7/15/16. The complex shift must recover -f(x2) up to a constant; cs_curve_max_abs_err is measured after anchoring at x2=0. mean_x3_flow_do_x1 stays unpinned on purpose: the DGP center plus the abs-err bound covers it.",
+  "_note": "Protocol = the paper's R code 1:1 up to the CI batch/lr deviation (see the YAML header): measured 2026-08-26 on the refactor/lean-fit branch. Paper Fig. 7/15/16. The complex shift must recover -f(x2) up to a constant; cs_curve_max_abs_err is measured after anchoring at x2=0. mean_x3_flow_do_x1 stays unpinned on purpose: the DGP center plus the abs-err bound covers it. Re-pinned 2026-09-01 from the tuned protocol (fewer epochs; see the YAML header).",
   "beta12": {
-    "value": 1.98747980594635,
+    "value": 1.9808402061462402,
     "atol": 0.05
   },
   "beta13": {
-    "value": -0.17292380332946777,
+    "value": -0.16748405992984772,
     "atol": 0.05,
     "why": "weakly identified: the coefficient multiplies the mixture x1 (sd 0.254 vs unit-scale siblings) \u2014 see the _note and docs/paper-replication.md"
   },
   "val_nll_x3": {
-    "value": 2.4607760906219482,
+    "value": 2.460599184036255,
     "atol": 0.05
   },
   "cs_curve_max_abs_err": {
-    "max": 0.1922
+    "max": 0.2612
   },
   "mean_x3_dgp_do_x1": {
     "value": 0.9375383689278238,
@@ -22,10 +22,10 @@
     "why": "a deterministic seeded DGP draw, like the other analytic entries; only numpy's last-bit drift moves it"
   },
   "mean_x3_abs_err_do_x1": {
-    "max": 0.2058
+    "max": 0.2003
   },
   "fit_seconds": {
-    "max": 1578,
-    "why": "3x the 2-core CI runner measurement (526 s, 2026-08-31): shared-runner wall clock is noisy, so this is a gross-regression tripwire (a lost no_grad, an accidental O(n^2)), not a benchmark"
+    "max": 1178,
+    "why": "3x the 2-core CI runner measurement (392 s, 2026-09-01, tuned protocol): shared-runner wall clock is noisy, so this is a gross-regression tripwire, not a benchmark"
   }
 }

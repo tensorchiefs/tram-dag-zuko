@@ -5,27 +5,34 @@
 ### Changed (breaking) — `fit` is one loop, the strategies are yours
 
 `CausalFlowDAG.fit` shrank from 18 keyword arguments to a minibatch Adam loop
-with an `optimizer=` hook and three callback lists (`flow.py` 2089 → ~1750
-lines, the shipped recipes in their own `callbacks.py`). Three independent reviews of the
+with an `optimizer=` hook and one `callbacks=` list (the shipped recipes in
+their own `callbacks.py`). Three independent reviews of the
 file agreed on the cut: what left was training *strategy* — choices tuned on
 this repository's own DGPs — not the TRAM-DAG model, and each of them had a
 default the paper replication or the tests had to switch off.
 
 - **`fit(train_df, *, epochs, learning_rate=1e-2, batch_size=512, seed=None,
-  optimizer=None, before_fit_callbacks=None, after_epoch_callbacks=None,
-  after_fit_callbacks=None, vc_ehat=None)`.** One optimizer over all
+  optimizer=None, callbacks=None, vc_ehat=None)`.** One optimizer over all
   parameters (the per-node NLLs have independent gradients, so this equals
   per-node training); `optimizer=` takes any torch optimizer, which is how a
-  `torch.optim.lr_scheduler` attaches. Each callback argument takes one
-  callable or a list. After-epoch callbacks run as `cb(flow, epoch,
-  optimizer)` after every epoch — all of them, every epoch — and the fit
-  stops after an epoch in which any returned `True`; the fit-level hooks run
-  as `cb(flow, optimizer)` once around the loop, the after-fit ones before
-  the VC re-centering (so restored weights get re-centered). `flow.history`
-  holds the per-node train NLL per epoch and nothing else. `epochs` is a
-  required keyword.
+  `torch.optim.lr_scheduler` attaches. `callbacks=` takes one entry or a
+  list: a `tramdag.callbacks.Callback` hooks `on_fit_begin(flow,
+  optimizer)`, `on_epoch_end(flow, epoch, optimizer)` and `on_fit_end(flow,
+  optimizer)`; a bare callable is an `on_epoch_end` hook. Epoch hooks run
+  after every epoch — all of them, every epoch — and the fit stops after an
+  epoch in which any returned `True`; `on_fit_end` runs before the VC
+  re-centering (so restored weights get re-centered). (The three-list shape
+  this section first shipped as — `before_fit_callbacks=` /
+  `after_epoch_callbacks=` / `after_fit_callbacks=` — collapsed into
+  `callbacks=` before release, after a usability review flagged the
+  two-hook `RestoreBest` registration as a silent footgun.) `flow.history`
+  holds the per-node train NLL per epoch — and, with validation configured,
+  the per-node validation NLL under `"val"`. `epochs` is a required
+  keyword.
 - **Gone from `fit`, with what replaces them** (all shown in
-  `docs/fitting.md`): `val_df` (compute `flow.nll(val_df)` in the callback);
+  `docs/fitting.md`): `val_df` — which later RETURNED in Keras shape
+  (see the validation bullet below) after the callback round measured
+  every shipped callback recomputing the same validation NLL;
   `schedule="plateau"`, `plateau_patience`, `plateau_factor`,
   `plateau_min_lr`, `min_delta` (torch's `ReduceLROnPlateau` on the
   optimizer you pass — the paper's VACA/CAREFL replication now runs the
@@ -33,8 +40,10 @@ default the paper replication or the tests had to switch off.
   a documented deviation); `freeze_patience` and the per-node freeze
   (back as the opt-in `tramdag.callbacks.PerNodePlateau`, the recipe
   `experiments/benchmarks/bench_training.py` measures); `restore_best`
-  (`tramdag.callbacks.RestoreBest`, or a six-line snapshot callback); `verbose` and the `tramdag.flow` logger (print or log in the
-  callback); `epoch_callback` (now `after_epoch_callbacks`, receives the
+  (`tramdag.callbacks.RestoreBest`, or a six-line snapshot callback);
+  `verbose` and the `tramdag.flow` logger — `verbose=` also returned,
+  Keras-style (below), and the module logger stayed gone;
+  `epoch_callback` (now an entry in `callbacks=`, receives the
   optimizer); `marginal_init` (moved to `calibrate`); `vc_warm_start` and
   the hidden classical proxy fit (two lines of user code, see
   `docs/varying-coefficients.md`; measured on `vc_hetero`: `beta0` 0.16
@@ -161,15 +170,29 @@ default the paper replication or the tests had to switch off.
   fitted probabilities to 9e-8. It makes two conventions concrete on the simplest
   possible model: an ordinal node *subtracts* its shift, and an ordinal
   parent's one-hot level-0 column is part of the intercept.
+- **Keras-shaped validation and progress in `fit`** —
+  `validation_data=` (a DataFrame) or `validation_split=` (a float: the
+  LAST fraction of `train_df`, unshuffled like Keras; only the head trains
+  and calibrates) make `fit` compute the per-node validation NLL once per
+  epoch into `flow.history["val"]`, in `validation_batch_size=` chunks.
+  `verbose=N` prints every Nth epoch plus the final one (0, the default,
+  is silent — no progress bars). A `validation_split` slices `vc_ehat`
+  with the same cut.
 - **`tramdag.callbacks`** — the common training recipes as shipped, opt-in
-  callbacks: `Logger` (epoch lines: train and validation NLL, `every=`),
-  `RestoreBest` (best-validation weights, restored through
-  `after_fit_callbacks` — the recipe the stroke finding needs, since
-  flexible CI/CS models overfit confounding at the MLE), and
-  `PerNodePlateau` with `per_node_adam` (per-node lr decay and freezing on
-  each node's own validation NLL, the pre-0.4 `fit(schedule="plateau")`
-  strategy). `fit` itself stays one plain loop; the callbacks are ordinary
-  `(flow, epoch, optimizer)` callables you could have written yourself.
+  callbacks on a small `Callback` base (`on_fit_begin` / `on_epoch_end` /
+  `on_fit_end`, each resetting its state at fit begin so instances are
+  reusable): `RestoreBest` (best-validation weights, restored
+  automatically at fit end — the recipe the stroke finding needs, since
+  flexible CI/CS models overfit confounding at the MLE), `EarlyStopping`
+  (`patience=` epochs without validation improvement; tracks its own best,
+  so it composes with `RestoreBest` in any order) and `PerNodePlateau`
+  with `per_node_adam` (per-node lr decay and freezing on each node's own
+  validation NLL, the pre-0.4 `fit(schedule="plateau")` strategy; its
+  `patience`/`freeze` now default to the benchmark's 15/50). All read
+  `history["val"]`, so a fit that registers them needs
+  `validation_data=`/`validation_split=` — the NLL is computed once,
+  shared. An earlier `Logger` callback existed briefly and dissolved into
+  `verbose=`. `fit` itself stays one plain loop.
 - **`src/tramdag/py.typed` ships (PEP 561)** — the package is fully
   annotated, and pip users' type checkers now see the inline types.
 - **`CausalFlowDAG(spec, init="glorot")`** — Keras' `Dense` default
@@ -182,17 +205,20 @@ default the paper replication or the tests had to switch off.
   difference). `init="normal"` is Keras' `RandomNormal` (sd 0.05 on weights
   and biases), the paper's triangle scripts' initializer. The VACA/CAREFL
   configs set glorot, the triangle configs normal. Stored in the checkpoint.
-- **`CausalFlowDAG(spec, net_input_scaling="minmax")`** — feeds every network
-  (complex intercept, complex shift, VC modifiers) its continuous parents
-  scaled to `[0, 1]` by the training min and max, the way the paper's
-  comparison scripts do (`comparison/utils.R::scale_df`); linear shifts and
-  the VC treatment stay raw, so `ls_coefficients` keep their units. Raw
-  parents saturate a tanh net whenever `|x| > 2` — 40% of the VACA rows —
-  which is why the VACA/CAREFL replications under the exact reference
-  protocol were 2–20× off the paper: `do(x2=-3)` error 0.731 → 0.098 with
-  the option on (0.026 under the earlier per-node plateau approximation). Default off; calibrated at the first `fit`, stored in the
-  checkpoint (the buffers are part of every node's state, so checkpoints
-  saved before this change do not load — refit).
+- **`CI/CS/VC(input_transform=)`** — every term's network chooses its own
+  input transform: `"minmax"`, `"standardize"`, or a callable `fn(x, train)`
+  that receives the frozen raw training column (never the batch's — batch
+  statistics would encode the same value differently per call). Statistics
+  freeze at `calibrate` and live in per-term buffers, so they checkpoint;
+  a callable must be a picklable module-level function to `save` (a lambda
+  raises with instructions). Linear shifts and the VC treatment stay raw,
+  so `ls_coefficients` keep their units. This replaces the earlier
+  flow-level `CausalFlowDAG(net_input_scaling=)` draft of the same idea
+  (one setting for ALL nets); its motivation carries over unchanged — raw
+  parents saturate a tanh net whenever `|x| > 2` (40% of the VACA rows),
+  which put the VACA/CAREFL replications 2-20x off the paper until the
+  minmax transform (`do(x2=-3)` error 0.731 -> 0.098). Default off;
+  checkpoints saved under the flow-level draft do not load — refit.
 - **`init_marginals(train_df)`** — the calibrated start as an explicit,
   repeatable step: resets every Bernstein/ordinal simple intercept to its
   column's marginal (spline and affine have no calibrated start)
@@ -232,6 +258,22 @@ default the paper replication or the tests had to switch off.
   arXiv:2503.16206 to the variant that reproduces it, including the
   paper's misspecified case (Fig. 17, new variant `triangle linear-cs`)
   and the two competing baselines that are deliberately not reimplemented.
+
+- **The replication protocol is tuned for runtime (2026-09-01)** — with the
+  quality gates unchanged: every ground-truth bound holds under 30-71% less
+  training. Triangle runs 300 epochs (linear-cs keeps 500 — its cs curve
+  needs them), mixed 350/200, VACA 4800 full-batch steps at lr 0.002 with
+  the plateau schedule dropped (the old anneal's only job was freezing
+  inside the do-error sweet spot; the tuned lr hits the same window
+  directly), CAREFL 3000 at lr 0.002, the validate-ls Adam descent 2000
+  epochs instead of 7000. The attempted bigger deviations are documented
+  negative results: raw network inputs fail on VACA/CAREFL (sigmoid
+  saturates like tanh, relu underfits and grows fragile Bernstein tails)
+  and minibatching biases the interventional decomposition (a -0.11
+  common-mode offset of the do-means at a perfect observational fit), so
+  those two keep tanh + `net_input_scaling: minmax`. Ground truths
+  re-pinned; details per experiment in the YAML headers and
+  docs/paper-replication.md.
 
 - **An experiments workflow** (`.github/workflows/experiments.yaml`) runs
   all replication variants as a matrix on every push and on demand,
@@ -522,8 +564,8 @@ default the paper replication or the tests had to switch off.
 
 - **No progress output from the package.** `fit` and `fit_classical`
   print and log nothing (the `verbose=` gate and the `tramdag.flow`
-  logger of an intermediate state are gone); an after-epoch callback
-  (e.g. `tramdag.callbacks.Logger`) reports what you want, `fit_classical` returns its report dict.
+  logger of an intermediate state are gone); `verbose=` or a bare
+  `on_epoch_end` callable reports what you want, `fit_classical` returns its report dict.
 
 - **The node formula argument is `terms`, not `transformation`.**
   `ContinuousNode(terms=...)` / `OrdinalNode(levels, terms=...)`, and the
@@ -548,7 +590,7 @@ default the paper replication or the tests had to switch off.
   executed notebooks, so its math is real math.
 
 - `experiments/paper/helpers.py`: the per-epoch coefficient read-out is
-  `fit(after_epoch_callbacks=)` inside one `fit_paper(generator, spec, config, out,
+  `fit(callbacks=)` inside one `fit_paper(generator, spec, config, out,
   record)` call — there is no chunked or snapshotting fit helper any more.
 
 - **Every complexity hotspot is dissolved into named stages** — `fit`

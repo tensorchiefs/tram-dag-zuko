@@ -35,8 +35,8 @@ def fit_paper(generator, spec: dict, config: dict, out: Path, record=None):
     (``update_learning_rate``: factor, patience, min_lr, strict ``<``). Both
     are one ``fit`` call here: the plateau rule is torch's own
     ``ReduceLROnPlateau`` on the summed validation NLL — global, like the
-    reference — stepped from the epoch callback, which is also where the
-    coefficients are read.
+    reference — stepped from the epoch callback on ``history["val"]``
+    (fit computes it), which is also where the coefficients are read.
 
     Train and validation are two separate draws, as in R. The reference has
     no calibrated start, so the flow is calibrated with ``marginal_init=False``.
@@ -52,12 +52,7 @@ def fit_paper(generator, spec: dict, config: dict, out: Path, record=None):
     """
     train = generator.observational(config["n_train"])
     val = generator.observational(config["n_val"], seed_offset=1)
-    flow = CausalFlowDAG(
-        spec,
-        seed=config["init_seed"],
-        net_input_scaling=config["net_input_scaling"],
-        init=config["init"],
-    )
+    flow = CausalFlowDAG(spec, seed=config["init_seed"], init=config["init"])
     flow.calibrate(train, marginal_init=False)
     opt = torch.optim.Adam(flow.parameters(), lr=config["learning_rate"])
     plateau = None
@@ -75,7 +70,7 @@ def fit_paper(generator, spec: dict, config: dict, out: Path, record=None):
 
     def epoch_end(f, epoch, _opt):
         if plateau is not None:
-            plateau.step(sum(f.nll(val).values()))
+            plateau.step(sum(f.history["val"][-1].values()))
         if record is not None:
             trajectory.append({"epoch": epoch, **record(f)})
 
@@ -84,9 +79,12 @@ def fit_paper(generator, spec: dict, config: dict, out: Path, record=None):
         train,
         epochs=config["epochs"],
         batch_size=config["batch_size"],
+        # per-epoch validation only where the protocol consumes it (the
+        # plateau rule); the triangle scripts never computed it per epoch
+        validation_data=val if plateau is not None else None,
         seed=config["shuffle_seed"],
         optimizer=opt,
-        after_epoch_callbacks=epoch_end,
+        callbacks=epoch_end,
     )
     fit_seconds = round(time.perf_counter() - t0, 1)
     flow.save(out / "flow.pt")
@@ -147,7 +145,7 @@ def cs_curve_error(
     x = torch.as_tensor(grid, dtype=torch.float32).view(-1, 1)
     nd = flow.nodes["x3"]
     with torch.no_grad():
-        fitted = nd.shifts["x2"](nd.net_input({"x2": x}, ("x2",))).numpy().ravel()
+        fitted = nd.shifts["x2"](nd.net_input({"x2": x}, ("x2",), "x2")).numpy().ravel()
     return plot_cs_curve(
         grid,
         fitted=fitted,
