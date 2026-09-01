@@ -160,7 +160,6 @@ import pandas as pd
 import torch
 
 from tramdag import CS, LS, CausalFlowDAG, ContinuousNode, OrdinalNode
-from tramdag.callbacks import Logger
 
 plt.rcParams["figure.dpi"] = 110
 
@@ -311,8 +310,8 @@ plt.show()
 # negative log-likelihood **decomposes per node**
 # ($\log p(x) = \sum_i \log p(x_i \mid \mathrm{pa}(x_i))$). Thus one Adam
 # optimizer trains all nodes at once. `fit` keeps the final weights — for
-# this unconfounded DGP the MLE is the right target. Progress printing is a
-# shipped callback (`tramdag.callbacks.Logger`).
+# this unconfounded DGP the MLE is the right target. Progress printing is
+# `fit`'s own `verbose=` (Keras-style; 0 = silent, N = every Nth epoch).
 
 # %%
 spec = {
@@ -325,13 +324,7 @@ spec = {
 flow = CausalFlowDAG(
     spec, seed=1
 )  # seed here too, for the Bernsteins' initial uniform knots
-flow.fit(
-    train_df,
-    epochs=800,
-    learning_rate=1e-2,
-    batch_size=20000,
-    after_epoch_callbacks=Logger(every=200),
-)
+flow.fit(train_df, epochs=800, learning_rate=1e-2, batch_size=20000, verbose=200)
 flow.fit(train_df, epochs=300, learning_rate=1e-3, batch_size=512)  # polish
 flow.nll(val_df)
 

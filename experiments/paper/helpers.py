@@ -35,8 +35,8 @@ def fit_paper(generator, spec: dict, config: dict, out: Path, record=None):
     (``update_learning_rate``: factor, patience, min_lr, strict ``<``). Both
     are one ``fit`` call here: the plateau rule is torch's own
     ``ReduceLROnPlateau`` on the summed validation NLL — global, like the
-    reference — stepped from the epoch callback, which is also where the
-    coefficients are read.
+    reference — stepped from the epoch callback on ``history["val"]``
+    (fit computes it), which is also where the coefficients are read.
 
     Train and validation are two separate draws, as in R. The reference has
     no calibrated start, so the flow is calibrated with ``marginal_init=False``.
@@ -70,7 +70,7 @@ def fit_paper(generator, spec: dict, config: dict, out: Path, record=None):
 
     def epoch_end(f, epoch, _opt):
         if plateau is not None:
-            plateau.step(sum(f.nll(val).values()))
+            plateau.step(sum(f.history["val"][-1].values()))
         if record is not None:
             trajectory.append({"epoch": epoch, **record(f)})
 
@@ -79,6 +79,9 @@ def fit_paper(generator, spec: dict, config: dict, out: Path, record=None):
         train,
         epochs=config["epochs"],
         batch_size=config["batch_size"],
+        # per-epoch validation only where the protocol consumes it (the
+        # plateau rule); the triangle scripts never computed it per epoch
+        validation_data=val if plateau is not None else None,
         seed=config["shuffle_seed"],
         optimizer=opt,
         after_epoch_callbacks=epoch_end,

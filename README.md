@@ -56,17 +56,20 @@ spec = {  # the spec IS the labelled DAG
 # train_df / val_df: DataFrames with one column per node
 flow = CausalFlowDAG(spec)  # validates acyclicity, builds the flow
 
-# fit() is one minibatch Adam loop; validation, schedules and early stopping
-# attach through optimizer= and the callback hooks — the common recipes ship
-# in tramdag.callbacks (docs/fitting.md)
-from tramdag.callbacks import Logger, RestoreBest
+# fit() is one minibatch Adam loop with Keras-shaped extras: validation_data=
+# (or validation_split=0.1) records the per-epoch validation NLL in
+# flow.history["val"], verbose= prints progress; schedules and early stopping
+# attach through optimizer= and the callback hooks (docs/fitting.md)
+from tramdag.callbacks import RestoreBest
 
-best = RestoreBest(val_df)  # keep the best-validation weights
+best = RestoreBest()  # keep the best-validation weights
 flow.fit(
     train_df,
     epochs=4000,
     batch_size=512,
-    after_epoch_callbacks=[Logger(val_df, every=100), best],
+    validation_data=val_df,
+    verbose=100,
+    after_epoch_callbacks=[best],
     after_fit_callbacks=[best.restore],
 )
 

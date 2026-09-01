@@ -73,10 +73,12 @@ See `experiments/README.md`.
   `ComplexShiftDefaultTabular` 64-128-64, `ComplexInterceptDefaultTabular` 8-8,
   `n_thetas=20`) — **not** the paper's R nets, which every `experiments/paper/`
   config sets explicitly instead.
-- `callbacks.py` — the shipped `fit` callbacks: `Logger`, `RestoreBest`
+- `callbacks.py` — the shipped `fit` callbacks: `RestoreBest`
   (best-validation weights, restored through `after_fit_callbacks`),
   `PerNodePlateau` + `per_node_adam` (per-node lr decay and freezing, the
-  pre-0.4 plateau recipe). Optional; `fit` itself stays one plain loop.
+  pre-0.4 plateau recipe). Both read `history["val"]`, which
+  `fit(validation_data=|validation_split=)` fills per epoch; `verbose=`
+  owns progress printing. Optional; `fit` itself stays one plain loop.
 - (no `utils.py` any more: `config_section` moved to
   `experiments/common.py`, `machine_info` to
   `experiments/benchmarks/perf_machine.py` — each next to its only caller, so
@@ -116,10 +118,14 @@ See `experiments/README.md`.
 - **`fit` keeps the final weights and is one minibatch Adam loop** — an
   all-`ls` model then matches statsmodels/R-polr to ~1e-3. Validation, lr
   schedules, early stopping / best-weight restoration and logging are the
-  caller's, through `fit(optimizer=, after_epoch_callbacks=, before_fit_callbacks=,
-  after_fit_callbacks=)` (per-epoch callbacks get `(flow, epoch, opt)`, any `True`
-  stops; the fit-level hooks get `(flow, opt)`); `tramdag/callbacks.py` ships
-  `Logger`, `RestoreBest`, `PerNodePlateau`+`per_node_adam`; `flow.calibrate(train_df, marginal_init=)`
+  caller's, through `fit(validation_data=|validation_split=,
+  validation_batch_size=, verbose=, optimizer=, after_epoch_callbacks=,
+  before_fit_callbacks=, after_fit_callbacks=)` — fit fills
+  `history["val"]` per epoch and `verbose=N` prints every Nth line;
+  per-epoch callbacks get `(flow, epoch, opt)`, any `True` stops; the
+  fit-level hooks get `(flow, opt)`; `tramdag/callbacks.py` ships
+  `RestoreBest`, `PerNodePlateau`+`per_node_adam` (they read
+  `history["val"]`); `flow.calibrate(train_df, marginal_init=)`
   takes the data-dependent state once (ranges, net min-max, calibrated start)
   and is called by the first fit; `init_marginals(train_df)` re-applies the
   calibrated start explicitly, any time. Key empirical finding (stroke storyline):

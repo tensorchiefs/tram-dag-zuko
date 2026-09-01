@@ -70,6 +70,50 @@ def _callback_list(cbs) -> list:
     return [cbs] if callable(cbs) else list(cbs)
 
 
+def _check_fit_sizes(epochs: int, batch_size: int) -> None:
+    """Reject a non-positive epoch or batch budget before anything runs."""
+    if epochs < 1:
+        raise ValueError(f"epochs must be at least 1, got {epochs}")
+    if batch_size < 1:
+        raise ValueError(f"batch_size must be at least 1, got {batch_size}")
+
+
+def _split_validation(
+    train_df: pd.DataFrame,
+    validation_data: pd.DataFrame | None,
+    validation_split: float | None,
+    verbose: int,
+    vc_ehat: dict | None,
+):
+    """Resolve fit's validation arguments (the Keras rules).
+
+    ``validation_split`` takes the LAST fraction of ``train_df`` as
+    validation without shuffling, exactly like Keras — deterministic, no
+    hidden RNG. ``vc_ehat`` rows are sliced with the same split, so the
+    caller supplies propensities for the frame they passed.
+    """
+    if verbose < 0 or int(verbose) != verbose:
+        raise ValueError(f"verbose must be a non-negative int, got {verbose!r}")
+    if validation_split is None:
+        return train_df, validation_data, vc_ehat
+    if validation_data is not None:
+        raise ValueError("pass validation_data OR validation_split, not both")
+    if not 0.0 < validation_split < 1.0:
+        raise ValueError(f"validation_split must be in (0, 1), got {validation_split}")
+    cut = round(len(train_df) * (1.0 - validation_split))
+    if cut < 1 or cut >= len(train_df):
+        raise ValueError(
+            f"validation_split={validation_split} leaves no rows on one side "
+            f"of the {len(train_df)}-row frame"
+        )
+    if vc_ehat is not None:
+        vc_ehat = {
+            node: {t: np.asarray(e)[:cut] for t, e in d.items()}
+            for node, d in vc_ehat.items()
+        }
+    return train_df.iloc[:cut], train_df.iloc[cut:], vc_ehat
+
+
 def _check_callbacks(cbs: list, args: tuple[str, ...], name: str) -> None:
     """Reject a mis-registered callback before training, not hours after it.
 
@@ -911,6 +955,10 @@ class CausalFlowDAG(nn.Module):
         epochs: int,
         learning_rate: float = 1e-2,
         batch_size: int = 512,
+        validation_data: pd.DataFrame | None = None,
+        validation_split: float | None = None,
+        validation_batch_size: int | None = None,
+        verbose: int = 0,
         seed: int | None = None,
         optimizer: torch.optim.Optimizer | None = None,
         before_fit_callbacks=None,
@@ -930,13 +978,15 @@ class CausalFlowDAG(nn.Module):
         logging — is the caller's, through ``optimizer`` and the callback
         hooks; :mod:`tramdag.callbacks` ships the common recipes::
 
-            from tramdag.callbacks import Logger, RestoreBest
+            from tramdag.callbacks import RestoreBest
 
-            best = RestoreBest(val_df)
+            best = RestoreBest()
             flow.fit(
                 train_df,
                 epochs=4000,
-                after_epoch_callbacks=[Logger(val_df, every=50), best],
+                validation_data=val_df,
+                verbose=50,
+                after_epoch_callbacks=[best],
                 after_fit_callbacks=[best.restore],
             )
 
@@ -954,6 +1004,23 @@ class CausalFlowDAG(nn.Module):
         batch_size : int, optional
             Rows per gradient step, by default 512. ``len(train_df)`` is one
             full-batch step per epoch.
+        validation_data : pd.DataFrame | None, optional
+            Validation rows, one column per node. When given (or split off),
+            the per-node validation NLL is computed after every epoch and
+            appended to ``flow.history["val"]`` — once, centrally; the
+            shipped callbacks read it there.
+        validation_split : float | None, optional
+            Keras' rule: the LAST fraction of ``train_df`` becomes the
+            validation set, without shuffling, and only the remaining rows
+            train (and calibrate — no leakage into the frozen statistics).
+            Mutually exclusive with ``validation_data``.
+        validation_batch_size : int | None, optional
+            Chunk size of the validation pass, by default one full batch.
+        verbose : int, optional
+            0 (default) is silent. ``N >= 1`` prints one line every ``N``
+            epochs and on the final epoch: epoch counter, summed train NLL,
+            summed validation NLL when validation is configured. No
+            progress bars.
         seed : int | None, optional
             Seeds torch's global RNG before the loop, for the minibatch
             shuffling. Weight initialization is seeded at construction
@@ -971,9 +1038,9 @@ class CausalFlowDAG(nn.Module):
             ``flow.history["train"]``. All of them run each epoch; the fit
             stops after an epoch in which any returned ``True``
             (``len(flow.history["train"])`` says how many epochs ran). Use them
-            for validation (``flow.nll(val_df)``), schedules, snapshots and
-            coefficient trajectories — :mod:`tramdag.callbacks` ships
-            ``Logger``, ``RestoreBest`` and ``PerNodePlateau``.
+            for schedules, snapshots and coefficient trajectories —
+            :mod:`tramdag.callbacks` ships ``RestoreBest`` and
+            ``PerNodePlateau``, both reading ``history["val"]``.
         after_fit_callbacks : callable | list[callable] | None, optional
             Each called as ``cb(flow, optimizer)`` once, after the loop and
             **before** the VC re-centering — so a callback that swaps the
@@ -991,8 +1058,10 @@ class CausalFlowDAG(nn.Module):
         Raises
         ------
         ValueError
-            If ``epochs`` or ``batch_size`` is below 1, or ``vc_ehat`` does
-            not match the centered VC terms of the spec.
+            If ``epochs`` or ``batch_size`` is below 1, ``verbose`` is
+            negative, both validation arguments are given, the split leaves
+            an empty side, or ``vc_ehat`` does not match the centered VC
+            terms of the spec.
         TypeError
             If a callback does not accept its hook's arguments — checked
             before the first epoch, so a mis-registered callback cannot
@@ -1010,10 +1079,7 @@ class CausalFlowDAG(nn.Module):
         training rows; the constant moves into ``beta0``, the function is
         unchanged.
         """
-        if epochs < 1:
-            raise ValueError(f"epochs must be at least 1, got {epochs}")
-        if batch_size < 1:
-            raise ValueError(f"batch_size must be at least 1, got {batch_size}")
+        _check_fit_sizes(epochs, batch_size)
         before = _callback_list(before_fit_callbacks)
         after_epoch = _callback_list(after_epoch_callbacks)
         after_fit = _callback_list(after_fit_callbacks)
@@ -1022,6 +1088,9 @@ class CausalFlowDAG(nn.Module):
         _check_callbacks(after_fit, ("flow", "optimizer"), "after_fit")
         if seed is not None:
             torch.manual_seed(seed)
+        train_df, validation_data, vc_ehat = _split_validation(
+            train_df, validation_data, validation_split, verbose, vc_ehat
+        )
         # vc_ehat is validated BEFORE calibrate: a malformed dict must fail
         # while the flow is still untouched (calibrate sets ranges and the
         # marginal start — a half-mutated flow after an error would be worse
@@ -1029,6 +1098,9 @@ class CausalFlowDAG(nn.Module):
         ehat = self._vc_ehat_train(train_df, vc_ehat)
         self.calibrate(train_df)
         vals = self._tensorize(train_df)
+        val_vals = (
+            self._tensorize(validation_data) if validation_data is not None else None
+        )
         opt = optimizer or torch.optim.Adam(self.parameters(), lr=learning_rate)
         penalized = [
             nd.shifts[g.on]
@@ -1039,13 +1111,12 @@ class CausalFlowDAG(nn.Module):
         for cb in before:
             cb(self, opt)
         for epoch in range(1, epochs + 1):
-            self.train()
-            self.history["train"].append(
-                self._fit_epoch(vals, ehat, opt, batch_size, penalized)
+            self._epoch_pass(
+                vals, ehat, opt, batch_size, penalized, val_vals, validation_batch_size
             )
-            self.eval()
-            # every callback runs (a stop must not skip the logger)
+            # every callback runs (a stop must not skip a monitoring one)
             stops = [bool(cb(self, epoch, opt)) for cb in after_epoch]
+            self._log_epoch(epoch, epochs, verbose, stopped=any(stops))
             if any(stops):
                 break
         for cb in after_fit:
@@ -1053,6 +1124,46 @@ class CausalFlowDAG(nn.Module):
         self._recenter_vc(vals)
         self.eval()
         return self
+
+    def _epoch_pass(
+        self, vals, ehat, opt, batch_size, penalized, val_vals, validation_batch_size
+    ) -> None:
+        """Run one training epoch and, when configured, the validation pass."""
+        self.train()
+        self.history["train"].append(
+            self._fit_epoch(vals, ehat, opt, batch_size, penalized)
+        )
+        self.eval()
+        if val_vals is not None:
+            self.history.setdefault("val", []).append(
+                self._val_nll(val_vals, validation_batch_size)
+            )
+
+    def _log_epoch(self, epoch: int, epochs: int, verbose: int, stopped: bool):
+        """Print one ``verbose`` progress line on the Nth and the final epoch."""
+        last = stopped or epoch == epochs
+        if not verbose or (epoch % verbose and not last):
+            return
+        line = f"epoch {epoch}/{epochs}"
+        line += f"  train {sum(self.history['train'][-1].values()):.4f}"
+        if self.history.get("val"):
+            line += f"  val {sum(self.history['val'][-1].values()):.4f}"
+        print(line)
+
+    def _val_nll(
+        self, vals: dict[str, Tensor], batch_size: int | None
+    ) -> dict[str, float]:
+        """Give the per-node mean validation NLL, chunked by validation batch size."""
+        n = len(next(iter(vals.values())))
+        chunk = batch_size or n
+        acc = dict.fromkeys(self.order, 0.0)
+        with torch.no_grad():
+            for start in range(0, n, chunk):
+                batch = {k: v[start : start + chunk] for k, v in vals.items()}
+                weight = len(next(iter(batch.values()))) / n
+                for k, v in self.node_log_prob(batch).items():
+                    acc[k] += float(-v.mean()) * weight
+        return acc
 
     def _fit_epoch(
         self,

@@ -22,10 +22,13 @@ default the paper replication or the tests had to switch off.
   stops after an epoch in which any returned `True`; the fit-level hooks run
   as `cb(flow, optimizer)` once around the loop, the after-fit ones before
   the VC re-centering (so restored weights get re-centered). `flow.history`
-  holds the per-node train NLL per epoch and nothing else. `epochs` is a
-  required keyword.
+  holds the per-node train NLL per epoch — and, with validation configured,
+  the per-node validation NLL under `"val"`. `epochs` is a required
+  keyword.
 - **Gone from `fit`, with what replaces them** (all shown in
-  `docs/fitting.md`): `val_df` (compute `flow.nll(val_df)` in the callback);
+  `docs/fitting.md`): `val_df` — which later RETURNED in Keras shape
+  (see the validation bullet below) after the callback round measured
+  every shipped callback recomputing the same validation NLL;
   `schedule="plateau"`, `plateau_patience`, `plateau_factor`,
   `plateau_min_lr`, `min_delta` (torch's `ReduceLROnPlateau` on the
   optimizer you pass — the paper's VACA/CAREFL replication now runs the
@@ -33,8 +36,10 @@ default the paper replication or the tests had to switch off.
   a documented deviation); `freeze_patience` and the per-node freeze
   (back as the opt-in `tramdag.callbacks.PerNodePlateau`, the recipe
   `experiments/benchmarks/bench_training.py` measures); `restore_best`
-  (`tramdag.callbacks.RestoreBest`, or a six-line snapshot callback); `verbose` and the `tramdag.flow` logger (print or log in the
-  callback); `epoch_callback` (now `after_epoch_callbacks`, receives the
+  (`tramdag.callbacks.RestoreBest`, or a six-line snapshot callback);
+  `verbose` and the `tramdag.flow` logger — `verbose=` also returned,
+  Keras-style (below), and the module logger stayed gone;
+  `epoch_callback` (now `after_epoch_callbacks`, receives the
   optimizer); `marginal_init` (moved to `calibrate`); `vc_warm_start` and
   the hidden classical proxy fit (two lines of user code, see
   `docs/varying-coefficients.md`; measured on `vc_hetero`: `beta0` 0.16
@@ -161,15 +166,26 @@ default the paper replication or the tests had to switch off.
   fitted probabilities to 9e-8. It makes two conventions concrete on the simplest
   possible model: an ordinal node *subtracts* its shift, and an ordinal
   parent's one-hot level-0 column is part of the intercept.
+- **Keras-shaped validation and progress in `fit`** —
+  `validation_data=` (a DataFrame) or `validation_split=` (a float: the
+  LAST fraction of `train_df`, unshuffled like Keras; only the head trains
+  and calibrates) make `fit` compute the per-node validation NLL once per
+  epoch into `flow.history["val"]`, in `validation_batch_size=` chunks.
+  `verbose=N` prints every Nth epoch plus the final one (0, the default,
+  is silent — no progress bars). A `validation_split` slices `vc_ehat`
+  with the same cut.
 - **`tramdag.callbacks`** — the common training recipes as shipped, opt-in
-  callbacks: `Logger` (epoch lines: train and validation NLL, `every=`),
-  `RestoreBest` (best-validation weights, restored through
+  callbacks: `RestoreBest` (best-validation weights, restored through
   `after_fit_callbacks` — the recipe the stroke finding needs, since
-  flexible CI/CS models overfit confounding at the MLE), and
+  flexible CI/CS models overfit confounding at the MLE) and
   `PerNodePlateau` with `per_node_adam` (per-node lr decay and freezing on
   each node's own validation NLL, the pre-0.4 `fit(schedule="plateau")`
-  strategy). `fit` itself stays one plain loop; the callbacks are ordinary
-  `(flow, epoch, optimizer)` callables you could have written yourself.
+  strategy). Both read `history["val"]`, so a fit that registers them
+  needs `validation_data=`/`validation_split=` — the NLL is computed once,
+  shared. An earlier `Logger` callback existed briefly and dissolved into
+  `verbose=`. `fit` itself stays one plain loop; the callbacks are
+  ordinary `(flow, epoch, optimizer)` callables you could have written
+  yourself.
 - **`src/tramdag/py.typed` ships (PEP 561)** — the package is fully
   annotated, and pip users' type checkers now see the inline types.
 - **`CausalFlowDAG(spec, init="glorot")`** — Keras' `Dense` default

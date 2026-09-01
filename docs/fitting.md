@@ -78,6 +78,13 @@ learning rates and freezing (a callback, below) and the all-`ls` classical fit.
   resets every Bernstein/ordinal simple intercept to its column's marginal
   (spline and affine have no calibrated start), any time — e.g. to
   restart a trained or loaded flow (`calibrate` won't, it is once-only).
+- **Validation, Keras-shaped** — `validation_data=` (a DataFrame) or
+  `validation_split=` (a float: the LAST fraction of `train_df`, no shuffle,
+  and only the head calibrates — no leakage) makes `fit` compute the
+  per-node validation NLL after every epoch, once, into
+  `flow.history["val"]` (`validation_batch_size=` chunks the pass). The
+  shipped callbacks read it there. `verbose=N` prints every Nth epoch plus
+  the final one (0, the default, is silent).
 - **Callback hooks** — `after_epoch_callbacks=` takes one callable or a list,
   each called as `cb(flow, epoch, optimizer)` after every epoch, once the
   epoch's train NLLs are in `flow.history["train"]`; every callback runs each
@@ -85,56 +92,61 @@ learning rates and freezing (a callback, below) and the all-`ls` classical fit.
   `before_fit_callbacks=` / `after_fit_callbacks=` (`cb(flow, optimizer)`)
   bracket the loop — the after-fit hooks run *before* the `VC` re-centering,
   so a callback that swaps weights hands them to the re-centering. This is
-  where validation (`flow.nll(val_df)`), schedules, snapshots, logging and
-  coefficient trajectories live. The common recipes ship in
-  [`tramdag.callbacks`](../src/tramdag/callbacks.py): `Logger` (epoch lines),
-  `RestoreBest` (best-validation weights), `PerNodePlateau` + `per_node_adam`
-  (per-node decay and freezing).
+  where schedules, snapshots and coefficient trajectories live. The common
+  recipes ship in [`tramdag.callbacks`](../src/tramdag/callbacks.py):
+  `RestoreBest` (best-validation weights) and `PerNodePlateau` +
+  `per_node_adam` (per-node decay and freezing), both reading
+  `history["val"]`.
 - **`vc_ehat=`**: the out-of-fold propensities a centered `VC` term needs,
   `{node: {t: array}}` with one value per training row (see
   [varying-coefficients.md](varying-coefficients.md)).
 
 ### The recipes, as callbacks
 
-The shipped ones first — best-validation weights plus progress lines is two
-imports:
+The shipped ones first — best-validation weights plus progress lines is one
+import:
 
 ```python
-from tramdag.callbacks import Logger, RestoreBest
+from tramdag.callbacks import RestoreBest
 
-best = RestoreBest(val_df)
+best = RestoreBest()
 flow.fit(
     train_df,
     epochs=4000,
-    after_epoch_callbacks=[Logger(val_df, every=50), best],
+    validation_data=val_df,   # or validation_split=0.1
+    verbose=50,
+    after_epoch_callbacks=[best],
     after_fit_callbacks=[best.restore],
 )
 ```
 
+**Per-node training**, the two requested recipes: a per-node optimizer is
+`per_node_adam(flow, lr)` — one parameter group per node, so groups can carry
+different rates — and per-node early stopping is `PerNodePlateau(patience=10,
+freeze=40)` over that optimizer: each node's rate decays on its own
+validation NLL and the fit stops when every node froze (the demo notebook
+runs this recipe end to end).
+
 Anything else is a few lines of your own. A learning-rate schedule is torch's,
-stepped from the hook; the snapshot half of this snippet is what `RestoreBest`
-does inside, written out:
+stepped from the hook on the validation NLL `fit` already computed; the
+snapshot half is what `RestoreBest` does inside, written out:
 
 ```python
 import copy
 
 opt = torch.optim.Adam(flow.parameters(), lr=1e-2)
-
-# a learning-rate schedule: torch's, on the validation NLL
 plateau = torch.optim.lr_scheduler.ReduceLROnPlateau(opt, factor=0.3, patience=30)
-
-# best-validation weights (early stopping) — RestoreBest, spelled out
 best = {"nll": float("inf"), "state": None}
 
 def on_epoch(flow, epoch, opt):
-    nll = sum(flow.nll(val_df).values())
+    nll = sum(flow.history["val"][-1].values())   # fit computed it
     plateau.step(nll)
     if nll < best["nll"]:
         best.update(nll=nll, state=copy.deepcopy(flow.state_dict()))
     return opt.param_groups[0]["lr"] < 1e-5      # stop once the rate bottomed out
 
-flow.fit(train_df, epochs=4000, batch_size=512, optimizer=opt,
-         after_epoch_callbacks=on_epoch)
+flow.fit(train_df, epochs=4000, batch_size=512, validation_data=val_df,
+         optimizer=opt, after_epoch_callbacks=on_epoch)
 flow.load_state_dict(best["state"])
 ```
 

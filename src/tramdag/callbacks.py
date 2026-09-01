@@ -1,17 +1,19 @@
-"""Predefined ``fit`` callbacks: logging, best-weight restoration, per-node plateau.
+"""Predefined ``fit`` callbacks: best-weight restoration, per-node plateau.
 
-``fit`` stays one plain loop; everything here is optional and attaches through
-its hooks (``after_epoch_callbacks=``, ``after_fit_callbacks=``). Each callback
-is self-contained — it computes its own validation NLL — so they compose in any
-order::
+``fit`` owns validation (``validation_data=`` / ``validation_split=``) and
+progress printing (``verbose=``); the callbacks here read the per-node
+validation NLL that ``fit`` appends to ``flow.history["val"]`` after every
+epoch — computed once, shared by all of them::
 
-    from tramdag.callbacks import Logger, RestoreBest
+    from tramdag.callbacks import RestoreBest
 
-    best = RestoreBest(val_df)
+    best = RestoreBest()
     flow.fit(
         train_df,
         epochs=4000,
-        after_epoch_callbacks=[Logger(val_df, every=50), best],
+        validation_data=val_df,
+        verbose=50,
+        after_epoch_callbacks=[best],
         after_fit_callbacks=[best.restore],
     )
 
@@ -24,8 +26,19 @@ from __future__ import annotations
 import copy
 import math
 
-import pandas as pd
 import torch
+
+
+# %% private functions -------------------------------------------------------------
+def _last_val(flow) -> dict[str, float]:
+    """Give the current epoch's per-node validation NLL, or fail loudly."""
+    val = flow.history.get("val")
+    if not val:
+        raise RuntimeError(
+            "this callback reads flow.history['val'] — pass validation_data= "
+            "or validation_split= to fit()"
+        )
+    return val[-1]
 
 
 # %% public functions ------------------------------------------------------------------
@@ -46,34 +59,6 @@ def per_node_adam(flow, lr: float = 1e-2, **adam_kwargs) -> torch.optim.Adam:
 
 
 # %% public classes --------------------------------------------------------------------
-class Logger:
-    """Print the summed train NLL — and validation NLL, when given — per epoch.
-
-    Parameters
-    ----------
-    val_df : pd.DataFrame | None, optional
-        Validation rows; their summed NLL joins the line when given.
-    every : int, optional
-        Print every that-many epochs, by default 1.
-    """
-
-    def __init__(self, val_df: pd.DataFrame | None = None, every: int = 1):
-        if every < 1:
-            raise ValueError(f"every must be at least 1, got {every}")
-        self.val_df = val_df
-        self.every = every
-
-    def __call__(self, flow, epoch: int, optimizer) -> None:
-        """Print the epoch line."""
-        if epoch % self.every:
-            return
-        train = sum(flow.history["train"][-1].values())
-        line = f"epoch {epoch:>5d}  train NLL {train:.4f}"
-        if self.val_df is not None:
-            line += f"  val NLL {sum(flow.nll(self.val_df).values()):.4f}"
-        print(line)
-
-
 class RestoreBest:
     """Keep the weights of the best summed validation NLL; ``restore`` loads them.
 
@@ -85,21 +70,23 @@ class RestoreBest:
     re-centering, so the restored weights are what gets re-centered. One
     instance per fit and per flow — the snapshot is a full ``state_dict``.
 
+    Reads ``flow.history["val"]``, so the fit needs ``validation_data=`` or
+    ``validation_split=``.
+
     Attributes
     ----------
     best_nll, best_epoch
         The best summed validation NLL seen and the epoch it came from.
     """
 
-    def __init__(self, val_df: pd.DataFrame):
-        self.val_df = val_df
+    def __init__(self):
         self.best_nll = math.inf
         self.best_epoch = 0
         self._state = None
 
     def __call__(self, flow, epoch: int, optimizer) -> None:
         """Snapshot the weights when the validation NLL improves."""
-        nll = sum(flow.nll(self.val_df).values())
+        nll = sum(_last_val(flow).values())
         if nll < self.best_nll:
             self.best_nll, self.best_epoch = nll, epoch
             self._state = copy.deepcopy(flow.state_dict())
@@ -127,7 +114,8 @@ class PerNodePlateau:
     (rate 0). The callback stops the fit when every node has left. Valid
     because the per-node NLLs have independent gradients — build the
     optimizer with :func:`per_node_adam` (one ``node``-tagged group per
-    node).
+    node), and give ``fit`` a validation set (the callback reads
+    ``flow.history["val"]``).
 
     A frozen node's rate is 0 but its forward/backward still runs, so the
     saving is in epochs, not per-epoch wall clock. This is the pre-0.4
@@ -138,9 +126,6 @@ class PerNodePlateau:
 
     Parameters
     ----------
-    val_df : pd.DataFrame | None, optional
-        Validation rows. Omit only when stepping manually through
-        :meth:`step` with your own NLL dict.
     patience, freeze : int
         Flat epochs before a decay, and before a decayed node freezes.
         The training-speed benchmark runs ``patience=30, freeze=120`` on its
@@ -154,7 +139,6 @@ class PerNodePlateau:
 
     def __init__(
         self,
-        val_df: pd.DataFrame | None = None,
         *,
         patience: int,
         freeze: int,
@@ -165,7 +149,6 @@ class PerNodePlateau:
             raise ValueError(
                 f"patience and freeze must be at least 1, got {patience}/{freeze}"
             )
-        self.val_df = val_df
         self.patience, self.freeze = patience, freeze
         self.min_delta, self.factor = min_delta, factor
         self.lr0: dict = {}
@@ -174,10 +157,8 @@ class PerNodePlateau:
         self.frozen: set = set()
 
     def __call__(self, flow, epoch: int, optimizer) -> bool:
-        """Step on ``flow.nll(val_df)``; ``True`` once every node is frozen."""
-        if self.val_df is None:
-            raise ValueError("PerNodePlateau needs val_df (or step it yourself)")
-        return self.step(flow.nll(self.val_df), optimizer)
+        """Step on the epoch's validation NLL; ``True`` once every node froze."""
+        return self.step(_last_val(flow), optimizer)
 
     def step(self, nll: dict[str, float], optimizer) -> bool:
         """Step every unfrozen node on its own NLL; ``True`` when all are frozen."""

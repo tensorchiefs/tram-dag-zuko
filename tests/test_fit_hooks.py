@@ -14,7 +14,7 @@ import pytest
 import torch
 
 from tramdag import LS, CausalFlowDAG, ContinuousNode, OrdinalNode
-from tramdag.callbacks import Logger, PerNodePlateau, RestoreBest, per_node_adam
+from tramdag.callbacks import PerNodePlateau, RestoreBest, per_node_adam
 
 
 # %% private functions -----------------------------------------------------------------
@@ -131,11 +131,12 @@ def test_restore_best_matches_the_manual_six_line_callback(ls_chain):
         if nll < manual["nll"]:
             manual.update(nll=nll, epoch=epoch)
 
-    best = RestoreBest(val)
+    best = RestoreBest()
     flow.fit(
         df,
         epochs=40,
         learning_rate=1e-2,
+        validation_data=val,
         after_epoch_callbacks=[keep_best, best],
         after_fit_callbacks=[best.restore],
     )
@@ -149,7 +150,7 @@ def test_misregistered_callback_fails_before_training(ls_chain):
     """
     df = ls_chain["draw"](200, 0)[["x1", "x2"]]
     flow = CausalFlowDAG(_two_node_spec(), seed=0)
-    best = RestoreBest(df)
+    best = RestoreBest()
     with pytest.raises(TypeError, match="after_fit_callbacks"):
         flow.fit(df, epochs=10, after_fit_callbacks=[best])  # not best.restore
     assert len(flow.history["train"]) == 0  # nothing trained
@@ -170,17 +171,39 @@ def test_restore_best_without_an_epoch_refuses(ls_chain):
     """``restore`` before any epoch is a bug in the caller's loop — loud."""
     flow = CausalFlowDAG(_two_node_spec(), seed=0)
     with pytest.raises(RuntimeError, match="no epoch"):
-        RestoreBest(ls_chain["draw"](50, 0)).restore(flow)
+        RestoreBest().restore(flow)
 
 
-def test_logger_prints_every_nth_epoch(ls_chain, capsys):
-    """``callbacks.Logger`` prints train (and val) NLL on the ``every`` grid."""
+def test_callbacks_demand_fit_managed_validation(ls_chain):
+    """RestoreBest without validation_data/-split fails loudly at epoch 1."""
+    df = ls_chain["draw"](100, 0)[["x1", "x2"]]
+    flow = CausalFlowDAG(_two_node_spec(), seed=0)
+    with pytest.raises(RuntimeError, match="validation_data"):
+        flow.fit(df, epochs=2, after_epoch_callbacks=RestoreBest())
+
+
+def test_verbose_prints_every_nth_and_final_epoch(ls_chain, capsys):
+    """``fit(verbose=N)`` prints every Nth epoch plus the final one."""
     df = ls_chain["draw"](200, 0)[["x1", "x2"]]
     flow = CausalFlowDAG(_two_node_spec(), seed=0)
-    flow.fit(df, epochs=5, after_epoch_callbacks=Logger(df, every=2))
+    flow.fit(df, epochs=5, verbose=2, validation_data=df.head(50))
     lines = capsys.readouterr().out.strip().splitlines()
-    assert [ln.split()[1] for ln in lines] == ["2", "4"]
-    assert all("train NLL" in ln and "val NLL" in ln for ln in lines)
+    assert [ln.split()[1] for ln in lines] == ["2/5", "4/5", "5/5"]
+    assert all("train" in ln and "val" in ln for ln in lines)
+
+
+def test_validation_split_takes_the_tail(ls_chain):
+    """A float split trains on the head, validates on the tail (Keras rule)."""
+    df = ls_chain["draw"](200, 0)[["x1", "x2"]]
+    flow = CausalFlowDAG(_two_node_spec(), seed=0)
+    flow.fit(df, epochs=2, validation_split=0.25, batch_size=50)
+    assert len(flow.history["val"]) == 2
+    # calibration saw only the head: the range is the head's quantiles
+    head = df.iloc[:150]
+    lo = float(flow.nodes["x1"].ut.xmin)
+    assert lo == pytest.approx(head["x1"].quantile(0.05), abs=1e-6)
+    with pytest.raises(ValueError, match="not both"):
+        flow.fit(df, epochs=1, validation_data=df, validation_split=0.5)
 
 
 def test_per_node_plateau_stops_early_and_keeps_the_mle(ls_chain):
@@ -191,9 +214,14 @@ def test_per_node_plateau_stops_early_and_keeps_the_mle(ls_chain):
     df = ls_chain["draw"](2000, 4)[["x1", "x2"]]
     flow = CausalFlowDAG(_two_node_spec(), seed=0)
     opt = per_node_adam(flow, lr=1e-2)
-    sched = PerNodePlateau(df, patience=10, freeze=40)
+    sched = PerNodePlateau(patience=10, freeze=40)
     flow.fit(
-        df, epochs=4000, batch_size=512, optimizer=opt, after_epoch_callbacks=sched
+        df,
+        epochs=4000,
+        batch_size=512,
+        validation_data=df,
+        optimizer=opt,
+        after_epoch_callbacks=sched,
     )
     assert sched.frozen == {"x1", "x2"}
     assert all(g["lr"] == 0.0 for g in opt.param_groups)
@@ -208,7 +236,7 @@ def test_per_node_plateau_rejects_an_untagged_optimizer(ls_chain):
     flow.calibrate(df)
     opt = torch.optim.Adam(flow.parameters(), lr=1e-2)
     with pytest.raises(ValueError, match="per_node_adam"):
-        PerNodePlateau(df, patience=5, freeze=10).step(flow.nll(df), opt)
+        PerNodePlateau(patience=5, freeze=10).step(flow.nll(df), opt)
 
 
 def test_torch_plateau_scheduler_preserves_exact_mle(ls_chain):
