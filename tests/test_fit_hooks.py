@@ -315,6 +315,23 @@ def test_callbacks_reject_the_class_instead_of_an_instance(ls_chain):
         flow.fit(df, epochs=2, callbacks=RestoreBest)
 
 
+def test_per_node_plateau_rejects_a_zero_start_rate(ls_chain):
+    """A node-tagged group at lr 0 without the initial_lr stamp (a reused
+    hand-built optimizer whose node froze) must fail, not train at rate 0.
+    """
+    df = ls_chain["draw"](200, 0)[["x1", "x2"]]
+    flow = CausalFlowDAG(_two_node_spec(), seed=0)
+    flow.calibrate(df)
+    opt = torch.optim.Adam(
+        [
+            {"params": list(flow.nodes[n].parameters()), "lr": 0.0, "node": n}
+            for n in flow.order
+        ]
+    )
+    with pytest.raises(ValueError, match="learning rate 0"):
+        PerNodePlateau().step(flow.nll(df), opt)
+
+
 def test_per_node_plateau_rejects_an_untagged_optimizer(ls_chain):
     """A plain optimizer (one group, no ``node`` tag) is refused loudly."""
     df = ls_chain["draw"](200, 0)[["x1", "x2"]]
