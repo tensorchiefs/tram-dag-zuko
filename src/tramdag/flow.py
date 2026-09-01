@@ -42,7 +42,6 @@ from .spec import (
     NodeSpec,
     OrdinalNode,
     node_parents,
-    node_terms,
     spec_from_dict,
     spec_to_dict,
     validate_and_sort,
@@ -329,7 +328,7 @@ class _Node(nn.Module):
     ):
         super().__init__()
         self.kind = node.kind
-        terms = node_terms(node)
+        terms = node.terms
         self.parents = tuple(node_parents(node))  # ordered parent names
         self.continuous_parents = tuple(
             p for p in self.parents if isinstance(spec[p], ContinuousNode)
@@ -1328,7 +1327,7 @@ class CausalFlowDAG(nn.Module):
         return all(
             _is_classical_term(term)
             for node in self.spec.values()
-            for term in node_terms(node)
+            for term in node.terms
         )
 
     def ls_coefficients(self) -> dict[str, dict[str, np.ndarray]]:
@@ -1375,7 +1374,7 @@ class CausalFlowDAG(nn.Module):
         """
         m = pd.DataFrame("", index=list(self.order), columns=list(self.order))
         for child in self.order:
-            for term in node_terms(self.spec[child]):
+            for term in self.spec[child].terms:
                 for p, tag in _term_cells(term):  # a VC modifier may share its
                     cur = m.loc[p, child]  # cell with a prognostic term -> "+"
                     m.loc[p, child] = f"{cur}+{tag}" if cur else tag

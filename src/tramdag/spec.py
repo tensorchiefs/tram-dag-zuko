@@ -264,7 +264,7 @@ def _check_vc_term(name: str, term: Term, spec: dict[str, NodeSpec]) -> tuple[st
             f"treatment, and '{on}' is continuous. E[T|x] centering "
             "is a follow-up."
         )
-    if term.center and any(t.effect == "VC" and t.center for t in node_terms(on_node)):
+    if term.center and any(t.effect == "VC" and t.center for t in on_node.terms):
         raise ValueError(
             f"Node '{name}': treatment '{on}' carries a centered VC term itself; "
             "chained centering is not supported."
@@ -352,7 +352,7 @@ def _check_node(name: str, node: NodeSpec, spec: dict[str, NodeSpec]) -> None:
         edge-owning term, or an ordinal node has fewer than 2 levels.
     """
     seen: set[str] = set()
-    for term in node_terms(node):
+    for term in node.terms:
         for p in _check_term(name, term, spec):
             if p in seen:
                 raise ValueError(
@@ -709,22 +709,6 @@ def varying_coefficient(
     )
 
 
-def node_terms(node: NodeSpec) -> list[Term]:
-    """Give the canonical term list of a node.
-
-    Parameters
-    ----------
-    node : NodeSpec
-        The node specification.
-
-    Returns
-    -------
-    list[Term]
-        The terms; ``[SI()]`` for a source node.
-    """
-    return list(node.terms)
-
-
 def node_parents(node: NodeSpec) -> list[str]:
     """Give the parent names that the terms of a node reference.
 
@@ -740,7 +724,7 @@ def node_parents(node: NodeSpec) -> list[str]:
         duplicates.
     """
     seen: dict[str, None] = {}
-    for term in node_terms(node):
+    for term in node.terms:
         for p in term.parents:
             seen.setdefault(p, None)
     return list(seen)
@@ -809,7 +793,7 @@ def spec_to_dict(spec: dict[str, NodeSpec]) -> dict:
                     "parents": list(t.parents),
                     "options": dict(t.options),
                 }
-                for t in node_terms(node)
+                for t in node.terms
             ],
         }
         if isinstance(node, OrdinalNode):
