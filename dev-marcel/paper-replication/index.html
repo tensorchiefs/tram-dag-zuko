@@ -613,6 +613,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#the-2026-09-01-tuning-round" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The 2026-09-01 tuning round
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#repository-choices-the-paper-does-not-state" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1242,6 +1253,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#the-2026-09-01-tuning-round" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The 2026-09-01 tuning round
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#repository-choices-the-paper-does-not-state" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1280,7 +1302,12 @@ model, every hyperparameter with its source, what deviates from the paper and
 why, and the numbers: what the paper reports, what the previous protocol of
 this repository measured, and what the current 1:1 protocol measures.</p>
 <p>Measured 2026-08-26 on <code>refactor/lean-fit</code> (seeds: DGP 42, init 7, shuffle 0)
-with the exact reference protocol — global plateau rule and Keras init; the
+with the exact reference protocol — global plateau rule and Keras init. On
+2026-09-01 the <em>optimization</em> was re-tuned for CI runtime (fewer epochs, lr
+scaled to match; data, model and init untouched) and every ground truth
+re-pinned from the tuned runs — the campaign, with what was tried and what
+failed, is in <a href="#the-2026-09-01-tuning-round">the 2026-09-01 tuning round</a>
+below. The
 2026-08-25 numbers of <code>feat/followups</code> (per-node plateau, torch init; CI run
 32878435001) are kept in the "R 1:1, torch init" column where they differ.
 "Previous" is the protocol before that branch: a 90/10 split of one draw,
@@ -1339,7 +1366,7 @@ the "paper" column names the figure and what it shows.</p>
 <tr>
 <td>plateau rule (VACA/CAREFL)</td>
 <td><code>update_learning_rate</code>: one optimizer, reduce when the summed validation NLL has not improved for 50 epochs (strict <code>&lt;</code>), factor 0.1, min 1e-7</td>
-<td>torch <code>ReduceLROnPlateau(patience=49, threshold=0, threshold_mode="abs", factor=0.1, min_lr=1e-7)</code> on <code>sum(flow.nll(val))</code> — the same rule, verified against torch's source</td>
+<td>torch <code>ReduceLROnPlateau(patience=49, threshold=0, threshold_mode="abs", factor=0.1, min_lr=1e-7)</code> on <code>sum(flow.nll(val))</code> — the same rule, verified against torch's source. CAREFL keeps it; VACA dropped it 2026-09-01 with the epoch cut (on the compressed trajectory it cannot fire inside the all-bounds window — see the tuning round)</td>
 </tr>
 </tbody>
 </table>
@@ -1376,7 +1403,7 @@ in <code>create_param_net</code> is commented out).</p>
 <td>epochs</td>
 <td>500</td>
 <td>500 (in chunks of 10, Adam restarted each chunk)</td>
-<td>500, one continuous run</td>
+<td><strong>300</strong> (<code>linear-cs</code>: 500), one continuous run — the CI deviation, floors below</td>
 </tr>
 <tr>
 <td>lr</td>
@@ -1418,8 +1445,8 @@ in <code>create_param_net</code> is commented out).</p>
 <th>metric</th>
 <th>paper</th>
 <th>previous</th>
-<th>paper protocol, <code>init: normal</code> (batch 32 / lr 0.001)</th>
-<th>CI config (batch 256 / lr 0.004), the pinned ground truth</th>
+<th>paper protocol, <code>init: normal</code> (batch 32 / lr 0.001 / 500 epochs)</th>
+<th>CI config (batch 256 / lr 0.004, 300 epochs — <code>linear-cs</code> 500), the pinned ground truth</th>
 </tr>
 </thead>
 <tbody>
@@ -1429,7 +1456,7 @@ in <code>create_param_net</code> is commented out).</p>
 <td>Fig. 14 trajectories; App. C.3 text: 1.98 / −0.21 / 0.26</td>
 <td>1.983 / −0.145 / 0.285</td>
 <td>1.987 / −0.170 / 0.282</td>
-<td>1.988 / −0.171 / 0.295</td>
+<td>1.981 / −0.161 / 0.281</td>
 </tr>
 <tr>
 <td>linear-cs</td>
@@ -1445,7 +1472,7 @@ in <code>create_param_net</code> is commented out).</p>
 <td>Fig. 7 right / 15 / 16: CS on −f; text: β12 = 2.07, β13 = −0.203</td>
 <td>−0.149; 0.229</td>
 <td>−0.168; 0.059 (glorot: 0.080, torch: 0.085)</td>
-<td>−0.173; 0.077</td>
+<td>−0.167; 0.104</td>
 </tr>
 <tr>
 <td>sin-cs</td>
@@ -1453,7 +1480,7 @@ in <code>create_param_net</code> is commented out).</p>
 <td>Fig. 18: CS follows the non-monotone f, saturating at the grid ends</td>
 <td>−0.185; 2.29</td>
 <td>−0.195; 1.10 (glorot: 0.997, torch: 1.016)</td>
-<td>−0.202; 1.024</td>
+<td>−0.206; 1.016</td>
 </tr>
 <tr>
 <td>all</td>
@@ -1461,7 +1488,7 @@ in <code>create_param_net</code> is commented out).</p>
 <td>Figs. 16/17: histograms overlap</td>
 <td>—</td>
 <td>0.09–0.14</td>
-<td>0.08–0.12</td>
+<td>0.08–0.11</td>
 </tr>
 <tr>
 <td>all</td>
@@ -1473,8 +1500,8 @@ in <code>create_param_net</code> is commented out).</p>
 </tr>
 </tbody>
 </table>
-<p>β13 at −0.17 instead of −0.2: x1 has sd 0.254, so SE(β13) ≈ 0.036 at n = 40000
-— inside one SE. The <code>sin-cs</code> error of 1.0 is the reference architecture's
+<p>β13 at −0.16 to −0.18 instead of −0.2: x1 has sd 0.254, so SE(β13) ≈ 0.036 at
+n = 40000 — within ~1 SE. The <code>sin-cs</code> error of 1.0 is the reference architecture's
 capacity: the two-unit bottleneck saturates at both ends of the grid exactly
 as in the paper's Fig. 18.</p>
 <h2 id="triangle-mixed-triangle_mixedpy-paper-sec-62-app-c4-app-b">Triangle, mixed (<code>triangle_mixed.py</code>) — paper Sec. 6.2, App. C.4, App. B<a class="headerlink" href="#triangle-mixed-triangle_mixedpy-paper-sec-62-app-c4-app-b" title="Permanent link">&para;</a></h2>
@@ -1505,7 +1532,7 @@ CS net = reference <code>c(2, 2, 2, 2)</code>, sigmoid.</p>
 <td>epochs, lr, batch, schedule, init</td>
 <td>500, 0.001, 32, none, random_normal</td>
 <td>500 (chunks of 10), 0.001, 512, torch</td>
-<td>500 continuous, none, <code>init: normal</code>; <strong>lr 0.004 / batch 256</strong>, the CI deviation</td>
+<td><strong>350 (<code>exp-cs</code>) / 200 (<code>linear-ls</code>)</strong> continuous, none, <code>init: normal</code>; <strong>lr 0.004 (<code>linear-ls</code>: 0.002) / batch 256</strong> — the CI deviations, floors below</td>
 </tr>
 <tr>
 <td><code>n_coeffs</code> (x1, x2)</td>
@@ -1535,8 +1562,8 @@ CS net = reference <code>c(2, 2, 2, 2)</code>, sigmoid.</p>
 <th>metric</th>
 <th>paper</th>
 <th>previous</th>
-<th>paper protocol, <code>init: normal</code></th>
-<th>CI config (batch 256 / lr 0.004), pinned</th>
+<th>paper protocol, <code>init: normal</code> (500 epochs)</th>
+<th>CI config (batch 256; <code>exp-cs</code> 350 epochs / lr 0.004, <code>linear-ls</code> 200 / 0.002), pinned</th>
 </tr>
 </thead>
 <tbody>
@@ -1546,7 +1573,7 @@ CS net = reference <code>c(2, 2, 2, 2)</code>, sigmoid.</p>
 <td>Fig. 19: 2 / −0.2 / 0.3</td>
 <td>1.983 / −0.268 / 0.322</td>
 <td>1.987 / −0.246 / 0.319</td>
-<td>1.988 / −0.243 / 0.306</td>
+<td>1.978 / −0.258 / 0.333</td>
 </tr>
 <tr>
 <td>linear-ls</td>
@@ -1554,7 +1581,7 @@ CS net = reference <code>c(2, 2, 2, 2)</code>, sigmoid.</p>
 <td>e² ≈ 7.39; C.4 text: 7.74, CI [7.16, 8.38]</td>
 <td>7.26 / 7.19</td>
 <td>7.29 / 7.19</td>
-<td>7.30 / 7.19</td>
+<td>7.23 / 7.19</td>
 </tr>
 <tr>
 <td>linear-ls</td>
@@ -1562,7 +1589,7 @@ CS net = reference <code>c(2, 2, 2, 2)</code>, sigmoid.</p>
 <td>— (App. B qualitative)</td>
 <td>0.084; 0.714 / 0.728 / 0.806</td>
 <td>0.044; 0.718 / 0.728 / 0.806</td>
-<td>0.038</td>
+<td>0.050; 0.716 / 0.728 / 0.806</td>
 </tr>
 <tr>
 <td>exp-cs</td>
@@ -1570,7 +1597,7 @@ CS net = reference <code>c(2, 2, 2, 2)</code>, sigmoid.</p>
 <td>Fig. 20: distributions match</td>
 <td>−0.227; 0.885</td>
 <td>−0.207; 0.142 (glorot: 0.071, torch: 0.126)</td>
-<td>−0.202; 0.107</td>
+<td>−0.200; 0.156</td>
 </tr>
 <tr>
 <td>exp-cs</td>
@@ -1578,7 +1605,7 @@ CS net = reference <code>c(2, 2, 2, 2)</code>, sigmoid.</p>
 <td>—</td>
 <td>0.075; 0.924 / 0.921</td>
 <td>0.023; 0.917 / 0.921</td>
-<td>0.020</td>
+<td>0.024; 0.920 / 0.921</td>
 </tr>
 </tbody>
 </table>
@@ -1610,13 +1637,13 @@ E[x3 | do(x2 = a)] = −0.25 + 0.25 a. The paper's Sec. 5.2 text says a ∈ {−
 <td>epochs</td>
 <td>10000 (<code>Figure_Triangle_Linear_Bimodal.R</code>, the sourcing script — not in our copy of the R code, so EPOCHS/M/nTrain for VACA rest on that reading)</td>
 <td>400 in chunks of 50, then 120 "polish"</td>
-<td>10000, one run</td>
+<td><strong>4800</strong>, one run — the CI deviation, see the tuning round</td>
 </tr>
 <tr>
 <td>lr</td>
 <td>0.001</td>
 <td>0.01, polish 0.001</td>
-<td>0.001</td>
+<td><strong>0.002</strong> — the CI deviation</td>
 </tr>
 <tr>
 <td>batch</td>
@@ -1628,7 +1655,7 @@ E[x3 | do(x2 = a)] = −0.25 + 0.25 a. The paper's Sec. 5.2 text says a ∈ {−
 <td>schedule</td>
 <td><code>update_learning_rate</code>: ReduceLROnPlateau on the summed val NLL, factor 0.1, patience 50, min_lr 1e-7, strict <code>&lt;</code></td>
 <td>none</td>
-<td>the same rule, global (torch's scheduler through <code>fit(optimizer=, after_epoch_callbacks=)</code>)</td>
+<td><strong>none</strong> — dropped 2026-09-01 with the epoch cut: on the lr-0.002 trajectory the summed val NLL keeps strictly improving past the all-bounds window (x1 still converging), so the rule cannot fire inside it</td>
 </tr>
 <tr>
 <td>input scaling</td>
@@ -1652,7 +1679,8 @@ E[x3 | do(x2 = a)] = −0.25 + 0.25 a. The paper's Sec. 5.2 text says a ∈ {−
 <th>paper</th>
 <th>previous</th>
 <th>R 1:1, torch init, per-node plateau (08-25)</th>
-<th>now: R 1:1, glorot, global plateau</th>
+<th>R 1:1, glorot, global plateau (08-26)</th>
+<th>now: 4800 epochs @ lr 0.002, no schedule — the pinned ground truth</th>
 </tr>
 </thead>
 <tbody>
@@ -1662,6 +1690,7 @@ E[x3 | do(x2 = a)] = −0.25 + 0.25 a. The paper's Sec. 5.2 text says a ∈ {−
 <td>0.037</td>
 <td>0.026</td>
 <td>0.097</td>
+<td>0.096</td>
 </tr>
 <tr>
 <td>|E[x3 | do(x2 = −1)] − (−0.5)|</td>
@@ -1669,6 +1698,7 @@ E[x3 | do(x2 = a)] = −0.25 + 0.25 a. The paper's Sec. 5.2 text says a ∈ {−
 <td>0.012</td>
 <td>— (do(−2) was scored: 0.034)</td>
 <td>0.088</td>
+<td>0.080</td>
 </tr>
 <tr>
 <td>|E[x3 | do(x2 = 0)] − (−0.25)|</td>
@@ -1676,6 +1706,7 @@ E[x3 | do(x2 = a)] = −0.25 + 0.25 a. The paper's Sec. 5.2 text says a ∈ {−
 <td>0.010</td>
 <td>0.077</td>
 <td>0.019</td>
+<td>0.022</td>
 </tr>
 <tr>
 <td>sd(x1) flow vs analytic 2.0767</td>
@@ -1683,6 +1714,7 @@ E[x3 | do(x2 = a)] = −0.25 + 0.25 a. The paper's Sec. 5.2 text says a ∈ {−
 <td>2.074</td>
 <td>error 0.0077</td>
 <td>error 0.032</td>
+<td>2.036, error 0.040</td>
 </tr>
 <tr>
 <td>val NLL x3</td>
@@ -1690,6 +1722,7 @@ E[x3 | do(x2 = a)] = −0.25 + 0.25 a. The paper's Sec. 5.2 text says a ∈ {−
 <td>1.4356</td>
 <td>1.4351</td>
 <td>1.4496</td>
+<td>1.4427</td>
 </tr>
 </tbody>
 </table>
@@ -1699,9 +1732,10 @@ the DGP paragraph above), so only do(x2 = −3) and do(x2 = 0) compare directly.
 At the earlier grid and with glorot the errors were 0.098 / 0.159 / 0.026 at
 this seed and 0.268 / 0.119 / 0.005 and 0.217 / 0.031 / 0.021 at init seeds 8
 and 9 — the spread quoted below.</p>
-<p>How the gap was traced, one change at a time under the exact protocol
-(inputs min-max scaled unless stated; do(x2) errors at the then-current grid
-−3 / −2 / 0):</p>
+<p>How the gap was traced, one change at a time under the exact protocol —
+10000 epochs at lr 0.001 with the plateau rule, before the 2026-09-01 epoch
+cut (inputs min-max scaled unless stated; do(x2) errors at the then-current
+grid −3 / −2 / 0):</p>
 <table>
 <thead>
 <tr>
@@ -1754,9 +1788,13 @@ and 9 — the spread quoted below.</p>
 </tbody>
 </table>
 <p>Under the exact protocol the result is <strong>seed-sensitive at the off-manifold
-point</strong> do(x2 = −3): 0.03–0.27 over four init draws, 0.005–0.026 at do(x2 = 0).
-The paper shows one run's densities. The committed bound is 2.5× the seed-7
-measurement, and this table is the honest picture.</p>
+point</strong> do(x2 = −3): 0.03–0.27 over four init draws, 0.005–0.026 at do(x2 = 0)
+(measured under the 10000-epoch protocol; the paper shows one run's
+densities). The committed bound is 2.5× the seed-7 measurement of the tuned
+4800-epoch run, and this table is the honest picture. Note the trace's
+"the rule is what stops the full-batch overfit" holds at lr 0.001 over 10000
+epochs; the tuned config replaces the rule with a fixed stop at 4800 — inside
+the compressed trajectory's all-bounds window, see the tuning round below.</p>
 <h2 id="carefl-benchmark-careflpy-paper-sec-53-app-c2">CAREFL benchmark (<code>carefl.py</code>) — paper Sec. 5.3, App. C.2<a class="headerlink" href="#carefl-benchmark-careflpy-paper-sec-53-app-c2" title="Permanent link">&para;</a></h2>
 <p><strong>DGP</strong> (Khemakhem et al. 2021): x1, x2 ~ Laplace(0, 1/√2); x3 = x1 + 0.5 x2³ + ε;
 x4 = −x2 + 0.5 x1² + ε, ε ~ Laplace(0, 1/√2). Counterfactuals are analytic by
@@ -1790,13 +1828,13 @@ same <code>make_model</code> nets as VACA.</p>
 <td>epochs</td>
 <td>7000</td>
 <td>300 in chunks of 50 + 100 polish</td>
-<td>7000</td>
+<td><strong>3000</strong> — the CI deviation, see the tuning round</td>
 </tr>
 <tr>
 <td>lr, batch, schedule, input scaling, init</td>
 <td>0.001, full batch, plateau 0.1/50/1e-7, <code>scale_df</code>, glorot</td>
 <td>0.01→0.001, 512, none, raw, torch</td>
-<td>0.001, 2500, the same global rule, <code>minmax</code>, glorot</td>
+<td><strong>0.002</strong> (the CI deviation), 2500, the same global rule, <code>minmax</code>, glorot</td>
 </tr>
 <tr>
 <td>scoring</td>
@@ -1814,7 +1852,8 @@ same <code>make_model</code> nets as VACA.</p>
 <th>paper</th>
 <th>previous (wrong x_obs)</th>
 <th>R 1:1, torch init, per-node plateau (08-25)</th>
-<th>now: R 1:1, glorot, global plateau</th>
+<th>R 1:1, glorot, global plateau, 7000 @ 0.001 (08-26)</th>
+<th>now: 3000 epochs @ lr 0.002 — the pinned ground truth</th>
 </tr>
 </thead>
 <tbody>
@@ -1824,6 +1863,7 @@ same <code>make_model</code> nets as VACA.</p>
 <td>1.64</td>
 <td>1.52 (at α = 3, x3 ≈ 17)</td>
 <td>1.87 (at α = 3)</td>
+<td>2.68 (at α = 3)</td>
 </tr>
 <tr>
 <td>Fig. 6 max |x4^cf error|</td>
@@ -1831,6 +1871,7 @@ same <code>make_model</code> nets as VACA.</p>
 <td>0.38</td>
 <td>0.47</td>
 <td>0.59</td>
+<td>0.77</td>
 </tr>
 <tr>
 <td>held-out CF MAE x3, α = −1.5 / 0 / 1.5</td>
@@ -1838,6 +1879,7 @@ same <code>make_model</code> nets as VACA.</p>
 <td>0.109 / 0.053 / 0.095</td>
 <td>0.177 / 0.065 / 0.123</td>
 <td>0.181 / 0.065 / 0.142 (seeds 8, 9: 0.158–0.171 / 0.069–0.084 / 0.136–0.154)</td>
+<td>0.208 / 0.060 / 0.128</td>
 </tr>
 <tr>
 <td>held-out CF MAE x4, α = −1.5 / 0 / 1.5</td>
@@ -1845,6 +1887,7 @@ same <code>make_model</code> nets as VACA.</p>
 <td>0.078 / 0.059 / 0.085</td>
 <td>0.117 / 0.059 / 0.115</td>
 <td>0.204 / 0.134 / 0.162 (0.172–0.178 / 0.113–0.129 / 0.145–0.160)</td>
+<td>0.124 / 0.097 / 0.122</td>
 </tr>
 <tr>
 <td>val NLL x3 / x4</td>
@@ -1852,9 +1895,14 @@ same <code>make_model</code> nets as VACA.</p>
 <td>1.376 / 1.345</td>
 <td>1.395 / 1.373</td>
 <td>1.403 / 1.419</td>
+<td>1.405 / 1.393</td>
 </tr>
 </tbody>
 </table>
+<p>Five of the six held-out MAEs are better at 3000 @ 0.002 than at the
+reference's 7000 @ 0.001 (only x3 at α = −1.5 is worse, 0.208 vs 0.181); the
+Fig. 6 single-point errors are larger — one noisy yardstick, which is why the
+held-out rows are scored next to it.</p>
 <p>The previous protocol trained on 7× more rows (18000), which is why its
 held-out MAEs are lower; they are not comparable to the paper's nTrain = 2500.
 Under the exact protocol the CAREFL numbers are stable across init seeds
@@ -1866,14 +1914,17 @@ the per-node protocol): x3 MAE 0.083 / 0.038 / 0.050 (better), x4 0.143 / 0.083
 / 0.154 (worse), val NLL 1.444 / 1.476 (worse). The quantile domain stays the
 default; a <code>range_quantile</code> knob would make R's choice available.</p>
 <h2 id="runtime-and-the-epochs">Runtime and the epochs<a class="headerlink" href="#runtime-and-the-epochs" title="Permanent link">&para;</a></h2>
-<p>Triangle: 500 epochs × 1250 steps of batch 32 — 3.2 s per epoch single-process
+<p>The reference protocol's cost, the motivation for every deviation here —
+triangle: 500 epochs × 1250 steps of batch 32, 3.2 s per epoch single-process
 at 2–4 torch threads (5.5 s at 32 threads, the step is overhead-bound), 42–69 min
-per variant on the 2-core CI runners; VACA 4.7 min, CAREFL 6.6 min; the
+per variant on the 2-core CI runners; VACA 355 s, CAREFL 338 s (2026-08-31); the
 workflow's ten jobs run in parallel, 70 min wall against a 300-min cap.</p>
-<p>The one deviation taken for CI runtime is the triangle <strong>batch size and learning
-rate</strong>: batch 256 at lr 0.004 instead of the paper's batch 32 at lr 0.001, the same
-500 epochs in 8× fewer optimizer steps. Measured on 2026-08-26 against the
-committed ground-truth bands (glorot init, cs max err unless noted):</p>
+<p>The first deviation taken for CI runtime (2026-08-26) was the triangle
+<strong>batch size and learning rate</strong>: batch 256 at lr 0.004 instead of the paper's
+batch 32 at lr 0.001, 8× fewer optimizer steps per epoch. This is the earlier
+selection grid, kept as the record of that choice — it ran at the paper's 500
+epochs with glorot init, against the then-committed ground-truth bands (cs max
+err unless noted):</p>
 <table>
 <thead>
 <tr>
@@ -1946,18 +1997,127 @@ committed ground-truth bands (glorot init, cs max err unless noted):</p>
 </table>
 <p>Batch 256 / lr 0.004 is the only row that keeps every cs error within ~0.02 (linear-cs: 0.022) of the
 paper protocol; larger batches or rates bend the misspecified linear-cs curve
-(0.16–0.18) and lr 0.008 hurts atan-cs. On CI (run 32974872751) the triangle
-jobs take 7–11 min instead of 42–69, the workflow about 12 min wall instead of
-70. The grid ran with glorot init; the
-committed configs use <code>init: normal</code> (the triangle scripts' initializer), whose
-CI-config numbers are in the result tables above (cs errors 0.088 / 0.077 /
-1.024 / 0.107). The paper-protocol numbers stay in this document as the
-reference; the ground truth is pinned from the CI config.</p>
-<p>An epoch cut was measured as well: at
-100 epochs the LS coefficients are unchanged (they settle after ~40 epochs,
-Fig. 14) but the complex shift is not — cs max err 0.235 (linear-cs, 0.116 at
-500) and 0.395 (mixed exp-cs, 0.126); at 250 epochs 0.112 and 0.203. The
-paper's 500 stay.</p>
+(0.16–0.18) and lr 0.008 hurts atan-cs. At 500 epochs and this batch/lr, CI
+run 32974872751 took 7–11 min per triangle job instead of 42–69, the workflow
+about 12 min wall instead of 70. The grid ran with glorot init; the committed
+configs use <code>init: normal</code> (the triangle scripts' initializer). The
+paper-protocol numbers stay in this document as the reference; the ground
+truth is pinned from the CI config, which since 2026-09-01 also cuts the
+epochs — the round below.</p>
+<h2 id="the-2026-09-01-tuning-round">The 2026-09-01 tuning round<a class="headerlink" href="#the-2026-09-01-tuning-round" title="Permanent link">&para;</a></h2>
+<p>The frame (repo decision 2026-09-01): the <em>data, model and init</em> stay the reference's;
+allowed were dropping <code>net_input_scaling</code>, trying sigmoid/relu activations,
+and tuning lr / batch size / epochs for CI runtime. Outcome: the triangle
+scripts already ran raw parents + sigmoid (their reference does), so they
+comply by construction and only their epochs moved; VACA and CAREFL <strong>keep
+tanh + <code>net_input_scaling: minmax</code></strong> because every alternative was tried and
+measurably fails. Every tuned variant's ground truth was re-pinned from its
+final run (centers to the run, <code>{max}</code> at 2.5x; <code>fit_seconds</code> waits for the
+next CI measurement) — <strong>the bounds and pins quoted in this section are the
+pre-repin 2026-08-26 values the round was measured against</strong>, and re-pinning
+loosened several. The full decision trail is in
+each config's YAML header.</p>
+<table>
+<thead>
+<tr>
+<th>experiment</th>
+<th>was</th>
+<th>now</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>triangle <code>linear-ls</code> / <code>atan-cs</code> / <code>sin-cs</code></td>
+<td>500 epochs</td>
+<td>300 epochs</td>
+</tr>
+<tr>
+<td>triangle <code>linear-cs</code></td>
+<td>500 epochs</td>
+<td>500 epochs (kept)</td>
+</tr>
+<tr>
+<td>triangle-mixed <code>exp-cs</code></td>
+<td>500 epochs</td>
+<td>350 epochs</td>
+</tr>
+<tr>
+<td>triangle-mixed <code>linear-ls</code></td>
+<td>500 epochs @ lr 0.004</td>
+<td>200 epochs @ lr 0.002</td>
+</tr>
+<tr>
+<td>vaca</td>
+<td>10000 full-batch epochs @ lr 0.001, plateau</td>
+<td>4800 @ lr 0.002, <strong>no schedule</strong></td>
+</tr>
+<tr>
+<td>carefl</td>
+<td>7000 full-batch epochs @ lr 0.001, plateau</td>
+<td>3000 @ lr 0.002, plateau kept</td>
+</tr>
+<tr>
+<td>validate_ls <code>adam</code> (misc)</td>
+<td>phases 4000/2000/1000 @ 1e-2/1e-3/1e-4</td>
+<td>800/700/500, batch 256 kept</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Triangle</strong> (batch 256 / lr 0.004 / sigmoid / <code>init: normal</code> / raw parents
+all unchanged): at 300 epochs every metric holds its bound; the floor is
+real — 150 epochs fails atan's do(x1) bound (0.235 &gt; 0.206). <code>linear-cs</code>
+keeps 500: at 300 its fitted cs curve visibly flattens past |x2| &gt; 0.5, max
+err 0.140 vs 0.088 — the DGP line spans only ±0.3 and the sigmoid net's slow
+tail convergence is half of that. relu is ruled out: the reference's 2-unit
+input bottleneck dies (atan: β13 +0.53, cs err 1.42).</p>
+<p><strong>Triangle-mixed</strong>: the cs variant's slow parts are the 2-unit sigmoid CS net
+and the do(x1) mean — cs max err 0.344 / 0.177 / 0.156 and do err 0.033 /
+0.060 / 0.022 at 100 / 250 / 350 epochs (0.107 / 0.016 at 500), so 100 failed
+the then-current cs bound (0.344 &gt; 0.2686) and 250 the do bound
+(0.060 &gt; 0.0398); <code>exp-cs</code> trains 350.
+<code>linear-ls</code> has no CS net to wait for and trains 200 at lr 0.002, which reads
+the weakly identified β13/β23 out slightly closer to the 500-epoch pins than
+lr 0.004 does (β23 0.333 vs 0.337, pin 0.306); at 100 epochs β13 sits 57%
+into its tolerance (−0.271 vs the pinned −0.243). relu dies at the sd-0.05
+normal init (cs err 0.859, β13 −0.055).</p>
+<p><strong>VACA</strong> — the instrumented finding: probing the reference trajectory (10000
+@ 0.001, plateau) shows the do(x2) errors descend until epoch ~6000–8500
+(best 0.005–0.10), then creep back up; the plateau anneal happens to fire at
+~9050 and freezes 0.101 / 0.099 / 0.030 (an instrumented re-run; the small
+offset from the 08-26 pins 0.097 / 0.088 / 0.019 is run-to-run sampling of
+the do-means) — the reference protocol's quality IS its anneal landing
+inside that window. At lr 0.002 the same smooth
+full-batch descent runs 2× compressed with an all-bounds window at epochs
+~4350–5000 (binding edges: x1's marginal std enters its 2.0766 ± 0.08 band at
+~4320, the do(x2=+0) error exits after ~5000); 4800 sits inside it, every
+margin ≥ 2×, at under half the reference's wall clock. The plateau rule is
+dropped because on the compressed trajectory the summed validation NLL keeps
+strictly improving past the window, so it cannot fire inside it; lr 0.004 is
+out because x1's std clock does not compress with lr (1.978 at its do-window,
+epochs ~2050–2350). Rejected, both measured: relu + raw parents wanders
+0.17–0.45 on do(x2=−3), holding the bound only at isolated epochs (tanh on
+raw parents saturates outright, 0.731); minibatch stepping (batch 256, even
+with minmax + tanh) converges with a systematic −0.11 common-mode offset of
+all three do-means — 2.4× the do(x2=+0) bound — while the observational fit
+stays perfect.</p>
+<p><strong>CAREFL</strong> (full batch + plateau kept): 3000 @ 0.002 replaces 7000 @ 0.001;
+five of the six held-out counterfactual MAEs come out better than the
+7000-epoch pins. Rejected: raw parents — sigmoid saturates on the Laplace
+parents just like tanh, and relu underfits x3 (val NLL 1.46–1.47 vs the
+1.403 ± 0.05 band) while growing a fragile Bernstein tail (one held-out row
+inverted to x4 ≈ 580, cf MAE 4.36 vs bound 0.33); minibatch — the fig6 grid
+ends live in the sparse x2 tail that minibatch gradients underweight
+(cf MAE x3 do(x2=+1.5) 0.40 — over the old 0.355 and the re-pinned 0.319
+bound alike — and fig6 x3 err 5.9 against the full-batch run's 2.7).</p>
+<p><strong>validate_ls <code>adam</code></strong> (misc, not a paper experiment but tuned in the same
+round): phases 800/700/500 instead of 4000/2000/1000 — 2000 epochs instead of
+7000 — still lands on the classical MLE, named-coef gap to statsmodels
+1.6e-5 vs the old 1.8e-5, ~3.5× less fit wall clock.</p>
+<p>Local wall times under the tuned protocol (32-core box, 4 torch threads):
+triangle 162–281 s per variant, mixed 88–165 s, vaca 46.5 s, carefl 72–82 s.
+The CI timings quoted above and the <code>fit_seconds</code> pins in <code>ground_truth/</code>
+are still the 2026-08-31 pre-cut measurements; both will be re-measured on
+the next push and the pins updated then.</p>
 <h2 id="repository-choices-the-paper-does-not-state">Repository choices the paper does not state<a class="headerlink" href="#repository-choices-the-paper-does-not-state" title="Permanent link">&para;</a></h2>
 <p>Seeds; the validation draw sizes for the triangle scripts (the R code's
 <code>test</code>); <code>n_compare</code>; <code>n_heldout = 300</code> and the α set {−1.5, 0, 1.5} scored
