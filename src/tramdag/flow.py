@@ -1600,6 +1600,9 @@ class CausalFlowDAG(nn.Module):
                 "flexible models."
             )
         self.calibrate(train_df, marginal_init=False)  # L-BFGS needs no warm start
+        # a callback used manually afterwards must not read a pre-classical
+        # validation entry as current — this fit computes none
+        self._fit_validated = False
 
         self.double()  # parameters + buffers (xmin/xmax) -> float64, one call
         t0 = time.perf_counter()

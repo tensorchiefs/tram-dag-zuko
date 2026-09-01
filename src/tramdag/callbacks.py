@@ -1,22 +1,9 @@
-"""Predefined ``fit`` callbacks — restore-best, early stopping, per-node plateau.
+"""Predefined ``fit`` callbacks: ``RestoreBest``, ``EarlyStopping``, ``PerNodePlateau``.
 
-``fit`` owns validation (``validation_data=`` / ``validation_split=``) and
-progress printing (``verbose=``); the callbacks here read the per-node
-validation NLL that ``fit`` appends to ``flow.history["val"]`` after every
-epoch — computed once, shared by all of them. One ``callbacks=`` list is the
-whole registration; each entry hooks itself into the fit::
-
-    from tramdag.callbacks import EarlyStopping, RestoreBest
-
-    flow.fit(
-        train_df,
-        epochs=4000,
-        validation_data=val_df,
-        verbose=50,
-        callbacks=[RestoreBest(), EarlyStopping(patience=200)],
-    )
-
-A bare function in the list is an ``on_epoch_end`` hook; anything not
+``fit`` owns validation and progress printing; the callbacks here read the
+per-node validation NLL that ``fit`` appends to ``flow.history["val"]`` after
+every epoch — computed once, shared by all of them. One ``callbacks=`` list
+is the whole registration (the ``fit`` docstring shows it); anything not
 covered here is a :class:`Callback` subclass of your own (docs/fitting.md).
 """
 
@@ -55,7 +42,14 @@ def per_node_adam(flow, lr: float = 1e-2, **adam_kwargs) -> torch.optim.Adam:
     """
     return torch.optim.Adam(
         [
-            {"params": list(flow.nodes[n].parameters()), "lr": lr, "node": n}
+            # initial_lr (torch's scheduler convention) lets PerNodePlateau
+            # restore a decayed group to its start at the next fit begin
+            {
+                "params": list(flow.nodes[n].parameters()),
+                "lr": lr,
+                "initial_lr": lr,
+                "node": n,
+            }
             for n in flow.order
         ],
         **adam_kwargs,
@@ -224,14 +218,16 @@ class PerNodePlateau(Callback):
     def on_fit_begin(self, flow, optimizer) -> None:
         """Start fresh — rates and frozen nodes never carry into the next fit.
 
-        A reused optimizer's decayed (or zeroed) group rates go back to their
-        remembered start values first; without that, the new baseline would
-        be the old decayed rate and a frozen node would "train" at rate 0.
+        A reused optimizer's decayed (or zeroed) group rates go back to the
+        ``initial_lr`` that ``per_node_adam`` stamped on each group; without
+        that, the new baseline would be the old decayed rate and a frozen
+        node would "train" at rate 0. The stamp lives on the group, so a
+        fresh optimizer, a fresh callback or a second flow all stay correct.
         """
         if optimizer is not None:
             for g in optimizer.param_groups:
-                if g.get("node") in self.lr0:
-                    g["lr"] = self.lr0[g["node"]]
+                if "initial_lr" in g:
+                    g["lr"] = g["initial_lr"]
         self._reset()
 
     def on_epoch_end(self, flow, epoch: int, optimizer) -> bool:
@@ -246,7 +242,7 @@ class PerNodePlateau(Callback):
                     "PerNodePlateau needs one 'node'-tagged parameter group "
                     "per node — build the optimizer with per_node_adam(flow, lr)"
                 )
-            self.lr0.setdefault(g["node"], g["lr"])
+            self.lr0.setdefault(g["node"], g.get("initial_lr", g["lr"]))
             if g["node"] not in self.frozen:
                 self._step_node(g, nll[g["node"]])
         return len(self.frozen) == len(optimizer.param_groups)

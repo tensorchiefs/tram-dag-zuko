@@ -126,7 +126,7 @@ decade. This is why the two-phase recipe existed.
 ## Recommendation
 
 The everyday recipe is the global-plateau callback in
-[fitting.md](fitting.md#the-recipes-as-callbacks) with a generous `epochs`
+[fitting.md](fitting.md#training-strategies) with a generous `epochs`
 ceiling; the per-node self-stopping variant is
 `tramdag.callbacks.PerNodePlateau`. One finding became a package default:
 `epochs` has no default, because Finding 6 is precisely that a fixed budget

@@ -264,6 +264,37 @@ def test_per_node_plateau_reuse_restores_the_optimizer_rates(ls_chain):
     assert all(g["lr"] > 0.0 or g["node"] in sched.frozen for g in opt.param_groups)
 
 
+def test_per_node_plateau_respects_a_fresh_optimizer_rate(ls_chain):
+    """A reused callback must not clobber a fresh optimizer's different lr —
+    the restore reads the group's own initial_lr stamp, not callback state.
+    """
+    df = ls_chain["draw"](2000, 4)[["x1", "x2"]]
+    flow = CausalFlowDAG(_two_node_spec(), seed=0)
+    sched = PerNodePlateau(patience=10, freeze=40)
+    flow.fit(
+        df,
+        epochs=4000,
+        validation_data=df,
+        optimizer=per_node_adam(flow, lr=1e-2),
+        callbacks=sched,
+    )
+    opt2 = per_node_adam(flow, lr=1e-3)  # a fresh optimizer, 10x smaller rate
+    flow.fit(df, epochs=1, validation_data=df, optimizer=opt2, callbacks=sched)
+    assert sched.lr0 == {"x1": 1e-3, "x2": 1e-3}
+
+
+def test_fit_classical_marks_validation_stale(ls_chain):
+    """After fit_classical the last history["val"] entry is pre-classical —
+    a manually driven callback must refuse it, not treat it as current.
+    """
+    df = ls_chain["draw"](400, 0)[["x1", "x2"]]
+    flow = CausalFlowDAG(_two_node_spec(), seed=0)
+    flow.fit(df, epochs=2, validation_data=df, callbacks=RestoreBest())
+    flow.fit_classical(df)
+    with pytest.raises(RuntimeError, match="validation_data"):
+        RestoreBest().on_epoch_end(flow, 1, None)
+
+
 def test_callbacks_reject_stale_validation_from_an_earlier_fit(ls_chain):
     """After a validated fit, an unvalidated fit must not let a callback read
     the old history["val"] entry as the current epoch.

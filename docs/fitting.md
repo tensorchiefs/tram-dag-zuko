@@ -86,20 +86,16 @@ learning rates and freezing (a callback, below) and the all-`ls` classical fit.
   shipped callbacks read it there. `verbose=N` prints every Nth epoch plus
   the final one (0, the default, is silent).
 - **`callbacks=`** — one entry or a list. A
-  [`tramdag.callbacks.Callback`](../src/tramdag/callbacks.py) hooks all
-  three points of the loop: `on_fit_begin(flow, optimizer)` once after
-  calibration (the shipped callbacks reset their state here, so instances
-  are reusable), `on_epoch_end(flow, epoch, optimizer)` after every epoch,
-  once the epoch's train NLLs are in `flow.history["train"]` — every
-  callback runs each epoch, and the fit stops after an epoch in which any
-  returned `True` — and `on_fit_end(flow, optimizer)`, which runs *before*
-  the `VC` re-centering, so a hook that swaps the weights hands them to the
-  re-centering. A bare callable in the list is an `on_epoch_end` hook —
-  this is where schedules, snapshots and coefficient trajectories live. The
-  common recipes ship in `tramdag.callbacks`: `RestoreBest`
-  (best-validation weights, restored automatically), `EarlyStopping`
-  (patience on the validation NLL) and `PerNodePlateau` + `per_node_adam`
-  (per-node decay and freezing), all reading `history["val"]`.
+  [`tramdag.callbacks.Callback`](../src/tramdag/callbacks.py) hooks
+  `on_fit_begin` / `on_epoch_end` / `on_fit_end` (its docstring is the
+  contract — timing, the stop rule, the VC re-centering order); a bare
+  callable in the list is an `on_epoch_end` hook, `cb(flow, epoch,
+  optimizer)`, and any `True` stops the fit — this is where schedules,
+  snapshots and coefficient trajectories live. The common recipes ship in
+  `tramdag.callbacks`: `RestoreBest` (best-validation weights, restored
+  automatically), `EarlyStopping` (patience on the validation NLL) and
+  `PerNodePlateau` + `per_node_adam` (per-node decay and freezing), all
+  reading `history["val"]`.
 - **`vc_ehat=`**: the out-of-fold propensities a centered `VC` term needs,
   `{node: {t: array}}` with one value per training row (see
   [varying-coefficients.md](varying-coefficients.md)).
@@ -183,6 +179,12 @@ flow.fit(train_df, epochs=4000, validation_split=0.1,
          callbacks=PerNodePlateau())   # patience=15, freeze=50
 ```
 
+Freezing helps and parallelizing the node loop does not: freezing deletes
+whole epochs, while node-level overlap only time-slices the cores that each
+node's batched BLAS ops already saturate — measured as contention, not speedup.
+Only when per-node kernels under-utilize the hardware (tiny nodes on a big GPU)
+could overlap pay, and there the tool is fusing same-shaped nodes, not threads.
+
 **Global plateau schedule** — anything else is a few lines of your own: a
 learning-rate schedule is torch's, stepped from the hook on the validation
 NLL `fit` already computed (so this too needs `validation_data=` or
@@ -216,12 +218,6 @@ subclass's `on_fit_end` instead.)
 
 The exact-MLE and warm-start strategies are Path B, below.
 
-
-Freezing helps and parallelizing the node loop does not: freezing deletes
-whole epochs, while node-level overlap only time-slices the cores that each
-node's batched BLAS ops already saturate — measured as contention, not speedup.
-Only when per-node kernels under-utilize the hardware (tiny nodes on a big GPU)
-could overlap pay, and there the tool is fusing same-shaped nodes, not threads.
 
 Benchmarks and schedule trade-offs are in
 [training-speed.md](training-speed.md). The worked walkthrough is
