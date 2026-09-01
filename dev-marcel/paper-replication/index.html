@@ -1661,7 +1661,7 @@ E[x3 | do(x2 = a)] = −0.25 + 0.25 a. The paper's Sec. 5.2 text says a ∈ {−
 <td>input scaling</td>
 <td><code>scale_df</code>: everything min-max to [0, 1]</td>
 <td>raw</td>
-<td><code>net_input_scaling: minmax</code> (network inputs; targets D1)</td>
+<td><code>input_transform: minmax</code> on the CI terms (network inputs; targets D1)</td>
 </tr>
 <tr>
 <td>n_compare</td>
@@ -2006,11 +2006,11 @@ truth is pinned from the CI config, which since 2026-09-01 also cuts the
 epochs — the round below.</p>
 <h2 id="the-2026-09-01-tuning-round">The 2026-09-01 tuning round<a class="headerlink" href="#the-2026-09-01-tuning-round" title="Permanent link">&para;</a></h2>
 <p>The frame (repo decision 2026-09-01): the <em>data, model and init</em> stay the reference's;
-allowed were dropping <code>net_input_scaling</code>, trying sigmoid/relu activations,
+allowed were dropping the network-input scaling, trying sigmoid/relu activations,
 and tuning lr / batch size / epochs for CI runtime. Outcome: the triangle
 scripts already ran raw parents + sigmoid (their reference does), so they
 comply by construction and only their epochs moved; VACA and CAREFL <strong>keep
-tanh + <code>net_input_scaling: minmax</code></strong> because every alternative was tried and
+tanh + min-max network inputs (<code>input_transform: minmax</code>)</strong> because every alternative was tried and
 measurably fails. Every tuned variant's ground truth was re-pinned from its
 final run (centers to the run, <code>{max}</code> at 2.5x; <code>fit_seconds</code> waits for the
 next CI measurement) — <strong>the bounds and pins quoted in this section are the

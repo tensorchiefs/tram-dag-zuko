@@ -1437,7 +1437,7 @@ intercept term <code>I</code> plus any number of shifts (notation:
 always purely additive on the latent scale, and interactions exist only
 <em>inside</em> a term. Lists and <code>+</code> sums are interchangeable:
 <code>[LS("A"), CS("B")]</code> ≡ <code>LS("A") + CS("B")</code>.</p>
-<p>Two knobs on the terms:</p>
+<p>Three knobs on the terms:</p>
 <ul>
 <li><strong><code>transform=</code> on <code>I</code></strong> picks the basis of <code>h_ϑ</code> for a continuous node —
   <code>"bernstein"</code> (default, 20 coefficients, tails extrapolate with the boundary
@@ -1445,6 +1445,10 @@ always purely additive on the latent scale, and interactions exist only
   slope) or <code>"affine"</code> (2 params: the latent is exactly logistic). Ordinal
   nodes have no basis: their intercept is the cutpoint vector,
   <code>P(x ≤ k) = σ(ϑ_k − shift)</code>.</li>
+<li><strong><code>input_transform=</code> on <code>CI</code>/<code>CS</code>/<code>VC</code></strong> — <code>"minmax"</code>, <code>"standardize"</code>, or
+  a callable <code>fn(x, train)</code> — transforms that term's continuous network
+  inputs with statistics frozen at the first fit; <code>LS</code> and the <code>VC</code>
+  treatment stay raw, so their coefficients keep their units.</li>
 <li><strong><code>units=</code> on <code>I</code>/<code>CS</code>/<code>VC</code></strong> sizes the term's network, e.g. <code>units=[16]</code>
   for one hidden layer of 16 neurons. The defaults match the PyTorch
   reference this package grew out of (<a href="https://github.com/buehlpa/TramDag">buehlpa/TramDag</a>,

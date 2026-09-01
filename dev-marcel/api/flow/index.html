@@ -1756,28 +1756,6 @@ minibatch shuffling.</p>
           </tr>
           <tr class="doc-section-item">
             <td>
-                <code>net_input_scaling</code>
-            </td>
-            <td>
-                  <code><span title="str">str</span> | None</code>
-            </td>
-            <td>
-              <div class="doc-md-description">
-                <p><code>"minmax"</code> feeds every network (complex intercepts, complex shifts,
-VC modifiers) its continuous parents scaled to <code>[0, 1]</code> by the
-training min and max, the way the paper's reference implementation
-does; raw parents (default <code>None</code>) saturate a tanh net whenever
-<code>|x| &gt; 2</code>. Linear shifts and the VC treatment stay raw, so their
-coefficients keep their units. Set by <code>calibrate</code>; stored in
-the checkpoint.</p>
-              </div>
-            </td>
-            <td>
-                  <code>None</code>
-            </td>
-          </tr>
-          <tr class="doc-section-item">
-            <td>
                 <code>init</code>
             </td>
             <td>
@@ -2102,9 +2080,10 @@ own treatment node.</p>
         <p>Take the data-dependent state from the training rows, once.</p>
 <p>Per continuous node the transform's domain: the train <code>RANGE_Q</code> /
 <code>1 - RANGE_Q</code> quantiles map onto <code>[-5, 5]</code> (the min-max scaling
-of the original implementation, made robust to outliers). With
-<code>net_input_scaling="minmax"</code> the min and max of every continuous
-parent, for the networks. With <code>marginal_init</code> a calibrated start:
+of the original implementation, made robust to outliers). The
+statistics of every term-level <code>input_transform=</code> (minmax lo/hi,
+standardize mean/std, a callable's frozen train columns). With
+<code>marginal_init</code> a calibrated start:
 a Bernstein simple intercept starts at the data marginal instead of
 zuko's default (about 2.5x too steep), an ordinal simple intercept at
 the marginal class log-odds. The optimum is unchanged, the path to

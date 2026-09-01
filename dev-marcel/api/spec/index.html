@@ -1860,7 +1860,8 @@ with their defaults, so <code>term.penalty</code> stays valid on every
 term. Keys: <code>penalty</code> and <code>center</code> (VC, see :func:<code>VC</code>);
 <code>transform</code> and <code>transform_kwargs</code> (I, the basis of the monotone
 transform, kwargs stored as sorted pairs);
-<code>units</code> (hidden layers of the term's network);
+<code>units</code> and <code>activation</code> (the term's network);
+<code>input_transform</code> (I/CS/VC: the network-input transform);
 <code>allow_interaction</code> (multi-parent I: one joint net or one net
 per parent).</p>
               </div>
@@ -2282,7 +2283,9 @@ basis of the monotone transform is chosen on the intercept term,
 
 
 <a href="#tramdag.spec.simple_intercept" class="headerlink" title="Permanent link">&para;</a></h3>
-<div class="doc-signature highlight"><pre><span></span><code><span class="nf">simple_intercept</span><span class="p">(</span><span class="n">transform</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="o">**</span><span class="n">transform_kwargs</span><span class="p">)</span>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">simple_intercept</span><span class="p">(</span>
+    <span class="n">transform</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">input_transform</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="o">**</span><span class="n">transform_kwargs</span>
+<span class="p">)</span>
 </code></pre></div>
 
     <div class="doc doc-contents ">
@@ -2392,6 +2395,7 @@ vector.</p>
     <span class="n">allow_interaction</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
     <span class="n">units</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
     <span class="n">activation</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+    <span class="n">input_transform</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
     <span class="n">transform</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
     <span class="o">**</span><span class="n">transform_kwargs</span>
 <span class="p">)</span>
@@ -2774,7 +2778,12 @@ docs and the paper.</p>
 
 
 <a href="#tramdag.spec.complex_shift" class="headerlink" title="Permanent link">&para;</a></h3>
-<div class="doc-signature highlight"><pre><span></span><code><span class="nf">complex_shift</span><span class="p">(</span><span class="o">*</span><span class="n">parents</span><span class="p">,</span> <span class="n">units</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">activation</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">complex_shift</span><span class="p">(</span>
+    <span class="o">*</span><span class="n">parents</span><span class="p">,</span>
+    <span class="n">units</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+    <span class="n">activation</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+    <span class="n">input_transform</span><span class="o">=</span><span class="kc">None</span>
+<span class="p">)</span>
 </code></pre></div>
 
     <div class="doc doc-contents ">
@@ -2902,7 +2911,8 @@ docs and the paper.</p>
     <span class="n">penalty</span><span class="o">=</span><span class="mf">1.0</span><span class="p">,</span>
     <span class="n">center</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
     <span class="n">units</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
-    <span class="n">activation</span><span class="o">=</span><span class="kc">None</span>
+    <span class="n">activation</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+    <span class="n">input_transform</span><span class="o">=</span><span class="kc">None</span>
 <span class="p">)</span>
 </code></pre></div>
 

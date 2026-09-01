@@ -1714,8 +1714,8 @@ default you can read at the call site. Nothing numeric is buried.</p>
 </tr>
 <tr>
 <td>network inputs</td>
-<td><code>CausalFlowDAG(net_input_scaling=)</code></td>
-<td><code>None</code> (raw parents); <code>"minmax"</code> scales the continuous parents of every net (CI/CS/VC modifiers) to [0, 1] by the training min–max, the reference's <code>scale_df</code> — LS and the VC treatment stay raw</td>
+<td><code>CI/CS/VC(input_transform=)</code></td>
+<td><code>None</code> (raw parents); <code>"minmax"</code> / <code>"standardize"</code> transform that term's continuous parents with statistics frozen at <code>calibrate</code>, and a callable <code>fn(x, train)</code> gets the frozen raw train column — LS and the VC treatment stay raw</td>
 </tr>
 </tbody>
 </table>
