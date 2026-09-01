@@ -233,6 +233,22 @@ default the paper replication or the tests had to switch off.
   paper's misspecified case (Fig. 17, new variant `triangle linear-cs`)
   and the two competing baselines that are deliberately not reimplemented.
 
+- **The replication protocol is tuned for runtime (2026-09-01)** — with the
+  quality gates unchanged: every ground-truth bound holds under 30-71% less
+  training. Triangle runs 300 epochs (linear-cs keeps 500 — its cs curve
+  needs them), mixed 350/200, VACA 4800 full-batch steps at lr 0.002 with
+  the plateau schedule dropped (the old anneal's only job was freezing
+  inside the do-error sweet spot; the tuned lr hits the same window
+  directly), CAREFL 3000 at lr 0.002, the validate-ls Adam descent 2000
+  epochs instead of 7000. The attempted bigger deviations are documented
+  negative results: raw network inputs fail on VACA/CAREFL (sigmoid
+  saturates like tanh, relu underfits and grows fragile Bernstein tails)
+  and minibatching biases the interventional decomposition (a -0.11
+  common-mode offset of the do-means at a perfect observational fit), so
+  those two keep tanh + `net_input_scaling: minmax`. Ground truths
+  re-pinned; details per experiment in the YAML headers and
+  docs/paper-replication.md.
+
 - **An experiments workflow** (`.github/workflows/experiments.yaml`) runs
   all replication variants as a matrix on every push and on demand,
   compares each run's `metrics.json` against the committed

@@ -10,7 +10,7 @@
 #     data/CAREFL_CF/X.csv and watches the *training* NLL (val = train), with
 #     x3/x4 sd-standardized; we draw from the same SCM and score in raw units;
 #   * one full-batch gradient step per epoch (train_step: one apply_gradients
-#     over all rows), 7000 epochs, Adam at lr 0.001;
+#     over all rows);
 #   * update_learning_rate: ReduceLROnPlateau on the summed validation NLL,
 #     factor 0.1, patience 50, min_lr 1e-7, no min_delta (strict <);
 #   * make_model: one net per node, dense(10, tanh) -> dense(100, tanh) ->
@@ -18,24 +18,39 @@
 # The plateau rule is torch's ReduceLROnPlateau on the summed validation NLL,
 # global like the reference's update_learning_rate, and the weights start from
 # Keras' Dense default, glorot_uniform / zero bias (`init: glorot`, make_model's
-# layer_dense) — under this full-batch protocol the init decides the fit: at
-# the config's seed the VACA do(x2) errors are 0.097/0.088/0.019 with glorot
-# (measured 2026-08-26 at the R code's -3/-1/0 grid), against 0.52/0.33/0.13
-# with torch's default init (at the earlier -3/-2/0 grid).
-# Known deviations, all framework-level and documented in CLAUDE.md: the
-# Bernstein domain comes from the train 5%/95% quantiles, not min-max to [0,
-# 1] (scale_df); the intercept net's output layer has no bias (Keras dense has
-# one); Adam eps 1e-8 vs 1e-7 (measured: no effect); the reference seeds R's
-# RNG with 42, which torch cannot replay, so every seed below is a repo
-# choice.
+# layer_dense).
+#
+# ONE allowed deviation from the R optimization (repo decision 2026-09-01,
+# taken for CI runtime — the 1:1 protocol, 7000 epochs at lr 0.001, took
+# ~338 s on the 2-core CI runner): 3000 epochs at lr 0.002 instead of 7000
+# at 0.001 — same full-batch steps, same plateau rule, ~2.3x fewer epochs
+# for the same converged fit (measured 2026-09-01: every pinned metric holds,
+# five of the six held-out counterfactual MAEs better than the 7000-epoch
+# pins). Two rejected candidates, both measured:
+#   * minibatch (batch 256, 400-800 epochs): 3-5x faster still, but the
+#     fig6 curve ends and the do(x2)=+1.5 MAE live in the sparse x2 tail,
+#     which minibatch gradients underweight — cf_mae_x3_do_x2_+1.5 0.40
+#     (bound 0.35), fig6_max_abs_err_x3 5.9 (bound 4.7);
+#   * `activation: relu` + `net_input_scaling: null` (undoing the scale_df
+#     workaround; sigmoid saturates on raw Laplace parents just like tanh, so
+#     relu is the only real raw-input candidate): x3 underfits (val NLL 1.46
+#     vs pin 1.403+-0.05) and the fitted x4 Bernstein tail is fragile — one
+#     large-noise held-out row inverted to x4 = 580, cf_mae_x4_do_x1_+0.0 = 4.4
+#     (bound 0.33). Raw parents cannot match the min-max-scaled reference here.
+# Known framework-level deviations, documented in CLAUDE.md: the Bernstein
+# domain comes from the train 5%/95% quantiles, not min-max to [0, 1]
+# (scale_df); the intercept net's output layer has no bias (Keras dense has
+# one); Adam eps 1e-8 vs Keras 1e-7 (measured: no effect); the reference
+# seeds R's RNG with 42, which torch cannot replay, so every seed below is a
+# repo choice.
 #
 variants:
   # all conditionals complex intercepts
   flexible:
     n_train: 2500               # nTrain
     n_val: 5000                 # val = dgp(5000)
-    epochs: 7000
-    learning_rate: 0.001
+    epochs: 3000                # deviation: 7000 @ 0.001 -> 3000 @ 0.002 (header)
+    learning_rate: 0.002
     batch_size: 2500            # = n_train: one full-batch step per epoch
     schedule: plateau           # update_learning_rate
     plateau_patience: 50
@@ -48,7 +63,7 @@ variants:
     # free-parameter count is what matches
     n_coeffs: 31
     intercept_units: [10, 100]  # make_model's two dense layers
-    activation: tanh            # make_model's activation
+    activation: tanh            # make_model's activation (relu+raw rejected, header)
     dgp_seed: 42                # repo choice
     init_seed: 7                # repo choice
     init: glorot                # Keras Dense default: glorot_uniform, zero bias

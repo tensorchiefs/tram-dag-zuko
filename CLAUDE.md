@@ -144,26 +144,35 @@ paper states only three training numbers — n=40000, 500 epochs, Bernstein
 order 20; the Adam lr 1e-3 is the R code's `optimizer_adam()` default. The configs follow the paper's own R code 1:1 where the
 framework allows: the triangle scripts train one continuous Adam run with a
 separate validation draw (40k / 10k mixed) and read the coefficients after
-every epoch (`fit(after_epoch_callbacks=)`) — at batch 256 / lr 0.004 instead of the
-paper's Keras-default batch 32 / lr 0.001, the one deviation taken for CI
-runtime (8× fewer steps, every metric kept; the grid is in
-docs/paper-replication.md); the
-VACA/CAREFL comparisons take one full-batch step per epoch on nTrain = 2500
-for 10000 / 7000 epochs with the reference's ReduceLROnPlateau (factor 0.1,
-patience 50, min_lr 1e-7) — torch's scheduler on the summed validation NLL,
-global as in `update_learning_rate`. Seeds: the triangle scripts run
+every epoch (`fit(after_epoch_callbacks=)`) — at batch 256 / lr 0.004 for 300
+epochs (linear-cs 500, mixed exp-cs 350, mixed linear-ls 200 @ lr 0.002)
+instead of the paper's 500 at Keras-default batch 32 / lr 0.001, the
+deviations taken for CI runtime (every metric kept; grid, epoch floors and
+the 2026-09-01 tuning round in docs/paper-replication.md); the
+VACA/CAREFL comparisons take one full-batch step per epoch on nTrain = 2500 —
+VACA 4800 epochs at lr 0.002 with no schedule, CAREFL 3000 at lr 0.002 with
+the reference's ReduceLROnPlateau (factor 0.1, patience 50, min_lr 1e-7;
+torch's scheduler on the summed validation NLL, global as in
+`update_learning_rate`) — against the reference's 10000 / 7000 at lr 0.001
+with plateau, the same CI-runtime deviation (VACA's rule cannot fire inside
+the compressed run's all-bounds window, so it is dropped there; minibatch and
+raw-parent alternatives measurably fail, see docs/paper-replication.md).
+Seeds: the triangle scripts run
 unseeded, the comparison scripts seed R's RNG with 42 (not replayable in
 torch), so every seed here is a repo choice. Init follows each reference:
 `init: normal` (Keras `random_normal`, the triangle scripts' `LinearMasked`
 layers) and `init: glorot` (Keras `Dense`, `make_model`) — under the
 full-batch protocol the init decides the fit (VACA do(x2) errors
 0.52/0.33/0.13 with torch's default init, 0.098/0.159/0.026 with glorot at
-the config's seed — both measured on the earlier −3/−2/0 grid; the shipped
-−3/−1/0 grid scores 0.097/0.088/0.019 with glorot). Known, documented deviations: the triangle scripts also
+the config's seed — both measured on the earlier −3/−2/0 grid; on the shipped
+−3/−1/0 grid glorot scored 0.097/0.088/0.019 under the old 10000-epoch
+plateau protocol and scores 0.096/0.080/0.022 under the tuned 4800-epoch
+config). Known, documented deviations: the triangle scripts also
 use 5%/95% quantiles for the Bernstein domain (a match), the comparison
 scripts min-max (`scale_df`) — we keep the quantiles there and scale the
 *network inputs* min-max (`net_input_scaling: minmax`; raw parents saturate
-the tanh nets: `do(x2=-3)` error 0.731 → 0.098); a bias-free intercept
+the tanh nets: `do(x2=-3)` error 0.731 → 0.098, and the 2026-09-01 relu/sigmoid
+raw-parent attempts fail too); a bias-free intercept
 output layer; Adam eps 1e-8 vs Keras 1e-7 (no effect);
 `calibrate(marginal_init=False)` in `helpers.py::fit_paper` (`validate_ls`
 keeps the default); CAREFL trains on a fresh 2500-row draw with a separate
@@ -201,7 +210,7 @@ extra control points on, so `n_coeffs=20` is order 21 where the reference's
   rows are scored next to it because one point is a noisy yardstick.
 - **`validate_ls`** (`experiments/misc/data/magic-mrclean/ls`, seed 7, n=1275, full data,
   final weights): flow = statsmodels = R polr at Age 0.0526, NIHSSa 0.1630,
-  T −0.9424; ATE +0.1429 vs +0.1428, true ATE +0.132. The R reference
+  T −0.9424; ATE +0.1428 vs +0.1428, true ATE +0.132. The R reference
   (`fit_ls.R`, needs `tram`/`MASS`) has its outputs committed under `ref_ls/`, so
   nothing needs R installed.
 - Committed expectations live in `experiments/<area>/ground_truth/<name>.json`;
@@ -226,9 +235,10 @@ extra control points on, so `n_coeffs=20` is order 21 where the reference's
 - `experiments/misc/data/magic-mrclean/ls` has no generator here (it left with the
   stroke storyline); it is frozen input data. Recover the generator from
   `pre-experiments-cut` if it ever needs regenerating.
-- Fit checks for the paper DGPs train on the paper protocol (n=40k, 500 epochs),
+- Fit checks for the paper DGPs train on the paper protocol (n=40k; epochs per
+  the tuned configs, 200-500),
   not the frozen n=5k CSVs — β13 multiplies x1, whose two mixture components sit at 0.25 and 0.73
-  (sd 0.254, against 0.375 for x2 and 2.918 for x3), so it is
+  (sd 0.254, against 0.375 for x2 and 2.918 for x3), so it
   is too weakly identified at n=5k.
 
 ## Roadmap notes
