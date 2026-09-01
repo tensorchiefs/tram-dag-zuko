@@ -1117,56 +1117,6 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#tramdag.callbacks.RestoreBest" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        RestoreBest
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="RestoreBest">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#tramdag.callbacks.RestoreBest.on_fit_begin" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        on_fit_begin
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#tramdag.callbacks.RestoreBest.on_epoch_end" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        on_epoch_end
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#tramdag.callbacks.RestoreBest.on_fit_end" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        on_fit_end
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-        
-          <li class="md-nav__item">
   <a href="#tramdag.callbacks.EarlyStopping" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1194,6 +1144,17 @@
     <span class="md-ellipsis">
       
         on_epoch_end
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tramdag.callbacks.EarlyStopping.on_fit_end" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        on_fit_end
       
     </span>
   </a>
@@ -1376,56 +1337,6 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#tramdag.callbacks.RestoreBest" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        RestoreBest
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="RestoreBest">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#tramdag.callbacks.RestoreBest.on_fit_begin" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        on_fit_begin
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#tramdag.callbacks.RestoreBest.on_epoch_end" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        on_epoch_end
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#tramdag.callbacks.RestoreBest.on_fit_end" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        on_fit_end
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-        
-          <li class="md-nav__item">
   <a href="#tramdag.callbacks.EarlyStopping" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1453,6 +1364,17 @@
     <span class="md-ellipsis">
       
         on_epoch_end
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tramdag.callbacks.EarlyStopping.on_fit_end" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        on_fit_end
       
     </span>
   </a>
@@ -1565,7 +1487,7 @@
 
     <div class="doc doc-contents first">
 
-        <p>Predefined <code>fit</code> callbacks: <code>RestoreBest</code>, <code>EarlyStopping</code>, <code>PerNodePlateau</code>.</p>
+        <p>Predefined <code>fit</code> callbacks: <code>EarlyStopping</code> and <code>PerNodePlateau</code>.</p>
 <p><code>fit</code> owns validation and progress printing; the callbacks here read the
 per-node validation NLL that <code>fit</code> appends to <code>flow.history["val"]</code> after
 every epoch — computed once, shared by all of them. One <code>callbacks=</code> list
@@ -1709,145 +1631,6 @@ the weights hands them to the re-centering.</p>
 
 
 
-<h3 id="tramdag.callbacks.RestoreBest" class="doc doc-heading">
-            <span class="doc doc-object-name doc-class-name">RestoreBest</span>
-
-
-<a href="#tramdag.callbacks.RestoreBest" class="headerlink" title="Permanent link">&para;</a></h3>
-
-
-    <div class="doc doc-contents ">
-            <p class="doc doc-class-bases">
-              Bases: <code><a class="autorefs autorefs-internal" title="Callback (tramdag.callbacks.Callback)" href="#tramdag.callbacks.Callback">Callback</a></code></p>
-
-
-
-        <p>Keep the weights of the best summed validation NLL; restore them at the end.</p>
-<p>The key empirical finding behind it: flexible (CI/CS) models overfit
-observational confounding at the MLE and need best-validation weights to
-recover the causal effect (docs/fitting.md). The restoration is
-automatic (<code>on_fit_end</code>, which <code>fit</code> runs before the VC
-re-centering) — registering the instance in <code>callbacks=</code> is the whole
-recipe. Reads <code>flow.history["val"]</code>, so the fit needs
-<code>validation_data=</code> or <code>validation_split=</code>.</p>
-
-
-<p><span class="doc-section-title">Attributes:</span></p>
-    <table>
-      <thead>
-        <tr>
-          <th>Name</th>
-          <th>Type</th>
-          <th>Description</th>
-        </tr>
-      </thead>
-      <tbody>
-          <tr class="doc-section-item">
-            <td><code><span title="tramdag.callbacks.RestoreBest.best_nll, best_epoch">best_nll, best_epoch</span></code></td>
-            <td>
-            </td>
-            <td>
-              <div class="doc-md-description">
-                <p>The best summed validation NLL seen this fit and its epoch.</p>
-              </div>
-            </td>
-          </tr>
-      </tbody>
-    </table>
-
-
-
-
-
-
-
-
-
-
-
-<div class="doc doc-children">
-
-
-
-
-
-
-
-
-
-
-<div class="doc doc-object doc-function">
-
-
-<h4 id="tramdag.callbacks.RestoreBest.on_fit_begin" class="doc doc-heading">
-            <span class="doc doc-object-name doc-function-name">on_fit_begin</span>
-
-
-<a href="#tramdag.callbacks.RestoreBest.on_fit_begin" class="headerlink" title="Permanent link">&para;</a></h4>
-<div class="doc-signature highlight"><pre><span></span><code><span class="nf">on_fit_begin</span><span class="p">(</span><span class="n">flow</span><span class="p">,</span> <span class="n">optimizer</span><span class="p">)</span>
-</code></pre></div>
-
-    <div class="doc doc-contents ">
-
-        <p>Start fresh — the snapshot never leaks into the next fit.</p>
-
-
-    </div>
-
-</div>
-
-<div class="doc doc-object doc-function">
-
-
-<h4 id="tramdag.callbacks.RestoreBest.on_epoch_end" class="doc doc-heading">
-            <span class="doc doc-object-name doc-function-name">on_epoch_end</span>
-
-
-<a href="#tramdag.callbacks.RestoreBest.on_epoch_end" class="headerlink" title="Permanent link">&para;</a></h4>
-<div class="doc-signature highlight"><pre><span></span><code><span class="nf">on_epoch_end</span><span class="p">(</span><span class="n">flow</span><span class="p">,</span> <span class="n">epoch</span><span class="p">,</span> <span class="n">optimizer</span><span class="p">)</span>
-</code></pre></div>
-
-    <div class="doc doc-contents ">
-
-        <p>Snapshot the weights when the validation NLL improves.</p>
-
-
-    </div>
-
-</div>
-
-<div class="doc doc-object doc-function">
-
-
-<h4 id="tramdag.callbacks.RestoreBest.on_fit_end" class="doc doc-heading">
-            <span class="doc doc-object-name doc-function-name">on_fit_end</span>
-
-
-<a href="#tramdag.callbacks.RestoreBest.on_fit_end" class="headerlink" title="Permanent link">&para;</a></h4>
-<div class="doc-signature highlight"><pre><span></span><code><span class="nf">on_fit_end</span><span class="p">(</span><span class="n">flow</span><span class="p">,</span> <span class="n">optimizer</span><span class="p">)</span>
-</code></pre></div>
-
-    <div class="doc doc-contents ">
-
-        <p>Load the best weights back into the flow.</p>
-
-
-    </div>
-
-</div>
-
-
-
-  </div>
-
-    </div>
-
-</div>
-
-<div class="doc doc-object doc-class">
-
-
-
 <h3 id="tramdag.callbacks.EarlyStopping" class="doc doc-heading">
             <span class="doc doc-object-name doc-class-name">EarlyStopping</span>
 
@@ -1861,10 +1644,15 @@ recipe. Reads <code>flow.history["val"]</code>, so the fit needs
 
 
 
-        <p>Stop the fit after <code>patience</code> epochs without validation improvement.</p>
-<p>Tracks the summed validation NLL itself, so it composes with
-:class:<code>RestoreBest</code> in any order — the usual pair is
-<code>callbacks=[RestoreBest(), EarlyStopping(patience=200)]</code>. Reads
+        <p>Keep the best-validation weights; optionally stop once they are old.</p>
+<p>Tracks the summed validation NLL. With <code>restore_best</code> (the default)
+the weights of the best epoch are snapshotted and loaded back at fit
+end (before the VC re-centering) — the flexible-model recipe: CI/CS
+models overfit observational confounding at the MLE and need
+best-validation weights to recover the causal effect
+(docs/fitting.md). With <code>patience</code> the fit also stops once the last
+improvement is that many epochs old; without it (the default) the fit
+runs its full epoch budget and only the restoration happens. Reads
 <code>flow.history["val"]</code>, so the fit needs <code>validation_data=</code> or
 <code>validation_split=</code>.</p>
 
@@ -1885,15 +1673,16 @@ recipe. Reads <code>flow.history["val"]</code>, so the fit needs
                 <code>patience</code>
             </td>
             <td>
-                  <code><span title="int">int</span></code>
+                  <code><span title="int">int</span> | None</code>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Epochs without a <code>min_delta</code> improvement before stopping.</p>
+                <p>Epochs without a <code>min_delta</code> improvement before stopping;
+<code>None</code> (the default) never stops.</p>
               </div>
             </td>
             <td>
-                <em>required</em>
+                  <code>None</code>
             </td>
           </tr>
           <tr class="doc-section-item">
@@ -1910,6 +1699,46 @@ recipe. Reads <code>flow.history["val"]</code>, so the fit needs
             </td>
             <td>
                   <code>0.0</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>restore_best</code>
+            </td>
+            <td>
+                  <code><span title="bool">bool</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Load the best epoch's weights back at fit end, by default True.</p>
+              </div>
+            </td>
+            <td>
+                  <code>True</code>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<p><span class="doc-section-title">Attributes:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td><code><span title="tramdag.callbacks.EarlyStopping.best_nll, best_epoch">best_nll, best_epoch</span></code></td>
+            <td>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The best summed validation NLL seen this fit and its epoch.</p>
+              </div>
             </td>
           </tr>
       </tbody>
@@ -1949,7 +1778,7 @@ recipe. Reads <code>flow.history["val"]</code>, so the fit needs
 
     <div class="doc doc-contents ">
 
-        <p>Start fresh — patience never carries into the next fit.</p>
+        <p>Start fresh — neither patience nor the snapshot carries over.</p>
 
 
     </div>
@@ -1969,7 +1798,27 @@ recipe. Reads <code>flow.history["val"]</code>, so the fit needs
 
     <div class="doc doc-contents ">
 
-        <p>Give <code>True</code> once the last improvement is <code>patience</code> epochs old.</p>
+        <p>Snapshot on improvement; <code>True</code> once the best is <code>patience</code> old.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="tramdag.callbacks.EarlyStopping.on_fit_end" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">on_fit_end</span>
+
+
+<a href="#tramdag.callbacks.EarlyStopping.on_fit_end" class="headerlink" title="Permanent link">&para;</a></h4>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">on_fit_end</span><span class="p">(</span><span class="n">flow</span><span class="p">,</span> <span class="n">optimizer</span><span class="p">)</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Load the best weights back into the flow (<code>restore_best</code> only).</p>
 
 
     </div>

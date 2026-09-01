@@ -1993,7 +1993,7 @@ span.linenos.special { color: #000000; background-color: #ffffc0; padding-left: 
 </style>
 <!-- End of mermaid configuration --><div class="jupyter-wrapper">
 <div class="jp-Notebook" data-jp-theme-light="true" data-jp-theme-name="JupyterLab Light">
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=5b7fcbdd">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=9f251d31">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -2017,7 +2017,7 @@ confounding.</p>
 </div>
 </div>
 </div><div class="jp-Cell jp-CodeCell jp-Notebook-cell jp-mod-noOutputs">
-<div class="jp-Cell jp-CodeCell jp-Notebook-cell jp-mod-noOutputs" id="cell-id=fc3b03f0">
+<div class="jp-Cell jp-CodeCell jp-Notebook-cell jp-mod-noOutputs" id="cell-id=48b4a118">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -2040,7 +2040,7 @@ confounding.</p>
 <span class="kn">import</span><span class="w"> </span><span class="nn">pandas</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pd</span>
 
 <span class="kn">from</span><span class="w"> </span><span class="nn">tramdag</span><span class="w"> </span><span class="kn">import</span> <span class="n">CS</span><span class="p">,</span> <span class="n">LS</span><span class="p">,</span> <span class="n">VC</span><span class="p">,</span> <span class="n">CausalFlowDAG</span><span class="p">,</span> <span class="n">ContinuousNode</span><span class="p">,</span> <span class="n">I</span><span class="p">,</span> <span class="n">OrdinalNode</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">tramdag.callbacks</span><span class="w"> </span><span class="kn">import</span> <span class="n">RestoreBest</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">tramdag.callbacks</span><span class="w"> </span><span class="kn">import</span> <span class="n">EarlyStopping</span>
 
 <span class="n">plt</span><span class="o">.</span><span class="n">rcParams</span><span class="p">[</span><span class="s2">"figure.dpi"</span><span class="p">]</span> <span class="o">=</span> <span class="mi">110</span>
 </pre></div>
@@ -2049,7 +2049,7 @@ import numpy as np
 import pandas as pd
 
 from tramdag import CS, LS, VC, CausalFlowDAG, ContinuousNode, I, OrdinalNode
-from tramdag.callbacks import RestoreBest
+from tramdag.callbacks import EarlyStopping
 
 plt.rcParams["figure.dpi"] = 110</div>
 </div>
@@ -2058,7 +2058,7 @@ plt.rcParams["figure.dpi"] = 110</div>
 </div>
 </div>
 </div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=31d82fcb">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=8142221c">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -2076,7 +2076,7 @@ where a naive estimate fails hardest.</p>
 </div>
 </div>
 </div><div class="jp-Cell jp-CodeCell jp-Notebook-cell">
-<div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=905fbced">
+<div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=8e3514ed">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -2161,7 +2161,7 @@ true effect ranges from -4.41 to +2.29
 </div>
 </div>
 </div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=286156d6">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=b8657bc8">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -2176,7 +2176,7 @@ covariate turns that into a ranking.</p>
 </div>
 </div>
 </div><div class="jp-Cell jp-CodeCell jp-Notebook-cell">
-<div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=064cca6c">
+<div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=7f36ec60">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -2243,7 +2243,7 @@ X3  3.162172  4.127816e-09     1.3581  True
 </div>
 </div>
 </div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=1a4ada22">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=778b7e7c">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -2262,7 +2262,7 @@ nothing else, and <code>X1</code> drops out of the shortlist.</p>
 </div>
 </div>
 </div><div class="jp-Cell jp-CodeCell jp-Notebook-cell">
-<div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=8ee17b42">
+<div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=2482e711">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -2329,7 +2329,7 @@ X1  0.552841  9.199350e-01     1.3581  False
 </div>
 </div>
 </div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=8d6a3607">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=661a4519">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -2342,7 +2342,7 @@ wrong here". Both are things you want to know.</p>
 </div>
 </div>
 </div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=81325530">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=2bf5714d">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -2356,7 +2356,7 @@ the head. Only the treatment named by <code>t=</code> owns its edge.</p>
 </div>
 </div>
 </div><div class="jp-Cell jp-CodeCell jp-Notebook-cell">
-<div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=63ce85ba">
+<div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=81b045dc">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -2389,7 +2389,7 @@ the head. Only the treatment named by <code>t=</code> owns its edge.</p>
     <span class="n">batch_size</span><span class="o">=</span><span class="mi">512</span><span class="p">,</span>
     <span class="n">validation_data</span><span class="o">=</span><span class="n">val</span><span class="p">,</span>
     <span class="n">seed</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span>
-    <span class="n">callbacks</span><span class="o">=</span><span class="n">RestoreBest</span><span class="p">(),</span>
+    <span class="n">callbacks</span><span class="o">=</span><span class="n">EarlyStopping</span><span class="p">(),</span>  <span class="c1"># keep the best-validation weights</span>
 <span class="p">)</span>
 <span class="nb">print</span><span class="p">(</span><span class="n">flow</span><span class="o">.</span><span class="n">to_matrix</span><span class="p">())</span>
 </pre></div>
@@ -2408,7 +2408,7 @@ flow.fit(
     batch_size=512,
     validation_data=val,
     seed=0,
-    callbacks=RestoreBest(),
+    callbacks=EarlyStopping(),  # keep the best-validation weights
 )
 print(flow.to_matrix())</div>
 </div>
@@ -2435,7 +2435,7 @@ Y
 </div>
 </div>
 </div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=a3893931">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=bef478d1">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -2449,7 +2449,7 @@ labelled with the term that carries it. <code>VC</code> marks the treatment edge
 </div>
 </div>
 </div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=eae0ec1b">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=64b281d5">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -2462,7 +2462,7 @@ look at the outcome — it is a property of the fitted model, not of the rows'
 </div>
 </div>
 </div><div class="jp-Cell jp-CodeCell jp-Notebook-cell">
-<div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=6408ea5c">
+<div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=f2c8ad30">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -2553,7 +2553,7 @@ mean |error| = 0.087
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>/tmp/ipykernel_4507/2710869176.py:4: UserWarning: Converting a tensor with requires_grad=True to a scalar may lead to unexpected behavior.
+<pre>/tmp/ipykernel_4480/2710869176.py:4: UserWarning: Converting a tensor with requires_grad=True to a scalar may lead to unexpected behavior.
 Consider using tensor.detach() first. (Triggered internally at /__w/pytorch/pytorch/torch/csrc/autograd/generated/python_variable_methods.cpp:822.)
   beta0 = float(flow.nodes["Y"].shifts["T"].beta0)
 </pre>
@@ -2569,7 +2569,7 @@ Consider using tensor.detach() first. (Triggered internally at /__w/pytorch/pyto
 </div>
 </div>
 </div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=146e2c5f">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=8f34d655">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -2581,7 +2581,7 @@ effect also depends on <code>X3</code> — exactly as it should be.</p>
 </div>
 </div>
 </div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=6ac11598">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=53dbe778">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -2594,7 +2594,7 @@ definition the implementation must satisfy, and it does, to float precision:</p>
 </div>
 </div>
 </div><div class="jp-Cell jp-CodeCell jp-Notebook-cell">
-<div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=ebbe333f">
+<div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=f94fff78">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -2638,7 +2638,7 @@ print(f"max |beta(x) - (u(T=1) - u(T=0))| = {np.abs(beta_hat - (u1 - u0)).max():
 </div>
 </div>
 </div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=3facfabf">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=ce56af6e">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -2659,7 +2659,7 @@ classical fits of the treatment spec.</p>
 </div>
 </div>
 </div><div class="jp-Cell jp-CodeCell jp-Notebook-cell">
-<div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=e539e099">
+<div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=76850098">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -2718,7 +2718,7 @@ classical fits of the treatment spec.</p>
         <span class="n">batch_size</span><span class="o">=</span><span class="mi">512</span><span class="p">,</span>
         <span class="n">validation_data</span><span class="o">=</span><span class="n">c_val</span><span class="p">,</span>
         <span class="n">seed</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span>
-        <span class="n">callbacks</span><span class="o">=</span><span class="n">RestoreBest</span><span class="p">(),</span>
+        <span class="n">callbacks</span><span class="o">=</span><span class="n">EarlyStopping</span><span class="p">(),</span>  <span class="c1"># keep the best-validation weights</span>
         <span class="n">vc_ehat</span><span class="o">=</span><span class="p">{</span><span class="s2">"Y"</span><span class="p">:</span> <span class="p">{</span><span class="s2">"T"</span><span class="p">:</span> <span class="n">e_oof</span><span class="p">}}</span> <span class="k">if</span> <span class="n">center</span> <span class="k">else</span> <span class="kc">None</span><span class="p">,</span>
     <span class="p">)</span>
     <span class="n">b</span> <span class="o">=</span> <span class="n">fc</span><span class="o">.</span><span class="n">varying_coef</span><span class="p">(</span><span class="n">c_test</span><span class="p">,</span> <span class="s2">"Y"</span><span class="p">)</span>
@@ -2768,7 +2768,7 @@ for center in (False, True):
         batch_size=512,
         validation_data=c_val,
         seed=0,
-        callbacks=RestoreBest(),
+        callbacks=EarlyStopping(),  # keep the best-validation weights
         vc_ehat={"Y": {"T": e_oof}} if center else None,
     )
     b = fc.varying_coef(c_test, "Y")
@@ -2802,7 +2802,7 @@ for center in (False, True):
 </div>
 </div>
 </div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=54d45ada">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=30550d43">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -2817,7 +2817,7 @@ why it is worth reaching for whenever assignment is not random.</p>
 </div>
 </div>
 </div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=d6bac523">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=27e5fe65">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>

@@ -1616,12 +1616,8 @@ config in <code>experiments/paper/</code> states <code>units=</code> and <code>a
 </thead>
 <tbody>
 <tr>
-<td><a class="autorefs autorefs-internal" title="RestoreBest" href="../api/callbacks/#tramdag.callbacks.RestoreBest"><code>RestoreBest</code></a></td>
-<td>Snapshots the weights of the best summed validation NLL (read from <code>history["val"]</code>) and restores them automatically at fit end, before the VC re-centering.</td>
-</tr>
-<tr>
 <td><a class="autorefs autorefs-internal" title="EarlyStopping" href="../api/callbacks/#tramdag.callbacks.EarlyStopping"><code>EarlyStopping</code></a></td>
-<td>Stops the fit after <code>patience</code> epochs without validation improvement; tracks its own best, so it composes with <code>RestoreBest</code> in any order.</td>
+<td>Snapshots the weights of the best summed validation NLL (read from <code>history["val"]</code>) and restores them automatically at fit end, before the VC re-centering; an optional <code>patience</code> also stops the fit once the best is that many epochs old.</td>
 </tr>
 <tr>
 <td><a class="autorefs autorefs-internal" title="PerNodePlateau" href="../api/callbacks/#tramdag.callbacks.PerNodePlateau"><code>PerNodePlateau</code></a></td>
@@ -1665,7 +1661,7 @@ default you can read at the call site. Nothing numeric is buried.</p>
 <tr>
 <td>schedules, early stopping</td>
 <td><code>fit(optimizer=, callbacks=)</code></td>
-<td><code>tramdag.callbacks</code> ships <code>RestoreBest</code>, <code>EarlyStopping</code>, <code>PerNodePlateau</code>; anything else is torch's <code>lr_scheduler</code> and a few lines of callback (<a href="../fitting/">fitting.md</a>)</td>
+<td><code>tramdag.callbacks</code> ships <code>EarlyStopping</code>, <code>PerNodePlateau</code>; anything else is torch's <code>lr_scheduler</code> and a few lines of callback (<a href="../fitting/">fitting.md</a>)</td>
 </tr>
 <tr>
 <td>calibrated init</td>
