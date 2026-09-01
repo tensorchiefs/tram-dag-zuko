@@ -1732,7 +1732,7 @@ object, so use whichever reads better:</p>
   continuous node; extra keyword arguments go straight to the transform
   class (<code>SI(transform="spline", bins=16)</code>).</li>
 <li>:func:<code>LS</code> — <em>linear shift</em>: <code>beta * x</code> (one interpretable weight), one parent.</li>
-<li>:func:<code>CS</code> — <em>complex shift</em>: an additive MLP <code>g(x)</code> on the latent scale.</li>
+<li>:func:<code>CS</code> — <em>complex shift</em>: an additive NN <code>g(x)</code> on the latent scale.</li>
 <li>:func:<code>VC</code> — <em>varying-coefficient shift</em>: <code>beta(modifiers) * x_on</code> with
   <code>beta(x) = beta0 + b_theta(x)</code> and <code>b_theta</code> a small, <strong>penalized</strong> network
   — a treatment-effect head with its own bias–variance budget (issue #28).</li>
@@ -1860,7 +1860,8 @@ with their defaults, so <code>term.penalty</code> stays valid on every
 term. Keys: <code>penalty</code> and <code>center</code> (VC, see :func:<code>VC</code>);
 <code>transform</code> and <code>transform_kwargs</code> (I, the basis of the monotone
 transform, kwargs stored as sorted pairs);
-<code>units</code> (hidden layers of the term's network);
+<code>units</code> and <code>activation</code> (the term's network);
+<code>input_transform</code> (I/CS/VC: the network-input transform);
 <code>allow_interaction</code> (multi-parent I: one joint net or one net
 per parent).</p>
               </div>
@@ -2282,7 +2283,9 @@ basis of the monotone transform is chosen on the intercept term,
 
 
 <a href="#tramdag.spec.simple_intercept" class="headerlink" title="Permanent link">&para;</a></h3>
-<div class="doc-signature highlight"><pre><span></span><code><span class="nf">simple_intercept</span><span class="p">(</span><span class="n">transform</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="o">**</span><span class="n">transform_kwargs</span><span class="p">)</span>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">simple_intercept</span><span class="p">(</span>
+    <span class="n">transform</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">input_transform</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="o">**</span><span class="n">transform_kwargs</span>
+<span class="p">)</span>
 </code></pre></div>
 
     <div class="doc doc-contents ">
@@ -2392,6 +2395,7 @@ vector.</p>
     <span class="n">allow_interaction</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
     <span class="n">units</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
     <span class="n">activation</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+    <span class="n">input_transform</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
     <span class="n">transform</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
     <span class="o">**</span><span class="n">transform_kwargs</span>
 <span class="p">)</span>
@@ -2774,12 +2778,17 @@ docs and the paper.</p>
 
 
 <a href="#tramdag.spec.complex_shift" class="headerlink" title="Permanent link">&para;</a></h3>
-<div class="doc-signature highlight"><pre><span></span><code><span class="nf">complex_shift</span><span class="p">(</span><span class="o">*</span><span class="n">parents</span><span class="p">,</span> <span class="n">units</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">activation</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">complex_shift</span><span class="p">(</span>
+    <span class="o">*</span><span class="n">parents</span><span class="p">,</span>
+    <span class="n">units</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+    <span class="n">activation</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+    <span class="n">input_transform</span><span class="o">=</span><span class="kc">None</span>
+<span class="p">)</span>
 </code></pre></div>
 
     <div class="doc doc-contents ">
 
-        <p>Build a complex-shift term: an additive MLP <code>g(x)</code>.</p>
+        <p>Build a complex-shift term: an additive NN <code>g(x)</code>.</p>
 <p><code>CS</code> is the exported alias of this function, the notation of the
 docs and the paper.</p>
 
@@ -2902,7 +2911,8 @@ docs and the paper.</p>
     <span class="n">penalty</span><span class="o">=</span><span class="mf">1.0</span><span class="p">,</span>
     <span class="n">center</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
     <span class="n">units</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
-    <span class="n">activation</span><span class="o">=</span><span class="kc">None</span>
+    <span class="n">activation</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+    <span class="n">input_transform</span><span class="o">=</span><span class="kc">None</span>
 <span class="p">)</span>
 </code></pre></div>
 
@@ -2913,7 +2923,7 @@ docs and the paper.</p>
 docs and the paper.</p>
 <p>This is the treatment-effect term of issue #28:
 <code>VC("X2", "X3", t="T")</code> is <code>(beta0 + b_theta(x2, x3)) * x_t</code>.</p>
-<p><code>beta(x) = beta0 + b_theta(x)</code>, with <code>b_theta</code> a small MLP whose
+<p><code>beta(x) = beta0 + b_theta(x)</code>, with <code>b_theta</code> a small NN whose
 weights carry the L2 <code>penalty</code>. The fitting objective is the
 penalized NLL <code>sum_i nll_i + penalty * ||b_theta weights||^2</code> on the
 total-likelihood scale. That is a fixed Gaussian prior whose shrinkage

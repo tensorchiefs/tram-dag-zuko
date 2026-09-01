@@ -1756,28 +1756,6 @@ minibatch shuffling.</p>
           </tr>
           <tr class="doc-section-item">
             <td>
-                <code>net_input_scaling</code>
-            </td>
-            <td>
-                  <code><span title="str">str</span> | None</code>
-            </td>
-            <td>
-              <div class="doc-md-description">
-                <p><code>"minmax"</code> feeds every network (complex intercepts, complex shifts,
-VC modifiers) its continuous parents scaled to <code>[0, 1]</code> by the
-training min and max, the way the paper's reference implementation
-does; raw parents (default <code>None</code>) saturate a tanh net whenever
-<code>|x| &gt; 2</code>. Linear shifts and the VC treatment stay raw, so their
-coefficients keep their units. Set by <code>calibrate</code>; stored in
-the checkpoint.</p>
-              </div>
-            </td>
-            <td>
-                  <code>None</code>
-            </td>
-          </tr>
-          <tr class="doc-section-item">
-            <td>
                 <code>init</code>
             </td>
             <td>
@@ -2102,9 +2080,10 @@ own treatment node.</p>
         <p>Take the data-dependent state from the training rows, once.</p>
 <p>Per continuous node the transform's domain: the train <code>RANGE_Q</code> /
 <code>1 - RANGE_Q</code> quantiles map onto <code>[-5, 5]</code> (the min-max scaling
-of the original implementation, made robust to outliers). With
-<code>net_input_scaling="minmax"</code> the min and max of every continuous
-parent, for the networks. With <code>marginal_init</code> a calibrated start:
+of the original implementation, made robust to outliers). The
+statistics of every term-level <code>input_transform=</code> (minmax lo/hi,
+standardize mean/std, a callable's frozen train columns). With
+<code>marginal_init</code> a calibrated start:
 a Bernstein simple intercept starts at the data marginal instead of
 zuko's default (about 2.5x too steep), an ordinal simple intercept at
 the marginal class log-odds. The optimum is unchanged, the path to
@@ -2215,11 +2194,13 @@ read) — only ordinal intercepts re-read the rows.</p>
     <span class="n">epochs</span><span class="p">,</span>
     <span class="n">learning_rate</span><span class="o">=</span><span class="mf">0.01</span><span class="p">,</span>
     <span class="n">batch_size</span><span class="o">=</span><span class="mi">512</span><span class="p">,</span>
+    <span class="n">validation_data</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+    <span class="n">validation_split</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+    <span class="n">validation_batch_size</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+    <span class="n">verbose</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span>
     <span class="n">seed</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
     <span class="n">optimizer</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
-    <span class="n">before_fit_callbacks</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
-    <span class="n">after_epoch_callbacks</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
-    <span class="n">after_fit_callbacks</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+    <span class="n">callbacks</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
     <span class="n">vc_ehat</span><span class="o">=</span><span class="kc">None</span>
 <span class="p">)</span>
 </code></pre></div>
@@ -2234,16 +2215,16 @@ convergence reproduces the classical maximum-likelihood estimate and
 matches <code>statsmodels</code> and R <code>polr</code>. A second <code>fit</code> call
 continues the training. Everything else — validation monitoring,
 learning-rate schedules, early stopping, best-weight restoration,
-logging — is the caller's, through <code>optimizer</code> and the callback
-hooks; :mod:<code>tramdag.callbacks</code> ships the common recipes::</p>
-<pre><code>from tramdag.callbacks import Logger, RestoreBest
+logging — is the caller's, through <code>optimizer</code> and <code>callbacks</code>;
+:mod:<code>tramdag.callbacks</code> ships the common recipes::</p>
+<pre><code>from tramdag.callbacks import EarlyStopping, RestoreBest
 
-best = RestoreBest(val_df)
 flow.fit(
     train_df,
     epochs=4000,
-    after_epoch_callbacks=[Logger(val_df, every=50), best],
-    after_fit_callbacks=[best.restore],
+    validation_data=val_df,
+    verbose=50,
+    callbacks=[RestoreBest(), EarlyStopping(patience=200)],
 )
 </code></pre>
 
@@ -2329,6 +2310,81 @@ full-batch step per epoch.</p>
           </tr>
           <tr class="doc-section-item">
             <td>
+                <code>validation_data</code>
+            </td>
+            <td>
+                  <code><span title="pandas.DataFrame">DataFrame</span> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Validation rows, one column per node. When given (or split off),
+the per-node validation NLL is computed after every epoch and
+appended to <code>flow.history["val"]</code> — once, centrally; the
+shipped callbacks read it there.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>validation_split</code>
+            </td>
+            <td>
+                  <code><span title="float">float</span> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Keras' rule: the LAST fraction of <code>train_df</code> becomes the
+validation set, without shuffling, and only the remaining rows
+train (and calibrate — no leakage into the frozen statistics).
+Mutually exclusive with <code>validation_data</code>.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>validation_batch_size</code>
+            </td>
+            <td>
+                  <code><span title="int">int</span> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Chunk size of the validation pass — a MEMORY ceiling for large
+validation frames, by default one full batch (which is also the
+fastest; chunk only when the full pass does not fit).</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>verbose</code>
+            </td>
+            <td>
+                  <code><span title="int">int</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>0 (default) is silent. <code>N &gt;= 1</code> prints one line every <code>N</code>
+epochs and on the final epoch: epoch counter, summed train NLL,
+summed validation NLL when validation is configured. No
+progress bars.</p>
+              </div>
+            </td>
+            <td>
+                  <code>0</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
                 <code>seed</code>
             </td>
             <td>
@@ -2365,56 +2421,21 @@ shuffling. Weight initialization is seeded at construction
           </tr>
           <tr class="doc-section-item">
             <td>
-                <code>before_fit_callbacks</code>
+                <code>callbacks</code>
             </td>
             <td>
-                  <code><span title="callable">callable</span> | <span title="list">list</span>[<span title="callable">callable</span>] | None</code>
-            </td>
-            <td>
-              <div class="doc-md-description">
-                <p>Each called as <code>cb(flow, optimizer)</code> once, after calibration
-and before the first epoch.</p>
-              </div>
-            </td>
-            <td>
-                  <code>None</code>
-            </td>
-          </tr>
-          <tr class="doc-section-item">
-            <td>
-                <code>after_epoch_callbacks</code>
-            </td>
-            <td>
-                  <code><span title="callable">callable</span> | <span title="list">list</span>[<span title="callable">callable</span>] | None</code>
+                  <code><a class="autorefs autorefs-internal" title="Callback (tramdag.callbacks.Callback)" href="../callbacks/#tramdag.callbacks.Callback">Callback</a> | <span title="callable">callable</span> | <span title="list">list</span> | None</code>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Each called as <code>cb(flow, epoch, optimizer)</code> after every epoch
-(<code>epoch</code> counts from 1), once the epoch's train NLLs are in
-<code>flow.history["train"]</code>. All of them run each epoch; the fit
-stops after an epoch in which any returned <code>True</code>
-(<code>len(flow.history["train"])</code> says how many epochs ran). Use them
-for validation (<code>flow.nll(val_df)</code>), schedules, snapshots and
-coefficient trajectories — :mod:<code>tramdag.callbacks</code> ships
-<code>Logger</code>, <code>RestoreBest</code> and <code>PerNodePlateau</code>.</p>
-              </div>
-            </td>
-            <td>
-                  <code>None</code>
-            </td>
-          </tr>
-          <tr class="doc-section-item">
-            <td>
-                <code>after_fit_callbacks</code>
-            </td>
-            <td>
-                  <code><span title="callable">callable</span> | <span title="list">list</span>[<span title="callable">callable</span>] | None</code>
-            </td>
-            <td>
-              <div class="doc-md-description">
-                <p>Each called as <code>cb(flow, optimizer)</code> once, after the loop and
-<strong>before</strong> the VC re-centering — so a callback that swaps the
-weights (<code>RestoreBest.restore</code>) hands them to the re-centering.</p>
+                <p>One entry or a list. A :class:<code>~tramdag.callbacks.Callback</code>
+hooks all three points of the fit — its docstring is the
+contract (begin/epoch/end timing, the stop rule, the VC
+re-centering order). A bare callable is an <code>on_epoch_end</code>
+hook, <code>cb(flow, epoch, optimizer)</code> — use it for schedules and
+coefficient trajectories. :mod:<code>tramdag.callbacks</code> ships
+<code>RestoreBest</code>, <code>EarlyStopping</code> and <code>PerNodePlateau</code>, all
+reading <code>history["val"]</code>.</p>
               </div>
             </td>
             <td>
@@ -2481,8 +2502,10 @@ has one (see docs/varying-coefficients.md).</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>If <code>epochs</code> or <code>batch_size</code> is below 1, or <code>vc_ehat</code> does
-not match the centered VC terms of the spec.</p>
+                <p>If <code>epochs</code> or <code>batch_size</code> is below 1, <code>verbose</code> is
+negative, both validation arguments are given, the split leaves
+an empty side, or <code>vc_ehat</code> does not match the centered VC
+terms of the spec.</p>
               </div>
             </td>
           </tr>
@@ -3079,7 +3102,7 @@ software, that is <code>statsmodels</code> <code>OrderedModel</code> and R <code
 <p>This method is valid only when every edge is <code>ls</code>, because each
 node-conditional is then a classical transformation model. Any other
 model raises. For a <code>cs</code> or <code>ci</code> model use :meth:<code>fit</code>, where
-the minibatch noise also regularizes the MLPs.</p>
+the minibatch noise also regularizes the NNs.</p>
 
 
 <p><span class="doc-section-title">Parameters:</span></p>

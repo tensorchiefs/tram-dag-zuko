@@ -1319,18 +1319,20 @@ uv<span class="w"> </span>sync<span class="w">                        </span><sp
 <span class="c1"># train_df / val_df: DataFrames with one column per node</span>
 <span class="n">flow</span> <span class="o">=</span> <span class="n">CausalFlowDAG</span><span class="p">(</span><span class="n">spec</span><span class="p">)</span>  <span class="c1"># validates acyclicity, builds the flow</span>
 
-<span class="c1"># fit() is one minibatch Adam loop; validation, schedules and early stopping</span>
-<span class="c1"># attach through optimizer= and the callback hooks — the common recipes ship</span>
-<span class="c1"># in tramdag.callbacks (docs/fitting.md)</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">tramdag.callbacks</span><span class="w"> </span><span class="kn">import</span> <span class="n">Logger</span><span class="p">,</span> <span class="n">RestoreBest</span>
+<span class="c1"># fit() is one minibatch Adam loop with Keras-shaped extras: validation_data=</span>
+<span class="c1"># (or validation_split=0.1) records the per-epoch validation NLL in</span>
+<span class="c1"># flow.history["val"], verbose= prints progress; schedules and early stopping</span>
+<span class="c1"># attach through optimizer= and callbacks= (docs/fitting.md)</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">tramdag.callbacks</span><span class="w"> </span><span class="kn">import</span> <span class="n">EarlyStopping</span><span class="p">,</span> <span class="n">RestoreBest</span>
 
-<span class="n">best</span> <span class="o">=</span> <span class="n">RestoreBest</span><span class="p">(</span><span class="n">val_df</span><span class="p">)</span>  <span class="c1"># keep the best-validation weights</span>
 <span class="n">flow</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span>
     <span class="n">train_df</span><span class="p">,</span>
     <span class="n">epochs</span><span class="o">=</span><span class="mi">4000</span><span class="p">,</span>
     <span class="n">batch_size</span><span class="o">=</span><span class="mi">512</span><span class="p">,</span>
-    <span class="n">after_epoch_callbacks</span><span class="o">=</span><span class="p">[</span><span class="n">Logger</span><span class="p">(</span><span class="n">val_df</span><span class="p">,</span> <span class="n">every</span><span class="o">=</span><span class="mi">100</span><span class="p">),</span> <span class="n">best</span><span class="p">],</span>
-    <span class="n">after_fit_callbacks</span><span class="o">=</span><span class="p">[</span><span class="n">best</span><span class="o">.</span><span class="n">restore</span><span class="p">],</span>
+    <span class="n">validation_data</span><span class="o">=</span><span class="n">val_df</span><span class="p">,</span>
+    <span class="n">verbose</span><span class="o">=</span><span class="mi">100</span><span class="p">,</span>
+    <span class="c1"># keep the best-validation weights; stop once the best is 200 epochs old</span>
+    <span class="n">callbacks</span><span class="o">=</span><span class="p">[</span><span class="n">RestoreBest</span><span class="p">(),</span> <span class="n">EarlyStopping</span><span class="p">(</span><span class="n">patience</span><span class="o">=</span><span class="mi">200</span><span class="p">)],</span>
 <span class="p">)</span>
 
 <span class="c1"># all-`ls` model? fit it classically instead: deterministic float64 L-BFGS,</span>
@@ -1386,19 +1388,19 @@ intercept term <code>I</code> plus any number of shifts (notation:
 <tr>
 <td><code>I("A")</code></td>
 <td><code>h_ϑ(a)(x)</code> — ϑ bends with the parent</td>
-<td><code>ComplexIntercept</code>: MLP <code>[8, 8] → n_params</code></td>
+<td><code>ComplexIntercept</code>: NN <code>[8, 8] → n_params</code></td>
 <td>the parent reshapes the whole distribution; no single coefficient</td>
 </tr>
 <tr>
 <td><code>I("A","B")</code> (default <code>allow_interaction=True</code>)</td>
 <td><code>h_ϑ(a,b)(x)</code></td>
-<td><strong>one joint</strong> MLP over both parents — they interact in ϑ</td>
+<td><strong>one joint</strong> NN over both parents — they interact in ϑ</td>
 <td>maximal flexibility</td>
 </tr>
 <tr>
 <td><code>I("A","B", allow_interaction=False)</code></td>
 <td><code>h_ϑ(a)+ϑ(b)(x)</code></td>
-<td>one MLP <strong>per parent</strong>, parameter vectors summed in coefficient space</td>
+<td>one NN <strong>per parent</strong>, parameter vectors summed in coefficient space</td>
 <td>per-parent partial effects via <code>flow.intercept_contributions</code></td>
 </tr>
 <tr>
@@ -1410,25 +1412,25 @@ intercept term <code>I</code> plus any number of shifts (notation:
 <tr>
 <td><code>CS("A")</code></td>
 <td><code>g(a)</code>, additive</td>
-<td><code>ComplexShift</code>: MLP <code>[64, 128, 64] → 1</code></td>
+<td><code>ComplexShift</code>: NN <code>[64, 128, 64] → 1</code></td>
 <td>plot <code>g</code></td>
 </tr>
 <tr>
 <td><code>CS("A","B")</code></td>
 <td><code>g(a,b)</code> — joint</td>
-<td>one MLP over the concatenated features</td>
+<td>one NN over the concatenated features</td>
 <td>interaction <em>in the shift</em></td>
 </tr>
 <tr>
 <td><code>CS("A") + CS("B")</code></td>
 <td><code>g₁(a) + g₂(b)</code></td>
-<td>two MLPs, scalars added</td>
+<td>two NNs, scalars added</td>
 <td>GAM-style, each effect plottable</td>
 </tr>
 <tr>
 <td><code>VC("A","B", t="T")</code></td>
 <td><code>(β₀ + b_Θ(a,b))·x_t</code></td>
-<td>scalar <code>β₀</code> + zero-initialised penalized MLP <code>[16] → 1</code>; the treatment value multiplies, it never enters the net</td>
+<td>scalar <code>β₀</code> + zero-initialised penalized NN <code>[16] → 1</code>; the treatment value multiplies, it never enters the net</td>
 <td><code>β₀</code> ≈ constant effect, <code>flow.varying_coef</code> reads <code>β(x)</code></td>
 </tr>
 </tbody>
@@ -1437,7 +1439,7 @@ intercept term <code>I</code> plus any number of shifts (notation:
 always purely additive on the latent scale, and interactions exist only
 <em>inside</em> a term. Lists and <code>+</code> sums are interchangeable:
 <code>[LS("A"), CS("B")]</code> ≡ <code>LS("A") + CS("B")</code>.</p>
-<p>Two knobs on the terms:</p>
+<p>Three knobs on the terms:</p>
 <ul>
 <li><strong><code>transform=</code> on <code>I</code></strong> picks the basis of <code>h_ϑ</code> for a continuous node —
   <code>"bernstein"</code> (default, 20 coefficients, tails extrapolate with the boundary
@@ -1445,6 +1447,10 @@ always purely additive on the latent scale, and interactions exist only
   slope) or <code>"affine"</code> (2 params: the latent is exactly logistic). Ordinal
   nodes have no basis: their intercept is the cutpoint vector,
   <code>P(x ≤ k) = σ(ϑ_k − shift)</code>.</li>
+<li><strong><code>input_transform=</code> on <code>CI</code>/<code>CS</code>/<code>VC</code></strong> — <code>"minmax"</code>, <code>"standardize"</code>, or
+  a callable <code>fn(x, train)</code> — transforms that term's continuous network
+  inputs with statistics frozen at the first fit; <code>LS</code> and the <code>VC</code>
+  treatment stay raw, so their coefficients keep their units.</li>
 <li><strong><code>units=</code> on <code>I</code>/<code>CS</code>/<code>VC</code></strong> sizes the term's network, e.g. <code>units=[16]</code>
   for one hidden layer of 16 neurons. The defaults match the PyTorch
   reference this package grew out of (<a href="https://github.com/buehlpa/TramDag">buehlpa/TramDag</a>,
@@ -1456,7 +1462,7 @@ always purely additive on the latent scale, and interactions exist only
 one-hot (<code>levels</code> columns). Abduction is exact for continuous nodes and
 truncated-logistic for ordinal ones, so <code>flow.sample(u=flow.abduct(df))</code>
 reproduces <code>df</code> exactly / level-exactly.</p>
-<p>There are two ways to fit the model: a stochastic optimizer (<code>fit</code>) and the classical route (<code>fit_classical</code>). For all-<code>ls</code> models — where each node-conditional is a classical transformation model — the classical fit is deterministic and takes seconds (measured ~10 s vs ~200 s for Adam on the CI runner); see <a href="fitting/"><code>docs/fitting.md</code></a>.</p>
+<p>There are two ways to fit the model: a stochastic optimizer (<code>fit</code>) and the classical route (<code>fit_classical</code>). For all-<code>ls</code> models — where each node-conditional is a classical transformation model — the classical fit is deterministic and takes seconds (measured ~10 s vs ~200 s for Adam on the CI runner — before the 2026-09 epoch cut made the Adam route ~3.5x faster; CI re-measures on the next push); see <a href="fitting/"><code>docs/fitting.md</code></a>.</p>
 <h2 id="validation">Validation<a class="headerlink" href="#validation" title="Permanent link">&para;</a></h2>
 <p>Two layers, deliberately separate.</p>
 <p><strong>The framework's own test suite</strong> (<a href="https://github.com/tensorchiefs/tramdag/tree/main/tests"><code>tests/</code></a>) measures the library

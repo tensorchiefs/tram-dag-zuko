@@ -1336,7 +1336,7 @@ are the same object, so <code>LS is linear_shift</code>.</p>
 </tr>
 <tr>
 <td><a class="autorefs autorefs-internal" title="complex_shift" href="../api/spec/#tramdag.spec.complex_shift"><code>complex_shift()</code></a> / <a class="autorefs autorefs-internal" title="complex_shift" href="../api/spec/#tramdag.spec.complex_shift"><code>CS</code></a></td>
-<td>Complex shift: an MLP <code>g(x)</code>, additive on the latent scale. Several parents form one joint network.</td>
+<td>Complex shift: an NN <code>g(x)</code>, additive on the latent scale. Several parents form one joint network.</td>
 </tr>
 <tr>
 <td><a class="autorefs autorefs-internal" title="varying_coefficient" href="../api/spec/#tramdag.spec.varying_coefficient"><code>varying_coefficient()</code></a> / <a class="autorefs autorefs-internal" title="varying_coefficient" href="../api/spec/#tramdag.spec.varying_coefficient"><code>VC</code></a></td>
@@ -1447,7 +1447,7 @@ config in <code>experiments/paper/</code> states <code>units=</code> and <code>a
 <tr>
 <td><a class="autorefs autorefs-internal" title="ComplexIntercept" href="../api/conditioners/#tramdag.conditioners.ComplexIntercept"><code>ComplexIntercept</code></a></td>
 <td><code>I(...)</code></td>
-<td>8-8 ReLU MLP from parent features to the transform parameters.</td>
+<td>8-8 ReLU NN from parent features to the transform parameters.</td>
 </tr>
 <tr>
 <td><a class="autorefs autorefs-internal" title="LinearShift" href="../api/conditioners/#tramdag.conditioners.LinearShift"><code>LinearShift</code></a></td>
@@ -1457,7 +1457,7 @@ config in <code>experiments/paper/</code> states <code>units=</code> and <code>a
 <tr>
 <td><a class="autorefs autorefs-internal" title="ComplexShift" href="../api/conditioners/#tramdag.conditioners.ComplexShift"><code>ComplexShift</code></a></td>
 <td><code>CS</code></td>
-<td>64-128-64 ReLU MLP to one shift value.</td>
+<td>64-128-64 ReLU NN to one shift value.</td>
 </tr>
 <tr>
 <td><a class="autorefs autorefs-internal" title="VaryingCoef" href="../api/conditioners/#tramdag.conditioners.VaryingCoef"><code>VaryingCoef</code></a></td>
@@ -1465,9 +1465,9 @@ config in <code>experiments/paper/</code> states <code>units=</code> and <code>a
 <td><code>beta0 + b_theta(mods)</code> with a zero-initialized output layer and the L2 hook <code>l2()</code>. <code>beta()</code> evaluates the effect, <code>recenter()</code> re-splits <code>beta0</code>/<code>b_theta</code> after training (function-preserving).</td>
 </tr>
 <tr>
-<td>(<code>_mlp</code>)</td>
+<td>(<code>_nn</code>)</td>
 <td>—</td>
-<td>The one MLP builder: a stack of the given <code>units</code> with the term's <code>activation</code> (relu by default), then a bias-free output layer.</td>
+<td>The one NN builder: a stack of the given <code>units</code> with the term's <code>activation</code> (relu by default), then a bias-free output layer.</td>
 </tr>
 </tbody>
 </table>
@@ -1494,7 +1494,7 @@ config in <code>experiments/paper/</code> states <code>units=</code> and <code>a
 </tr>
 <tr>
 <td><a class="autorefs autorefs-internal" title="fit" href="../api/flow/#tramdag.flow.CausalFlowDAG.fit"><code>fit()</code></a></td>
-<td>Joint maximum likelihood: one minibatch Adam loop over all parameters (exact per node, because the NLL decomposes), final weights kept. Hooks: <code>optimizer=</code> (any torch optimizer, for schedulers), <code>after_epoch_callbacks=</code> (one callable or a list, <code>cb(flow, epoch, opt)</code> after every epoch, any <code>True</code> stops) and <code>before_fit_callbacks=</code>/<code>after_fit_callbacks=</code> around the loop — validation, schedules, early stopping and logging attach here; the common recipes ship in <code>callbacks.py</code>. <code>vc_ehat=</code> carries the out-of-fold propensities of centered VC terms. A second call continues training.</td>
+<td>Joint maximum likelihood: one minibatch Adam loop over all parameters (exact per node, because the NLL decomposes), final weights kept. Keras-shaped validation (<code>validation_data=</code>/<code>validation_split=</code> fill <code>history["val"]</code> per epoch, <code>validation_batch_size=</code> chunks the pass) and progress (<code>verbose=</code>). Hooks: <code>optimizer=</code> (any torch optimizer, for schedulers) and <code>callbacks=</code> (one entry or a list; a <code>Callback</code> hooks <code>on_fit_begin</code>/<code>on_epoch_end</code>/<code>on_fit_end</code>, a bare callable is an <code>on_epoch_end</code> hook <code>cb(flow, epoch, opt)</code> — any <code>True</code> stops); the recipes in <code>callbacks.py</code> read <code>history["val"]</code>. <code>vc_ehat=</code> carries the out-of-fold propensities of centered VC terms. A second call continues training.</td>
 </tr>
 <tr>
 <td><a class="autorefs autorefs-internal" title="fit_classical" href="../api/flow/#tramdag.flow.CausalFlowDAG.fit_classical"><code>fit_classical()</code></a></td>
@@ -1616,16 +1616,16 @@ config in <code>experiments/paper/</code> states <code>units=</code> and <code>a
 </thead>
 <tbody>
 <tr>
-<td><a class="autorefs autorefs-internal" title="Logger" href="../api/callbacks/#tramdag.callbacks.Logger"><code>Logger</code></a></td>
-<td>Prints one line per <code>every</code> epochs: summed train NLL, plus validation NLL when <code>val_df</code> is given.</td>
+<td><a class="autorefs autorefs-internal" title="RestoreBest" href="../api/callbacks/#tramdag.callbacks.RestoreBest"><code>RestoreBest</code></a></td>
+<td>Snapshots the weights of the best summed validation NLL (read from <code>history["val"]</code>) and restores them automatically at fit end, before the VC re-centering.</td>
 </tr>
 <tr>
-<td><a class="autorefs autorefs-internal" title="RestoreBest" href="../api/callbacks/#tramdag.callbacks.RestoreBest"><code>RestoreBest</code></a></td>
-<td>Snapshots the weights of the best summed validation NLL per epoch; <code>restore</code> (registered in <code>after_fit_callbacks</code>) loads them back before the VC re-centering.</td>
+<td><a class="autorefs autorefs-internal" title="EarlyStopping" href="../api/callbacks/#tramdag.callbacks.EarlyStopping"><code>EarlyStopping</code></a></td>
+<td>Stops the fit after <code>patience</code> epochs without validation improvement; tracks its own best, so it composes with <code>RestoreBest</code> in any order.</td>
 </tr>
 <tr>
 <td><a class="autorefs autorefs-internal" title="PerNodePlateau" href="../api/callbacks/#tramdag.callbacks.PerNodePlateau"><code>PerNodePlateau</code></a></td>
-<td>Per-node lr decay and freezing on each node's own validation NLL; stops the fit once every node froze. The pre-0.4 <code>fit(schedule="plateau")</code> recipe, opt-in. <code>step(nll, opt)</code> for a hand-computed NLL.</td>
+<td>Per-node lr decay and freezing on each node's own validation NLL (from <code>history["val"]</code>); stops the fit once every node froze. The pre-0.4 <code>fit(schedule="plateau")</code> recipe, opt-in. <code>step(nll, opt)</code> for a hand-computed NLL.</td>
 </tr>
 <tr>
 <td><a class="autorefs autorefs-internal" title="per_node_adam" href="../api/callbacks/#tramdag.callbacks.per_node_adam"><code>per_node_adam()</code></a></td>
@@ -1658,9 +1658,14 @@ default you can read at the call site. Nothing numeric is buried.</p>
 <td>1e-2 / 512 (in-repo callers state them explicitly anyway)</td>
 </tr>
 <tr>
-<td>schedules, early stopping, logging</td>
-<td><code>fit(optimizer=, after_epoch_callbacks=)</code></td>
-<td><code>tramdag.callbacks</code> ships <code>Logger</code>, <code>RestoreBest</code>, <code>PerNodePlateau</code>; anything else is torch's <code>lr_scheduler</code> and a few lines of callback (<a href="../fitting/">fitting.md</a>)</td>
+<td>validation, progress</td>
+<td><code>fit(validation_data=, validation_split=, validation_batch_size=, verbose=)</code></td>
+<td>per-node val NLL into <code>history["val"]</code> each epoch; <code>verbose=N</code> prints every Nth + final epoch (default 0, silent)</td>
+</tr>
+<tr>
+<td>schedules, early stopping</td>
+<td><code>fit(optimizer=, callbacks=)</code></td>
+<td><code>tramdag.callbacks</code> ships <code>RestoreBest</code>, <code>EarlyStopping</code>, <code>PerNodePlateau</code>; anything else is torch's <code>lr_scheduler</code> and a few lines of callback (<a href="../fitting/">fitting.md</a>)</td>
 </tr>
 <tr>
 <td>calibrated init</td>
@@ -1714,8 +1719,8 @@ default you can read at the call site. Nothing numeric is buried.</p>
 </tr>
 <tr>
 <td>network inputs</td>
-<td><code>CausalFlowDAG(net_input_scaling=)</code></td>
-<td><code>None</code> (raw parents); <code>"minmax"</code> scales the continuous parents of every net (CI/CS/VC modifiers) to [0, 1] by the training min–max, the reference's <code>scale_df</code> — LS and the VC treatment stay raw</td>
+<td><code>CI/CS/VC(input_transform=)</code></td>
+<td><code>None</code> (raw parents); <code>"minmax"</code> / <code>"standardize"</code> transform that term's continuous parents with statistics frozen at <code>calibrate</code>, and a callable <code>fn(x, train)</code> gets the frozen raw train column — LS and the VC treatment stay raw</td>
 </tr>
 </tbody>
 </table>
