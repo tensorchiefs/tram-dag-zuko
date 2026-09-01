@@ -204,7 +204,9 @@ def write_report(
     truths = truths or {}
     lines = [f"## {title}", ""]
     if truths:
-        lines += ["| metric | value | DGP truth | \\|err\\| |", "|---|---|---|---|"]
+        # no pipes in cell text: cml strips the backslash escapes, which
+        # desyncs the header from the |---| separator row
+        lines += ["| metric | value | DGP truth | abs. error |", "|---|---|---|---|"]
     else:
         lines += ["| metric | value |", "|---|---|"]
     lines += [_report_row(name, value, truths) for name, value in metrics.items()]
