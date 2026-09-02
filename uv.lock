@@ -4104,7 +4104,6 @@ wheels = [
 
 [[package]]
 name = "tramdag"
-version = "0.3.0"
 source = { editable = "." }
 dependencies = [
     { name = "numpy", version = "2.2.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },

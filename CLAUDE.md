@@ -274,10 +274,14 @@ extra control points on, so `n_coeffs=20` is order 21 where the reference's
   paper's DGPs (triangle/triangle-mixed/vaca/carefl, June 2026). Still open:
   hidden confounding à la DeCaFlow.
 - ~~Package for PyPI~~ — published as `tramdag` (latest 0.3.0, June 2026);
-  release flow:
-  bump `version` in pyproject (`__init__` now reads it back from the installed
-  metadata, so there is only one place to edit), `uv build`, `uv publish`
-  (Oliver's PyPI token), CHANGELOG section.
+  release flow since the 1.0-RC: tag-driven (skeleton convention) — the
+  version IS the git tag (hatch-vcs; `cz bump` derives it from the
+  conventional commits, or tag `vX.Y.Z` by hand), pushing the tag runs
+  `.github/workflows/release.yaml` (uv build → PyPI via trusted publishing →
+  sigstore-signed GitHub release). One-time prerequisite: register the
+  GitHub repo as a trusted publisher on pypi.org/manage/project/tramdag
+  (needs the PyPI project owner — Oliver) and create the `pypi` environment
+  in the repo settings. CHANGELOG section stays hand-written.
 - The `experiments/` tree is the candidate for a companion repository
   (`tensorchiefs/tramdag-simu`); it is already self-contained, so the move is a
   directory copy plus a workflow.

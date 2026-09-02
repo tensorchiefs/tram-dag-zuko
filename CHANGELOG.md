@@ -2,6 +2,16 @@
 
 ## 1.0.0-rc (unreleased, branch rc/1.0-architecture)
 
+### Changed — tag-driven releases (the skeleton convention)
+
+The version is now the git tag: hatch-vcs derives it (`no-local-version`),
+`pyproject` carries no version field any more, and pushing a `v*` tag runs
+the new release workflow — build with uv, publish to PyPI via trusted
+publishing (no token secret), sigstore-sign and create the GitHub release.
+`cz bump` computes the next tag from the conventional commits. One-time
+setup outside the repo: the PyPI trusted-publisher registration and the
+`pypi` GitHub environment.
+
 ### Changed — term-owned architecture (docs/adr/001, docs/architecture.md)
 
 The 0.4 monolith split along its seams and every per-effect behavior moved
