@@ -76,25 +76,28 @@ from dataclasses import dataclass
 DEFAULT_TRANSFORM = "bernstein"
 
 
-# defaults of the effect-specific options; a constructor value equal to its
-# default stays out of ``Term.options``, so term equality is canonical
-_OPTION_DEFAULTS = {
-    "penalty": None,  # VC: L2 weight on b_theta
-    "center": False,  # VC: propensity centering
-    "transform": None,  # I: basis of the monotone transform
-    "transform_kwargs": None,  # I: kwargs of the basis, as sorted pairs
-    "units": None,  # I/CS/VC: hidden layers of the term's network
-    "activation": None,  # I/CS/VC: hidden activation of that network
-    "allow_interaction": True,  # I: one joint net, or one net per parent
-    "input_transform": None,  # I/CS/VC/Fn: the term's network-input transform
-    "fn": None,  # Fn: the custom shift callable / nn.Module
-}
-
-
 # %% private functions -----------------------------------------------------------------
-def _options(**kwargs) -> tuple:
-    """Canonicalize effect-specific options: sorted pairs, defaults dropped."""
-    return tuple(sorted((k, v) for k, v in kwargs.items() if v != _OPTION_DEFAULTS[k]))
+def _option_defaults(effect: str) -> dict:
+    """Give an effect's option defaults from its registry entry."""
+    from .terms import get_term
+
+    return get_term(effect).option_defaults
+
+
+def _options(effect: str, **kwargs) -> tuple:
+    """Canonicalize one effect's options: sorted pairs, defaults dropped.
+
+    A key the effect does not take raises — a wrong-effect option must
+    error instead of silently answering with a default.
+    """
+    defaults = _option_defaults(effect)
+    unknown = sorted(set(kwargs) - set(defaults))
+    if unknown:
+        raise ValueError(
+            f"effect '{effect}' takes no option(s) {unknown}; "
+            f"it takes {sorted(defaults)}."
+        )
+    return tuple(sorted((k, v) for k, v in kwargs.items() if v != defaults[k]))
 
 
 def _tupled(value):
@@ -275,7 +278,7 @@ def _check_input_transform(name: str, term: Term) -> None:
     ``fn(x, train)`` applied per continuous parent column (``train`` is
     that column's raw training data, frozen at ``calibrate``).
     """
-    value = term.input_transform
+    value = getattr(term, "input_transform", None)  # LS takes no such option
     if value is None:
         return
     # the parentless-SI case raises in simple_intercept(); LS is reachable
@@ -395,7 +398,7 @@ def simple_intercept(
             "belongs on CI/CS/VC terms."
         )
     kw = tuple(sorted(transform_kwargs.items())) or None
-    return Term("I", (), _options(transform=transform, transform_kwargs=kw))
+    return Term("I", (), _options("I", transform=transform, transform_kwargs=kw))
 
 
 def complex_intercept(
@@ -456,6 +459,7 @@ def complex_intercept(
         "I",
         tuple(parents),
         _options(
+            "I",
             transform=transform,
             transform_kwargs=kw,
             units=tuple(units) if units is not None else None,
@@ -553,6 +557,7 @@ def complex_shift(
         "CS",
         tuple(parents),
         _options(
+            "CS",
             units=tuple(units) if units else None,
             activation=activation,
             input_transform=input_transform,
@@ -659,6 +664,7 @@ def varying_coefficient(
         "VC",
         (t, *modifiers),
         _options(
+            "VC",
             penalty=float(penalty),
             center=center,
             units=tuple(units) if units else None,
@@ -761,6 +767,26 @@ def spec_to_dict(spec: dict[str, NodeSpec]) -> dict:
     return out
 
 
+def _check_dict_options(name: str, t: dict) -> None:
+    """Reject stale or misspelled option keys in a serialized term.
+
+    An unknown key would silently break term equality against a freshly
+    constructed spec. An unknown *effect* passes through — validate_and_sort
+    carries the register_term message.
+    """
+    try:
+        known = set(_option_defaults(t["effect"]))
+    except KeyError:
+        return
+    unknown = sorted(set(t["options"]) - known)
+    if unknown:
+        raise ValueError(
+            f"node '{name}': effect '{t['effect']}' takes no option(s) "
+            f"{unknown} — a stale or misspelled key would silently break "
+            "term equality."
+        )
+
+
 def spec_from_dict(d: dict) -> dict[str, NodeSpec]:
     """Rebuild a spec from its serialized form.
 
@@ -785,6 +811,8 @@ def spec_from_dict(d: dict) -> dict[str, NodeSpec]:
                     "specs written by earlier versions do not load — refit and "
                     "save again."
                 )
+        for t in nd["terms"]:
+            _check_dict_options(name, t)
         terms = [
             Term(
                 t["effect"],
@@ -840,7 +868,9 @@ def fn_shift(*parents: str, fn, input_transform=None) -> Term:
         raise ValueError(  # noqa: TRY004
             f"fn_shift(fn=) must be callable, got {type(fn).__name__}."
         )
-    return Term("Fn", tuple(parents), _options(fn=fn, input_transform=input_transform))
+    return Term(
+        "Fn", tuple(parents), _options("Fn", fn=fn, input_transform=input_transform)
+    )
 
 
 # %% public classes --------------------------------------------------------------------
@@ -875,12 +905,20 @@ class Term:
 
     effect: str
     parents: tuple[str, ...]
-    options: tuple = ()  # canonical (key, value) pairs, see _OPTION_DEFAULTS
+    options: tuple = ()  # canonical (key, value) pairs; defaults dropped
 
     def __getattr__(self, name: str):
-        """Serve the effect-specific options, with their defaults."""
-        if name in _OPTION_DEFAULTS:
-            return dict(self.options).get(name, _OPTION_DEFAULTS[name])
+        """Serve this effect's options, with their defaults.
+
+        A key another effect takes raises AttributeError instead of
+        answering with a foreign default.
+        """
+        try:
+            defaults = _option_defaults(self.effect)
+        except KeyError:
+            defaults = {}
+        if name in defaults:
+            return dict(self.options).get(name, defaults[name])
         raise AttributeError(name)
 
     def __add__(self, other: Term | list[Term]) -> list[Term]:

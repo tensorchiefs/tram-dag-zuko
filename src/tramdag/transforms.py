@@ -89,13 +89,16 @@ def _log1mexp(x: Tensor) -> Tensor:
 
 
 # %% public functions ------------------------------------------------------------------
-def make_univariate_transform(name: str, **kwargs) -> _ScaledUT:
-    """Build a scaled univariate transform by name.
+def make_univariate_transform(name, **kwargs) -> _ScaledUT:
+    """Build a scaled univariate transform by name — or from a class.
 
     Parameters
     ----------
-    name : str
-        One of the registered names: ``"bernstein"``, ``"spline"``, ``"affine"``.
+    name : str | type[_ScaledUT]
+        One of the registered names — ``"bernstein"``, ``"spline"``,
+        ``"affine"`` — or a ``_ScaledUT`` subclass itself, the custom-basis
+        hatch (``I(transform=MyUT)``; note a class in a spec serializes
+        through pickle only, like a callable ``input_transform``).
     **kwargs
         Passed to the transform class.
 
@@ -107,13 +110,16 @@ def make_univariate_transform(name: str, **kwargs) -> _ScaledUT:
     Raises
     ------
     ValueError
-        If ``name`` is not registered.
+        If ``name`` is neither registered nor a ``_ScaledUT`` subclass.
     """
+    if isinstance(name, type) and issubclass(name, _ScaledUT):
+        return name(**kwargs)
     try:
         cls = _TRANSFORMS[name]
-    except KeyError:
+    except (KeyError, TypeError):
         raise ValueError(
-            f"unknown transform {name!r}; choose one of {sorted(_TRANSFORMS)}"
+            f"unknown transform {name!r}; choose one of {sorted(_TRANSFORMS)} "
+            "or pass a _ScaledUT subclass"
         ) from None
     return cls(**kwargs)
 

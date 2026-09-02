@@ -62,6 +62,9 @@ class TermDef:
 
     effect: ClassVar[str]
     slot: ClassVar[str]  # "intercept" | "shift"
+    # the effect's options with their defaults; a constructor value equal to
+    # its default stays out of Term.options, so term equality is canonical
+    option_defaults: ClassVar[dict] = {}
 
     @staticmethod
     def check_arity(name: str, term: Term) -> None:
@@ -212,6 +215,14 @@ class InterceptDef(InterceptTerm):
 
     effect = "I"
     slot = "intercept"
+    option_defaults: ClassVar[dict] = {
+        "transform": None,
+        "transform_kwargs": None,
+        "units": None,
+        "activation": None,
+        "allow_interaction": True,
+        "input_transform": None,
+    }
 
     @classmethod
     def cells(cls, term: Term) -> list[tuple[str, str]]:
@@ -344,6 +355,11 @@ class CSTerm(ShiftTerm, ComplexShift):
 
     effect = "CS"
     slot = "shift"
+    option_defaults: ClassVar[dict] = {
+        "units": None,
+        "activation": None,
+        "input_transform": None,
+    }
 
     @classmethod
     def build(cls, term: Term, spec: dict[str, NodeSpec]) -> CSTerm:
@@ -369,6 +385,13 @@ class VCTerm(ShiftTerm, VaryingCoef):
     effect = "VC"
     slot = "shift"
     scored = True
+    option_defaults: ClassVar[dict] = {
+        "penalty": None,
+        "center": False,
+        "units": None,
+        "activation": None,
+        "input_transform": None,
+    }
 
     @classmethod
     def cells(cls, term: Term) -> list[tuple[str, str]]:
@@ -516,6 +539,7 @@ class FnTerm(ShiftTerm, nn.Module):
 
     effect = "Fn"
     slot = "shift"
+    option_defaults: ClassVar[dict] = {"fn": None, "input_transform": None}
 
     def __init__(self, fn):
         nn.Module.__init__(self)

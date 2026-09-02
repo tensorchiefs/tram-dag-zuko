@@ -333,3 +333,40 @@ def test_spec_survives_a_json_roundtrip():
     assert back == spec
     assert back["y"].terms[0].units == (8, 8)  # the CI intercept comes first
     assert hash(back["y"].terms[1]) == hash(spec["y"].terms[1])
+
+
+def test_wrong_effect_option_errors_instead_of_defaulting():
+    """A key another effect takes raises — no silent foreign defaults."""
+    from tramdag.spec import _options
+
+    with pytest.raises(ValueError, match="takes no option"):
+        _options("CS", penalty=1.0)  # penalty is VC's
+    with pytest.raises(AttributeError):
+        _ = LS("x").penalty  # reading a foreign option refuses too
+    d = {
+        "x": {
+            "kind": "continuous",
+            "terms": [{"effect": "I", "parents": [], "options": {}}],
+        },
+        "y": {
+            "kind": "continuous",
+            "terms": [
+                {"effect": "I", "parents": [], "options": {}},
+                {"effect": "LS", "parents": ["x"], "options": {"pnealty": 1.0}},
+            ],
+        },
+    }
+    from tramdag import spec_from_dict
+
+    with pytest.raises(ValueError, match="takes no option"):
+        spec_from_dict(d)
+
+
+def test_transform_accepts_a_custom_class():
+    """``I(transform=<class>)`` builds a custom basis (pickle-only serialization)."""
+    from tramdag.transforms import BernsteinUT
+
+    spec = {"x": ContinuousNode([I(transform=BernsteinUT, n_coeffs=7)])}
+    flow = CausalFlowDAG(spec, seed=0)
+    assert isinstance(flow.nodes["x"].ut, BernsteinUT)
+    assert flow.nodes["x"].ut.n_params == 7

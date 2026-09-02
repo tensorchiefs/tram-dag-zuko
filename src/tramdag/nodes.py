@@ -165,7 +165,7 @@ class _Node(nn.Module):
         identity until ``calibrate`` freezes the statistics. Only continuous
         parents transform — ordinal one-hots pass through.
         """
-        if term.input_transform is None:
+        if getattr(term, "input_transform", None) is None:  # LS takes none
             return
         cps = tuple(p for p in parents if isinstance(spec[p], ContinuousNode))
         if cps:

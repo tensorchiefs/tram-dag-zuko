@@ -8,6 +8,8 @@ registered first — and a lambda ``fn`` refuses to save.
 """
 
 # %% imports ---------------------------------------------------------------------------
+from typing import ClassVar
+
 import numpy as np
 import pytest
 import torch
@@ -79,6 +81,7 @@ class _ScaledLS(ShiftTerm, nn.Module):
 
     effect = "SLS"
     slot = "shift"
+    option_defaults: ClassVar[dict] = {"fn": None}  # the scale rides fn
 
     def __init__(self, scale: float):
         nn.Module.__init__(self)
@@ -107,7 +110,7 @@ def test_register_term_round_trip_and_collision(ls_chain):
     assert get_term("SLS") is _ScaledLS
     with pytest.raises(ValueError, match="already registered"):
         register_term(_ScaledLS)
-    term = Term("SLS", ("x1",), _options(fn=3.0))
+    term = Term("SLS", ("x1",), _options("SLS", fn=3.0))
     flow = CausalFlowDAG(_two_node(term), seed=0)
     flow.fit(df, epochs=10, batch_size=200, learning_rate=1e-1)
     assert float(flow.nodes["x2"].shifts["x1"].w) != 0.0
