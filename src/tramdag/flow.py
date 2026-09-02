@@ -44,7 +44,7 @@ from .spec import (
     spec_to_dict,
     validate_and_sort,
 )
-from .terms import ShiftTerm
+from .terms import ShiftTerm, get_term
 from .transforms import (
     RANGE_Q,
     StandardLogistic,
@@ -215,18 +215,9 @@ class CausalFlowDAG(nn.Module):
     def _vc_ehat_live(
         self, nd: _Node, values: dict[str, Tensor], n: int
     ) -> dict[str, Tensor] | None:
-        """Recompute ``e_hat(pa_on) = P(on = 1 | pa_on)`` for the centered VC terms.
+        """Collect every term's live side inputs (see ``ShiftTerm.live_side``).
 
-        The value comes from this flow's own fitted ``on`` node, as a full-data
-        propensity fit. That is the DML prediction convention. Training uses
-        frozen out-of-fold values instead, see :meth:`fit`.
-
-        The result is detached, so no gradient reaches the ``on`` node from the
-        loss of this node.
-
-        The function derives the value from the current parent values, so
-        ``do``-mutilated sampling uses ``t - e_hat(x)`` with the intervened ``t``
-        and the observed ``x``. It never reads a cached value.
+        Training uses the frozen out-of-fold values instead (:meth:`fit`).
         """
         out = {}
         for m in nd.shifts.values():
@@ -408,8 +399,7 @@ class CausalFlowDAG(nn.Module):
     def _marginal_start(self, name: str, train_df: pd.DataFrame) -> None:
         """Start a simple intercept at the node's data marginal."""
         node = self.nodes[name]
-        levels = self.spec[name].levels if node.kind == "ordinal" else None
-        theta = kind_marginal_theta(node, levels, train_df[name].to_numpy())
+        theta = kind_marginal_theta(node, train_df[name].to_numpy())
         if theta is None:  # a spline or affine transform has no calibrated start
             return
         node.intercept.marginal_start(theta)
@@ -699,7 +689,7 @@ class CausalFlowDAG(nn.Module):
         for name in self.order:
             nd = self.nodes[name]
             for m in nd.shifts.values():
-                if not getattr(m, "finalizes", False):
+                if not m.finalizes:
                     continue
                 if feats is None:
                     feats = self._features(values)
@@ -762,7 +752,7 @@ class CausalFlowDAG(nn.Module):
 
         Only ``LS`` terms have a weight to give. A node's ``CS`` and ``VC``
         shifts are networks, so they are skipped — reading them needs
-        :meth:`varying_coef` or an evaluation of the network itflow.
+        :meth:`varying_coef` or an evaluation of the network itself.
 
         Returns
         -------
@@ -856,7 +846,7 @@ class CausalFlowDAG(nn.Module):
         parameter space, where the model sums the additive terms before the
         monotonicity constraint. They are exact partial effects on those
         parameters, but not, in general, an additive shift of the curve
-        itflow.
+        itself.
         """
         return _readouts.intercept_contributions(self, df, node)
 
@@ -894,8 +884,6 @@ class CausalFlowDAG(nn.Module):
         return _readouts.design_matrix(self, df, node, drop_first=drop_first)
 
     def _is_classical(self) -> bool:
-        from .terms import get_term
-
         return all(
             get_term(term.effect).term_is_classical(term)
             for node in self.spec.values()

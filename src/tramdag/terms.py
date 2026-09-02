@@ -15,6 +15,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, ClassVar
 
+import torch
 from torch import Tensor, nn
 
 from .conditioners import (
@@ -24,6 +25,7 @@ from .conditioners import (
     SimpleIntercept,
     VaryingCoef,
 )
+from .spec import OrdinalNode, feat_width
 
 if TYPE_CHECKING:
     from .nodes import _Node
@@ -75,13 +77,15 @@ class TermDef:
         """Validate against the spec; give the edge-owning parents."""
         return term.parents
 
+    cell_tag: ClassVar[str | None] = None  # to_matrix tag; None -> the effect
+
     @classmethod
     def cells(cls, term: Term) -> list[tuple[str, str]]:
         """Give the term's adjacency cells as ``(parent, tag)`` pairs.
 
         A multi-parent term carries its parent group as a suffix.
         """
-        tag = cls.effect
+        tag = cls.cell_tag or cls.effect
         if len(term.parents) > 1:
             tag = f"{tag}{list(term.parents)}"
         return [(p, tag) for p in term.parents]
@@ -186,8 +190,6 @@ class InterceptTerm(TermDef):
             else [(p,) for p in term.parents]
         )
         if len(groups) == 1:
-            from .spec import feat_width
-
             m = CITerm(
                 feat_width(spec, groups[0]),
                 n_params,
@@ -252,8 +254,6 @@ class SITerm(InterceptTerm, SimpleIntercept):
 
     def marginal_start(self, theta: Tensor) -> None:
         """Start at the node's data marginal."""
-        import torch
-
         with torch.no_grad():
             self.theta.copy_(theta)
 
@@ -280,8 +280,6 @@ class AdditiveCITerm(InterceptTerm, nn.Module):
     slot = "intercept"
 
     def __init__(self, groups, n_params: int, spec, units, activation):
-        from .spec import feat_width
-
         nn.Module.__init__(self)
         self.nets = nn.ModuleList(
             ComplexIntercept(
@@ -328,8 +326,6 @@ class LSTerm(ShiftTerm, LinearShift):
     @classmethod
     def build(cls, term: Term, spec: dict[str, NodeSpec]) -> LSTerm:
         """One weight per feature of the single parent; keyed by its name."""
-        from .spec import feat_width
-
         m = cls(feat_width(spec, term.parents))
         m.key = term.parents[0]
         m.parents = tuple(term.parents)
@@ -338,8 +334,6 @@ class LSTerm(ShiftTerm, LinearShift):
 
     def shift_value(self, node: _Node, feats: dict, vc_ehat: dict | None) -> Tensor:
         """Give the raw parent column times the weight — no input transform."""
-        import torch
-
         return self(torch.cat([feats[p] for p in self.parents], dim=1))
 
     def score_columns(self, node: _Node, flow, feats: dict, dlds, ehat) -> dict:
@@ -347,8 +341,6 @@ class LSTerm(ShiftTerm, LinearShift):
 
         ``d l_i / d beta = (d l_i / d s_i) * x_i`` — analytic and exact.
         """
-        from .spec import OrdinalNode
-
         (parent,) = self.parents  # an LS term has exactly one parent
         psi = (dlds.unsqueeze(1) * feats[parent]).cpu().numpy()
         if isinstance(flow.spec[parent], OrdinalNode):
@@ -371,11 +363,9 @@ class CSTerm(ShiftTerm, ComplexShift):
     @classmethod
     def build(cls, term: Term, spec: dict[str, NodeSpec]) -> CSTerm:
         """One net over the concatenated parents; keyed 'a' or 'a+b'."""
-        from .spec import feat_width
-
         ps = tuple(term.parents)
         m = cls(feat_width(spec, ps), units=term.units, activation=term.activation)
-        m.key = ps[0] if len(ps) == 1 else "+".join(ps)
+        m.key = "+".join(ps)  # the parent itself for a single-parent term
         m.parents = ps
         m.net_parents = ps
         return m
@@ -408,8 +398,6 @@ class VCTerm(ShiftTerm, VaryingCoef):
     @classmethod
     def build(cls, term: Term, spec: dict[str, NodeSpec]) -> VCTerm:
         """Build the effect head over the modifiers; keyed by the treatment name."""
-        from .spec import OrdinalNode, feat_width
-
         on, mods = term.parents[0], tuple(term.parents[1:])
         m = cls(
             feat_width(spec, mods),
@@ -424,6 +412,9 @@ class VCTerm(ShiftTerm, VaryingCoef):
         m.on_is_ord = isinstance(spec[on], OrdinalNode)
         m.vc_center = term.center
         m.finalizes = bool(mods)
+        from .nodes import _VCGroup
+
+        m.group = _VCGroup(on, mods, m.on_is_ord, m.vc_center)
         return m
 
     def shift_value(self, node: _Node, feats: dict, vc_ehat: dict | None) -> Tensor:
@@ -492,18 +483,9 @@ class VCTerm(ShiftTerm, VaryingCoef):
         """Give the treatment's parents (a treatment cannot be centered itself)."""
         return list(flow.nodes[self.key].parents) if self.vc_center else []
 
-    @property
-    def group(self):
-        """Give the term as the legacy ``_VCGroup`` view (scores/read-outs)."""
-        from .nodes import _VCGroup
-
-        return _VCGroup(self.key, self.mods, self.on_is_ord, self.vc_center)
-
     @staticmethod
     def edge_parents(name: str, term: Term, spec: dict[str, NodeSpec]) -> tuple:
         """Check treatment, penalty and centering; the treatment owns the edge."""
-        from .spec import OrdinalNode
-
         if not term.parents:
             raise ValueError(f"Node '{name}': VC term needs a treatment parent.")
         on = term.parents[0]
@@ -557,7 +539,7 @@ class FnTerm(ShiftTerm, nn.Module):
         """Wrap the callable; keyed like a CS ('a' or 'a+b')."""
         ps = tuple(term.parents)
         m = cls(term.fn)
-        m.key = ps[0] if len(ps) == 1 else "+".join(ps)
+        m.key = "+".join(ps)  # the parent itself for a single-parent term
         m.parents = ps
         m.net_parents = ps
         return m

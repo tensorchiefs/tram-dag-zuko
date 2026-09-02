@@ -143,9 +143,6 @@ class _Node(nn.Module):
         self.kind = node.kind
         terms = node.terms
         self.parents = tuple(node_parents(node))  # ordered parent names
-        self.continuous_parents = tuple(
-            p for p in self.parents if isinstance(spec[p], ContinuousNode)
-        )
         self.input_transforms = nn.ModuleDict()
         if isinstance(node, ContinuousNode):
             self.ut = make_univariate_transform(node.transform, **node.transform_kwargs)
@@ -274,10 +271,6 @@ class _Node(nn.Module):
             cols.append(x)
         return torch.cat(cols, dim=1)
 
-    def _theta(self, feats: dict[str, Tensor], n: int) -> Tensor:
-        """Evaluate the intercept: the transform parameters, shape ``(n, P)``."""
-        return self.intercept.theta_value(self, feats, n)
-
     def theta_shift(
         self, feats: dict[str, Tensor], n: int, vc_ehat: dict[str, Tensor] | None = None
     ) -> tuple[Tensor, Tensor]:
@@ -308,7 +301,7 @@ class _Node(nn.Module):
         """
         from .terms import VCTerm
 
-        theta = self._theta(feats, n)
+        theta = self.intercept.theta_value(self, feats, n)
         shift = torch.zeros(n, dtype=theta.dtype, device=theta.device)
         # plain shifts first, then the VC terms — today's accumulation order
         for key, _ps in self._shift_groups:
@@ -348,13 +341,13 @@ def kind_abduct(
     return ordinal_abduct(theta, shift, x, generator=generator)
 
 
-def kind_marginal_theta(node: _Node, levels: int | None, column: np.ndarray):
+def kind_marginal_theta(node: _Node, column: np.ndarray):
     """Give the marginal-start theta of a simple intercept, or ``None``.
 
     Ordinal: the empirical class log-odds. Continuous: the transform's own
     calibrated start (``None`` for spline/affine — nothing to set).
     """
     if node.kind == "ordinal":
-        counts = np.bincount(column.astype(np.int64), minlength=levels)
+        counts = np.bincount(column.astype(np.int64), minlength=node.levels)
         return ordinal_marginal_init_theta(counts)
     return node.ut.marginal_init_theta()
