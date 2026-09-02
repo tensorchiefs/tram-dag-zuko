@@ -328,6 +328,14 @@ class _ScaledUT(torch.nn.Module):
         self.register_buffer("xmin", torch.tensor(0.0))
         self.register_buffer("xmax", torch.tensor(1.0))
 
+    def marginal_init_theta(self) -> Tensor | None:
+        """Give the calibrated marginal start, or ``None`` — no such start.
+
+        ``BernsteinUT`` overrides with its linear-map start; a spline or
+        affine transform has none and silently skips the marginal init.
+        """
+        return None
+
     @property
     def n_params(self) -> int:  # pragma: no cover - abstract
         raise NotImplementedError

@@ -31,6 +31,10 @@ from .nodes import (
     _init_linear,
     _is_classical_term,
     _Node,
+    kind_abduct,
+    kind_log_prob,
+    kind_marginal_theta,
+    kind_sample,
 )
 from .scores import effect_modifier_scan as _effect_modifier_scan
 from .scores import node_scores as _node_scores
@@ -44,13 +48,8 @@ from .spec import (
 )
 from .transforms import (
     RANGE_Q,
-    BernsteinUT,
     StandardLogistic,
-    ordinal_abduct,
-    ordinal_log_prob,
-    ordinal_marginal_init_theta,
     ordinal_pmf,
-    ordinal_sample,
 )
 
 # %% global variables ------------------------------------------------------------------
@@ -286,13 +285,7 @@ class CausalFlowDAG(nn.Module):
                 else self._vc_ehat_live(node, values, n)
             )
             theta, shift = node.theta_shift(feats, n, vc_ehat=ehat)
-            x = values[name]
-            if node.kind == "continuous":
-                u0, ladj = node.ut.forward(theta, x)
-                u = u0 + shift
-                out[name] = StandardLogistic.log_prob(u) + ladj
-            else:
-                out[name] = ordinal_log_prob(theta, shift, x)
+            out[name] = kind_log_prob(node, theta, shift, values[name])
         return out
 
     def log_prob(self, df: pd.DataFrame) -> Tensor:
@@ -418,15 +411,9 @@ class CausalFlowDAG(nn.Module):
     def _marginal_start(self, name: str, train_df: pd.DataFrame) -> None:
         """Start a simple intercept at the node's data marginal."""
         node = self.nodes[name]
-        if node.kind == "ordinal":
-            counts = np.bincount(
-                train_df[name].to_numpy().astype(np.int64),
-                minlength=self.spec[name].levels,
-            )
-            theta = ordinal_marginal_init_theta(counts)
-        elif isinstance(node.ut, BernsteinUT):
-            theta = node.ut.marginal_init_theta()
-        else:  # a spline or affine transform has no calibrated start
+        levels = self.spec[name].levels if node.kind == "ordinal" else None
+        theta = kind_marginal_theta(node, levels, train_df[name].to_numpy())
+        if theta is None:  # a spline or affine transform has no calibrated start
             return
         with torch.no_grad():
             node.intercept.theta.copy_(theta)
@@ -982,11 +969,7 @@ class CausalFlowDAG(nn.Module):
             theta, shift = node.theta_shift(
                 feats, n, vc_ehat=self._vc_ehat_live(node, values, n)
             )
-            u_val = u_vals[name]
-            if node.kind == "continuous":
-                values[name] = node.ut.inverse(theta, u_val - shift)
-            else:
-                values[name] = ordinal_sample(theta, shift, u_val)
+            values[name] = kind_sample(node, theta, shift, u_vals[name])
         return self._to_frame(values)
 
     @torch.no_grad()
@@ -1021,12 +1004,7 @@ class CausalFlowDAG(nn.Module):
             theta, shift = node.theta_shift(
                 feats, n, vc_ehat=self._vc_ehat_live(node, values, n)
             )
-            x = values[name]
-            if node.kind == "continuous":
-                u0, _ = node.ut.forward(theta, x)
-                u[name] = u0 + shift
-            else:
-                u[name] = ordinal_abduct(theta, shift, x, generator=gen)
+            u[name] = kind_abduct(node, theta, shift, values[name], generator=gen)
         return pd.DataFrame({k: v.cpu().numpy() for k, v in u.items()}, index=df.index)
 
     def _conditional(

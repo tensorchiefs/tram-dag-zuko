@@ -36,7 +36,14 @@ from .spec import (
     OrdinalNode,
     node_parents,
 )
-from .transforms import make_univariate_transform
+from .transforms import (
+    StandardLogistic,
+    make_univariate_transform,
+    ordinal_abduct,
+    ordinal_log_prob,
+    ordinal_marginal_init_theta,
+    ordinal_sample,
+)
 
 
 # %% private functions -----------------------------------------------------------------
@@ -411,3 +418,44 @@ class _Node(nn.Module):
         for g in self._vc_groups:
             shift = shift + self._vc_shift(g, feats, vc_ehat)
         return theta, shift
+
+
+# %% per-kind operations ---------------------------------------------------------------
+# The ONLY continuous-vs-ordinal branches of the package live in these four
+# adjacent functions. A third node kind earns a protocol; two stay an if/else
+# in one place.
+def kind_log_prob(node: _Node, theta: Tensor, shift: Tensor, x: Tensor) -> Tensor:
+    """``log p(x | pa)`` from one node's transform parameters and shift."""
+    if node.kind == "continuous":
+        u0, ladj = node.ut.forward(theta, x)
+        return StandardLogistic.log_prob(u0 + shift) + ladj
+    return ordinal_log_prob(theta, shift, x)
+
+
+def kind_sample(node: _Node, theta: Tensor, shift: Tensor, u: Tensor) -> Tensor:
+    """Push one node's latent ``u`` forward to an observed value."""
+    if node.kind == "continuous":
+        return node.ut.inverse(theta, u - shift)
+    return ordinal_sample(theta, shift, u)
+
+
+def kind_abduct(
+    node: _Node, theta: Tensor, shift: Tensor, x: Tensor, generator=None
+) -> Tensor:
+    """Recover one node's latent: exact (continuous) or truncated-sampled (ordinal)."""
+    if node.kind == "continuous":
+        u0, _ = node.ut.forward(theta, x)
+        return u0 + shift
+    return ordinal_abduct(theta, shift, x, generator=generator)
+
+
+def kind_marginal_theta(node: _Node, levels: int | None, column: np.ndarray):
+    """Give the marginal-start theta of a simple intercept, or ``None``.
+
+    Ordinal: the empirical class log-odds. Continuous: the transform's own
+    calibrated start (``None`` for spline/affine — nothing to set).
+    """
+    if node.kind == "ordinal":
+        counts = np.bincount(column.astype(np.int64), minlength=levels)
+        return ordinal_marginal_init_theta(counts)
+    return node.ut.marginal_init_theta()
