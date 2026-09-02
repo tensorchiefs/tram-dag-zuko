@@ -78,6 +78,7 @@ class ShiftTerm(TermDef):
     """
 
     is_classical: ClassVar[bool] = False
+    scored: ClassVar[bool] = False  # True when score_columns gives coefficients
     finalizes = False  # set per instance when a post-fit step is needed
 
     key: str
@@ -108,6 +109,13 @@ class ShiftTerm(TermDef):
     def finalize(self, node: _Node, feats: dict) -> None:
         """Run the term's post-fit step (after the after-fit callbacks)."""
 
+    def score_columns(self, node: _Node, flow, feats: dict, dlds, ehat) -> dict:
+        """Give the per-observation score columns of this term's coefficients.
+
+        Empty for a term with no interpretable coefficient (``CS``).
+        """
+        return {}
+
 
 @register_term
 class InterceptDef(TermDef):
@@ -124,6 +132,7 @@ class LSTerm(ShiftTerm, LinearShift):
     effect = "LS"
     slot = "shift"
     is_classical = True
+    scored = True
 
     @staticmethod
     def check_arity(name: str, term: Term) -> None:
@@ -147,6 +156,19 @@ class LSTerm(ShiftTerm, LinearShift):
         import torch
 
         return self(torch.cat([feats[p] for p in self.parents], dim=1))
+
+    def score_columns(self, node: _Node, flow, feats: dict, dlds, ehat) -> dict:
+        """One column per weight: the parent (continuous) or its one-hot levels.
+
+        ``d l_i / d beta = (d l_i / d s_i) * x_i`` — analytic and exact.
+        """
+        from .spec import OrdinalNode
+
+        (parent,) = self.parents  # an LS term has exactly one parent
+        psi = (dlds.unsqueeze(1) * feats[parent]).cpu().numpy()
+        if isinstance(flow.spec[parent], OrdinalNode):
+            return {f"{parent}[{k}]": psi[:, k] for k in range(psi.shape[1])}
+        return {self.key: psi[:, 0]}
 
 
 @register_term
@@ -179,6 +201,7 @@ class VCTerm(ShiftTerm, VaryingCoef):
 
     effect = "VC"
     slot = "shift"
+    scored = True
 
     @classmethod
     def build(cls, term: Term, spec: dict[str, NodeSpec]) -> VCTerm:
@@ -230,6 +253,15 @@ class VCTerm(ShiftTerm, VaryingCoef):
     def finalize(self, node: _Node, feats: dict) -> None:
         """Re-split ``beta0``/``b_theta``: the head sums to zero over train."""
         self.recenter(node.net_input(feats, self.mods, self.key))
+
+    def score_columns(self, node: _Node, flow, feats: dict, dlds, ehat) -> dict:
+        """One column, keyed by the treatment: the ``beta0`` score.
+
+        ``d s / d beta0`` is the term's own regressor (``vc_column``), so
+        forward and score share one definition by construction.
+        """
+        t = node.vc_column(self.group, feats, ehat)
+        return {self.key: (dlds * t.squeeze(-1)).cpu().numpy()}
 
     @property
     def group(self):

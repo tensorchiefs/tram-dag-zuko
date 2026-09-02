@@ -1148,6 +1148,7 @@ class CausalFlowDAG(nn.Module):
         *,
         t: str,
         candidates: list[str] | None = None,
+        column: str | None = None,
     ) -> pd.DataFrame:
         """Rank candidate effect modifiers with a fluctuation scan.
 
@@ -1168,6 +1169,9 @@ class CausalFlowDAG(nn.Module):
         candidates : list[str] | None, optional
             Candidate covariates. Defaults to every column of ``df``
             except ``node`` and ``t``.
+        column : str | None, optional
+            Score column to scan instead of the ``t``-derived one — for a
+            multi-level ordinal treatment's level contrast (``"t[2]"``).
 
         Returns
         -------
@@ -1176,7 +1180,9 @@ class CausalFlowDAG(nn.Module):
             columns ``stat``, ``p_value``, ``crit_5pct`` and ``flag``. See
             :func:`tramdag.scores.effect_modifier_scan`.
         """
-        return _effect_modifier_scan(self, df, node, t, candidates=candidates)
+        return _effect_modifier_scan(
+            self, df, node, t, candidates=candidates, column=column
+        )
 
     def save(self, path: str | Path) -> None:
         """Write the model, its history and its provenance to a checkpoint.
