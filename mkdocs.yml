@@ -26,6 +26,8 @@ nav:
   - Scores: scores.md
   - Varying coefficients: varying-coefficients.md
   - Paper replication: paper-replication.md
+  - Architecture: architecture.md
+  - ADR 001 (1.0 architecture): adr/001-term-owned-architecture.md
   - Code map: code-map.md
   - Zuko upstream: zuko-upstream.md
 - Notebooks:
@@ -38,6 +40,9 @@ nav:
   - tramdag: api/tramdag.md
   - spec: api/spec.md
   - flow: api/flow.md
+  - terms: api/terms.md
+  - fitting: api/fitting.md
+  - readouts: api/readouts.md
   - transforms: api/transforms.md
   - conditioners: api/conditioners.md
   - scores: api/scores.md

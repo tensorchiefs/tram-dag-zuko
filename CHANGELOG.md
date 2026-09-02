@@ -1,5 +1,41 @@
 # Changelog
 
+## 1.0.0-rc (unreleased, branch rc/1.0-architecture)
+
+### Changed — term-owned architecture (docs/adr/001, docs/architecture.md)
+
+The 0.4 monolith split along its seams and every per-effect behavior moved
+onto one registry entry per effect in the new `terms.py` — no effect
+string-switch survives outside it. Public behavior, error messages, sign
+conventions, seeding and all ten experiment ground truths are unchanged
+(verified per step by a seeded state-dict smoke and replications); the fit
+API, queries and read-outs keep their signatures via one-line delegates.
+
+- New modules: `nodes.py` (the node model + the ONLY four continuous/ordinal
+  branches: `kind_log_prob`/`kind_sample`/`kind_abduct`/`kind_marginal_theta`),
+  `fitting.py` (fit/fit_classical as free functions), `readouts.py`
+  (stateless read-outs), `terms.py` (the registry and the term classes:
+  LSTerm/CSTerm/VCTerm/FnTerm, SITerm/CITerm/AdditiveCITerm on
+  ShiftTerm/InterceptTerm hooks).
+- New public API: `shift_curve(flow, node, parent, grid)` (replaces reaching
+  into `nd.shifts[..]`/`net_input`); `fn_shift(*parents, fn=)`/`Fn` (a
+  callable or trainable `nn.Module` in the additive shifts);
+  `register_term` (whole custom effects as `ShiftTerm` subclasses);
+  `effect_modifier_scan(column=)` (scan a named level contrast of a
+  multi-level ordinal treatment); `ordinal_bounds`; `I(transform=)` accepts
+  a `_ScaledUT` subclass; `node_parents`/`validate_and_sort`/
+  `spec_to_dict`/`spec_from_dict` exported; `flow._fit_validated` declared.
+- Stricter spec: a wrong-effect option errors at construction instead of
+  silently defaulting; `spec_from_dict` rejects stale/misspelled option
+  keys; the unknown-effect error names `register_term`; `spec_to_dict`
+  documents the callable/`fn`/class pickle-only caveat; `node_terms` is
+  gone (`node.terms` is canonical); `_fit_validated` is set `False` by
+  `fit_classical` so callbacks cannot read a pre-classical validation entry.
+- BREAKING (0.4 was unreleased): additive-CI checkpoints re-key,
+  `nodes.*.intercept_nets.*` → `nodes.*.intercept.nets.*` (parameters
+  bit-identical under the rename — refit or re-key, no shim);
+  `RestoreBest` had already merged into `EarlyStopping`.
+
 ## 0.4.0 (unreleased)
 
 ### Changed (breaking) — `fit` is one loop, the strategies are yours

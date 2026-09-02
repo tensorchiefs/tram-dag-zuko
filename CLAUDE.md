@@ -42,6 +42,20 @@ See `experiments/README.md`.
 
 ## Architecture (src/tramdag/)
 
+Since the 1.0-RC refactor (branch rc/1.0-architecture, docs/adr/001):
+term-specific behavior lives on the effect's registry entry in `terms.py`
+(validation, build, shift_value/theta_value, post_init, regularizer,
+finalize, score_columns, side inputs, cells, term_is_classical,
+option_defaults — built-ins subclass their conditioners so checkpoints and
+the seeded RNG stream stay bit-stable); node-kind branches live ONLY in
+nodes.py's four kind_* functions; `fitting.py`/`readouts.py` hold fit and
+the read-outs as free functions behind one-line flow delegates; new public:
+`shift_curve`, `fn_shift`/`Fn`, `register_term`, `ordinal_bounds`,
+spec exports (`spec_to_dict`/`spec_from_dict`/`validate_and_sort`/
+`node_parents`), `effect_modifier_scan(column=)`. Custom effects:
+subclass `tramdag.terms.ShiftTerm`, register under a new effect name.
+docs/architecture.md carries the module map and the term-contract diagram.
+
 - `spec.py` — user-facing DAG spec: `{name: ContinuousNode|OrdinalNode}`, each node
   declares its transformation as the first positional argument — a list of terms
   or a `+` sum (`I("a") + LS("b")`). Term constructors: `SI()` (simple
