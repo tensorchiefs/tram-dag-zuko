@@ -16,7 +16,7 @@ import pandas as pd
 import torch
 
 from .conditioners import LinearShift
-from .nodes import _term_cells
+from .terms import get_term
 
 if TYPE_CHECKING:
     from .flow import CausalFlowDAG
@@ -88,7 +88,8 @@ def to_matrix(flow) -> pd.DataFrame:
     m = pd.DataFrame("", index=list(flow.order), columns=list(flow.order))
     for child in flow.order:
         for term in flow.spec[child].terms:
-            for p, tag in _term_cells(term):  # a VC modifier may share its
+            # a VC modifier may share its cell with an edge-owning term
+            for p, tag in get_term(term.effect).cells(term):
                 cur = m.loc[p, child]  # cell with a prognostic term -> "+"
                 m.loc[p, child] = f"{cur}+{tag}" if cur else tag
     return m

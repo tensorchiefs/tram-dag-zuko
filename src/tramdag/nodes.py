@@ -39,20 +39,6 @@ from .transforms import (
 
 
 # %% private functions -----------------------------------------------------------------
-def _term_cells(term) -> list[tuple[str, str]]:
-    """Give a term's adjacency cells as ``(parent, tag)`` pairs.
-
-    A VC term tags its treatment cell ``"VC"`` and its modifiers ``"VCm"``.
-    A multi-parent term carries its parent group as a suffix.
-    """
-    if term.effect == "VC":
-        return [(term.parents[0], "VC")] + [(p, "VCm") for p in term.parents[1:]]
-    tag = "CI" if term.effect == "I" else term.effect
-    if len(term.parents) > 1:
-        tag = f"{tag}{list(term.parents)}"
-    return [(p, tag) for p in term.parents]
-
-
 def _init_linear(m: nn.Linear, init: str) -> None:
     """Keras' two initializers on one linear layer: ``glorot`` or ``normal``."""
     if init == "glorot":
@@ -63,15 +49,6 @@ def _init_linear(m: nn.Linear, init: str) -> None:
         nn.init.normal_(m.weight, std=0.05)
         if m.bias is not None:
             nn.init.normal_(m.bias, std=0.05)
-
-
-def _is_classical_term(term) -> bool:
-    """Say whether the exact classical fit handles this term.
-
-    It handles an ``LS``, and a parentless ``I()`` — the simple-intercept
-    baseline made explicit, for example as the carrier of ``transform=``.
-    """
-    return term.effect == "LS" or (term.effect == "I" and not term.parents)
 
 
 # %% private classes -------------------------------------------------------------------

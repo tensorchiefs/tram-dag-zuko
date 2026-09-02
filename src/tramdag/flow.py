@@ -28,7 +28,6 @@ from . import fitting as _fitting
 from . import readouts as _readouts
 from .nodes import (
     _init_linear,
-    _is_classical_term,
     _Node,
     kind_abduct,
     kind_log_prob,
@@ -895,8 +894,10 @@ class CausalFlowDAG(nn.Module):
         return _readouts.design_matrix(self, df, node, drop_first=drop_first)
 
     def _is_classical(self) -> bool:
+        from .terms import get_term
+
         return all(
-            _is_classical_term(term)
+            get_term(term.effect).term_is_classical(term)
             for node in self.spec.values()
             for term in node.terms
         )

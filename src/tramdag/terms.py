@@ -72,6 +72,22 @@ class TermDef:
         """Validate against the spec; give the edge-owning parents."""
         return term.parents
 
+    @classmethod
+    def cells(cls, term: Term) -> list[tuple[str, str]]:
+        """Give the term's adjacency cells as ``(parent, tag)`` pairs.
+
+        A multi-parent term carries its parent group as a suffix.
+        """
+        tag = cls.effect
+        if len(term.parents) > 1:
+            tag = f"{tag}{list(term.parents)}"
+        return [(p, tag) for p in term.parents]
+
+    @classmethod
+    def term_is_classical(cls, term: Term) -> bool:
+        """Say whether the exact classical fit handles this term."""
+        return False
+
 
 class ShiftTerm(TermDef):
     """A shift term's behavior hooks, mixed into its conditioner.
@@ -197,6 +213,19 @@ class InterceptDef(InterceptTerm):
     effect = "I"
     slot = "intercept"
 
+    @classmethod
+    def cells(cls, term: Term) -> list[tuple[str, str]]:
+        """Tag a parented intercept's cells ``CI``."""
+        tag = "CI"
+        if len(term.parents) > 1:
+            tag = f"{tag}{list(term.parents)}"
+        return [(p, tag) for p in term.parents]
+
+    @classmethod
+    def term_is_classical(cls, term: Term) -> bool:
+        """Say yes only for a parentless ``I()`` — the simple baseline."""
+        return not term.parents
+
 
 class SITerm(InterceptTerm, SimpleIntercept):
     """The free simple intercept: one theta vector, no parents."""
@@ -267,6 +296,11 @@ class LSTerm(ShiftTerm, LinearShift):
     is_classical = True
     scored = True
 
+    @classmethod
+    def term_is_classical(cls, term: Term) -> bool:
+        """Say yes — an LS is a classical transformation-model coefficient."""
+        return True
+
     @staticmethod
     def check_arity(name: str, term: Term) -> None:
         """Refuse any parent count but one."""
@@ -335,6 +369,11 @@ class VCTerm(ShiftTerm, VaryingCoef):
     effect = "VC"
     slot = "shift"
     scored = True
+
+    @classmethod
+    def cells(cls, term: Term) -> list[tuple[str, str]]:
+        """Tag the treatment cell ``VC`` and the modifiers ``VCm``."""
+        return [(term.parents[0], "VC")] + [(p, "VCm") for p in term.parents[1:]]
 
     @classmethod
     def build(cls, term: Term, spec: dict[str, NodeSpec]) -> VCTerm:
