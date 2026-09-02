@@ -13,7 +13,7 @@
         <link rel="canonical" href="https://tensorchiefs.github.io/tramdag/dev-marcel/code-map/">
       
       
-        <link rel="prev" href="../paper-replication/">
+        <link rel="prev" href="../adr/001-term-owned-architecture/">
       
       
         <link rel="next" href="../zuko-upstream/">
@@ -80,7 +80,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#code-map-every-class-and-function-in-srctramdag" class="md-skip">
+        <a href="#code-map-every-module-of-srctramdag-the-public-names-and-the-private-plumbing" class="md-skip">
           Skip to content
         </a>
       
@@ -512,6 +512,62 @@
                 
   
   
+  
+  
+    <li class="md-nav__item">
+      <a href="../architecture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/001-term-owned-architecture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR 001 (1.0 architecture)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
     
   
   
@@ -612,6 +668,50 @@
     <span class="md-ellipsis">
       
         flow.py — the model
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#termspy-the-effect-registry-the-10-architectures-core" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        terms.py — the effect registry (the 1.0 architecture's core)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#nodespy-the-node-model" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        nodes.py — the node model
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#fittingpy-_fitmixin" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        fitting.py — _FitMixin
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#readoutspy-_readoutsmixin" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        readouts.py — _ReadoutsMixin
       
     </span>
   </a>
@@ -1048,6 +1148,90 @@
   
   
     <li class="md-nav__item">
+      <a href="../api/terms/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    terms
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/fitting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    fitting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/readouts/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    readouts
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../api/transforms/" class="md-nav__link">
         
   
@@ -1231,6 +1415,50 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#termspy-the-effect-registry-the-10-architectures-core" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        terms.py — the effect registry (the 1.0 architecture's core)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#nodespy-the-node-model" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        nodes.py — the node model
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#fittingpy-_fitmixin" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        fitting.py — _FitMixin
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#readoutspy-_readoutsmixin" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        readouts.py — _ReadoutsMixin
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#scorespy-effect-modifier-detection-issue-29" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1294,7 +1522,7 @@
   
 
 
-<h1 id="code-map-every-class-and-function-in-srctramdag">Code map — every class and function in <code>src/tramdag/</code><a class="headerlink" href="#code-map-every-class-and-function-in-srctramdag" title="Permanent link">&para;</a></h1>
+<h1 id="code-map-every-module-of-srctramdag-the-public-names-and-the-private-plumbing">Code map — every module of <code>src/tramdag/</code> — the public names and the private plumbing<a class="headerlink" href="#code-map-every-module-of-srctramdag-the-public-names-and-the-private-plumbing" title="Permanent link">&para;</a></h1>
 <p>One entry per name, with its role and its place in the pipeline. Names in
 parentheses are private machinery: useful to know, not part of the API.
 The last section lists every training hyperparameter and where it lives.</p>
@@ -1351,8 +1579,8 @@ are the same object, so <code>LS is linear_shift</code>.</p>
 <td>Ordinal variable with <code>levels</code> classes: ordered logit (cutpoints) plus shifts.</td>
 </tr>
 <tr>
-<td><a class="autorefs autorefs-internal" title="node_terms" href="../api/spec/#tramdag.spec.node_terms"><code>node_terms()</code></a> / <a class="autorefs autorefs-internal" title="node_parents" href="../api/spec/#tramdag.spec.node_parents"><code>node_parents()</code></a></td>
-<td>Canonical term list / ordered de-duplicated parent names of a node.</td>
+<td><a class="autorefs autorefs-internal" title="node_parents" href="../api/spec/#tramdag.spec.node_parents"><code>node_parents()</code></a></td>
+<td>Ordered de-duplicated parent names of a node (the canonical term list is <code>node.terms</code>).</td>
 </tr>
 <tr>
 <td><a class="autorefs autorefs-internal" title="validate_and_sort" href="../api/spec/#tramdag.spec.validate_and_sort"><code>validate_and_sort()</code></a></td>
@@ -1363,12 +1591,12 @@ are the same object, so <code>LS is linear_shift</code>.</p>
 <td>Checkpoint (de)serialization. A term serializes as <code>{effect, parents, options}</code> and nothing else, since <code>options</code> is already canonical. No compatibility shims: <code>spec_from_dict</code> rejects a term without <code>options</code>, the node constructors normalize the formula, and <code>validate_and_sort</code> checks the DAG.</td>
 </tr>
 <tr>
-<td>(<code>_normalize_terms</code>, <code>_as_term</code>, <code>_intercept_basis</code>, <code>_options</code>, <code>_OPTION_DEFAULTS</code>)</td>
-<td>Formula flattening and per-entry validation (a <code>+</code> sum nested in a list is rejected), the one-parented-<code>I</code> rule plus basis hoisting in one pass, canonical option storage.</td>
+<td>(<code>_normalize_terms</code>, <code>_as_term</code>, <code>_intercept_basis</code>, <code>_options</code>)</td>
+<td>Formula flattening and per-entry validation (a <code>+</code> sum nested in a list is rejected), the one-parented-<code>I</code> rule plus basis hoisting in one pass, canonical option storage against each effect's <code>option_defaults</code> (a wrong-effect option errors).</td>
 </tr>
 <tr>
-<td>(<code>_check_term</code>, <code>_check_node</code>, <code>_check_vc_term</code>, <code>_kahn_sort</code>)</td>
-<td>The stages behind <code>validate_and_sort</code>: per-term validation (effect, LS arity, unknown parents), per-node edge-ownership bookkeeping, the VC-specific checks, and the topological sort.</td>
+<td>(<code>_check_term</code>, <code>_check_node</code>, <code>_check_input_transform</code>, <code>_kahn_sort</code>)</td>
+<td>The stages behind <code>validate_and_sort</code>: the generic checks (effect known, parents exist, <code>input_transform</code> shape) plus each entry's own rules (LS arity, the VC treatment/centering block — on the term classes), edge-ownership bookkeeping, the topological sort.</td>
 </tr>
 </tbody>
 </table>
@@ -1494,7 +1722,7 @@ config in <code>experiments/paper/</code> states <code>units=</code> and <code>a
 </tr>
 <tr>
 <td><a class="autorefs autorefs-internal" title="fit" href="../api/flow/#tramdag.flow.CausalFlowDAG.fit"><code>fit()</code></a></td>
-<td>Joint maximum likelihood: one minibatch Adam loop over all parameters (exact per node, because the NLL decomposes), final weights kept. Keras-shaped validation (<code>validation_data=</code>/<code>validation_split=</code> fill <code>history["val"]</code> per epoch, <code>validation_batch_size=</code> chunks the pass) and progress (<code>verbose=</code>). Hooks: <code>optimizer=</code> (any torch optimizer, for schedulers) and <code>callbacks=</code> (one entry or a list; a <code>Callback</code> hooks <code>on_fit_begin</code>/<code>on_epoch_end</code>/<code>on_fit_end</code>, a bare callable is an <code>on_epoch_end</code> hook <code>cb(flow, epoch, opt)</code> — any <code>True</code> stops); the recipes in <code>callbacks.py</code> read <code>history["val"]</code>. <code>vc_ehat=</code> carries the out-of-fold propensities of centered VC terms. A second call continues training.</td>
+<td>Joint maximum likelihood: one minibatch Adam loop over all parameters (exact per node, because the NLL decomposes), final weights kept. Keras-shaped validation (<code>validation_data=</code>/<code>validation_split=</code> fill <code>history["val"]</code> per epoch, <code>validation_batch_size=</code> chunks the pass) and progress (<code>verbose=</code>). Hooks: <code>optimizer=</code> (any torch optimizer, for schedulers) and <code>callbacks=</code> (one entry or a list; a <code>Callback</code> hooks <code>on_fit_begin</code>/<code>on_epoch_end</code>/<code>on_fit_end</code>, a bare callable is an <code>on_epoch_end</code> hook <code>cb(flow, epoch, opt)</code> — any <code>True</code> stops); the recipes in <code>callbacks.py</code> read <code>history["val"]</code>. A centered VC's out-of-fold propensities ride the training frame as the column its <code>center=</code> names. A second call continues training.</td>
 </tr>
 <tr>
 <td><a class="autorefs autorefs-internal" title="fit_classical" href="../api/flow/#tramdag.flow.CausalFlowDAG.fit_classical"><code>fit_classical()</code></a></td>
@@ -1558,24 +1786,110 @@ config in <code>experiments/paper/</code> states <code>units=</code> and <code>a
 <td>Checkpoints with history and provenance (version, time, device). <code>load</code> requires a complete checkpoint and fails loudly otherwise.</td>
 </tr>
 <tr>
-<td>(<code>_Node</code>, <code>_VCGroup</code>)</td>
-<td>Per-node module (intercept + shift <code>ModuleDict</code> + VC bookkeeping); construction is <code>_build_intercept</code>/<code>_build_shifts</code>, and <code>theta_shift()</code> computes <code>(theta, shift)</code> through <code>_theta</code>/<code>_vc_shift</code>/<code>vc_column</code>.</td>
+<td>(<code>_node</code>, <code>_encode_parent</code>, <code>_features</code>, <code>_tensorize</code>, <code>_generator</code>, <code>_dtype</code>, <code>_np_dtype</code>)</td>
+<td>Node lookup with one shared error; parent encoding (continuous raw, ordinal one-hot); <code>_tensorize(df, cols=None)</code> for any column subset; seeded-generator and dtype plumbing.</td>
 </tr>
 <tr>
-<td>(<code>_node</code>, <code>_encode_parent</code>, <code>_features</code>, <code>_tensorize</code>, <code>_generator</code>, <code>_dtype</code>, <code>_np_dtype</code>, <code>_feat_width</code>, <code>_slice_ehat</code>, <code>_term_cells</code>)</td>
-<td>Node lookup with one shared error; parent encoding (continuous raw, ordinal one-hot); <code>_tensorize(df, cols=None)</code> for any column subset; seeded-generator, dtype, feature-width and adjacency-cell plumbing.</td>
+<td>(<code>_check_side_columns</code>, <code>_binary_p1</code>, <code>_side_feats</code>, <code>_query_side_columns</code>, <code>_recenter_vc</code>)</td>
+<td>The generic side-column plumbing (each term names/validates/recomputes its own columns via the <code>ShiftTerm</code> hooks) plus the binary propensity fit and the post-fit <code>finalize</code> loop.</td>
 </tr>
 <tr>
-<td>(<code>_fit_epoch</code>)</td>
-<td>One shuffled pass over the rows; the epoch-mean train NLL per node goes to <code>history["train"]</code>.</td>
+<td>(<code>_is_classical</code>)</td>
+<td>Guard for <code>fit_classical</code>: every term's <code>term_is_classical</code> — <code>LS</code>, or a parentless <code>I()</code> basis carrier.</td>
+</tr>
+</tbody>
+</table>
+<h2 id="termspy-the-effect-registry-the-10-architectures-core"><code>terms.py</code> — the effect registry (the 1.0 architecture's core)<a class="headerlink" href="#termspy-the-effect-registry-the-10-architectures-core" title="Permanent link">&para;</a></h2>
+<p>One <code>TermDef</code> per effect; see <a href="../architecture/">architecture.md</a> for the
+contract diagram.</p>
+<table>
+<thead>
+<tr>
+<th>Name</th>
+<th>Role</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a class="autorefs autorefs-internal" title="register_term" href="../api/terms/#tramdag.terms.register_term"><code>register_term()</code></a> / <a class="autorefs autorefs-internal" title="get_term" href="../api/terms/#tramdag.terms.get_term"><code>get_term()</code></a></td>
+<td>The registry: custom effects register a <code>ShiftTerm</code> subclass under a new effect name; collisions refuse.</td>
 </tr>
 <tr>
-<td>(<code>_vc_ehat_train</code>, <code>_binary_p1</code>, <code>_vc_ehat_live</code>, <code>_vc_ehat_columns</code>, <code>_recenter_vc</code>)</td>
-<td>The VC machinery: the caller's out-of-fold propensities as frozen training tensors (DML); live full-fit propensities for inference (recomputed under <code>do</code>, never cached); post-fit re-centering.</td>
+<td><a class="autorefs autorefs-internal" title="ShiftTerm" href="../api/terms/#tramdag.terms.ShiftTerm"><code>ShiftTerm</code></a> / <a class="autorefs autorefs-internal" title="InterceptTerm" href="../api/terms/#tramdag.terms.InterceptTerm"><code>InterceptTerm</code></a></td>
+<td>The behavior hooks a term owns: validation, <code>build</code>, <code>shift_value</code>/<code>theta_value</code>, <code>post_init</code>, <code>regularizer</code>, post-fit <code>finalize</code>, <code>score_columns</code>, the side-input contract, <code>cells</code>, <code>term_is_classical</code>, <code>option_defaults</code>.</td>
 </tr>
 <tr>
-<td>(<code>_is_all_ls</code>, <code>_covered_by_classical</code>)</td>
-<td>Guard for <code>fit_classical</code>: every term an <code>LS</code>, or a parentless <code>I()</code> basis carrier.</td>
+<td><a class="autorefs autorefs-internal" title="LSTerm" href="../api/terms/#tramdag.terms.LSTerm"><code>LSTerm</code></a> / <a class="autorefs autorefs-internal" title="CSTerm" href="../api/terms/#tramdag.terms.CSTerm"><code>CSTerm</code></a> / <a class="autorefs autorefs-internal" title="VCTerm" href="../api/terms/#tramdag.terms.VCTerm"><code>VCTerm</code></a> / <a class="autorefs autorefs-internal" title="FnTerm" href="../api/terms/#tramdag.terms.FnTerm"><code>FnTerm</code></a></td>
+<td>The built-in shift terms, subclassing their conditioners (state-dict paths and the seeded RNG stream stay bit-stable). <code>VCTerm.regressor</code> is both the forward regressor and the <code>beta0</code> score.</td>
+</tr>
+<tr>
+<td><a class="autorefs autorefs-internal" title="SITerm" href="../api/terms/#tramdag.terms.SITerm"><code>SITerm</code></a> / <a class="autorefs autorefs-internal" title="CITerm" href="../api/terms/#tramdag.terms.CITerm"><code>CITerm</code></a> / <a class="autorefs autorefs-internal" title="AdditiveCITerm" href="../api/terms/#tramdag.terms.AdditiveCITerm"><code>AdditiveCITerm</code></a></td>
+<td>The intercept slot: free theta, one joint net, or one net per parent summed in coefficient space.</td>
+</tr>
+</tbody>
+</table>
+<h2 id="nodespy-the-node-model"><code>nodes.py</code> — the node model<a class="headerlink" href="#nodespy-the-node-model" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Name</th>
+<th>Role</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>(<code>_Node</code>)</td>
+<td>One sub-model per variable: builds its intercept and shift terms via the registry; <code>theta_shift()</code> sums the terms' <code>shift_value</code>s (plain shifts first, then VC); <code>net_input()</code> feeds every term network, <code>input_transform</code> applied.</td>
+</tr>
+<tr>
+<td>(<code>_InputTransform</code>)</td>
+<td>One term's frozen network-input transform (minmax / standardize / callable over frozen train columns).</td>
+</tr>
+<tr>
+<td>(<code>kind_log_prob</code>, <code>kind_sample</code>, <code>kind_abduct</code>, <code>kind_marginal_theta</code>)</td>
+<td>The ONLY continuous-vs-ordinal branches in the package, adjacent.</td>
+</tr>
+<tr>
+<td>(<code>_init_linear</code>)</td>
+<td>Keras' <code>glorot</code>/<code>normal</code> initializers on one linear layer.</td>
+</tr>
+</tbody>
+</table>
+<h2 id="fittingpy-_fitmixin"><code>fitting.py</code> — <code>_FitMixin</code><a class="headerlink" href="#fittingpy-_fitmixin" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Name</th>
+<th>Role</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a class="autorefs autorefs-internal" title="fit" href="../api/flow/#tramdag.flow.CausalFlowDAG.fit"><code>fit()</code></a> / <a class="autorefs autorefs-internal" title="fit_classical" href="../api/flow/#tramdag.flow.CausalFlowDAG.fit_classical"><code>fit_classical()</code></a></td>
+<td>Defined here once, methods of the flow via the mixin.</td>
+</tr>
+<tr>
+<td>(<code>_split_validation</code>, <code>_normalize_callbacks</code>, <code>_check_epoch_hook</code>, <code>_check_fit_sizes</code>, <code>_epoch_pass</code>, <code>_log_epoch</code>, <code>_val_nll</code>, <code>_fit_epoch</code>, <code>_FnCallback</code>)</td>
+<td>The loop plumbing: Keras-shaped validation split, callback normalization and pre-fit signature checks, the epoch/validation passes, verbose printing.</td>
+</tr>
+</tbody>
+</table>
+<h2 id="readoutspy-_readoutsmixin"><code>readouts.py</code> — <code>_ReadoutsMixin</code><a class="headerlink" href="#readoutspy-_readoutsmixin" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Name</th>
+<th>Role</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a class="autorefs autorefs-internal" title="shift_curve" href="../api/flow/#tramdag.flow.CausalFlowDAG.shift_curve"><code>shift_curve()</code></a></td>
+<td>One fitted shift term on a 1-D grid, through the term's own <code>shift_value</code> — the public replacement for reaching into <code>nd.shifts[..]</code>.</td>
+</tr>
+<tr>
+<td>the read-out methods</td>
+<td><code>varying_coef</code>, <code>ls_coefficients</code>, <code>to_matrix</code>, <code>intercept_contributions</code>, <code>design_matrix</code> — defined here once, methods of the flow via the mixin.</td>
 </tr>
 </tbody>
 </table>
@@ -1601,8 +1915,8 @@ config in <code>experiments/paper/</code> states <code>units=</code> and <code>a
 <td><code>P(sup |Brownian bridge| &gt; stat)</code>, the Kolmogorov series.</td>
 </tr>
 <tr>
-<td>(<code>_dl_ds</code>, <code>_ls_score_columns</code>, <code>CRIT_5PCT</code>)</td>
-<td>Closed-form latent-scale derivative; the LS/one-hot score-column builder; the 5% critical value 1.3581.</td>
+<td>(<code>_dl_ds</code>, <code>CRIT_5PCT</code>)</td>
+<td>Closed-form latent-scale derivative; the 5% critical value 1.3581. The per-term columns come from each term's <code>score_columns</code> hook.</td>
 </tr>
 </tbody>
 </table>
@@ -1617,7 +1931,7 @@ config in <code>experiments/paper/</code> states <code>units=</code> and <code>a
 <tbody>
 <tr>
 <td><a class="autorefs autorefs-internal" title="EarlyStopping" href="../api/callbacks/#tramdag.callbacks.EarlyStopping"><code>EarlyStopping</code></a></td>
-<td>Snapshots the weights of the best summed validation NLL (read from <code>history["val"]</code>) and restores them automatically at fit end, before the VC re-centering; an optional <code>patience</code> also stops the fit once the best is that many epochs old.</td>
+<td>Snapshots the weights of the best summed validation NLL (read from <code>history["val"]</code>) and restores them automatically at fit end (<code>restore_best=False</code> keeps the final weights), before the VC re-centering; an optional <code>patience</code> also stops the fit once the best is that many epochs old.</td>
 </tr>
 <tr>
 <td><a class="autorefs autorefs-internal" title="PerNodePlateau" href="../api/callbacks/#tramdag.callbacks.PerNodePlateau"><code>PerNodePlateau</code></a></td>
@@ -1670,13 +1984,13 @@ default you can read at the call site. Nothing numeric is buried.</p>
 </tr>
 <tr>
 <td>VC stage-1 propensities</td>
-<td><code>fit(vc_ehat=)</code></td>
+<td>the training-frame column <code>VC(center=)</code> names</td>
 <td>required for a centered VC term, out of fold, computed by the caller</td>
 </tr>
 <tr>
 <td>VC penalty and centering</td>
 <td><code>VC(penalty=, center=)</code></td>
-<td>1.0 / False (centering needs <code>fit(vc_ehat=)</code>)</td>
+<td>1.0 / False (<code>center="col"</code> names the propensity column)</td>
 </tr>
 <tr>
 <td>L-BFGS budget</td>

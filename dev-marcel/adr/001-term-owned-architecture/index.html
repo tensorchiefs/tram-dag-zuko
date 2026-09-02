@@ -10,31 +10,31 @@
       
       
       
-        <link rel="canonical" href="https://tensorchiefs.github.io/tramdag/dev-marcel/scores/">
+        <link rel="canonical" href="https://tensorchiefs.github.io/tramdag/dev-marcel/adr/001-term-owned-architecture/">
       
       
-        <link rel="prev" href="../training-speed/">
+        <link rel="prev" href="../../architecture/">
       
       
-        <link rel="next" href="../varying-coefficients/">
+        <link rel="next" href="../../code-map/">
       
       
         
       
       
-      <link rel="icon" href="../assets/images/favicon.png">
+      <link rel="icon" href="../../assets/images/favicon.png">
       <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
     
     
       
-        <title>Scores - tramdag</title>
+        <title>ADR 001 (1.0 architecture) - tramdag</title>
       
     
     
-      <link rel="stylesheet" href="../assets/stylesheets/main.ec1eaa64.min.css">
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
       
         
-        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
       
       
 
@@ -53,9 +53,9 @@
       
     
     
-      <link rel="stylesheet" href="../assets/_mkdocstrings.css">
+      <link rel="stylesheet" href="../../assets/_mkdocstrings.css">
     
-    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
     
       
 
@@ -80,7 +80,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#per-observation-scores-the-effect-modifier-scan" class="md-skip">
+        <a href="#adr-001-term-owned-architecture-for-10-rc" class="md-skip">
           Skip to content
         </a>
       
@@ -100,7 +100,7 @@
 
 <header class="md-header md-header--shadow" data-md-component="header">
   <nav class="md-header__inner md-grid" aria-label="Header">
-    <a href=".." title="tramdag" class="md-header__button md-logo" aria-label="tramdag" data-md-component="logo">
+    <a href="../.." title="tramdag" class="md-header__button md-logo" aria-label="tramdag" data-md-component="logo">
       
   
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
@@ -120,7 +120,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Scores
+              ADR 001 (1.0 architecture)
             
           </span>
         </div>
@@ -236,7 +236,7 @@
 
 <nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
   <label class="md-nav__title" for="__drawer">
-    <a href=".." title="tramdag" class="md-nav__button md-logo" aria-label="tramdag" data-md-component="logo">
+    <a href="../.." title="tramdag" class="md-nav__button md-logo" aria-label="tramdag" data-md-component="logo">
       
   
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
@@ -266,7 +266,7 @@
   
   
     <li class="md-nav__item">
-      <a href=".." class="md-nav__link">
+      <a href="../.." class="md-nav__link">
         
   
   
@@ -347,7 +347,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../notation/" class="md-nav__link">
+      <a href="../../notation/" class="md-nav__link">
         
   
   
@@ -375,7 +375,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../fitting/" class="md-nav__link">
+      <a href="../../fitting/" class="md-nav__link">
         
   
   
@@ -403,7 +403,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../training-speed/" class="md-nav__link">
+      <a href="../../training-speed/" class="md-nav__link">
         
   
   
@@ -411,6 +411,118 @@
     
   
     Training speed
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../scores/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Scores
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../varying-coefficients/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Varying coefficients
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../paper-replication/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Paper replication
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
   
 
     
@@ -447,7 +559,7 @@
   <span class="md-ellipsis">
     
   
-    Scores
+    ADR 001 (1.0 architecture)
   
 
     
@@ -465,7 +577,7 @@
   <span class="md-ellipsis">
     
   
-    Scores
+    ADR 001 (1.0 architecture)
   
 
     
@@ -491,10 +603,43 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#worked-example-where-does-x-need-to-bend" class="md-nav__link">
+  <a href="#context" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Worked example: where does β(x) need to bend?
+        Context
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#decision" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Decision
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#refused-deliberately-so-a-later-proposal-can-find-the-reasoning" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Refused (deliberately, so a later proposal can find the reasoning)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#consequences" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Consequences
       
     </span>
   </a>
@@ -517,119 +662,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../varying-coefficients/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Varying coefficients
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../paper-replication/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Paper replication
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../architecture/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Architecture
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../adr/001-term-owned-architecture/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    ADR 001 (1.0 architecture)
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../code-map/" class="md-nav__link">
+      <a href="../../code-map/" class="md-nav__link">
         
   
   
@@ -657,7 +690,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../zuko-upstream/" class="md-nav__link">
+      <a href="../../zuko-upstream/" class="md-nav__link">
         
   
   
@@ -744,7 +777,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../notebooks/demo_tram_dag_colab/" class="md-nav__link">
+      <a href="../../notebooks/demo_tram_dag_colab/" class="md-nav__link">
         
   
   
@@ -772,7 +805,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../notebooks/intro_tram_dag/" class="md-nav__link">
+      <a href="../../notebooks/intro_tram_dag/" class="md-nav__link">
         
   
   
@@ -800,7 +833,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../notebooks/additive_vs_joint_ci/" class="md-nav__link">
+      <a href="../../notebooks/additive_vs_joint_ci/" class="md-nav__link">
         
   
   
@@ -828,7 +861,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../notebooks/varying_coefficients/" class="md-nav__link">
+      <a href="../../notebooks/varying_coefficients/" class="md-nav__link">
         
   
   
@@ -856,7 +889,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../notebooks/classical_fit_tram_dag/" class="md-nav__link">
+      <a href="../../notebooks/classical_fit_tram_dag/" class="md-nav__link">
         
   
   
@@ -943,7 +976,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../api/tramdag/" class="md-nav__link">
+      <a href="../../api/tramdag/" class="md-nav__link">
         
   
   
@@ -971,7 +1004,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../api/spec/" class="md-nav__link">
+      <a href="../../api/spec/" class="md-nav__link">
         
   
   
@@ -999,7 +1032,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../api/flow/" class="md-nav__link">
+      <a href="../../api/flow/" class="md-nav__link">
         
   
   
@@ -1027,7 +1060,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../api/terms/" class="md-nav__link">
+      <a href="../../api/terms/" class="md-nav__link">
         
   
   
@@ -1055,7 +1088,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../api/fitting/" class="md-nav__link">
+      <a href="../../api/fitting/" class="md-nav__link">
         
   
   
@@ -1083,7 +1116,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../api/readouts/" class="md-nav__link">
+      <a href="../../api/readouts/" class="md-nav__link">
         
   
   
@@ -1111,7 +1144,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../api/transforms/" class="md-nav__link">
+      <a href="../../api/transforms/" class="md-nav__link">
         
   
   
@@ -1139,7 +1172,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../api/conditioners/" class="md-nav__link">
+      <a href="../../api/conditioners/" class="md-nav__link">
         
   
   
@@ -1167,7 +1200,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../api/scores/" class="md-nav__link">
+      <a href="../../api/scores/" class="md-nav__link">
         
   
   
@@ -1195,7 +1228,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../api/callbacks/" class="md-nav__link">
+      <a href="../../api/callbacks/" class="md-nav__link">
         
   
   
@@ -1250,10 +1283,43 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#worked-example-where-does-x-need-to-bend" class="md-nav__link">
+  <a href="#context" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Worked example: where does β(x) need to bend?
+        Context
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#decision" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Decision
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#refused-deliberately-so-a-later-proposal-can-find-the-reasoning" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Refused (deliberately, so a later proposal can find the reasoning)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#consequences" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Consequences
       
     </span>
   </a>
@@ -1280,60 +1346,76 @@
   
 
 
-<h1 id="per-observation-scores-the-effect-modifier-scan">Per-observation scores &amp; the effect-modifier scan<a class="headerlink" href="#per-observation-scores-the-effect-modifier-scan" title="Permanent link">&para;</a></h1>
-<p><code>flow.scores(df, node)</code> returns the score ψᵢ = ∂ℓᵢ/∂θ of each observation
-for the node's interpretable shift coefficients. These coefficients are every
-<code>LS</code> weight and every <code>VC</code> term's <code>beta0</code>. An <code>LS</code> weight gives one column per
-continuous parent and one column per one-hot level of an ordinal parent. The
-<code>beta0</code> column is named after the treatment.</p>
-<p>The computation is <strong>analytic and exact</strong>, with no autograd. Shifts enter the
-latent additively. Thus ∂ℓᵢ/∂β = (∂ℓᵢ/∂sᵢ)·xᵢ, with ∂ℓᵢ/∂s in closed form
-(<code>src/tramdag/scores.py</code>). The function is a pure read-out. It does not touch
-the fitting or sampling code paths. At a fitted MLE, the sum of each column is
-≈ 0. Tests pin this behavior and include a float64 finite-difference check.</p>
-<h2 id="worked-example-where-does-x-need-to-bend">Worked example: where does β(x) need to bend?<a class="headerlink" href="#worked-example-where-does-x-need-to-bend" title="Permanent link">&para;</a></h2>
-<p>The score is the cheapest effect-modifier detector available. It uses the
-structural-change logic of model-based recursive partitioning (Zeileis &amp;
-Hornik; Dandl et al. 2024). Before you fit an expensive model, fit the
-<strong>cheap all-<code>LS</code> model</strong>. This fit takes seconds and is deterministic. Then
-scan the treatment-coefficient scores:</p>
-<div class="highlight"><pre><span></span><code><span class="n">flow</span> <span class="o">=</span> <span class="n">td</span><span class="o">.</span><span class="n">CausalFlowDAG</span><span class="p">(</span><span class="n">all_ls_spec</span><span class="p">,</span> <span class="n">seed</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
-<span class="n">flow</span><span class="o">.</span><span class="n">fit_classical</span><span class="p">(</span><span class="n">df</span><span class="p">)</span>  <span class="c1"># seconds, exact MLE</span>
-
-<span class="n">scan</span> <span class="o">=</span> <span class="n">flow</span><span class="o">.</span><span class="n">effect_modifier_scan</span><span class="p">(</span><span class="n">df</span><span class="p">,</span> <span class="n">node</span><span class="o">=</span><span class="s2">"Y"</span><span class="p">,</span> <span class="n">t</span><span class="o">=</span><span class="s2">"T"</span><span class="p">)</span>
-<span class="c1">#         stat   p_value  crit_5pct   flag</span>
-<span class="c1"># X2      4.21    &lt;0.001     1.3581   True     &lt;- true modifier</span>
-<span class="c1"># X3      3.05    &lt;0.001     1.3581   True     &lt;- true modifier</span>
-<span class="c1"># X1      0.74     0.64      1.3581  False     &lt;- prognostic only</span>
-</code></pre></div>
-<p>For each candidate covariate, the scan orders the scores by that covariate
-and forms the scaled cumulative sum <code>B_j = Σ_{i≤j} ψ_(i) / (sd(ψ)·√n)</code>. Under
-a stable coefficient, <code>B</code> is a Brownian bridge. Thus <code>sup|B|</code> has the
-Kolmogorov distribution (5% critical value 1.358). A coefficient that truly
-varies with the covariate makes the ordered scores drift. The flagged
-covariates are the measured shortlist of <code>VC</code> modifiers
-(<code>docs/varying-coefficients.md</code>):</p>
-<div class="highlight"><pre><span></span><code><span class="n">spec</span><span class="p">[</span><span class="s2">"Y"</span><span class="p">]</span> <span class="o">=</span> <span class="n">td</span><span class="o">.</span><span class="n">ContinuousNode</span><span class="p">(</span>
-    <span class="n">td</span><span class="o">.</span><span class="n">CS</span><span class="p">(</span><span class="s2">"X1"</span><span class="p">,</span> <span class="s2">"X2"</span><span class="p">,</span> <span class="s2">"X3"</span><span class="p">)</span> <span class="o">+</span> <span class="n">td</span><span class="o">.</span><span class="n">VC</span><span class="p">(</span><span class="s2">"X2"</span><span class="p">,</span> <span class="s2">"X3"</span><span class="p">,</span> <span class="n">t</span><span class="o">=</span><span class="s2">"T"</span><span class="p">)</span>
-<span class="p">)</span>  <span class="c1"># scan-informed</span>
-</code></pre></div>
-<p><strong>Read it as screening, not as a test of effect modification.</strong> The statistic
-measures how unstable the <em>cheap</em> model is along a covariate, and instability
-has two sources: a coefficient that genuinely varies, and a <strong>prognostic part
-the cheap model gets wrong</strong>. In the example above <code>X1</code> is unflagged because
-its prognostic effect is linear; make it quadratic and <code>X1</code> flags as strongly
-as the true modifiers (0.56 → 4.14 on the DGP of
-<a href="../notebooks/varying_coefficients/"><code>notebooks/varying_coefficients.py</code></a>,
-which demonstrates both cases side by side). A flag therefore means "look
-here", and what you find may be a modifier or a misspecification — both worth
-knowing.</p>
-<p>Notes: For a binary ordinal <code>LS</code> treatment, <code>t</code> resolves to the identified
-level-1-vs-0 contrast. For a <code>VC</code> treatment, <code>t</code> resolves to <code>beta0</code>.
-Candidates default to every column of <code>df</code> except the node and <code>t</code>.
-Modifiers do not need to be parents. For few-level (heavily tied) candidates,
-the ordering is only partial. Then read the scan as a ranking diagnostic, not
-as an exact-size test. You can also use the scores later for
-influence-function analyses and robust standard errors.</p>
+<h1 id="adr-001-term-owned-architecture-for-10-rc">ADR 001 — Term-owned architecture for 1.0-RC<a class="headerlink" href="#adr-001-term-owned-architecture-for-10-rc" title="Permanent link">&para;</a></h1>
+<p>Date: 2026-09-02 · Status: accepted · Branch: <code>rc/1.0-architecture</code></p>
+<h2 id="context">Context<a class="headerlink" href="#context" title="Permanent link">&para;</a></h2>
+<p>At 0.4 the package was seven modules with flow.py a 2020-line monolith; per-effect
+behavior (validation, construction, evaluation, penalty, post-fit steps, score
+columns, adjacency cells, classical-fit eligibility) lived in five parallel string
+switches across spec.py/flow.py/scores.py — VC alone had ~27 sites. Three
+architecture proposals (term-owned, one-dispatch-table, pure seam-split) were
+drafted against a seven-subsystem survey and judged from three lenses
+(maintainability, migration risk, extensibility without over-engineering).</p>
+<h2 id="decision">Decision<a class="headerlink" href="#decision" title="Permanent link">&para;</a></h2>
+<p><strong>Term-owned flow, executed in the seam-split's order.</strong></p>
+<ol>
+<li>Verbatim code motion first: <code>nodes.py</code> (node model), <code>fitting.py</code>
+   (<code>_FitMixin</code>: fit/fit_classical), <code>readouts.py</code> (<code>_ReadoutsMixin</code>: the
+   stateless read-outs + the new <code>shift_curve</code>) — state-dict paths and the
+   seeded RNG stream untouched. The methods stay methods of
+   <code>CausalFlowDAG</code> (it composes the two mixins), each defined once in its
+   module; a first draft used free functions behind one-line delegates and
+   the delegate layer was cut as duplication.</li>
+<li>The <strong>registry</strong> (<code>terms.py</code>): one definition per effect. Built-in shift terms
+   subclass their conditioners (<code>LSTerm(ShiftTerm, LinearShift)</code> …), so
+   checkpoints and RNG draws stay bit-stable; each term owns validation
+   (<code>check_arity</code>/<code>edge_parents</code>), construction (<code>build</code>), evaluation
+   (<code>shift_value</code>/<code>theta_value</code>), <code>post_init</code>, <code>regularizer</code>, post-fit
+   <code>finalize</code>, <code>score_columns</code>, the side-input contract
+   (<code>side_keys</code>/<code>check_side</code>/<code>live_side</code>/<code>extra_columns</code>), adjacency <code>cells</code>,
+   <code>term_is_classical</code> and its <code>option_defaults</code>.</li>
+<li>The intercept slot is a term too (<code>SITerm</code>/<code>CITerm</code>/<code>AdditiveCITerm</code>);
+   the theta read is inline in <code>theta_shift</code> and the marginal init is a hook
+   (<code>has_marginal_start</code>/<code>marginal_start</code>, <code>transform.marginal_init_theta</code>).</li>
+<li><strong>Node kinds stay an if/else in ONE place</strong>: the four adjacent functions
+   <code>kind_log_prob</code>/<code>kind_sample</code>/<code>kind_abduct</code>/<code>kind_marginal_theta</code> in
+   nodes.py. The judges cut the drafted per-kind Head protocol as an n=2
+   abstraction — a third node kind earns the protocol.</li>
+<li>Extension points: <code>register_term</code> (a <code>ShiftTerm</code> subclass under its own
+   effect name) and <code>fn_shift</code> (a callable / <code>nn.Module</code> in the additive
+   shifts); <code>I(transform=&lt;_ScaledUT subclass&gt;)</code> for a custom basis.</li>
+</ol>
+<h2 id="refused-deliberately-so-a-later-proposal-can-find-the-reasoning">Refused (deliberately, so a later proposal can find the reasoning)<a class="headerlink" href="#refused-deliberately-so-a-later-proposal-can-find-the-reasoning" title="Permanent link">&para;</a></h2>
+<ul>
+<li>No per-kind node protocol (n=2), no new node kinds at 1.0.</li>
+<li>No per-effect <code>Term</code> subclasses in the data layer — <code>Term</code> stays ONE frozen
+  dataclass serialized by effect name; the polymorphism lives once, in terms.py.</li>
+<li>No transform/activation registry beyond <code>make_univariate_transform</code> accepting
+  a class; no plugin entry points; no config system; no new dependencies.</li>
+<li>No custom latent distribution — the standard logistic IS the TRAM semantics;
+  every pinned number depends on it.</li>
+<li>No collapse of ComplexIntercept/ComplexShift into factories: their names
+  anchor checkpoint paths and the seeded RNG stream that ten CI ground truths pin.</li>
+<li>No side-input channel at all (revised 2026-09-02): the first RC kept
+  <code>fit(vc_ehat=)</code>; the final one deletes it — a centered <code>VC</code> names its
+  out-of-fold propensity COLUMN (<code>VC(center="ps")</code>) and the values ride the
+  training frame like any data, so splitting/slicing/validation come free
+  and no term-specific argument crosses <code>fit</code>. Queries still recompute the
+  propensity live from the treatment node (<code>ShiftTerm.live_side</code>).</li>
+<li>Error messages reworded only where a responsibility physically moved.</li>
+</ul>
+<h2 id="consequences">Consequences<a class="headerlink" href="#consequences" title="Permanent link">&para;</a></h2>
+<ul>
+<li>flow.py ≈ 900 lines of framework only; no effect string-switch survives
+  outside terms.py; a new effect touches one class.</li>
+<li>One deliberate checkpoint break (0.4 unreleased): additive-CI keys
+  <code>nodes.*.intercept_nets.*</code> → <code>nodes.*.intercept.nets.*</code> (parameters proven
+  bit-identical under the rename).</li>
+<li>Every migration step landed with the full quick suite, a seeded
+  state-dict-diff smoke (<code>tests/tools/statedict_smoke.py</code>), and experiment
+  reproductions against the committed ground truths; guards were only
+  tightened, never re-based silently.</li>
+</ul>
 
 
 
@@ -1389,12 +1471,12 @@ influence-function analyses and robust standard errors.</p>
     
       
       
-      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.sections", "navigation.top", "content.code.copy", "toc.follow"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"provider": "mike"}}</script>
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.sections", "navigation.top", "content.code.copy", "toc.follow"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"provider": "mike"}}</script>
     
     
-      <script src="../assets/javascripts/bundle.d7400e89.min.js"></script>
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
       
-        <script src="../javascripts/mathjax.js"></script>
+        <script src="../../javascripts/mathjax.js"></script>
       
         <script src="https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-mml-chtml.js"></script>
       

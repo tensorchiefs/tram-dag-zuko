@@ -541,10 +541,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#propensity-centered-vc-centertrue-r-learner-orthogonalization" class="md-nav__link">
+  <a href="#propensity-centered-vc-centercol-r-learner-orthogonalization" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Propensity-centered VC: center=True (R-learner orthogonalization)
+        Propensity-centered VC: center="col" (R-learner orthogonalization)
       
     </span>
   </a>
@@ -586,6 +586,62 @@
     
   
     Paper replication
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../architecture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/001-term-owned-architecture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR 001 (1.0 architecture)
   
 
     
@@ -1004,6 +1060,90 @@
   
   
     <li class="md-nav__item">
+      <a href="../api/terms/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    terms
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/fitting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    fitting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/readouts/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    readouts
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../api/transforms/" class="md-nav__link">
         
   
@@ -1165,10 +1305,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#propensity-centered-vc-centertrue-r-learner-orthogonalization" class="md-nav__link">
+  <a href="#propensity-centered-vc-centercol-r-learner-orthogonalization" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Propensity-centered VC: center=True (R-learner orthogonalization)
+        Propensity-centered VC: center="col" (R-learner orthogonalization)
       
     </span>
   </a>
@@ -1232,7 +1372,7 @@ by-product:</p>
 <span class="p">)</span>  <span class="c1"># best-validation weights: callbacks.EarlyStopping, see fitting.md</span>
 
 <span class="n">beta</span> <span class="o">=</span> <span class="n">flow</span><span class="o">.</span><span class="n">varying_coef</span><span class="p">(</span><span class="n">df_new</span><span class="p">,</span> <span class="s2">"Y"</span><span class="p">)</span>  <span class="c1"># (n,) array beta(x) — deterministic, y-free</span>
-<span class="n">beta0</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">flow</span><span class="o">.</span><span class="n">nodes</span><span class="p">[</span><span class="s2">"Y"</span><span class="p">]</span><span class="o">.</span><span class="n">shifts</span><span class="p">[</span><span class="s2">"T"</span><span class="p">]</span><span class="o">.</span><span class="n">beta0</span><span class="p">)</span>  <span class="c1"># interpretable main effect</span>
+<span class="n">beta0</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">flow</span><span class="o">.</span><span class="n">nodes</span><span class="p">[</span><span class="s2">"Y"</span><span class="p">]</span><span class="o">.</span><span class="n">shifts</span><span class="p">[</span><span class="s2">"T"</span><span class="p">]</span><span class="o">.</span><span class="n">beta0</span><span class="o">.</span><span class="n">detach</span><span class="p">())</span>  <span class="c1"># interpretable main effect</span>
 </code></pre></div>
 <p><code>X2</code> and <code>X3</code> appear <strong>twice</strong>: as prognostic parents through <code>CS</code> and as
 effect modifiers through <code>VC</code>. This pattern is intended. Only the treatment
@@ -1289,9 +1429,10 @@ framework.</p>
   the abduct-difference <code>u(x, t=1, y) − u(x, t=0, y)</code> identically (pinned by
   a test).</li>
 </ul>
-<h2 id="propensity-centered-vc-centertrue-r-learner-orthogonalization">Propensity-centered VC: <code>center=True</code> (R-learner orthogonalization)<a class="headerlink" href="#propensity-centered-vc-centertrue-r-learner-orthogonalization" title="Permanent link">&para;</a></h2>
-<div class="highlight"><pre><span></span><code><span class="n">td</span><span class="o">.</span><span class="n">VC</span><span class="p">(</span><span class="s2">"X2"</span><span class="p">,</span> <span class="s2">"X3"</span><span class="p">,</span> <span class="n">t</span><span class="o">=</span><span class="s2">"T"</span><span class="p">,</span> <span class="n">penalty</span><span class="o">=</span><span class="mf">1.0</span><span class="p">,</span> <span class="n">center</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
-<span class="c1"># contributes  beta(x) * (t - e_hat(x))  to the shift; e_hat comes from you</span>
+<h2 id="propensity-centered-vc-centercol-r-learner-orthogonalization">Propensity-centered VC: <code>center="col"</code> (R-learner orthogonalization)<a class="headerlink" href="#propensity-centered-vc-centercol-r-learner-orthogonalization" title="Permanent link">&para;</a></h2>
+<div class="highlight"><pre><span></span><code><span class="n">td</span><span class="o">.</span><span class="n">VC</span><span class="p">(</span><span class="s2">"X2"</span><span class="p">,</span> <span class="s2">"X3"</span><span class="p">,</span> <span class="n">t</span><span class="o">=</span><span class="s2">"T"</span><span class="p">,</span> <span class="n">penalty</span><span class="o">=</span><span class="mf">1.0</span><span class="p">,</span> <span class="n">center</span><span class="o">=</span><span class="s2">"ps"</span><span class="p">)</span>
+<span class="c1"># contributes  beta(x) * (t - e_hat(x))  to the shift; e_hat comes from you,</span>
+<span class="c1"># out of fold, as the training-frame column named by center=</span>
 </code></pre></div>
 <p>This is Robinson/R-learner centering inside the likelihood. Dandl et al.
 (2024) found treatment-centering to be <em>the</em> decisive ingredient for effect
@@ -1308,7 +1449,7 @@ misspecification that you do not know you have.</p>
 design:</p>
 <ul>
 <li><strong>Training</strong> uses <strong>out-of-fold</strong> ê that <em>you</em> compute and pass as
-  <code>fit(vc_ehat={"Y": {"T": e_oof}})</code>, one value per training row: any
+  the frame column <code>VC(center=)</code> names (<code>df.assign(ps=e_oof)</code>), one value per training row: any
   propensity model, each fold predicted by a fit that never saw it. This is
   the DML cross-fitting requirement — in-sample ê reintroduces the
   own-observation bias and can be <em>worse</em> than no centering. Six lines with
@@ -1324,7 +1465,7 @@ design:</p>
 <p>The OOF values enter the outcome loss as frozen data. Thus <strong>no gradient
   reaches the treatment node</strong> from the outcome node, and the per-node
   factorization stays intact (pinned by a gradient-isolation test). <code>fit</code>
-  refuses a centered spec without <code>vc_ehat</code> and a <code>vc_ehat</code> that does not
+  refuses a centered spec whose frame lacks the column, and one that does not
   match the spec.
 - <strong>Inference</strong> (<code>log_prob</code> / <code>sample</code> / <code>abduct</code> / <code>pmf</code> / <code>scores</code>)
   recomputes ê from the flow's <strong>own fitted treatment node</strong>, the full-data
@@ -1347,7 +1488,7 @@ recovery corr ≥ 0.9 at n = 5000 (measured ≈ 0.99, min over 3 seeds 0.986), a
 fitted <code>beta0</code> that matches <code>fit_classical</code> under a large penalty, and the
 read-out identities. The centering claims are measured against the
 <code>confounded</code> DGP in the same file. Both former follow-ups have since
-shipped: propensity centering (#30) is <code>center=True</code>, documented above, and the
+shipped: propensity centering (#30) is <code>center="col"</code>, documented above, and the
 per-observation scores for effect-modifier scans (#29) are <code>flow.scores</code> and
 <code>flow.effect_modifier_scan</code> — see <a href="../scores/">scores.md</a>.</p>
 

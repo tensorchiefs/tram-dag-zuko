@@ -513,6 +513,62 @@
   
   
     <li class="md-nav__item">
+      <a href="../../architecture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/001-term-owned-architecture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR 001 (1.0 architecture)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../code-map/" class="md-nav__link">
         
   
@@ -1079,6 +1135,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#tramdag.spec.feat_width" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        feat_width
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#tramdag.spec.simple_intercept" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1145,17 +1212,6 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#tramdag.spec.node_terms" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        node_terms
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
   <a href="#tramdag.spec.node_parents" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1199,6 +1255,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#tramdag.spec.fn_shift" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        fn_shift
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -1228,6 +1295,90 @@
     
   
     flow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../terms/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    terms
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../fitting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    fitting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../readouts/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    readouts
   
 
     
@@ -1549,6 +1700,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#tramdag.spec.feat_width" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        feat_width
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#tramdag.spec.simple_intercept" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1615,17 +1777,6 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#tramdag.spec.node_terms" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        node_terms
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
   <a href="#tramdag.spec.node_parents" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1663,6 +1814,17 @@
     <span class="md-ellipsis">
       
         spec_from_dict
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tramdag.spec.fn_shift" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        fn_shift
       
     </span>
   </a>
@@ -1810,7 +1972,7 @@ prognostically through the shift <em>and</em> modifies the treatment effect.</p>
         <p>One additive term of a node's transformation.</p>
 <p>Terms add: <code>I("a") + CS("b")</code> is the same transformation as
 <code>[I("a"), CS("b")]</code>. Build terms with the constructors :func:<code>I</code>,
-:func:<code>LS</code>, :func:<code>CS</code> and :func:<code>VC</code>, not directly.</p>
+:func:<code>LS</code>, :func:<code>CS</code>, :func:<code>VC</code> and :func:<code>Fn</code>, not directly.</p>
 
 
 <p><span class="doc-section-title">Attributes:</span></p>
@@ -1830,7 +1992,8 @@ prognostically through the shift <em>and</em> modifies the treatment effect.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>One of <code>"I"</code>, <code>"LS"</code>, <code>"CS"</code>, <code>"VC"</code>.</p>
+                <p>A registered effect name: <code>"I"</code>, <code>"LS"</code>, <code>"CS"</code>, <code>"VC"</code>,
+<code>"Fn"</code>, or a :func:<code>tramdag.terms.register_term</code> custom name.</p>
               </div>
             </td>
           </tr>
@@ -1843,7 +2006,8 @@ prognostically through the shift <em>and</em> modifies the treatment effect.</p>
               <div class="doc-md-description">
                 <p>Ordered parent names the term depends on. Empty only for the bare
 simple-intercept <code>I()</code>. For a <code>VC</code> term, <code>parents[0]</code> is the
-treatment (<code>on</code>) and the rest are the effect modifiers.</p>
+treatment (<code>on</code>) and the rest are the effect modifiers; every
+other built-in term's parents all own their edges.</p>
               </div>
             </td>
           </tr>
@@ -1855,15 +2019,16 @@ treatment (<code>on</code>) and the rest are the effect modifiers.</p>
             <td>
               <div class="doc-md-description">
                 <p>Effect-specific settings as canonical <code>(key, value)</code> pairs:
-sorted by key, defaults omitted. Attribute access serves them
-with their defaults, so <code>term.penalty</code> stays valid on every
-term. Keys: <code>penalty</code> and <code>center</code> (VC, see :func:<code>VC</code>);
-<code>transform</code> and <code>transform_kwargs</code> (I, the basis of the monotone
-transform, kwargs stored as sorted pairs);
-<code>units</code> and <code>activation</code> (the term's network);
-<code>input_transform</code> (I/CS/VC: the network-input transform);
-<code>allow_interaction</code> (multi-parent I: one joint net or one net
-per parent).</p>
+sorted by key, defaults omitted. Attribute access serves this
+effect's options with their defaults; a key another effect takes
+raises <code>AttributeError</code> instead of answering with a foreign
+default. Keys per effect: <code>penalty</code> and <code>center</code> (VC, see
+:func:<code>VC</code>); <code>transform</code> and <code>transform_kwargs</code> (I, the basis
+of the monotone transform, kwargs stored as sorted pairs);
+<code>units</code> and <code>activation</code> (the term's network); <code>fn</code> (Fn, the
+custom shift callable); <code>input_transform</code> (I/CS/VC/Fn: the
+network-input transform); <code>allow_interaction</code> (multi-parent I:
+one joint net or one net per parent).</p>
               </div>
             </td>
           </tr>
@@ -1904,7 +2069,11 @@ per parent).</p>
 
     <div class="doc doc-contents ">
 
-        <p>Serve the effect-specific options, with their defaults.</p>
+        <p>Serve this effect's options, with their defaults.</p>
+<p>A key another effect takes raises AttributeError instead of
+answering with a foreign default. Reads <code>effect</code> from <strong>dict</strong>:
+pickle/deepcopy probe dunders on an empty instance, and going
+through attribute access again would recurse.</p>
 
 
     </div>
@@ -2274,6 +2443,26 @@ basis of the monotone transform is chosen on the intercept term,
 
 </div>
 
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="tramdag.spec.feat_width" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">feat_width</span>
+
+
+<a href="#tramdag.spec.feat_width" class="headerlink" title="Permanent link">&para;</a></h3>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">feat_width</span><span class="p">(</span><span class="n">spec</span><span class="p">,</span> <span class="n">parents</span><span class="p">)</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Total feature width of the parents (ordinal one-hot, continuous raw).</p>
+
+
+    </div>
+
+</div>
 
 <div class="doc doc-object doc-function">
 
@@ -3011,7 +3200,7 @@ with <code>n</code>: raise it for small <code>n</code> or many modifiers.</p>
                 <code>center</code>
             </td>
             <td>
-                  <code><span title="bool">bool</span></code>
+                  <code><span title="str">str</span> | False</code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -3020,10 +3209,14 @@ bit-identical to the uncentered term — so a plain <code>VC</code> stays what
 it was before centering existed, and every committed number keeps
 reproducing. <code>docs/varying-coefficients.md</code> measures a 5-10x bias
 reduction from turning it on, so turn it on for an effect estimate.
-<code>True</code> uses the <strong>propensity-centered</strong> regressor
-<code>beta(x) * (x_t - e_hat(pa_t))</code> — the Robinson/R-learner
-orthogonalization inside the likelihood. Requires a binary ordinal
-<code>t</code>.</p>
+A string names the <strong>training-frame column</strong> holding the
+out-of-fold propensities <code>P(t = 1 | pa_t)</code> per row — compute them
+with any cross-fitted classifier OUTSIDE the flow and merge them as
+a column (in-sample values reintroduce the own-observation bias).
+The regressor becomes <code>beta(x) * (x_t - e_hat(pa_t))</code> — the
+Robinson/R-learner orthogonalization inside the likelihood; every
+query after the fit recomputes the propensity live from the flow's
+own treatment node. Requires a binary ordinal <code>t</code>.</p>
               </div>
             </td>
             <td>
@@ -3121,9 +3314,10 @@ conditioners' <code>relu</code>.</p>
 
 <details class="note" open>
   <summary>Notes</summary>
-  <p>With <code>center=True</code>, training needs <strong>out-of-fold</strong> <code>e_hat</code> for every
-training row, passed as <code>fit(vc_ehat=)</code> — the DML cross-fitting
-requirement; in-sample centering can be <em>worse</em> than none. The values
+  <p>With <code>center="col"</code>, training reads <strong>out-of-fold</strong> <code>e_hat</code> for
+every row from that column of the training frame — the DML
+cross-fitting requirement; in-sample centering can be <em>worse</em> than
+none. The values
 are frozen as data, so no gradient reaches the <code>t</code> node from this
 node's loss. Inference (<code>log_prob</code>/<code>sample</code>/<code>abduct</code>/<code>pmf</code>)
 recomputes <code>e_hat</code> from the flow's own fitted <code>t</code> node — the
@@ -3133,85 +3327,6 @@ centering, <code>beta0</code> is the effect at the treatment margin (the
 observed propensities). The LS-nesting reading applies to the
 uncentered term only.</p>
 </details>
-
-    </div>
-
-</div>
-
-<div class="doc doc-object doc-function">
-
-
-<h3 id="tramdag.spec.node_terms" class="doc doc-heading">
-            <span class="doc doc-object-name doc-function-name">node_terms</span>
-
-
-<a href="#tramdag.spec.node_terms" class="headerlink" title="Permanent link">&para;</a></h3>
-<div class="doc-signature highlight"><pre><span></span><code><span class="nf">node_terms</span><span class="p">(</span><span class="n">node</span><span class="p">)</span>
-</code></pre></div>
-
-    <div class="doc doc-contents ">
-
-        <p>Give the canonical term list of a node.</p>
-
-
-<p><span class="doc-section-title">Parameters:</span></p>
-    <table>
-      <thead>
-        <tr>
-          <th>Name</th>
-          <th>Type</th>
-          <th>Description</th>
-          <th>Default</th>
-        </tr>
-      </thead>
-      <tbody>
-          <tr class="doc-section-item">
-            <td>
-                <code>node</code>
-            </td>
-            <td>
-                  <code><span title="tramdag.spec.NodeSpec">NodeSpec</span></code>
-            </td>
-            <td>
-              <div class="doc-md-description">
-                <p>The node specification.</p>
-              </div>
-            </td>
-            <td>
-                <em>required</em>
-            </td>
-          </tr>
-      </tbody>
-    </table>
-
-
-    <p><span class="doc-section-title">Returns:</span></p>
-    <table>
-      <thead>
-        <tr>
-          <th>Type</th>
-          <th>Description</th>
-        </tr>
-      </thead>
-      <tbody>
-          <tr class="doc-section-item">
-            <td>
-                  <code><span title="list">list</span>[<a class="autorefs autorefs-internal" title="Term
-
-
-  
-      dataclass
-   (tramdag.spec.Term)" href="#tramdag.spec.Term">Term</a>]</code>
-            </td>
-            <td>
-              <div class="doc-md-description">
-                <p>The terms; <code>[SI()]</code> for a source node.</p>
-              </div>
-            </td>
-          </tr>
-      </tbody>
-    </table>
-
 
     </div>
 
@@ -3415,7 +3530,9 @@ cycle.</p>
 dropped — so a term serializes as its three fields and nothing else.
 The result is JSON-safe: tuples become lists, and :func:<code>spec_from_dict</code>
 turns them back, so a spec round-trips through <code>json</code> as well as
-through <code>torch.save</code>.</p>
+through <code>torch.save</code> — except when a term carries a <em>callable</em>
+<code>input_transform</code>, which serializes only through pickle
+(<code>torch.save</code>) and only as a module-level function.</p>
 
 
 <p><span class="doc-section-title">Parameters:</span></p>
@@ -3539,6 +3656,149 @@ through <code>torch.save</code>.</p>
             <td>
               <div class="doc-md-description">
                 <p>The node specification, keyed by node name.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="tramdag.spec.fn_shift" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">fn_shift</span>
+
+
+<a href="#tramdag.spec.fn_shift" class="headerlink" title="Permanent link">&para;</a></h3>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">fn_shift</span><span class="p">(</span><span class="o">*</span><span class="n">parents</span><span class="p">,</span> <span class="n">fn</span><span class="p">,</span> <span class="n">input_transform</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Give a custom function shift: <code>fn(features)</code> joins the additive shifts.</p>
+<p>The cheapest custom term: <code>fn</code> takes the term's concatenated parent
+features <code>(n, k)</code> (continuous raw, ordinal one-hot — through
+<code>input_transform</code> when given) and returns the shift contribution,
+shape <code>(n,)</code> or <code>(n, 1)</code>. A plain function is a fixed offset; an
+<code>nn.Module</code> registers as a submodule and trains with the flow.</p>
+<p>Checkpoints pickle <code>fn</code>, so it must be a module-level function or an
+importable <code>nn.Module</code> — <code>save()</code> refuses a lambda. For a whole new
+effect (own validation, penalty, side inputs) subclass
+:class:<code>tramdag.terms.ShiftTerm</code> and <code>register_term</code> it instead.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>*parents</code>
+            </td>
+            <td>
+                  <code><span title="str">str</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Parent node names feeding <code>fn</code>.</p>
+              </div>
+            </td>
+            <td>
+                  <code>()</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>fn</code>
+            </td>
+            <td>
+                  <code><span title="callable">callable</span> | <span title="torch.nn.Module">Module</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The shift function.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>input_transform</code>
+            </td>
+            <td>
+                  <code><span title="str">str</span> | <span title="callable">callable</span> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>As on :func:<code>complex_shift</code>, by default None.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="Term
+
+
+  
+      dataclass
+   (tramdag.spec.Term)" href="#tramdag.spec.Term">Term</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The term, effect <code>"Fn"</code>.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<p><span class="doc-section-title">Raises:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="ValueError">ValueError</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>If no parent is given or <code>fn</code> is not callable.</p>
               </div>
             </td>
           </tr>

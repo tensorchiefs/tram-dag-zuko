@@ -361,11 +361,14 @@ def describe_node(flow, name):
     node = flow.nodes[name]
     n_params = node.ut.n_params if node.ut is not None else node.levels - 1
     print(f"{name}  ({node.kind})")
-    if node.ci_parents:
-        print(f"  intercept: ComplexIntercept({node.ci_parents} -> {n_params} params)")
+    if node.intercept.ci_parents:
+        print(
+            f"  intercept: ComplexIntercept({node.intercept.ci_parents}"
+            f" -> {n_params} params)"
+        )
     else:
         print(f"  intercept: SimpleIntercept({n_params} params)")
-    for parent in node.ci_parents:
+    for parent in node.intercept.ci_parents:
         print(f"    {parent:>3} -> I    (feeds the joint intercept above)")
     for parent, mod in node.shifts.items():
         eff = "LS" if type(mod).__name__ == "LinearShift" else "CS"

@@ -2,102 +2,122 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
     <url>
          <loc>https://tensorchiefs.github.io/tramdag/dev-marcel/</loc>
-         <lastmod>2026-09-01</lastmod>
+         <lastmod>2026-09-02</lastmod>
+    </url>
+    <url>
+         <loc>https://tensorchiefs.github.io/tramdag/dev-marcel/architecture/</loc>
+         <lastmod>2026-09-02</lastmod>
     </url>
     <url>
          <loc>https://tensorchiefs.github.io/tramdag/dev-marcel/code-map/</loc>
-         <lastmod>2026-09-01</lastmod>
+         <lastmod>2026-09-02</lastmod>
     </url>
     <url>
          <loc>https://tensorchiefs.github.io/tramdag/dev-marcel/fitting/</loc>
-         <lastmod>2026-09-01</lastmod>
+         <lastmod>2026-09-02</lastmod>
     </url>
     <url>
          <loc>https://tensorchiefs.github.io/tramdag/dev-marcel/notation/</loc>
-         <lastmod>2026-09-01</lastmod>
+         <lastmod>2026-09-02</lastmod>
     </url>
     <url>
          <loc>https://tensorchiefs.github.io/tramdag/dev-marcel/paper-replication/</loc>
-         <lastmod>2026-09-01</lastmod>
+         <lastmod>2026-09-02</lastmod>
     </url>
     <url>
          <loc>https://tensorchiefs.github.io/tramdag/dev-marcel/scores/</loc>
-         <lastmod>2026-09-01</lastmod>
+         <lastmod>2026-09-02</lastmod>
     </url>
     <url>
          <loc>https://tensorchiefs.github.io/tramdag/dev-marcel/training-speed/</loc>
-         <lastmod>2026-09-01</lastmod>
+         <lastmod>2026-09-02</lastmod>
     </url>
     <url>
          <loc>https://tensorchiefs.github.io/tramdag/dev-marcel/varying-coefficients/</loc>
-         <lastmod>2026-09-01</lastmod>
+         <lastmod>2026-09-02</lastmod>
     </url>
     <url>
          <loc>https://tensorchiefs.github.io/tramdag/dev-marcel/zuko-upstream/</loc>
-         <lastmod>2026-09-01</lastmod>
+         <lastmod>2026-09-02</lastmod>
+    </url>
+    <url>
+         <loc>https://tensorchiefs.github.io/tramdag/dev-marcel/adr/001-term-owned-architecture/</loc>
+         <lastmod>2026-09-02</lastmod>
     </url>
     <url>
          <loc>https://tensorchiefs.github.io/tramdag/dev-marcel/api/callbacks/</loc>
-         <lastmod>2026-09-01</lastmod>
+         <lastmod>2026-09-02</lastmod>
     </url>
     <url>
          <loc>https://tensorchiefs.github.io/tramdag/dev-marcel/api/conditioners/</loc>
-         <lastmod>2026-09-01</lastmod>
+         <lastmod>2026-09-02</lastmod>
+    </url>
+    <url>
+         <loc>https://tensorchiefs.github.io/tramdag/dev-marcel/api/fitting/</loc>
+         <lastmod>2026-09-02</lastmod>
     </url>
     <url>
          <loc>https://tensorchiefs.github.io/tramdag/dev-marcel/api/flow/</loc>
-         <lastmod>2026-09-01</lastmod>
+         <lastmod>2026-09-02</lastmod>
+    </url>
+    <url>
+         <loc>https://tensorchiefs.github.io/tramdag/dev-marcel/api/readouts/</loc>
+         <lastmod>2026-09-02</lastmod>
     </url>
     <url>
          <loc>https://tensorchiefs.github.io/tramdag/dev-marcel/api/scores/</loc>
-         <lastmod>2026-09-01</lastmod>
+         <lastmod>2026-09-02</lastmod>
     </url>
     <url>
          <loc>https://tensorchiefs.github.io/tramdag/dev-marcel/api/spec/</loc>
-         <lastmod>2026-09-01</lastmod>
+         <lastmod>2026-09-02</lastmod>
+    </url>
+    <url>
+         <loc>https://tensorchiefs.github.io/tramdag/dev-marcel/api/terms/</loc>
+         <lastmod>2026-09-02</lastmod>
     </url>
     <url>
          <loc>https://tensorchiefs.github.io/tramdag/dev-marcel/api/tramdag/</loc>
-         <lastmod>2026-09-01</lastmod>
+         <lastmod>2026-09-02</lastmod>
     </url>
     <url>
          <loc>https://tensorchiefs.github.io/tramdag/dev-marcel/api/transforms/</loc>
-         <lastmod>2026-09-01</lastmod>
+         <lastmod>2026-09-02</lastmod>
     </url>
     <url>
          <loc>https://tensorchiefs.github.io/tramdag/dev-marcel/notebooks/additive_vs_joint_ci/</loc>
-         <lastmod>2026-09-01</lastmod>
+         <lastmod>2026-09-02</lastmod>
     </url>
     <url>
          <loc>https://tensorchiefs.github.io/tramdag/dev-marcel/notebooks/classical_fit_tram_dag/</loc>
-         <lastmod>2026-09-01</lastmod>
+         <lastmod>2026-09-02</lastmod>
     </url>
     <url>
          <loc>https://tensorchiefs.github.io/tramdag/dev-marcel/notebooks/demo_tram_dag_colab/</loc>
-         <lastmod>2026-09-01</lastmod>
+         <lastmod>2026-09-02</lastmod>
     </url>
     <url>
          <loc>https://tensorchiefs.github.io/tramdag/dev-marcel/notebooks/intro_tram_dag/</loc>
-         <lastmod>2026-09-01</lastmod>
+         <lastmod>2026-09-02</lastmod>
     </url>
     <url>
          <loc>https://tensorchiefs.github.io/tramdag/dev-marcel/notebooks/varying_coefficients/</loc>
-         <lastmod>2026-09-01</lastmod>
+         <lastmod>2026-09-02</lastmod>
     </url>
     <url>
          <loc>https://tensorchiefs.github.io/tramdag/dev-marcel/perf/REPORT/</loc>
-         <lastmod>2026-09-01</lastmod>
+         <lastmod>2026-09-02</lastmod>
     </url>
     <url>
          <loc>https://tensorchiefs.github.io/tramdag/dev-marcel/research/</loc>
-         <lastmod>2026-09-01</lastmod>
+         <lastmod>2026-09-02</lastmod>
     </url>
     <url>
          <loc>https://tensorchiefs.github.io/tramdag/dev-marcel/research/MISSION_autoresearch/</loc>
-         <lastmod>2026-09-01</lastmod>
+         <lastmod>2026-09-02</lastmod>
     </url>
     <url>
          <loc>https://tensorchiefs.github.io/tramdag/dev-marcel/research/REPORT/</loc>
-         <lastmod>2026-09-01</lastmod>
+         <lastmod>2026-09-02</lastmod>
     </url>
 </urlset>

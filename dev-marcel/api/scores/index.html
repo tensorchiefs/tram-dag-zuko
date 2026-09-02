@@ -513,6 +513,62 @@
   
   
     <li class="md-nav__item">
+      <a href="../../architecture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/001-term-owned-architecture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR 001 (1.0 architecture)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../code-map/" class="md-nav__link">
         
   
@@ -893,6 +949,90 @@
     
   
     flow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../terms/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    terms
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../fitting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    fitting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../readouts/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    readouts
   
 
     
@@ -1509,7 +1649,9 @@ contrast of level 1 against level 0.</p>
 
 
 <a href="#tramdag.scores.effect_modifier_scan" class="headerlink" title="Permanent link">&para;</a></h3>
-<div class="doc-signature highlight"><pre><span></span><code><span class="nf">effect_modifier_scan</span><span class="p">(</span><span class="n">flow</span><span class="p">,</span> <span class="n">df</span><span class="p">,</span> <span class="n">node</span><span class="p">,</span> <span class="n">t</span><span class="p">,</span> <span class="n">candidates</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">effect_modifier_scan</span><span class="p">(</span>
+    <span class="n">flow</span><span class="p">,</span> <span class="n">df</span><span class="p">,</span> <span class="n">node</span><span class="p">,</span> <span class="n">t</span><span class="p">,</span> <span class="n">candidates</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">column</span><span class="o">=</span><span class="kc">None</span>
+<span class="p">)</span>
 </code></pre></div>
 
     <div class="doc doc-contents ">
@@ -1616,6 +1758,24 @@ continuous parent or a VC term, and the identified level-1 column
               <div class="doc-md-description">
                 <p>Candidate covariates. Defaults to every column of <code>df</code> except
 <code>node</code> and <code>t</code>.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>column</code>
+            </td>
+            <td>
+                  <code><span title="str">str</span> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Score column to scan, overriding the <code>t</code>-derived choice — the
+way to scan one level contrast of a multi-level ordinal
+treatment (e.g. <code>"t[2]"</code>), which has no single default column.</p>
               </div>
             </td>
             <td>

@@ -1,0 +1,4437 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Interpretable Neural Causal Models (TRAM-DAGs) in PyTorch">
+      
+      
+      
+        <link rel="canonical" href="https://tensorchiefs.github.io/tramdag/dev-marcel/api/terms/">
+      
+      
+        <link rel="prev" href="../flow/">
+      
+      
+        <link rel="next" href="../fitting/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>terms - tramdag</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#tramdagterms" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+      <div data-md-color-scheme="default" data-md-component="outdated" hidden>
+        
+      </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="tramdag" class="md-header__button md-logo" aria-label="tramdag" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            tramdag
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              terms
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/tensorchiefs/tramdag" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    GitHub
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="tramdag" class="md-nav__button md-logo" aria-label="tramdag" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    tramdag
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/tensorchiefs/tramdag" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    GitHub
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Guides
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Guides
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../notation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Notation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../fitting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Fitting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../training-speed/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Training speed
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../scores/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Scores
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../varying-coefficients/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Varying coefficients
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../paper-replication/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Paper replication
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/001-term-owned-architecture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR 001 (1.0 architecture)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../code-map/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Code map
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../zuko-upstream/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Zuko upstream
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Notebooks
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Notebooks
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../notebooks/demo_tram_dag_colab/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    TRAM-DAG in 5 minutes — one causal model, all three rungs of Pearl's ladder
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../notebooks/intro_tram_dag/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    TRAM-DAG — a didactic introduction with
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../notebooks/additive_vs_joint_ci/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Additive vs joint complex intercept — interpreting per-parent effects
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../notebooks/varying_coefficients/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Heterogeneous treatment effects: the term
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../notebooks/classical_fit_tram_dag/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Classical fitting of all- TRAM-DAGs ()
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../tramdag/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    tramdag
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../spec/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    spec
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../flow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    flow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    terms
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    terms
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#tramdag.terms" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        terms
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="terms">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#tramdag.terms.TermDef" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        TermDef
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="TermDef">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#tramdag.terms.TermDef.check_arity" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        check_arity
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tramdag.terms.TermDef.edge_parents" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        edge_parents
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tramdag.terms.TermDef.cells" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        cells
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tramdag.terms.TermDef.term_is_classical" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        term_is_classical
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tramdag.terms.ShiftTerm" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ShiftTerm
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="ShiftTerm">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#tramdag.terms.ShiftTerm.has_regularizer" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        has_regularizer
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tramdag.terms.ShiftTerm.build" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        build
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tramdag.terms.ShiftTerm.shift_value" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        shift_value
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tramdag.terms.ShiftTerm.post_init" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        post_init
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tramdag.terms.ShiftTerm.regularizer" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        regularizer
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tramdag.terms.ShiftTerm.finalize" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        finalize
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tramdag.terms.ShiftTerm.score_columns" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        score_columns
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tramdag.terms.ShiftTerm.side_columns" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        side_columns
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tramdag.terms.ShiftTerm.check_column" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        check_column
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tramdag.terms.ShiftTerm.live_side" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        live_side
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tramdag.terms.ShiftTerm.extra_columns" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        extra_columns
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tramdag.terms.InterceptTerm" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        InterceptTerm
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="InterceptTerm">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#tramdag.terms.InterceptTerm.build" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        build
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tramdag.terms.InterceptTerm.theta_value" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        theta_value
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tramdag.terms.InterceptTerm.marginal_start" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        marginal_start
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tramdag.terms.InterceptDef" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        InterceptDef
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="InterceptDef">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#tramdag.terms.InterceptDef.term_is_classical" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        term_is_classical
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tramdag.terms.SITerm" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SITerm
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="SITerm">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#tramdag.terms.SITerm.theta_value" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        theta_value
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tramdag.terms.SITerm.marginal_start" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        marginal_start
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tramdag.terms.CITerm" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CITerm
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="CITerm">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#tramdag.terms.CITerm.theta_value" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        theta_value
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tramdag.terms.AdditiveCITerm" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        AdditiveCITerm
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="AdditiveCITerm">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#tramdag.terms.AdditiveCITerm.theta_value" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        theta_value
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tramdag.terms.LSTerm" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        LSTerm
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="LSTerm">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#tramdag.terms.LSTerm.term_is_classical" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        term_is_classical
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tramdag.terms.LSTerm.check_arity" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        check_arity
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tramdag.terms.LSTerm.build" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        build
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tramdag.terms.LSTerm.shift_value" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        shift_value
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tramdag.terms.LSTerm.score_columns" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        score_columns
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tramdag.terms.CSTerm" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CSTerm
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="CSTerm">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#tramdag.terms.CSTerm.build" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        build
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tramdag.terms.CSTerm.shift_value" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        shift_value
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tramdag.terms.VCTerm" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        VCTerm
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="VCTerm">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#tramdag.terms.VCTerm.has_regularizer" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        has_regularizer
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tramdag.terms.VCTerm.cells" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        cells
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tramdag.terms.VCTerm.build" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        build
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tramdag.terms.VCTerm.edge_parents" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        edge_parents
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tramdag.terms.VCTerm.regressor" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        regressor
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tramdag.terms.VCTerm.shift_value" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        shift_value
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tramdag.terms.VCTerm.post_init" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        post_init
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tramdag.terms.VCTerm.regularizer" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        regularizer
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tramdag.terms.VCTerm.finalize" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        finalize
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tramdag.terms.VCTerm.score_columns" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        score_columns
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tramdag.terms.VCTerm.side_columns" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        side_columns
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tramdag.terms.VCTerm.check_column" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        check_column
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tramdag.terms.VCTerm.live_side" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        live_side
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tramdag.terms.VCTerm.extra_columns" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        extra_columns
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tramdag.terms.FnTerm" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        FnTerm
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="FnTerm">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#tramdag.terms.FnTerm.build" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        build
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tramdag.terms.FnTerm.shift_value" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        shift_value
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tramdag.terms.register_term" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        register_term
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tramdag.terms.get_term" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        get_term
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../fitting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    fitting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../readouts/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    readouts
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../transforms/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    transforms
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../conditioners/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    conditioners
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../scores/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    scores
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../callbacks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    callbacks
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#tramdag.terms" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        terms
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="terms">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#tramdag.terms.TermDef" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        TermDef
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="TermDef">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#tramdag.terms.TermDef.check_arity" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        check_arity
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tramdag.terms.TermDef.edge_parents" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        edge_parents
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tramdag.terms.TermDef.cells" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        cells
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tramdag.terms.TermDef.term_is_classical" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        term_is_classical
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tramdag.terms.ShiftTerm" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ShiftTerm
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="ShiftTerm">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#tramdag.terms.ShiftTerm.has_regularizer" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        has_regularizer
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tramdag.terms.ShiftTerm.build" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        build
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tramdag.terms.ShiftTerm.shift_value" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        shift_value
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tramdag.terms.ShiftTerm.post_init" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        post_init
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tramdag.terms.ShiftTerm.regularizer" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        regularizer
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tramdag.terms.ShiftTerm.finalize" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        finalize
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tramdag.terms.ShiftTerm.score_columns" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        score_columns
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tramdag.terms.ShiftTerm.side_columns" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        side_columns
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tramdag.terms.ShiftTerm.check_column" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        check_column
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tramdag.terms.ShiftTerm.live_side" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        live_side
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tramdag.terms.ShiftTerm.extra_columns" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        extra_columns
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tramdag.terms.InterceptTerm" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        InterceptTerm
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="InterceptTerm">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#tramdag.terms.InterceptTerm.build" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        build
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tramdag.terms.InterceptTerm.theta_value" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        theta_value
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tramdag.terms.InterceptTerm.marginal_start" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        marginal_start
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tramdag.terms.InterceptDef" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        InterceptDef
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="InterceptDef">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#tramdag.terms.InterceptDef.term_is_classical" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        term_is_classical
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tramdag.terms.SITerm" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SITerm
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="SITerm">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#tramdag.terms.SITerm.theta_value" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        theta_value
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tramdag.terms.SITerm.marginal_start" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        marginal_start
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tramdag.terms.CITerm" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CITerm
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="CITerm">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#tramdag.terms.CITerm.theta_value" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        theta_value
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tramdag.terms.AdditiveCITerm" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        AdditiveCITerm
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="AdditiveCITerm">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#tramdag.terms.AdditiveCITerm.theta_value" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        theta_value
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tramdag.terms.LSTerm" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        LSTerm
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="LSTerm">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#tramdag.terms.LSTerm.term_is_classical" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        term_is_classical
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tramdag.terms.LSTerm.check_arity" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        check_arity
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tramdag.terms.LSTerm.build" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        build
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tramdag.terms.LSTerm.shift_value" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        shift_value
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tramdag.terms.LSTerm.score_columns" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        score_columns
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tramdag.terms.CSTerm" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CSTerm
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="CSTerm">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#tramdag.terms.CSTerm.build" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        build
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tramdag.terms.CSTerm.shift_value" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        shift_value
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tramdag.terms.VCTerm" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        VCTerm
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="VCTerm">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#tramdag.terms.VCTerm.has_regularizer" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        has_regularizer
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tramdag.terms.VCTerm.cells" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        cells
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tramdag.terms.VCTerm.build" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        build
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tramdag.terms.VCTerm.edge_parents" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        edge_parents
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tramdag.terms.VCTerm.regressor" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        regressor
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tramdag.terms.VCTerm.shift_value" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        shift_value
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tramdag.terms.VCTerm.post_init" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        post_init
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tramdag.terms.VCTerm.regularizer" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        regularizer
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tramdag.terms.VCTerm.finalize" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        finalize
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tramdag.terms.VCTerm.score_columns" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        score_columns
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tramdag.terms.VCTerm.side_columns" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        side_columns
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tramdag.terms.VCTerm.check_column" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        check_column
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tramdag.terms.VCTerm.live_side" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        live_side
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tramdag.terms.VCTerm.extra_columns" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        extra_columns
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tramdag.terms.FnTerm" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        FnTerm
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="FnTerm">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#tramdag.terms.FnTerm.build" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        build
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tramdag.terms.FnTerm.shift_value" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        shift_value
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tramdag.terms.register_term" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        register_term
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tramdag.terms.get_term" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        get_term
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="tramdagterms">tramdag.terms<a class="headerlink" href="#tramdagterms" title="Permanent link">&para;</a></h1>
+
+
+<div class="doc doc-object doc-module">
+
+
+
+<h2 id="tramdag.terms" class="doc doc-heading">
+            <span class="doc doc-object-name doc-module-name">tramdag.terms</span>
+
+
+<a href="#tramdag.terms" class="headerlink" title="Permanent link">&para;</a></h2>
+
+    <div class="doc doc-contents first">
+
+        <p>The effect registry: one definition per term effect.</p>
+<p>Each entry names its slot (<code>"intercept"</code> or <code>"shift"</code>) and owns the
+validation that is specific to its effect — the arity rule of <code>LS</code>, the
+treatment/centering rules of <code>VC</code>. <code>spec.py</code> consults the registry
+lazily, so the generic checks (parents exist, <code>input_transform</code> shape,
+edge ownership) stay there and run in the same order as before.</p>
+<p>A custom effect subclasses :class:<code>ShiftTerm</code> (or, once supported,
+:class:<code>InterceptTerm</code>), sets <code>effect</code>/<code>slot</code>/<code>option_defaults</code>,
+implements <code>build</code> and <code>shift_value</code>, and calls :func:<code>register_term</code>;
+the built-ins register themselves at import.</p>
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="tramdag.terms.TermDef" class="doc doc-heading">
+            <span class="doc doc-object-name doc-class-name">TermDef</span>
+
+
+<a href="#tramdag.terms.TermDef" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+
+
+        <p>One effect's definition: its slot and its effect-specific validation.</p>
+<p><code>check_arity</code> runs before the generic parent checks (it carries the
+errors that must fire even for unknown parents); <code>edge_parents</code> runs
+after them and gives the parents that own an edge — every parent for
+the built-in intercept and shifts, only the treatment for <code>VC</code>.</p>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="tramdag.terms.TermDef.check_arity" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">check_arity</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-staticmethod"><code>staticmethod</code></small>
+  </span>
+
+<a href="#tramdag.terms.TermDef.check_arity" class="headerlink" title="Permanent link">&para;</a></h4>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">check_arity</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="n">term</span><span class="p">)</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Reject a term whose parent count is wrong for its effect.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="tramdag.terms.TermDef.edge_parents" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">edge_parents</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-staticmethod"><code>staticmethod</code></small>
+  </span>
+
+<a href="#tramdag.terms.TermDef.edge_parents" class="headerlink" title="Permanent link">&para;</a></h4>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">edge_parents</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="n">term</span><span class="p">,</span> <span class="n">spec</span><span class="p">)</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Validate against the spec; give the edge-owning parents.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="tramdag.terms.TermDef.cells" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">cells</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-classmethod"><code>classmethod</code></small>
+  </span>
+
+<a href="#tramdag.terms.TermDef.cells" class="headerlink" title="Permanent link">&para;</a></h4>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">cells</span><span class="p">(</span><span class="n">term</span><span class="p">)</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Give the term's adjacency cells as <code>(parent, tag)</code> pairs.</p>
+<p>A multi-parent term carries its parent group as a suffix.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="tramdag.terms.TermDef.term_is_classical" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">term_is_classical</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-classmethod"><code>classmethod</code></small>
+  </span>
+
+<a href="#tramdag.terms.TermDef.term_is_classical" class="headerlink" title="Permanent link">&para;</a></h4>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">term_is_classical</span><span class="p">(</span><span class="n">term</span><span class="p">)</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Say whether the exact classical fit handles this term.</p>
+
+
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="tramdag.terms.ShiftTerm" class="doc doc-heading">
+            <span class="doc doc-object-name doc-class-name">ShiftTerm</span>
+
+
+<a href="#tramdag.terms.ShiftTerm" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><a class="autorefs autorefs-internal" title="TermDef (tramdag.terms.TermDef)" href="#tramdag.terms.TermDef">TermDef</a></code></p>
+
+
+
+        <p>A shift term's behavior hooks, mixed into its conditioner.</p>
+<p>A built term instance carries <code>key</code> (its ModuleDict key), <code>parents</code>
+(the term's written parents) and <code>net_parents</code> (the parents whose
+columns feed its <em>network</em> — empty for <code>LS</code>, the modifiers for
+<code>VC</code>); subclasses may add term-specific attributes (<code>VCTerm</code> keeps
+<code>mods</code>/<code>on_is_ord</code>/<code>center_col</code>). <code>build</code> constructs the module
+exactly as the node used to, so state-dict paths and the seeded RNG
+stream stay bit-stable.</p>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h4 id="tramdag.terms.ShiftTerm.has_regularizer" class="doc doc-heading">
+            <span class="doc doc-object-name doc-attribute-name">has_regularizer</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#tramdag.terms.ShiftTerm.has_regularizer" class="headerlink" title="Permanent link">&para;</a></h4>
+<div class="doc-signature highlight"><pre><span></span><code><span class="n">has_regularizer</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p><code>True</code> when :meth:<code>regularizer</code> joins the training loss.</p>
+
+    </div>
+
+</div>
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="tramdag.terms.ShiftTerm.build" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">build</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-classmethod"><code>classmethod</code></small>
+  </span>
+
+<a href="#tramdag.terms.ShiftTerm.build" class="headerlink" title="Permanent link">&para;</a></h4>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">build</span><span class="p">(</span><span class="n">term</span><span class="p">,</span> <span class="n">spec</span><span class="p">)</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Construct the term module from its spec Term.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="tramdag.terms.ShiftTerm.shift_value" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">shift_value</span>
+
+
+<a href="#tramdag.terms.ShiftTerm.shift_value" class="headerlink" title="Permanent link">&para;</a></h4>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">shift_value</span><span class="p">(</span><span class="n">node</span><span class="p">,</span> <span class="n">feats</span><span class="p">)</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Give this term's contribution to the node's shift, shape <code>(n,)</code>.</p>
+<p><code>feats</code> holds the node's encoded parents plus this term's side
+columns (frozen from the data frame during training, injected live
+by the flow at query time).</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="tramdag.terms.ShiftTerm.post_init" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">post_init</span>
+
+
+<a href="#tramdag.terms.ShiftTerm.post_init" class="headerlink" title="Permanent link">&para;</a></h4>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">post_init</span><span class="p">()</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Re-apply construction-time invariants after a global weight init.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="tramdag.terms.ShiftTerm.regularizer" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">regularizer</span>
+
+
+<a href="#tramdag.terms.ShiftTerm.regularizer" class="headerlink" title="Permanent link">&para;</a></h4>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">regularizer</span><span class="p">()</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Give the term's penalty on the total-likelihood scale.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="tramdag.terms.ShiftTerm.finalize" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">finalize</span>
+
+
+<a href="#tramdag.terms.ShiftTerm.finalize" class="headerlink" title="Permanent link">&para;</a></h4>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">finalize</span><span class="p">(</span><span class="n">node</span><span class="p">,</span> <span class="n">feats</span><span class="p">)</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Run the term's post-fit step (after the after-fit callbacks).</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="tramdag.terms.ShiftTerm.score_columns" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">score_columns</span>
+
+
+<a href="#tramdag.terms.ShiftTerm.score_columns" class="headerlink" title="Permanent link">&para;</a></h4>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">score_columns</span><span class="p">(</span><span class="n">node</span><span class="p">,</span> <span class="n">flow</span><span class="p">,</span> <span class="n">feats</span><span class="p">,</span> <span class="n">dlds</span><span class="p">)</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Give the per-observation score columns of this term's coefficients.</p>
+<p>Empty for a term with no interpretable coefficient (<code>CS</code>).</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="tramdag.terms.ShiftTerm.side_columns" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">side_columns</span>
+
+
+<a href="#tramdag.terms.ShiftTerm.side_columns" class="headerlink" title="Permanent link">&para;</a></h4>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">side_columns</span><span class="p">()</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Name the data-frame columns this term needs beyond the parents.</p>
+<p>Training reads them from <code>train_df</code> like any other column (so the
+validation split and the minibatch slicing come for free).</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="tramdag.terms.ShiftTerm.check_column" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">check_column</span>
+
+
+<a href="#tramdag.terms.ShiftTerm.check_column" class="headerlink" title="Permanent link">&para;</a></h4>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">check_column</span><span class="p">(</span><span class="n">node_name</span><span class="p">,</span> <span class="n">col</span><span class="p">,</span> <span class="n">values</span><span class="p">)</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Validate one side column's values at fit time.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="tramdag.terms.ShiftTerm.live_side" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">live_side</span>
+
+
+<a href="#tramdag.terms.ShiftTerm.live_side" class="headerlink" title="Permanent link">&para;</a></h4>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">live_side</span><span class="p">(</span><span class="n">flow</span><span class="p">,</span> <span class="n">values</span><span class="p">,</span> <span class="n">n</span><span class="p">)</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Recompute the side columns from the fitted flow, at query time.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="tramdag.terms.ShiftTerm.extra_columns" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">extra_columns</span>
+
+
+<a href="#tramdag.terms.ShiftTerm.extra_columns" class="headerlink" title="Permanent link">&para;</a></h4>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">extra_columns</span><span class="p">(</span><span class="n">flow</span><span class="p">)</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>List the extra columns queries must tensorize for :meth:<code>live_side</code>.</p>
+
+
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="tramdag.terms.InterceptTerm" class="doc doc-heading">
+            <span class="doc doc-object-name doc-class-name">InterceptTerm</span>
+
+
+<a href="#tramdag.terms.InterceptTerm" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><a class="autorefs autorefs-internal" title="TermDef (tramdag.terms.TermDef)" href="#tramdag.terms.TermDef">TermDef</a></code></p>
+
+
+
+        <p>The intercept slot's behavior hooks, mixed into its module.</p>
+<p>A node has exactly one intercept term (normalization guarantees
+<code>node.terms[0]</code>); it produces the transform parameters <code>theta</code>.
+<code>groups</code> carries the parent groups — empty for a simple intercept,
+one tuple for a joint net, one per parent for an additive one — and
+<code>ci_parents</code> their flat order.</p>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="tramdag.terms.InterceptTerm.build" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">build</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-classmethod"><code>classmethod</code></small>
+  </span>
+
+<a href="#tramdag.terms.InterceptTerm.build" class="headerlink" title="Permanent link">&para;</a></h4>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">build</span><span class="p">(</span><span class="n">term</span><span class="p">,</span> <span class="n">spec</span><span class="p">,</span> <span class="n">n_params</span><span class="p">)</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Construct the node's intercept module from its intercept Term.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="tramdag.terms.InterceptTerm.theta_value" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">theta_value</span>
+
+
+<a href="#tramdag.terms.InterceptTerm.theta_value" class="headerlink" title="Permanent link">&para;</a></h4>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">theta_value</span><span class="p">(</span><span class="n">node</span><span class="p">,</span> <span class="n">feats</span><span class="p">,</span> <span class="n">n</span><span class="p">)</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Give the transform parameters, shape <code>(n, P)</code>.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="tramdag.terms.InterceptTerm.marginal_start" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">marginal_start</span>
+
+
+<a href="#tramdag.terms.InterceptTerm.marginal_start" class="headerlink" title="Permanent link">&para;</a></h4>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">marginal_start</span><span class="p">(</span><span class="n">theta</span><span class="p">)</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Set the calibrated marginal start (<code>has_marginal_start</code> only).</p>
+
+
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="tramdag.terms.InterceptDef" class="doc doc-heading">
+            <span class="doc doc-object-name doc-class-name">InterceptDef</span>
+
+
+<a href="#tramdag.terms.InterceptDef" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><a class="autorefs autorefs-internal" title="InterceptTerm (tramdag.terms.InterceptTerm)" href="#tramdag.terms.InterceptTerm">InterceptTerm</a></code></p>
+
+
+
+        <p><code>I</code>/<code>SI</code>/<code>CI</code> — the registry entry of the intercept slot.</p>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="tramdag.terms.InterceptDef.term_is_classical" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">term_is_classical</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-classmethod"><code>classmethod</code></small>
+  </span>
+
+<a href="#tramdag.terms.InterceptDef.term_is_classical" class="headerlink" title="Permanent link">&para;</a></h4>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">term_is_classical</span><span class="p">(</span><span class="n">term</span><span class="p">)</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Say yes only for a parentless <code>I()</code> — the simple baseline.</p>
+
+
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="tramdag.terms.SITerm" class="doc doc-heading">
+            <span class="doc doc-object-name doc-class-name">SITerm</span>
+
+
+<a href="#tramdag.terms.SITerm" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><a class="autorefs autorefs-internal" title="InterceptTerm (tramdag.terms.InterceptTerm)" href="#tramdag.terms.InterceptTerm">InterceptTerm</a></code>, <code><a class="autorefs autorefs-internal" title="SimpleIntercept (tramdag.conditioners.SimpleIntercept)" href="../conditioners/#tramdag.conditioners.SimpleIntercept">SimpleIntercept</a></code></p>
+
+
+
+        <p>The free simple intercept: one theta vector, no parents.</p>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="tramdag.terms.SITerm.theta_value" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">theta_value</span>
+
+
+<a href="#tramdag.terms.SITerm.theta_value" class="headerlink" title="Permanent link">&para;</a></h4>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">theta_value</span><span class="p">(</span><span class="n">node</span><span class="p">,</span> <span class="n">feats</span><span class="p">,</span> <span class="n">n</span><span class="p">)</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Broadcast the free theta over the batch.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="tramdag.terms.SITerm.marginal_start" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">marginal_start</span>
+
+
+<a href="#tramdag.terms.SITerm.marginal_start" class="headerlink" title="Permanent link">&para;</a></h4>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">marginal_start</span><span class="p">(</span><span class="n">theta</span><span class="p">)</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Start at the node's data marginal.</p>
+
+
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="tramdag.terms.CITerm" class="doc doc-heading">
+            <span class="doc doc-object-name doc-class-name">CITerm</span>
+
+
+<a href="#tramdag.terms.CITerm" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><a class="autorefs autorefs-internal" title="InterceptTerm (tramdag.terms.InterceptTerm)" href="#tramdag.terms.InterceptTerm">InterceptTerm</a></code>, <code><a class="autorefs autorefs-internal" title="ComplexIntercept (tramdag.conditioners.ComplexIntercept)" href="../conditioners/#tramdag.conditioners.ComplexIntercept">ComplexIntercept</a></code></p>
+
+
+
+        <p>A single (possibly joint multi-parent) complex intercept net.</p>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="tramdag.terms.CITerm.theta_value" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">theta_value</span>
+
+
+<a href="#tramdag.terms.CITerm.theta_value" class="headerlink" title="Permanent link">&para;</a></h4>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">theta_value</span><span class="p">(</span><span class="n">node</span><span class="p">,</span> <span class="n">feats</span><span class="p">,</span> <span class="n">n</span><span class="p">)</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Run the one net over the joint parent features.</p>
+
+
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="tramdag.terms.AdditiveCITerm" class="doc doc-heading">
+            <span class="doc doc-object-name doc-class-name">AdditiveCITerm</span>
+
+
+<a href="#tramdag.terms.AdditiveCITerm" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><a class="autorefs autorefs-internal" title="InterceptTerm (tramdag.terms.InterceptTerm)" href="#tramdag.terms.InterceptTerm">InterceptTerm</a></code>, <code><span title="torch.nn.Module">Module</span></code></p>
+
+
+
+        <p><code>allow_interaction=False</code>: one net per parent, outputs summed.</p>
+<p>Each parent reshapes the transform independently, in unconstrained
+coefficient space.</p>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="tramdag.terms.AdditiveCITerm.theta_value" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">theta_value</span>
+
+
+<a href="#tramdag.terms.AdditiveCITerm.theta_value" class="headerlink" title="Permanent link">&para;</a></h4>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">theta_value</span><span class="p">(</span><span class="n">node</span><span class="p">,</span> <span class="n">feats</span><span class="p">,</span> <span class="n">n</span><span class="p">)</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Sum the per-parent nets in coefficient space.</p>
+
+
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="tramdag.terms.LSTerm" class="doc doc-heading">
+            <span class="doc doc-object-name doc-class-name">LSTerm</span>
+
+
+<a href="#tramdag.terms.LSTerm" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><a class="autorefs autorefs-internal" title="ShiftTerm (tramdag.terms.ShiftTerm)" href="#tramdag.terms.ShiftTerm">ShiftTerm</a></code>, <code><a class="autorefs autorefs-internal" title="LinearShift (tramdag.conditioners.LinearShift)" href="../conditioners/#tramdag.conditioners.LinearShift">LinearShift</a></code></p>
+
+
+
+        <p><code>LS</code> — one raw-unit coefficient per (single) parent.</p>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="tramdag.terms.LSTerm.term_is_classical" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">term_is_classical</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-classmethod"><code>classmethod</code></small>
+  </span>
+
+<a href="#tramdag.terms.LSTerm.term_is_classical" class="headerlink" title="Permanent link">&para;</a></h4>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">term_is_classical</span><span class="p">(</span><span class="n">term</span><span class="p">)</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Say yes — an LS is a classical transformation-model coefficient.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="tramdag.terms.LSTerm.check_arity" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">check_arity</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-staticmethod"><code>staticmethod</code></small>
+  </span>
+
+<a href="#tramdag.terms.LSTerm.check_arity" class="headerlink" title="Permanent link">&para;</a></h4>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">check_arity</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="n">term</span><span class="p">)</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Refuse any parent count but one, and any input_transform.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="tramdag.terms.LSTerm.build" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">build</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-classmethod"><code>classmethod</code></small>
+  </span>
+
+<a href="#tramdag.terms.LSTerm.build" class="headerlink" title="Permanent link">&para;</a></h4>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">build</span><span class="p">(</span><span class="n">term</span><span class="p">,</span> <span class="n">spec</span><span class="p">)</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>One weight per feature of the single parent; keyed by its name.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="tramdag.terms.LSTerm.shift_value" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">shift_value</span>
+
+
+<a href="#tramdag.terms.LSTerm.shift_value" class="headerlink" title="Permanent link">&para;</a></h4>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">shift_value</span><span class="p">(</span><span class="n">node</span><span class="p">,</span> <span class="n">feats</span><span class="p">)</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Give the raw parent column times the weight — no input transform.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="tramdag.terms.LSTerm.score_columns" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">score_columns</span>
+
+
+<a href="#tramdag.terms.LSTerm.score_columns" class="headerlink" title="Permanent link">&para;</a></h4>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">score_columns</span><span class="p">(</span><span class="n">node</span><span class="p">,</span> <span class="n">flow</span><span class="p">,</span> <span class="n">feats</span><span class="p">,</span> <span class="n">dlds</span><span class="p">)</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>One column per weight: the parent (continuous) or its one-hot levels.</p>
+<p><code>d l_i / d beta = (d l_i / d s_i) * x_i</code> — analytic and exact.</p>
+
+
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="tramdag.terms.CSTerm" class="doc doc-heading">
+            <span class="doc doc-object-name doc-class-name">CSTerm</span>
+
+
+<a href="#tramdag.terms.CSTerm" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><a class="autorefs autorefs-internal" title="ShiftTerm (tramdag.terms.ShiftTerm)" href="#tramdag.terms.ShiftTerm">ShiftTerm</a></code>, <code><a class="autorefs autorefs-internal" title="ComplexShift (tramdag.conditioners.ComplexShift)" href="../conditioners/#tramdag.conditioners.ComplexShift">ComplexShift</a></code></p>
+
+
+
+        <p><code>CS</code> — a network shift over its parents.</p>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="tramdag.terms.CSTerm.build" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">build</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-classmethod"><code>classmethod</code></small>
+  </span>
+
+<a href="#tramdag.terms.CSTerm.build" class="headerlink" title="Permanent link">&para;</a></h4>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">build</span><span class="p">(</span><span class="n">term</span><span class="p">,</span> <span class="n">spec</span><span class="p">)</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>One net over the concatenated parents; keyed 'a' or 'a+b'.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="tramdag.terms.CSTerm.shift_value" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">shift_value</span>
+
+
+<a href="#tramdag.terms.CSTerm.shift_value" class="headerlink" title="Permanent link">&para;</a></h4>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">shift_value</span><span class="p">(</span><span class="n">node</span><span class="p">,</span> <span class="n">feats</span><span class="p">)</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Give the net over this term's (possibly input-transformed) features.</p>
+
+
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="tramdag.terms.VCTerm" class="doc doc-heading">
+            <span class="doc doc-object-name doc-class-name">VCTerm</span>
+
+
+<a href="#tramdag.terms.VCTerm" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><a class="autorefs autorefs-internal" title="ShiftTerm (tramdag.terms.ShiftTerm)" href="#tramdag.terms.ShiftTerm">ShiftTerm</a></code>, <code><a class="autorefs autorefs-internal" title="VaryingCoef (tramdag.conditioners.VaryingCoef)" href="../conditioners/#tramdag.conditioners.VaryingCoef">VaryingCoef</a></code></p>
+
+
+
+        <p><code>VC</code> — <code>beta(modifiers) * x_t</code>; only the treatment owns an edge.</p>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h4 id="tramdag.terms.VCTerm.has_regularizer" class="doc doc-heading">
+            <span class="doc doc-object-name doc-attribute-name">has_regularizer</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#tramdag.terms.VCTerm.has_regularizer" class="headerlink" title="Permanent link">&para;</a></h4>
+<div class="doc-signature highlight"><pre><span></span><code><span class="n">has_regularizer</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Penalized whenever the term has a head to shrink.</p>
+
+    </div>
+
+</div>
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="tramdag.terms.VCTerm.cells" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">cells</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-classmethod"><code>classmethod</code></small>
+  </span>
+
+<a href="#tramdag.terms.VCTerm.cells" class="headerlink" title="Permanent link">&para;</a></h4>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">cells</span><span class="p">(</span><span class="n">term</span><span class="p">)</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Tag the treatment cell <code>VC</code> and the modifiers <code>VCm</code>.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="tramdag.terms.VCTerm.build" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">build</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-classmethod"><code>classmethod</code></small>
+  </span>
+
+<a href="#tramdag.terms.VCTerm.build" class="headerlink" title="Permanent link">&para;</a></h4>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">build</span><span class="p">(</span><span class="n">term</span><span class="p">,</span> <span class="n">spec</span><span class="p">)</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Build the effect head over the modifiers; keyed by the treatment name.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="tramdag.terms.VCTerm.edge_parents" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">edge_parents</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-staticmethod"><code>staticmethod</code></small>
+  </span>
+
+<a href="#tramdag.terms.VCTerm.edge_parents" class="headerlink" title="Permanent link">&para;</a></h4>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">edge_parents</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="n">term</span><span class="p">,</span> <span class="n">spec</span><span class="p">)</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Check treatment, penalty and centering; the treatment owns the edge.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="tramdag.terms.VCTerm.regressor" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">regressor</span>
+
+
+<a href="#tramdag.terms.VCTerm.regressor" class="headerlink" title="Permanent link">&para;</a></h4>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">regressor</span><span class="p">(</span><span class="n">feats</span><span class="p">)</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Give the <code>(n, 1)</code> column <code>beta</code> multiplies — the treatment, raw.</p>
+<p>The one-hot level-1 indicator for a binary ordinal treatment, the
+value itself for a continuous one; a centered term subtracts its
+propensity column (the Robinson regressor <code>t - e_hat(x)</code>). It is
+also the score of <code>beta0</code>, so :meth:<code>score_columns</code> reads it here.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="tramdag.terms.VCTerm.shift_value" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">shift_value</span>
+
+
+<a href="#tramdag.terms.VCTerm.shift_value" class="headerlink" title="Permanent link">&para;</a></h4>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">shift_value</span><span class="p">(</span><span class="n">node</span><span class="p">,</span> <span class="n">feats</span><span class="p">)</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p><code>beta(modifiers) * regressor</code>, with the centered-term guard.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="tramdag.terms.VCTerm.post_init" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">post_init</span>
+
+
+<a href="#tramdag.terms.VCTerm.post_init" class="headerlink" title="Permanent link">&para;</a></h4>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">post_init</span><span class="p">()</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Re-zero the head's output layer: <code>beta(x) == beta0</code> at start.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="tramdag.terms.VCTerm.regularizer" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">regularizer</span>
+
+
+<a href="#tramdag.terms.VCTerm.regularizer" class="headerlink" title="Permanent link">&para;</a></h4>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">regularizer</span><span class="p">()</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p><code>penalty * ||b_theta weights||^2</code> on the total-likelihood scale.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="tramdag.terms.VCTerm.finalize" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">finalize</span>
+
+
+<a href="#tramdag.terms.VCTerm.finalize" class="headerlink" title="Permanent link">&para;</a></h4>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">finalize</span><span class="p">(</span><span class="n">node</span><span class="p">,</span> <span class="n">feats</span><span class="p">)</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Re-split <code>beta0</code>/<code>b_theta</code>: the head sums to zero over train.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="tramdag.terms.VCTerm.score_columns" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">score_columns</span>
+
+
+<a href="#tramdag.terms.VCTerm.score_columns" class="headerlink" title="Permanent link">&para;</a></h4>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">score_columns</span><span class="p">(</span><span class="n">node</span><span class="p">,</span> <span class="n">flow</span><span class="p">,</span> <span class="n">feats</span><span class="p">,</span> <span class="n">dlds</span><span class="p">)</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>One column, keyed by the treatment: the <code>beta0</code> score.</p>
+<p><code>d s / d beta0</code> is the term's own :meth:<code>regressor</code>, so forward
+and score share one definition by construction.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="tramdag.terms.VCTerm.side_columns" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">side_columns</span>
+
+
+<a href="#tramdag.terms.VCTerm.side_columns" class="headerlink" title="Permanent link">&para;</a></h4>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">side_columns</span><span class="p">()</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Name the propensity column a centered term reads from the frame.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="tramdag.terms.VCTerm.check_column" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">check_column</span>
+
+
+<a href="#tramdag.terms.VCTerm.check_column" class="headerlink" title="Permanent link">&para;</a></h4>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">check_column</span><span class="p">(</span><span class="n">node_name</span><span class="p">,</span> <span class="n">col</span><span class="p">,</span> <span class="n">values</span><span class="p">)</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Propensities are probabilities.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="tramdag.terms.VCTerm.live_side" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">live_side</span>
+
+
+<a href="#tramdag.terms.VCTerm.live_side" class="headerlink" title="Permanent link">&para;</a></h4>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">live_side</span><span class="p">(</span><span class="n">flow</span><span class="p">,</span> <span class="n">values</span><span class="p">,</span> <span class="n">n</span><span class="p">)</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Give the full-data propensity from the flow's own treatment node.</p>
+<p>Detached — no gradient reaches the treatment node from this node's
+loss — and derived from the current parent values, so
+<code>do</code>-mutilated sampling centers with the intervened <code>t</code> (the DML
+prediction convention; training uses the frozen out-of-fold column).</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="tramdag.terms.VCTerm.extra_columns" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">extra_columns</span>
+
+
+<a href="#tramdag.terms.VCTerm.extra_columns" class="headerlink" title="Permanent link">&para;</a></h4>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">extra_columns</span><span class="p">(</span><span class="n">flow</span><span class="p">)</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Give the treatment's parents (a treatment cannot be centered itself).</p>
+
+
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="tramdag.terms.FnTerm" class="doc doc-heading">
+            <span class="doc doc-object-name doc-class-name">FnTerm</span>
+
+
+<a href="#tramdag.terms.FnTerm" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><a class="autorefs autorefs-internal" title="ShiftTerm (tramdag.terms.ShiftTerm)" href="#tramdag.terms.ShiftTerm">ShiftTerm</a></code>, <code><span title="torch.nn.Module">Module</span></code></p>
+
+
+
+        <p><code>Fn</code> — a user-supplied shift function over the parent features.</p>
+<p>A plain function contributes a fixed (non-trained) offset; an
+<code>nn.Module</code> registers as a submodule and trains with the flow. Built
+by :func:<code>tramdag.spec.fn_shift</code>.</p>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="tramdag.terms.FnTerm.build" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">build</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-classmethod"><code>classmethod</code></small>
+  </span>
+
+<a href="#tramdag.terms.FnTerm.build" class="headerlink" title="Permanent link">&para;</a></h4>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">build</span><span class="p">(</span><span class="n">term</span><span class="p">,</span> <span class="n">spec</span><span class="p">)</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Wrap the callable; keyed like a CS ('a' or 'a+b').</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="tramdag.terms.FnTerm.shift_value" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">shift_value</span>
+
+
+<a href="#tramdag.terms.FnTerm.shift_value" class="headerlink" title="Permanent link">&para;</a></h4>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">shift_value</span><span class="p">(</span><span class="n">node</span><span class="p">,</span> <span class="n">feats</span><span class="p">)</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Run <code>fn</code> on the term's features; accept <code>(n,)</code> or <code>(n, 1)</code>.</p>
+
+
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="tramdag.terms.register_term" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">register_term</span>
+
+
+<a href="#tramdag.terms.register_term" class="headerlink" title="Permanent link">&para;</a></h3>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">register_term</span><span class="p">(</span><span class="bp">cls</span><span class="p">)</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Register a term definition under its <code>effect</code> name; refuse collisions.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="tramdag.terms.get_term" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">get_term</span>
+
+
+<a href="#tramdag.terms.get_term" class="headerlink" title="Permanent link">&para;</a></h3>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">get_term</span><span class="p">(</span><span class="n">effect</span><span class="p">)</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Give the registered definition of an effect (<code>KeyError</code> if unknown).</p>
+
+
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.sections", "navigation.top", "content.code.copy", "toc.follow"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"provider": "mike"}}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+        <script src="../../javascripts/mathjax.js"></script>
+      
+        <script src="https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-mml-chtml.js"></script>
+      
+    
+  </body>
+</html>

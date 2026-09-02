@@ -10,31 +10,31 @@
       
       
       
-        <link rel="canonical" href="https://tensorchiefs.github.io/tramdag/dev-marcel/scores/">
+        <link rel="canonical" href="https://tensorchiefs.github.io/tramdag/dev-marcel/api/fitting/">
       
       
-        <link rel="prev" href="../training-speed/">
+        <link rel="prev" href="../terms/">
       
       
-        <link rel="next" href="../varying-coefficients/">
+        <link rel="next" href="../readouts/">
       
       
         
       
       
-      <link rel="icon" href="../assets/images/favicon.png">
+      <link rel="icon" href="../../assets/images/favicon.png">
       <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
     
     
       
-        <title>Scores - tramdag</title>
+        <title>fitting - tramdag</title>
       
     
     
-      <link rel="stylesheet" href="../assets/stylesheets/main.ec1eaa64.min.css">
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
       
         
-        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
       
       
 
@@ -53,9 +53,9 @@
       
     
     
-      <link rel="stylesheet" href="../assets/_mkdocstrings.css">
+      <link rel="stylesheet" href="../../assets/_mkdocstrings.css">
     
-    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
     
       
 
@@ -80,7 +80,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#per-observation-scores-the-effect-modifier-scan" class="md-skip">
+        <a href="#tramdagfitting" class="md-skip">
           Skip to content
         </a>
       
@@ -100,7 +100,7 @@
 
 <header class="md-header md-header--shadow" data-md-component="header">
   <nav class="md-header__inner md-grid" aria-label="Header">
-    <a href=".." title="tramdag" class="md-header__button md-logo" aria-label="tramdag" data-md-component="logo">
+    <a href="../.." title="tramdag" class="md-header__button md-logo" aria-label="tramdag" data-md-component="logo">
       
   
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
@@ -120,7 +120,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Scores
+              fitting
             
           </span>
         </div>
@@ -236,7 +236,7 @@
 
 <nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
   <label class="md-nav__title" for="__drawer">
-    <a href=".." title="tramdag" class="md-nav__button md-logo" aria-label="tramdag" data-md-component="logo">
+    <a href="../.." title="tramdag" class="md-nav__button md-logo" aria-label="tramdag" data-md-component="logo">
       
   
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
@@ -266,7 +266,7 @@
   
   
     <li class="md-nav__item">
-      <a href=".." class="md-nav__link">
+      <a href="../.." class="md-nav__link">
         
   
   
@@ -290,8 +290,6 @@
       
   
   
-    
-  
   
   
     
@@ -304,11 +302,11 @@
       
     
     
-    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" checked>
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" >
         
           
           <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="">
@@ -329,7 +327,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="true">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
           <label class="md-nav__title" for="__nav_2">
             <span class="md-nav__icon md-icon"></span>
             
@@ -347,7 +345,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../notation/" class="md-nav__link">
+      <a href="../../notation/" class="md-nav__link">
         
   
   
@@ -375,7 +373,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../fitting/" class="md-nav__link">
+      <a href="../../fitting/" class="md-nav__link">
         
   
   
@@ -403,7 +401,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../training-speed/" class="md-nav__link">
+      <a href="../../training-speed/" class="md-nav__link">
         
   
   
@@ -428,37 +426,10 @@
                 
   
   
-    
   
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Scores
-  
-
-    
-  </span>
-  
-  
-
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
-      <a href="./" class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="../../scores/" class="md-nav__link">
         
   
   
@@ -474,37 +445,6 @@
   
 
       </a>
-      
-        
-
-<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
-  
-  
-  
-    
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#worked-example-where-does-x-need-to-bend" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Worked example: where does β(x) need to bend?
-      
-    </span>
-  </a>
-  
-</li>
-      
-    </ul>
-  
-</nav>
-      
     </li>
   
 
@@ -517,7 +457,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../varying-coefficients/" class="md-nav__link">
+      <a href="../../varying-coefficients/" class="md-nav__link">
         
   
   
@@ -545,7 +485,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../paper-replication/" class="md-nav__link">
+      <a href="../../paper-replication/" class="md-nav__link">
         
   
   
@@ -573,7 +513,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../architecture/" class="md-nav__link">
+      <a href="../../architecture/" class="md-nav__link">
         
   
   
@@ -601,7 +541,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../adr/001-term-owned-architecture/" class="md-nav__link">
+      <a href="../../adr/001-term-owned-architecture/" class="md-nav__link">
         
   
   
@@ -629,7 +569,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../code-map/" class="md-nav__link">
+      <a href="../../code-map/" class="md-nav__link">
         
   
   
@@ -657,7 +597,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../zuko-upstream/" class="md-nav__link">
+      <a href="../../zuko-upstream/" class="md-nav__link">
         
   
   
@@ -744,7 +684,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../notebooks/demo_tram_dag_colab/" class="md-nav__link">
+      <a href="../../notebooks/demo_tram_dag_colab/" class="md-nav__link">
         
   
   
@@ -772,7 +712,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../notebooks/intro_tram_dag/" class="md-nav__link">
+      <a href="../../notebooks/intro_tram_dag/" class="md-nav__link">
         
   
   
@@ -800,7 +740,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../notebooks/additive_vs_joint_ci/" class="md-nav__link">
+      <a href="../../notebooks/additive_vs_joint_ci/" class="md-nav__link">
         
   
   
@@ -828,7 +768,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../notebooks/varying_coefficients/" class="md-nav__link">
+      <a href="../../notebooks/varying_coefficients/" class="md-nav__link">
         
   
   
@@ -856,7 +796,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../notebooks/classical_fit_tram_dag/" class="md-nav__link">
+      <a href="../../notebooks/classical_fit_tram_dag/" class="md-nav__link">
         
   
   
@@ -888,8 +828,10 @@
       
   
   
+    
   
   
+  
     
     
     
@@ -900,11 +842,11 @@
       
     
     
-    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" checked>
         
           
           <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="">
@@ -925,7 +867,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="true">
           <label class="md-nav__title" for="__nav_4">
             <span class="md-nav__icon md-icon"></span>
             
@@ -943,7 +885,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../api/tramdag/" class="md-nav__link">
+      <a href="../tramdag/" class="md-nav__link">
         
   
   
@@ -971,7 +913,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../api/spec/" class="md-nav__link">
+      <a href="../spec/" class="md-nav__link">
         
   
   
@@ -999,7 +941,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../api/flow/" class="md-nav__link">
+      <a href="../flow/" class="md-nav__link">
         
   
   
@@ -1027,7 +969,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../api/terms/" class="md-nav__link">
+      <a href="../terms/" class="md-nav__link">
         
   
   
@@ -1052,10 +994,37 @@
                 
   
   
+    
   
   
-    <li class="md-nav__item">
-      <a href="../api/fitting/" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    fitting
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
         
   
   
@@ -1071,6 +1040,37 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#tramdag.fitting" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        fitting
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -1083,7 +1083,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../api/readouts/" class="md-nav__link">
+      <a href="../readouts/" class="md-nav__link">
         
   
   
@@ -1111,7 +1111,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../api/transforms/" class="md-nav__link">
+      <a href="../transforms/" class="md-nav__link">
         
   
   
@@ -1139,7 +1139,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../api/conditioners/" class="md-nav__link">
+      <a href="../conditioners/" class="md-nav__link">
         
   
   
@@ -1167,7 +1167,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../api/scores/" class="md-nav__link">
+      <a href="../scores/" class="md-nav__link">
         
   
   
@@ -1195,7 +1195,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../api/callbacks/" class="md-nav__link">
+      <a href="../callbacks/" class="md-nav__link">
         
   
   
@@ -1250,10 +1250,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#worked-example-where-does-x-need-to-bend" class="md-nav__link">
+  <a href="#tramdag.fitting" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Worked example: where does β(x) need to bend?
+        fitting
       
     </span>
   </a>
@@ -1280,60 +1280,54 @@
   
 
 
-<h1 id="per-observation-scores-the-effect-modifier-scan">Per-observation scores &amp; the effect-modifier scan<a class="headerlink" href="#per-observation-scores-the-effect-modifier-scan" title="Permanent link">&para;</a></h1>
-<p><code>flow.scores(df, node)</code> returns the score ψᵢ = ∂ℓᵢ/∂θ of each observation
-for the node's interpretable shift coefficients. These coefficients are every
-<code>LS</code> weight and every <code>VC</code> term's <code>beta0</code>. An <code>LS</code> weight gives one column per
-continuous parent and one column per one-hot level of an ordinal parent. The
-<code>beta0</code> column is named after the treatment.</p>
-<p>The computation is <strong>analytic and exact</strong>, with no autograd. Shifts enter the
-latent additively. Thus ∂ℓᵢ/∂β = (∂ℓᵢ/∂sᵢ)·xᵢ, with ∂ℓᵢ/∂s in closed form
-(<code>src/tramdag/scores.py</code>). The function is a pure read-out. It does not touch
-the fitting or sampling code paths. At a fitted MLE, the sum of each column is
-≈ 0. Tests pin this behavior and include a float64 finite-difference check.</p>
-<h2 id="worked-example-where-does-x-need-to-bend">Worked example: where does β(x) need to bend?<a class="headerlink" href="#worked-example-where-does-x-need-to-bend" title="Permanent link">&para;</a></h2>
-<p>The score is the cheapest effect-modifier detector available. It uses the
-structural-change logic of model-based recursive partitioning (Zeileis &amp;
-Hornik; Dandl et al. 2024). Before you fit an expensive model, fit the
-<strong>cheap all-<code>LS</code> model</strong>. This fit takes seconds and is deterministic. Then
-scan the treatment-coefficient scores:</p>
-<div class="highlight"><pre><span></span><code><span class="n">flow</span> <span class="o">=</span> <span class="n">td</span><span class="o">.</span><span class="n">CausalFlowDAG</span><span class="p">(</span><span class="n">all_ls_spec</span><span class="p">,</span> <span class="n">seed</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
-<span class="n">flow</span><span class="o">.</span><span class="n">fit_classical</span><span class="p">(</span><span class="n">df</span><span class="p">)</span>  <span class="c1"># seconds, exact MLE</span>
+<h1 id="tramdagfitting">tramdag.fitting<a class="headerlink" href="#tramdagfitting" title="Permanent link">&para;</a></h1>
 
-<span class="n">scan</span> <span class="o">=</span> <span class="n">flow</span><span class="o">.</span><span class="n">effect_modifier_scan</span><span class="p">(</span><span class="n">df</span><span class="p">,</span> <span class="n">node</span><span class="o">=</span><span class="s2">"Y"</span><span class="p">,</span> <span class="n">t</span><span class="o">=</span><span class="s2">"T"</span><span class="p">)</span>
-<span class="c1">#         stat   p_value  crit_5pct   flag</span>
-<span class="c1"># X2      4.21    &lt;0.001     1.3581   True     &lt;- true modifier</span>
-<span class="c1"># X3      3.05    &lt;0.001     1.3581   True     &lt;- true modifier</span>
-<span class="c1"># X1      0.74     0.64      1.3581  False     &lt;- prognostic only</span>
-</code></pre></div>
-<p>For each candidate covariate, the scan orders the scores by that covariate
-and forms the scaled cumulative sum <code>B_j = Σ_{i≤j} ψ_(i) / (sd(ψ)·√n)</code>. Under
-a stable coefficient, <code>B</code> is a Brownian bridge. Thus <code>sup|B|</code> has the
-Kolmogorov distribution (5% critical value 1.358). A coefficient that truly
-varies with the covariate makes the ordered scores drift. The flagged
-covariates are the measured shortlist of <code>VC</code> modifiers
-(<code>docs/varying-coefficients.md</code>):</p>
-<div class="highlight"><pre><span></span><code><span class="n">spec</span><span class="p">[</span><span class="s2">"Y"</span><span class="p">]</span> <span class="o">=</span> <span class="n">td</span><span class="o">.</span><span class="n">ContinuousNode</span><span class="p">(</span>
-    <span class="n">td</span><span class="o">.</span><span class="n">CS</span><span class="p">(</span><span class="s2">"X1"</span><span class="p">,</span> <span class="s2">"X2"</span><span class="p">,</span> <span class="s2">"X3"</span><span class="p">)</span> <span class="o">+</span> <span class="n">td</span><span class="o">.</span><span class="n">VC</span><span class="p">(</span><span class="s2">"X2"</span><span class="p">,</span> <span class="s2">"X3"</span><span class="p">,</span> <span class="n">t</span><span class="o">=</span><span class="s2">"T"</span><span class="p">)</span>
-<span class="p">)</span>  <span class="c1"># scan-informed</span>
-</code></pre></div>
-<p><strong>Read it as screening, not as a test of effect modification.</strong> The statistic
-measures how unstable the <em>cheap</em> model is along a covariate, and instability
-has two sources: a coefficient that genuinely varies, and a <strong>prognostic part
-the cheap model gets wrong</strong>. In the example above <code>X1</code> is unflagged because
-its prognostic effect is linear; make it quadratic and <code>X1</code> flags as strongly
-as the true modifiers (0.56 → 4.14 on the DGP of
-<a href="../notebooks/varying_coefficients/"><code>notebooks/varying_coefficients.py</code></a>,
-which demonstrates both cases side by side). A flag therefore means "look
-here", and what you find may be a modifier or a misspecification — both worth
-knowing.</p>
-<p>Notes: For a binary ordinal <code>LS</code> treatment, <code>t</code> resolves to the identified
-level-1-vs-0 contrast. For a <code>VC</code> treatment, <code>t</code> resolves to <code>beta0</code>.
-Candidates default to every column of <code>df</code> except the node and <code>t</code>.
-Modifiers do not need to be parents. For few-level (heavily tied) candidates,
-the ordering is only partial. Then read the scan as a ranking diagnostic, not
-as an exact-size test. You can also use the scores later for
-influence-function analyses and robust standard errors.</p>
+
+<div class="doc doc-object doc-module">
+
+
+
+<h2 id="tramdag.fitting" class="doc doc-heading">
+            <span class="doc doc-object-name doc-module-name">tramdag.fitting</span>
+
+
+<a href="#tramdag.fitting" class="headerlink" title="Permanent link">&para;</a></h2>
+
+    <div class="doc doc-contents first">
+
+        <p>The two fitting paths: <code>_FitMixin</code>, composed into <code>CausalFlowDAG</code>.</p>
+<p><code>fit</code> is one minibatch Adam loop (validation, verbose printing and the
+callback hooks included); <code>fit_classical</code> is the float64 full-batch L-BFGS
+exact-MLE route for all-<code>ls</code> specs. Both are defined here once and are
+ordinary methods of the flow.</p>
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
 
 
 
@@ -1389,12 +1383,12 @@ influence-function analyses and robust standard errors.</p>
     
       
       
-      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.sections", "navigation.top", "content.code.copy", "toc.follow"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"provider": "mike"}}</script>
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.sections", "navigation.top", "content.code.copy", "toc.follow"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"provider": "mike"}}</script>
     
     
-      <script src="../assets/javascripts/bundle.d7400e89.min.js"></script>
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
       
-        <script src="../javascripts/mathjax.js"></script>
+        <script src="../../javascripts/mathjax.js"></script>
       
         <script src="https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-mml-chtml.js"></script>
       

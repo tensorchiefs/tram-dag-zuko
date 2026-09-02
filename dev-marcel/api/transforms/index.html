@@ -13,7 +13,7 @@
         <link rel="canonical" href="https://tensorchiefs.github.io/tramdag/dev-marcel/api/transforms/">
       
       
-        <link rel="prev" href="../flow/">
+        <link rel="prev" href="../readouts/">
       
       
         <link rel="next" href="../conditioners/">
@@ -513,6 +513,62 @@
   
   
     <li class="md-nav__item">
+      <a href="../../architecture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/001-term-owned-architecture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR 001 (1.0 architecture)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../code-map/" class="md-nav__link">
         
   
@@ -910,6 +966,90 @@
                 
   
   
+  
+  
+    <li class="md-nav__item">
+      <a href="../terms/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    terms
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../fitting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    fitting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../readouts/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    readouts
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
     
   
   
@@ -1126,6 +1266,17 @@
         
       </ul>
     </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tramdag.transforms.ordinal_bounds" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ordinal_bounds
+      
+    </span>
+  </a>
   
 </li>
         
@@ -1495,6 +1646,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#tramdag.transforms.ordinal_bounds" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ordinal_bounds
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#tramdag.transforms.make_univariate_transform" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1622,7 +1784,7 @@ flow from the standard-logistic latent to the observed variables.</p>
 <li>continuous: <code>u = h(x) + s(parents)</code> with <code>h</code> Bernstein / RQ-spline / affine,
   fitted on the value range scaled from the train 5%/95% quantiles to <code>[-B, B]</code>
   and linearly extrapolated outside.</li>
-<li>ordinal:    <code>P(x &lt;= k) = sigmoid(theta_k - s(parents))</code> with increasing
+<li>ordinal:    <code>P(y &lt;= k) = sigmoid(theta_k - s(parents))</code> with increasing
   cutpoints <code>theta</code>. This is the parametrization of
   <code>transform_intercepts_ordinal</code> in the original implementation.</li>
 </ul>
@@ -2300,6 +2462,26 @@ spline node reproduces upstream unless asked otherwise.</p>
 <div class="doc doc-object doc-function">
 
 
+<h3 id="tramdag.transforms.ordinal_bounds" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">ordinal_bounds</span>
+
+
+<a href="#tramdag.transforms.ordinal_bounds" class="headerlink" title="Permanent link">&para;</a></h3>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">ordinal_bounds</span><span class="p">(</span><span class="n">theta_tilde</span><span class="p">,</span> <span class="n">shift</span><span class="p">,</span> <span class="n">y</span><span class="p">)</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Give the shifted cutpoint interval of each observed level.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
 <h3 id="tramdag.transforms.make_univariate_transform" class="doc doc-heading">
             <span class="doc doc-object-name doc-function-name">make_univariate_transform</span>
 
@@ -2310,7 +2492,7 @@ spline node reproduces upstream unless asked otherwise.</p>
 
     <div class="doc doc-contents ">
 
-        <p>Build a scaled univariate transform by name.</p>
+        <p>Build a scaled univariate transform by name — or from a class.</p>
 
 
 <p><span class="doc-section-title">Parameters:</span></p>
@@ -2329,11 +2511,14 @@ spline node reproduces upstream unless asked otherwise.</p>
                 <code>name</code>
             </td>
             <td>
-                  <code><span title="str">str</span></code>
+                  <code><span title="str">str</span> | <span title="type">type</span>[<span title="tramdag.transforms._ScaledUT">_ScaledUT</span>]</code>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>One of the registered names: <code>"bernstein"</code>, <code>"spline"</code>, <code>"affine"</code>.</p>
+                <p>One of the registered names — <code>"bernstein"</code>, <code>"spline"</code>,
+<code>"affine"</code> — or a <code>_ScaledUT</code> subclass itself, the custom-basis
+hatch (<code>I(transform=MyUT)</code>; note a class in a spec serializes
+through pickle only, like a callable <code>input_transform</code>).</p>
               </div>
             </td>
             <td>
@@ -2397,7 +2582,7 @@ spline node reproduces upstream unless asked otherwise.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>If <code>name</code> is not registered.</p>
+                <p>If <code>name</code> is neither registered nor a <code>_ScaledUT</code> subclass.</p>
               </div>
             </td>
           </tr>

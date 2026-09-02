@@ -635,6 +635,62 @@
   
   
     <li class="md-nav__item">
+      <a href="architecture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="adr/001-term-owned-architecture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR 001 (1.0 architecture)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="code-map/" class="md-nav__link">
         
   
@@ -1033,6 +1089,90 @@
   
   
     <li class="md-nav__item">
+      <a href="api/terms/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    terms
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="api/fitting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    fitting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="api/readouts/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    readouts
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="api/transforms/" class="md-nav__link">
         
   
@@ -1275,12 +1415,10 @@
 <a href="https://github.com/tensorchiefs/tramdag/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/tensorchiefs/tramdag/actions/workflows/ci.yml/badge.svg" /></a>
 <a href="https://github.com/tensorchiefs/tramdag/tree/dev-marcel/LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/License-MIT-yellow.svg" /></a></p>
 <blockquote>
-<p>⚠️ <strong>Status: beta (0.x), under active development.</strong> The API may change
-between releases until 1.0, so pin a version for reproducibility. Note that
-this README documents the <strong>unreleased 0.4</strong> API: the term constructors
-(<code>SI</code>/<code>CI</code>/<code>VC</code>), <code>scores</code>, <code>varying_coef</code> and <code>intercept_contributions</code> are
-not in <code>0.3.0</code> on PyPI. Until 0.4 ships, install from git to follow the docs
-below.</p>
+<p>⚠️ <strong>Status: 1.0 release candidate.</strong> This README documents the
+<strong>unreleased 1.0</strong> API (term registry, <code>callbacks=</code>, <code>flow.shift_curve</code>,
+<code>VC(center="col")</code>); <code>0.3.0</code> on PyPI predates all of it. Until 1.0 ships,
+install from git to follow the docs below.</p>
 </blockquote>
 <p><strong>TRAM-DAGs</strong> model each variable of a structural causal model with a
 (transformation-model) flow: one triangular normalizing flow from iid
@@ -1527,8 +1665,9 @@ numbers (paper / previous protocol / now):
 <h2 id="testing-policy">Testing policy<a class="headerlink" href="#testing-policy" title="Permanent link">&para;</a></h2>
 <p>See the <a href="https://github.com/tensorchiefs/tramdag/blob/dev-marcel/tests/README.md"><code>tests/README.md</code></a> file for more details.</p>
 <h2 id="layout">Layout<a class="headerlink" href="#layout" title="Permanent link">&para;</a></h2>
-<div class="highlight"><pre><span></span><code>src/tramdag/            spec.py transforms.py conditioners.py flow.py
-                        scores.py                 &lt;- the framework, and nothing else
+<div class="highlight"><pre><span></span><code>src/tramdag/            spec.py terms.py transforms.py conditioners.py
+                        nodes.py flow.py fitting.py readouts.py scores.py
+                        callbacks.py              &lt;- the framework, and nothing else
 tests/                  unit tests, identities, acceptance bars, three inline DGPs
 experiments/            research code, one directory per area, each self-contained:
                           paper/       the replications + generators + frozen data
@@ -1539,10 +1678,10 @@ experiments/            research code, one directory per area, each self-contain
                         other areas' data and pins no ground truth)
 notebooks/              four executed examples: didactic intro, Colab demo,
                         additive-vs-joint intercepts, varying coefficients
-docs/                   code-map.md (every class/function + all knobs),
-                        fitting.md, notation.md, training-speed.md,
-                        paper-replication.md, varying-coefficients.md,
-                        scores.md
+docs/                   architecture.md + adr/ (the 1.0 design and its
+                        refusals), code-map.md, fitting.md, notation.md,
+                        training-speed.md, paper-replication.md,
+                        varying-coefficients.md, scores.md
 </code></pre></div>
 <p>Implementation conventions (latent-scale signs, raw/one-hot parent encoding,
 log-space ordinal likelihood, seeding) are documented in
