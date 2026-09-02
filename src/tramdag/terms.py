@@ -503,3 +503,35 @@ class VCTerm(ShiftTerm, VaryingCoef):
                 "itself; chained centering is not supported."
             )
         return (on,)
+
+
+@register_term
+class FnTerm(ShiftTerm, nn.Module):
+    """``Fn`` — a user-supplied shift function over the parent features.
+
+    A plain function contributes a fixed (non-trained) offset; an
+    ``nn.Module`` registers as a submodule and trains with the flow. Built
+    by :func:`tramdag.spec.fn_shift`.
+    """
+
+    effect = "Fn"
+    slot = "shift"
+
+    def __init__(self, fn):
+        nn.Module.__init__(self)
+        self.fn = fn  # an nn.Module registers as a submodule here
+
+    @classmethod
+    def build(cls, term: Term, spec: dict[str, NodeSpec]) -> FnTerm:
+        """Wrap the callable; keyed like a CS ('a' or 'a+b')."""
+        ps = tuple(term.parents)
+        m = cls(term.fn)
+        m.key = ps[0] if len(ps) == 1 else "+".join(ps)
+        m.parents = ps
+        m.net_parents = ps
+        return m
+
+    def shift_value(self, node: _Node, feats: dict, vc_ehat: dict | None) -> Tensor:
+        """Run ``fn`` on the term's features; accept ``(n,)`` or ``(n, 1)``."""
+        out = self.fn(node.net_input(feats, self.parents, self.key))
+        return out.squeeze(-1) if out.dim() > 1 else out

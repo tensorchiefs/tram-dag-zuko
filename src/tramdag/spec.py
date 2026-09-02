@@ -86,7 +86,8 @@ _OPTION_DEFAULTS = {
     "units": None,  # I/CS/VC: hidden layers of the term's network
     "activation": None,  # I/CS/VC: hidden activation of that network
     "allow_interaction": True,  # I: one joint net, or one net per parent
-    "input_transform": None,  # I/CS/VC: the term's network-input transform
+    "input_transform": None,  # I/CS/VC/Fn: the term's network-input transform
+    "fn": None,  # Fn: the custom shift callable / nn.Module
 }
 
 
@@ -255,7 +256,9 @@ def _check_term(name: str, term: Term, spec: dict[str, NodeSpec]) -> tuple[str, 
         entry = get_term(term.effect)
     except KeyError:
         raise ValueError(
-            f"Node '{name}': unknown term effect '{term.effect}'."
+            f"Node '{name}': unknown term effect '{term.effect}'. A custom "
+            "effect must be registered (tramdag.terms.register_term) before "
+            "the spec is built or loaded."
         ) from None
     entry.check_arity(name, term)
     for p in term.parents:
@@ -797,6 +800,49 @@ def spec_from_dict(d: dict) -> dict[str, NodeSpec]:
     return spec
 
 
+def fn_shift(*parents: str, fn, input_transform=None) -> Term:
+    """Give a custom function shift: ``fn(features)`` joins the additive shifts.
+
+    The cheapest custom term: ``fn`` takes the term's concatenated parent
+    features ``(n, k)`` (continuous raw, ordinal one-hot — through
+    ``input_transform`` when given) and returns the shift contribution,
+    shape ``(n,)`` or ``(n, 1)``. A plain function is a fixed offset; an
+    ``nn.Module`` registers as a submodule and trains with the flow.
+
+    Checkpoints pickle ``fn``, so it must be a module-level function or an
+    importable ``nn.Module`` — ``save()`` refuses a lambda. For a whole new
+    effect (own validation, penalty, side inputs) subclass
+    :class:`tramdag.terms.ShiftTerm` and ``register_term`` it instead.
+
+    Parameters
+    ----------
+    *parents : str
+        Parent node names feeding ``fn``.
+    fn : callable | torch.nn.Module
+        The shift function.
+    input_transform : str | callable | None, optional
+        As on :func:`complex_shift`, by default None.
+
+    Returns
+    -------
+    Term
+        The term, effect ``"Fn"``.
+
+    Raises
+    ------
+    ValueError
+        If no parent is given or ``fn`` is not callable.
+    """
+    if not parents:
+        raise ValueError("fn_shift needs at least one parent.")
+    if not callable(fn):
+        # a domain error (a wrong option value), not a Python type error
+        raise ValueError(  # noqa: TRY004
+            f"fn_shift(fn=) must be callable, got {type(fn).__name__}."
+        )
+    return Term("Fn", tuple(parents), _options(fn=fn, input_transform=input_transform))
+
+
 # %% public classes --------------------------------------------------------------------
 @dataclass(frozen=True)
 class Term:
@@ -937,5 +983,6 @@ I = intercept  # noqa: E741 - ambiguous only out of context
 SI = simple_intercept
 CI = complex_intercept
 LS = linear_shift
+Fn = fn_shift
 CS = complex_shift
 VC = varying_coefficient
