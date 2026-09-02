@@ -230,10 +230,8 @@ class CausalFlowDAG(nn.Module):
         and the observed ``x``. It never reads a cached value.
         """
         out = {}
-        for g in nd._vc_groups:
-            if not g.center:
-                continue
-            out[g.on] = self._binary_p1(self.nodes[g.on], values, n).detach()
+        for m in nd.shifts.values():
+            out.update(m.live_side(self, values, n))
         return out or None
 
     def _vc_ehat_columns(self, nd: _Node) -> list[str]:
@@ -243,7 +241,7 @@ class CausalFlowDAG(nn.Module):
         treatment nodes (which cannot be centered themselves, so one level
         is all there is).
         """
-        cols = [p for g in nd._vc_groups if g.center for p in self.nodes[g.on].parents]
+        cols = [p for m in nd.shifts.values() for p in m.extra_columns(self)]
         return [c for c in dict.fromkeys(cols) if c not in nd.parents]
 
     def node_log_prob(
@@ -448,12 +446,13 @@ class CausalFlowDAG(nn.Module):
         classifier. The training loss uses these frozen values; every query
         after the fit uses the live treatment node (:meth:`_vc_ehat_live`).
         """
-        centered = {
-            (name, g.on)
+        demanders = {
+            (name, key): m
             for name in self.order
-            for g in self.nodes[name]._vc_groups
-            if g.center
+            for m in self.nodes[name].shifts.values()
+            for key in m.side_keys()
         }
+        centered = set(demanders)
         given = {(node, on) for node, d in (vc_ehat or {}).items() for on in d}
         if centered != given:
             raise ValueError(
@@ -471,10 +470,7 @@ class CausalFlowDAG(nn.Module):
                 raise ValueError(
                     f"vc_ehat[{node!r}][{on!r}] has {len(e)} rows, not {n}"
                 )
-            if not ((e >= 0) & (e <= 1)).all():
-                raise ValueError(
-                    f"vc_ehat[{node!r}][{on!r}] must hold probabilities in [0, 1]"
-                )
+            demanders[(node, on)].check_side(node, on, e)
             out.setdefault(node, {})[on] = torch.as_tensor(e, device=self.device)
         return out
 

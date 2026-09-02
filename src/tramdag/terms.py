@@ -122,6 +122,21 @@ class ShiftTerm(TermDef):
         """
         return {}
 
+    def side_keys(self) -> tuple[str, ...]:
+        """Name the per-row side inputs this term demands from ``fit(vc_ehat=)``."""
+        return ()
+
+    def check_side(self, node_name: str, key: str, e) -> None:
+        """Validate one supplied side-input array (values, not shape)."""
+
+    def live_side(self, flow, values: dict, n: int) -> dict:
+        """Recompute this term's side inputs from the fitted flow, at query time."""
+        return {}
+
+    def extra_columns(self, flow) -> list[str]:
+        """List columns beyond the node's parents that the side inputs need."""
+        return []
+
 
 class InterceptTerm(TermDef):
     """The intercept slot's behavior hooks, mixed into its module.
@@ -380,6 +395,33 @@ class VCTerm(ShiftTerm, VaryingCoef):
         """
         t = node.vc_column(self.group, feats, ehat)
         return {self.key: (dlds * t.squeeze(-1)).cpu().numpy()}
+
+    def side_keys(self) -> tuple[str, ...]:
+        """Demand the treatment's out-of-fold propensities when centered."""
+        return (self.key,) if self.vc_center else ()
+
+    def check_side(self, node_name: str, key: str, e) -> None:
+        """Propensities are probabilities."""
+        if not ((e >= 0) & (e <= 1)).all():
+            raise ValueError(
+                f"vc_ehat[{node_name!r}][{key!r}] must hold probabilities in [0, 1]"
+            )
+
+    def live_side(self, flow, values: dict, n: int) -> dict:
+        """Give the full-data propensity from the flow's own treatment node.
+
+        Detached — no gradient reaches the treatment node from this node's
+        loss — and derived from the current parent values, so
+        ``do``-mutilated sampling centers with the intervened ``t`` (the DML
+        prediction convention; training uses the frozen out-of-fold values).
+        """
+        if not self.vc_center:
+            return {}
+        return {self.key: flow._binary_p1(flow.nodes[self.key], values, n).detach()}
+
+    def extra_columns(self, flow) -> list[str]:
+        """Give the treatment's parents (a treatment cannot be centered itself)."""
+        return list(flow.nodes[self.key].parents) if self.vc_center else []
 
     @property
     def group(self):
