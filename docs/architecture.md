@@ -91,7 +91,8 @@ classDiagram
 Built-in terms subclass their conditioners, so state-dict paths
 (`nodes.<n>.shifts.<key>.…`) and the seeded RNG stream are those of 0.4.
 A custom effect subclasses `ShiftTerm`, sets `effect`/`slot`/
-`option_defaults`, implements `build` + `shift_value`, and registers with
+`option_defaults`, implements `build` (which must set `key`/`parents`/`net_parents`) +
+`shift_value`, and registers with
 `register_term`; the cheap path for a one-off is `fn_shift`.
 
 ## Node kinds

@@ -202,7 +202,7 @@ class _Node(nn.Module):
         names its own ModuleDict key: the parent for single-parent terms,
         "a+b" for a joint CS, the treatment for a VC.
         """
-        from .terms import ShiftTerm, get_term
+        from .terms import ShiftTerm, VCTerm, get_term
 
         self.shifts = nn.ModuleDict()
         self._shift_groups: list[tuple[str, tuple[str, ...]]] = []
@@ -214,7 +214,7 @@ class _Node(nn.Module):
             m = entry.build(term, spec)
             self.shifts[m.key] = m
             self._add_input_transform(m.key, term, m.net_parents, spec)
-            if term.effect != "VC":  # VC evaluates after the plain shifts
+            if not isinstance(m, VCTerm):  # VC evaluates after the plain shifts
                 self._shift_groups.append((m.key, m.parents))
 
     @property

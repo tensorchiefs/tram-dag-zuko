@@ -278,16 +278,11 @@ def _check_input_transform(name: str, term: Term) -> None:
     ``fn(x, train)`` applied per continuous parent column (``train`` is
     that column's raw training data, frozen at ``calibrate``).
     """
-    value = getattr(term, "input_transform", None)  # LS takes no such option
+    # read the raw options: an effect that does not take the key (LS) must
+    # still be caught here, not silently ignored at build time
+    value = dict(term.options).get("input_transform")
     if value is None:
         return
-    # the parentless-SI case raises in simple_intercept(); LS is reachable
-    # only through a hand-built dict — its weight must stay in raw units
-    if term.effect == "LS":
-        raise ValueError(
-            f"Node '{name}': a linear shift takes no input_transform — "
-            "its weight is the interpretable raw-unit coefficient."
-        )
     if not (callable(value) or value in ("minmax", "standardize")):
         raise ValueError(
             f"Node '{name}': input_transform must be 'minmax', 'standardize' "
@@ -911,10 +906,15 @@ class Term:
         """Serve this effect's options, with their defaults.
 
         A key another effect takes raises AttributeError instead of
-        answering with a foreign default.
+        answering with a foreign default. Reads ``effect`` from __dict__:
+        pickle/deepcopy probe dunders on an empty instance, and going
+        through attribute access again would recurse.
         """
+        effect = self.__dict__.get("effect")
+        if effect is None:
+            raise AttributeError(name)
         try:
-            defaults = _option_defaults(self.effect)
+            defaults = _option_defaults(effect)
         except KeyError:
             defaults = {}
         if name in defaults:

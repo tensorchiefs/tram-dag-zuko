@@ -22,7 +22,7 @@ API, queries and read-outs keep their signatures via one-line delegates.
   callable or trainable `nn.Module` in the additive shifts);
   `register_term` (whole custom effects as `ShiftTerm` subclasses);
   `effect_modifier_scan(column=)` (scan a named level contrast of a
-  multi-level ordinal treatment); `ordinal_bounds`; `I(transform=)` accepts
+  multi-level ordinal treatment); `transforms.ordinal_bounds`; `I(transform=)` accepts
   a `_ScaledUT` subclass; `node_parents`/`validate_and_sort`/
   `spec_to_dict`/`spec_from_dict` exported; `flow._fit_validated` declared.
 - Stricter spec: a wrong-effect option errors at construction instead of

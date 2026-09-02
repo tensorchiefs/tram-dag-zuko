@@ -314,9 +314,16 @@ class LSTerm(ShiftTerm, LinearShift):
 
     @staticmethod
     def check_arity(name: str, term: Term) -> None:
-        """Refuse any parent count but one."""
+        """Refuse any parent count but one, and any input_transform."""
         if len(term.parents) != 1:
             raise ValueError(f"Node '{name}': LS term must have exactly one parent.")
+        # reachable only through a hand-built dict — the weight must stay
+        # the interpretable raw-unit coefficient
+        if dict(term.options).get("input_transform") is not None:
+            raise ValueError(
+                f"Node '{name}': a linear shift takes no input_transform — "
+                "its weight is the interpretable raw-unit coefficient."
+            )
 
     @classmethod
     def build(cls, term: Term, spec: dict[str, NodeSpec]) -> LSTerm:

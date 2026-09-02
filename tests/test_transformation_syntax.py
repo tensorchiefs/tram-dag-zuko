@@ -370,3 +370,29 @@ def test_transform_accepts_a_custom_class():
     flow = CausalFlowDAG(spec, seed=0)
     assert isinstance(flow.nodes["x"].ut, BernsteinUT)
     assert flow.nodes["x"].ut.n_params == 7
+
+
+def test_terms_pickle_and_deepcopy():
+    """pickle/deepcopy probe dunders on an empty instance — __getattr__ must
+    not recurse (torch.save of a whole flow, ensembles, sweeps).
+    """
+    import copy
+    import pickle
+
+    t = LS("a")
+    assert pickle.loads(pickle.dumps(t)) == t
+    assert copy.deepcopy(t) == t
+
+
+def test_hand_built_ls_with_input_transform_refuses():
+    """The raw-unit-coefficient guard fires for a hand-built LS term instead
+    of the option being silently ignored at build time.
+    """
+    from tramdag.spec import Term
+
+    spec = {
+        "a": ContinuousNode(),
+        "y": ContinuousNode([Term("LS", ("a",), (("input_transform", "minmax"),))]),
+    }
+    with pytest.raises(ValueError, match="raw-unit coefficient"):
+        CausalFlowDAG(spec)
