@@ -73,10 +73,12 @@ paper_protocol: &paper_protocol
   cf_draws: 200                # abduction draws averaged into a per-row PMF
   cf_seed: 1000
 
-# the shift network, from the reference; only a complex-shift variant has one
+# the shift network, from the reference; only a complex-shift variant has one.
+# hidden_features_CS = c(2, 2, 2, 2): in/out dims around the hidden stack
+# (2, 2) — the same corrected reading as the continuous triangle (2026-09-02)
 reference_net: &reference_net
-  shift_units: [2, 2, 2, 2]     # hidden_features_CS
-  activation: sigmoid           # create_param_net (relu dies at 2 units, see above)
+  shift_units: [2, 2]
+  activation: sigmoid           # create_param_net
 
 variants:
   # the paper's headline mixed case (Fig. 9/19 + the C.4 odds-ratio check);

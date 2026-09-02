@@ -1,20 +1,20 @@
 {
-  "_note": "Protocol = the paper's R code 1:1 up to the CI batch/lr deviation (see the YAML header): measured 2026-08-26 on the refactor/lean-fit branch. Paper App. C.3.3 / Fig. 17, the misspecified case: the DGP's x2 -> x3 effect is linear (-0.3*x2), and a complex shift fitted to it must reproduce that straight line (the flow learns -f(x2) up to a constant, so +0.3*x2). cs_curve_max_abs_err is measured after anchoring both curves at x2 = 0. mean_x3_flow_do_x1 stays unpinned on purpose: the DGP center plus the abs-err bound covers it.",
+  "_note": "Protocol = the paper's R code 1:1 up to the CI batch/lr deviation (see the YAML header): measured 2026-08-26 on the refactor/lean-fit branch. Paper App. C.3.3 / Fig. 17, the misspecified case: the DGP's x2 -> x3 effect is linear (-0.3*x2), and a complex shift fitted to it must reproduce that straight line (the flow learns -f(x2) up to a constant, so +0.3*x2). cs_curve_max_abs_err is measured after anchoring both curves at x2 = 0. mean_x3_flow_do_x1 stays unpinned on purpose: the DGP center plus the abs-err bound covers it. ARCHITECTURE CORRECTED 2026-09-02: hidden_features_CS = c(2,25,25,2) reads as in/out dims around the hidden stack (25,25) \u2014 under the earlier literal [2,25,25,2] reading a 2-sigmoid input bottleneck flattened every CS curve (sin could not reproduce paper Fig. 18 at ANY protocol; (25,25) lands on it). Centers re-pinned from the corrected runs; {max} bounds 2.5x the new measurement where tighter.",
   "beta12": {
-    "value": 1.98747980594635,
+    "value": 1.9874800443649292,
     "atol": 0.05
   },
   "beta13": {
-    "value": -0.17843155562877655,
+    "value": -0.1805673986673355,
     "atol": 0.05,
     "why": "weakly identified: the coefficient multiplies the mixture x1 (sd 0.254 vs unit-scale siblings) \u2014 see the _note and docs/paper-replication.md"
   },
   "val_nll_x3": {
-    "value": 2.460632562637329,
+    "value": 2.460859775543213,
     "atol": 0.05
   },
   "cs_curve_max_abs_err": {
-    "max": 0.2204
+    "max": 0.0633
   },
   "mean_x3_dgp_do_x1": {
     "value": -0.4602388493168226,

@@ -173,14 +173,14 @@ epochs (linear-cs 500, mixed exp-cs 350, mixed linear-ls 200 @ lr 0.002)
 instead of the paper's 500 at Keras-default batch 32 / lr 0.001, the
 deviations taken for CI runtime (every metric kept; grid, epoch floors and
 the 2026-09-01 tuning round in docs/paper-replication.md); the
-VACA/CAREFL comparisons take one full-batch step per epoch on nTrain = 2500 —
-VACA 4800 epochs at lr 0.002 with no schedule, CAREFL 3000 at lr 0.002 with
-the reference's ReduceLROnPlateau (factor 0.1, patience 50, min_lr 1e-7;
-torch's scheduler on the summed validation NLL, global as in
-`update_learning_rate`) — against the reference's 10000 / 7000 at lr 0.001
-with plateau, the same CI-runtime deviation (VACA's rule cannot fire inside
-the compressed run's all-bounds window, so it is dropped there; minibatch and
-raw-parent alternatives measurably fail, see docs/paper-replication.md).
+VACA/CAREFL comparisons take one full-batch step per epoch on nTrain = 2500,
+running the reference protocols 1:1 since 2026-09-02 — 10000 /
+7000 full-batch epochs at lr 0.001 with the reference's ReduceLROnPlateau
+(factor 0.1, patience 50, min_lr 1e-7; torch's scheduler on the summed
+validation NLL, global as in `update_learning_rate`); the 2026-09-01
+CI-runtime cuts (4800 / 3000 @ lr 0.002) were reverted after a visual pass
+against paper Figs. 5/6 (minibatch and raw-parent alternatives measurably
+fail, see docs/paper-replication.md).
 Seeds: the triangle scripts run
 unseeded, the comparison scripts seed R's RNG with 42 (not replayable in
 torch), so every seed here is a repo choice. Init follows each reference:
@@ -190,8 +190,8 @@ full-batch protocol the init decides the fit (VACA do(x2) errors
 0.52/0.33/0.13 with torch's default init, 0.098/0.159/0.026 with glorot at
 the config's seed — both measured on the earlier −3/−2/0 grid; on the shipped
 −3/−1/0 grid glorot scored 0.097/0.088/0.019 under the old 10000-epoch
-plateau protocol and scores 0.096/0.080/0.022 under the tuned 4800-epoch
-config). Known, documented deviations: the triangle scripts also
+plateau protocol and 0.096/0.086/0.018 under the restored reference
+protocol). Known, documented deviations: the triangle scripts also
 use 5%/95% quantiles for the Bernstein domain (a match), the comparison
 scripts min-max (`scale_df`) — we keep the quantiles there and scale the
 *network inputs* min-max (`input_transform: minmax` on the CI terms; raw parents saturate
@@ -207,15 +207,17 @@ CAREFL's own `X.csv` with `val = train` and sd-standardized x3/x4.
 reference uses two different ones. The triangle experiments
 (`summerof24/triangle_structured_*.R`): `hidden_features_I = hidden_features_CS`
 = `c(2,25,25,2)` continuous / `c(2,2,2,2)` mixed, **sigmoid** (the ReLU line is
-commented out), `len_theta = 20`. The VACA/CAREFL comparisons
+commented out), `len_theta = 20`. CORRECTED 2026-09-02: the c(...) vector
+reads as in/out dims around the hidden stack — hidden (25,25) continuous,
+(2,2) mixed. The earlier literal [2,25,25,2] reading put a 2-sigmoid
+bottleneck on the input: sin could not reproduce paper Fig. 18 at any
+protocol (curve err 1.22), (25,25) lands on the figure (0.24); linear-cs
+0.13 -> 0.025, atan edge flattening gone. The VACA/CAREFL comparisons
 (`comparison/utils.R::make_model`): one net per node, `dense(10, tanh) ->
 dense(100, tanh) -> dense(len_theta)`, `M = 30`. Applying the triangle net to
 CAREFL — which an earlier revision did — cost an order of magnitude on the
-counterfactual MAE (x4, measured on the old 18k-row protocol: 0.968 / 0.515 /
-0.986 against 0.078 / 0.059 / 0.086, though that run also used M = 20 rather than the comparison scripts'
-M = 30); the 2-unit bottleneck cannot carry it. On `sin-cs` that same
-bottleneck saturates at both ends of the grid, which is the reference
-architecture's capacity and not a fit failure (see the ground-truth note).
+counterfactual MAE (x4, measured on the old 18k-row protocol, under the
+misread bottleneck net and M = 20).
 Note also that `n_coeffs` counts *unconstrained* coefficients: zuko ties two
 extra control points on, so `n_coeffs=20` is order 21 where the reference's
 `len_theta=20` is order 19. The free-parameter count is what matches.

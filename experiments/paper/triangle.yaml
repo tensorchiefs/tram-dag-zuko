@@ -62,12 +62,18 @@ paper_protocol: &paper_protocol
   grid_high: 1.0
   grid_points: 81
 
-# the shift network, from the reference; only a complex-shift variant has one
+# the shift network, from the reference; only a complex-shift variant has one.
+# hidden_features_CS = c(2, 25, 25, 2) reads as in/out dims around the hidden
+# stack (25, 25): the literal [2, 25, 25, 2] reading puts a 2-sigmoid
+# bottleneck on the input and cannot reproduce paper Fig. 18 (sin curve err
+# 1.22 both at the CI and the full paper protocol), while (25, 25) lands on
+# the figure (0.24, incl. its small -1-endpoint deviation) — corrected
+# 2026-09-02, the figures being the criterion absent the sourcing R script.
 reference_net: &reference_net
-  shift_units: [2, 25, 25, 2]   # hidden_features_CS
-  activation: sigmoid           # create_param_net; relu measured 2026-09-01:
-                                # the 2-unit input bottleneck dies (beta13
-                                # +0.53, cs curve err 1.42 on atan) — keep sigmoid
+  shift_units: [25, 25]
+  activation: sigmoid           # create_param_net (relu at the OLD 2-unit
+                                # bottleneck died — beta13 +0.53; sigmoid is
+                                # the reference activation either way)
 
 variants:
   # the linear DGP is the only one with a true beta23 (+0.3) to recover
@@ -96,3 +102,7 @@ variants:
     <<: [*paper_protocol, *reference_net]
     f: sin
     shift: cs
+    # the paper evaluates the sin fit on half a period (Fig. 18 plots
+    # x2 in [-1, 0]) — the grid follows it
+    grid_low: -1.0
+    grid_high: 0.0
