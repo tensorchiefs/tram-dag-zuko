@@ -55,9 +55,6 @@ from .transforms import (
 __all__ = ["CausalFlowDAG"]
 
 
-# %% private functions -----------------------------------------------------------------
-
-
 # %% public classes --------------------------------------------------------------------
 class CausalFlowDAG(_FitMixin, _ReadoutsMixin, nn.Module):
     """A causal normalizing flow defined by a DAG specification.

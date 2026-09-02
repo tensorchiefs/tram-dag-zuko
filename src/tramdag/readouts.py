@@ -16,8 +16,6 @@ import torch
 from .conditioners import LinearShift
 from .terms import get_term
 
-# %% public functions ------------------------------------------------------------------
-
 
 # %% public classes --------------------------------------------------------------------
 class _ReadoutsMixin:
