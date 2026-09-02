@@ -17,7 +17,13 @@ from typing import TYPE_CHECKING, ClassVar
 
 from torch import Tensor, nn
 
-from .conditioners import ComplexShift, LinearShift, VaryingCoef
+from .conditioners import (
+    ComplexIntercept,
+    ComplexShift,
+    LinearShift,
+    SimpleIntercept,
+    VaryingCoef,
+)
 
 if TYPE_CHECKING:
     from .nodes import _Node
@@ -117,12 +123,124 @@ class ShiftTerm(TermDef):
         return {}
 
 
+class InterceptTerm(TermDef):
+    """The intercept slot's behavior hooks, mixed into its module.
+
+    A node has exactly one intercept term (normalization guarantees
+    ``node.terms[0]``); it produces the transform parameters ``theta``.
+    ``groups`` carries the parent groups — empty for a simple intercept,
+    one tuple for a joint net, one per parent for an additive one — and
+    ``ci_parents`` their flat order.
+    """
+
+    is_classical: ClassVar[bool] = False
+    has_marginal_start: ClassVar[bool] = False
+
+    groups: list[tuple[str, ...]]
+    ci_parents: list[str]
+
+    @classmethod
+    def build(cls, term: Term, spec: dict[str, NodeSpec], n_params: int):
+        """Construct the node's intercept module from its intercept Term."""
+        if not term.parents:
+            m = SITerm(n_params)
+            m.groups, m.ci_parents = [], []
+            return m
+        groups = (
+            [tuple(term.parents)]
+            if term.allow_interaction
+            else [(p,) for p in term.parents]
+        )
+        if len(groups) == 1:
+            from .spec import feat_width
+
+            m = CITerm(
+                feat_width(spec, groups[0]),
+                n_params,
+                units=term.units,
+                activation=term.activation,
+            )
+        else:  # additive intercept: one net per parent, coefficients summed
+            m = AdditiveCITerm(groups, n_params, spec, term.units, term.activation)
+        m.groups = groups
+        m.ci_parents = [p for grp in groups for p in grp]
+        return m
+
+    def theta_value(self, node: _Node, feats: dict, n: int) -> Tensor:
+        """Give the transform parameters, shape ``(n, P)``."""
+        raise NotImplementedError
+
+    def marginal_start(self, theta: Tensor) -> None:
+        """Set the calibrated marginal start (``has_marginal_start`` only)."""
+        raise NotImplementedError
+
+
 @register_term
-class InterceptDef(TermDef):
-    """``I``/``SI``/``CI`` — the transform-parameter slot."""
+class InterceptDef(InterceptTerm):
+    """``I``/``SI``/``CI`` — the registry entry of the intercept slot."""
 
     effect = "I"
     slot = "intercept"
+
+
+class SITerm(InterceptTerm, SimpleIntercept):
+    """The free simple intercept: one theta vector, no parents."""
+
+    effect = "I"
+    slot = "intercept"
+    is_classical = True
+    has_marginal_start = True
+
+    def theta_value(self, node: _Node, feats: dict, n: int) -> Tensor:
+        """Broadcast the free theta over the batch."""
+        return self(n)
+
+    def marginal_start(self, theta: Tensor) -> None:
+        """Start at the node's data marginal."""
+        import torch
+
+        with torch.no_grad():
+            self.theta.copy_(theta)
+
+
+class CITerm(InterceptTerm, ComplexIntercept):
+    """A single (possibly joint multi-parent) complex intercept net."""
+
+    effect = "I"
+    slot = "intercept"
+
+    def theta_value(self, node: _Node, feats: dict, n: int) -> Tensor:
+        """Run the one net over the joint parent features."""
+        return self(node.net_input(feats, self.ci_parents, "@I"))
+
+
+class AdditiveCITerm(InterceptTerm, nn.Module):
+    """``allow_interaction=False``: one net per parent, outputs summed.
+
+    Each parent reshapes the transform independently, in unconstrained
+    coefficient space.
+    """
+
+    effect = "I"
+    slot = "intercept"
+
+    def __init__(self, groups, n_params: int, spec, units, activation):
+        from .spec import feat_width
+
+        nn.Module.__init__(self)
+        self.nets = nn.ModuleList(
+            ComplexIntercept(
+                feat_width(spec, grp), n_params, units=units, activation=activation
+            )
+            for grp in groups
+        )
+
+    def theta_value(self, node: _Node, feats: dict, n: int) -> Tensor:
+        """Sum the per-parent nets in coefficient space."""
+        return sum(
+            net(node.net_input(feats, grp, "@I"))
+            for net, grp in zip(self.nets, self.groups, strict=True)
+        )
 
 
 @register_term

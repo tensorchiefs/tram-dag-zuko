@@ -26,7 +26,6 @@ from torch import Tensor, nn
 
 from . import fitting as _fitting
 from . import readouts as _readouts
-from .conditioners import SimpleIntercept
 from .nodes import (
     _init_linear,
     _is_classical_term,
@@ -392,7 +391,7 @@ class CausalFlowDAG(nn.Module):
             self.calibrate(train_df, marginal_init=False)
         for name in self.order:
             node = self.nodes[name]
-            if isinstance(node.intercept, SimpleIntercept):
+            if node.intercept.has_marginal_start:
                 if node.kind == "ordinal":
                     self._check_levels(name, train_df)
                 self._marginal_start(name, train_df)
@@ -416,8 +415,7 @@ class CausalFlowDAG(nn.Module):
         theta = kind_marginal_theta(node, levels, train_df[name].to_numpy())
         if theta is None:  # a spline or affine transform has no calibrated start
             return
-        with torch.no_grad():
-            node.intercept.theta.copy_(theta)
+        node.intercept.marginal_start(theta)
 
     def _check_levels(self, name: str, train_df: pd.DataFrame) -> None:
         """Reject an ordinal column that is not a level index of its node.

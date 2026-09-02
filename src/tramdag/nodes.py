@@ -8,7 +8,7 @@ Internal-but-stable surface
 ---------------------------
 scores.py, callbacks recipes, the read-outs and the test suite read these
 names by design; renaming any of them is an API change, not a cleanup:
-``shifts``, ``intercept`` / ``intercept_nets`` / ``_intercept_groups``,
+``shifts``, ``intercept`` (+ ``.nets``/``.groups``) / ``_intercept_groups``,
 ``_shift_groups``, ``_vc_groups``, ``ut``, ``input_transforms``,
 ``net_input``, ``theta_shift``, ``vc_column``.
 """
@@ -23,14 +23,9 @@ import pandas as pd
 import torch
 from torch import Tensor, nn
 
-from .conditioners import (
-    ComplexIntercept,
-    SimpleIntercept,
-)
 from .spec import (
     ContinuousNode,
     NodeSpec,
-    feat_width,
     node_parents,
 )
 from .transforms import (
@@ -175,18 +170,6 @@ class _Node(nn.Module):
             p for p in self.parents if isinstance(spec[p], ContinuousNode)
         )
         self.input_transforms = nn.ModuleDict()
-        i_term = next((t for t in terms if t.effect == "I" and t.parents), None)
-        if i_term is None:
-            i_groups = []
-        elif i_term.allow_interaction:
-            i_groups = [tuple(i_term.parents)]
-        else:  # additive intercept: one net per parent, coefficients summed
-            i_groups = [(p,) for p in i_term.parents]
-        self._intercept_groups = i_groups
-        self.ci_parents = [
-            p for grp in i_groups for p in grp
-        ]  # flat, for introspection
-
         if isinstance(node, ContinuousNode):
             self.ut = make_univariate_transform(node.transform, **node.transform_kwargs)
             n_params = self.ut.n_params
@@ -195,7 +178,7 @@ class _Node(nn.Module):
             self.ut = None
             self.levels = node.levels
             n_params = node.levels - 1
-        self._build_intercept(i_term, n_params, spec)
+        self._build_intercept(terms[0], n_params, spec)
         self._build_shifts(terms, spec)
 
     def _add_input_transform(self, key: str, term, parents, spec) -> None:
@@ -212,39 +195,27 @@ class _Node(nn.Module):
             self.input_transforms[key] = _InputTransform(term.input_transform, cps)
 
     def _build_intercept(self, i_term, n_params: int, spec: dict[str, NodeSpec]):
-        """Build the intercept module(s) from the intercept groups.
+        """Build the node's one intercept term module, via the registry.
 
-        By group count: none -> the free SimpleIntercept theta_0; one (a
-        single parent, or a joint multi-parent term) -> one ComplexIntercept
-        that IS theta; several (``allow_interaction=False``) -> one net per
-        parent, their outputs summed in unconstrained coefficient space, so
-        each parent reshapes the transform independently.
+        The term class decides its own shape: the free SimpleIntercept
+        theta_0, one joint ComplexIntercept, or one net per parent summed in
+        unconstrained coefficient space (``allow_interaction=False``).
         """
-        i_groups = self._intercept_groups
-        if i_term is not None:
+        from .terms import get_term
+
+        if i_term.parents:
             self._add_input_transform("@I", i_term, i_term.parents, spec)
-        if not i_groups:
-            self.intercept = SimpleIntercept(n_params)
-            self.intercept_nets = None
-        elif len(i_groups) == 1:
-            self.intercept = ComplexIntercept(
-                feat_width(spec, i_groups[0]),
-                n_params,
-                units=i_term.units,
-                activation=i_term.activation,
-            )
-            self.intercept_nets = None
-        else:
-            self.intercept = None
-            self.intercept_nets = nn.ModuleList(
-                ComplexIntercept(
-                    feat_width(spec, grp),
-                    n_params,
-                    units=i_term.units,
-                    activation=i_term.activation,
-                )
-                for grp in i_groups
-            )
+        self.intercept = get_term(i_term.effect).build(i_term, spec, n_params)
+
+    @property
+    def _intercept_groups(self) -> list[tuple[str, ...]]:
+        """The intercept term's parent groups (legacy view for read-outs)."""
+        return self.intercept.groups
+
+    @property
+    def ci_parents(self) -> list[str]:
+        """The intercept term's flat parent order, for introspection."""
+        return self.intercept.ci_parents
 
     def _build_shifts(self, terms, spec: dict[str, NodeSpec]):
         """Build one shift term module per LS/CS/VC term, via the registry.
@@ -328,16 +299,7 @@ class _Node(nn.Module):
 
     def _theta(self, feats: dict[str, Tensor], n: int) -> Tensor:
         """Evaluate the intercept: the transform parameters, shape ``(n, P)``."""
-        if self.intercept_nets is not None:  # additive complex intercept
-            return sum(
-                net(self.net_input(feats, grp, "@I"))
-                for net, grp in zip(
-                    self.intercept_nets, self._intercept_groups, strict=True
-                )
-            )
-        if self.ci_parents:  # single or joint complex intercept
-            return self.intercept(self.net_input(feats, self.ci_parents, "@I"))
-        return self.intercept(n)  # simple (free) intercept
+        return self.intercept.theta_value(self, feats, n)
 
     def theta_shift(
         self, feats: dict[str, Tensor], n: int, vc_ehat: dict[str, Tensor] | None = None

@@ -109,9 +109,9 @@ def intercept_contributions(flow, df: pd.DataFrame, node: str) -> dict:
         raise KeyError(f"df is missing intercept-parent column(s): {missing}")
 
     feats = flow._features(flow._tensorize(df, nd.ci_parents))
-    # one net per group: the additive case stores them in intercept_nets;
-    # a single (possibly joint) I-term is the lone `intercept` network.
-    nets = list(nd.intercept_nets) if nd.intercept_nets is not None else [nd.intercept]
+    # one net per group: the additive term holds them in .nets; a single
+    # (possibly joint) I-term is itself the one network.
+    nets = list(getattr(nd.intercept, "nets", None) or [nd.intercept])
 
     contributions: dict[str, np.ndarray] = {}
     parents: dict[str, tuple] = {}

@@ -193,7 +193,7 @@ def test_read_outs_use_the_transformed_inputs():
         vc = nd.shifts["t"]
         beta = vc.beta(nd.net_input(feats, ("x1",), "t"), len(df))
         parts = flow.intercept_contributions(df, "y")
-        raw = nd.intercept_nets[0](nd.net_input(feats, ("x1",), "@I"))
+        raw = nd.intercept.nets[0](nd.net_input(feats, ("x1",), "@I"))
     np.testing.assert_allclose(flow.varying_coef(df, "y"), beta.numpy().ravel())
     np.testing.assert_allclose(
         parts["contributions"]["x1"], (raw - raw.mean(0)).numpy(), atol=1e-6

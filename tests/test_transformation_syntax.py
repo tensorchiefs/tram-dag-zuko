@@ -148,18 +148,17 @@ def test_additive_flag_builds_one_net_per_parent():
     }
     flow = CausalFlowDAG(spec)
     node = flow.nodes["y"]
-    assert node.intercept is None
-    assert len(node.intercept_nets) == 2
+    assert len(node.intercept.nets) == 2
     assert node._intercept_groups == [("a",), ("b",)]
     assert node.ci_parents == ["a", "b"]  # flat, for introspection
 
     joint = CausalFlowDAG({**spec, "y": ContinuousNode([I("a", "b")])})
-    assert joint.nodes["y"].intercept_nets is None
+    assert not hasattr(joint.nodes["y"].intercept, "nets")  # one joint net
     assert joint.nodes["y"]._intercept_groups == [("a", "b")]
     assert joint.nodes["y"].ci_parents == ["a", "b"]
 
     single = CausalFlowDAG({**spec, "y": ContinuousNode([I("a")])})
-    assert single.nodes["y"].intercept_nets is None
+    assert not hasattr(single.nodes["y"].intercept, "nets")  # one single net
     assert single.nodes["y"].ci_parents == ["a"]
 
 
