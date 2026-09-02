@@ -1444,10 +1444,13 @@ this repository measured, and what the current 1:1 protocol measures.</p>
 <p>Measured 2026-08-26 on <code>refactor/lean-fit</code> (seeds: DGP 42, init 7, shuffle 0)
 with the exact reference protocol — global plateau rule and Keras init. On
 2026-09-01 the <em>optimization</em> was re-tuned for CI runtime (fewer epochs, lr
-scaled to match; data, model and init untouched) and every ground truth
-re-pinned from the tuned runs — the campaign, with what was tried and what
-failed, is in <a href="#the-2026-09-01-tuning-round">the 2026-09-01 tuning round</a>
-below. The
+scaled to match; data, model and init untouched); on <strong>2026-09-02 the
+VACA and CAREFL cuts were reverted to the reference protocols 1:1</strong> after a
+visual pass against paper Figs. 5/6 (the triangle cuts stay): the reference
+runs cut CAREFL's Fig. 6 curve errors ~30% and improved VACA's do(x2=0),
+with every bound holding — ground truths re-pinned from those runs. The
+tuning campaign, with what was tried and what failed, is in
+<a href="#the-2026-09-01-tuning-round">the 2026-09-01 tuning round</a> below. The
 2026-08-25 numbers of <code>feat/followups</code> (per-node plateau, torch init; CI run
 32878435001) are kept in the "R 1:1, torch init" column where they differ.
 "Previous" is the protocol before that branch: a 90/10 split of one draw,
@@ -1506,7 +1509,7 @@ the "paper" column names the figure and what it shows.</p>
 <tr>
 <td>plateau rule (VACA/CAREFL)</td>
 <td><code>update_learning_rate</code>: one optimizer, reduce when the summed validation NLL has not improved for 50 epochs (strict <code>&lt;</code>), factor 0.1, min 1e-7</td>
-<td>torch <code>ReduceLROnPlateau(patience=49, threshold=0, threshold_mode="abs", factor=0.1, min_lr=1e-7)</code> on the summed <code>history["val"]</code> entry (fit computes it) — the same rule, verified against torch's source. CAREFL keeps it; VACA dropped it 2026-09-01 with the epoch cut (on the compressed trajectory it cannot fire inside the all-bounds window — see the tuning round)</td>
+<td>torch <code>ReduceLROnPlateau(patience=49, threshold=0, threshold_mode="abs", factor=0.1, min_lr=1e-7)</code> on the summed <code>history["val"]</code> entry (fit computes it) — the same rule, verified against torch's source; both keep it since 2026-09-02 (VACA's 2026-09-01 drop went with the reverted epoch cut)</td>
 </tr>
 </tbody>
 </table>
@@ -1522,7 +1525,12 @@ f: <code>linear</code> −0.3 x, <code>atan</code> 0.75 atan(5 (x + 0.12)), <cod
 True weights in the flow's convention: β12 = +2, β13 = −0.2, β23 = +0.3 (linear only).</p>
 <p><strong>Model</strong>: <code>x1: SI</code>, <code>x2: SI + LS(x1)</code>, <code>x3: SI + LS(x1) + {LS(x2) | CS(x2)}</code>, Bernstein.
 CS net = reference <code>hidden_features_CS = c(2, 25, 25, 2)</code>, sigmoid (the ReLU line
-in <code>create_param_net</code> is commented out).</p>
+in <code>create_param_net</code> is commented out). <strong>Corrected 2026-09-02</strong>: the vector
+reads as in/out dims around the hidden stack <strong>(25, 25)</strong> — the earlier
+literal <code>[2, 25, 25, 2]</code> reading put a 2-sigmoid bottleneck on the input and
+could not reproduce paper Fig. 18 (sin) at any protocol; (25, 25) lands on
+Figs. 17/18 (linear cs err 0.13 → 0.025, sin 1.22 → 0.24 on the paper's
+[−1, 0] window). Mixed likewise: c(2, 2, 2, 2) → hidden (2, 2).</p>
 <table>
 <thead>
 <tr>
@@ -1612,15 +1620,15 @@ in <code>create_param_net</code> is commented out).</p>
 <td>Fig. 7 right / 15 / 16: CS on −f; text: β12 = 2.07, β13 = −0.203</td>
 <td>−0.149; 0.229</td>
 <td>−0.168; 0.059 (glorot: 0.080, torch: 0.085)</td>
-<td>−0.167; 0.104</td>
+<td>−0.168; 0.108 (hidden (25,25), 2026-09-02)</td>
 </tr>
 <tr>
 <td>sin-cs</td>
 <td>β13; cs max err</td>
-<td>Fig. 18: CS follows the non-monotone f, saturating at the grid ends</td>
+<td>Fig. 18: CS follows the non-monotone f on x2 ∈ [−1, 0]</td>
 <td>−0.185; 2.29</td>
 <td>−0.195; 1.10 (glorot: 0.997, torch: 1.016)</td>
-<td>−0.206; 1.016</td>
+<td>−0.168; 0.240 on the paper's [−1, 0] window (hidden (25,25), 2026-09-02)</td>
 </tr>
 <tr>
 <td>all</td>
@@ -1641,9 +1649,10 @@ in <code>create_param_net</code> is commented out).</p>
 </tbody>
 </table>
 <p>β13 at −0.16 to −0.18 instead of −0.2: x1 has sd 0.254, so SE(β13) ≈ 0.036 at
-n = 40000 — within ~1 SE. The <code>sin-cs</code> error of 1.0 is the reference architecture's
-capacity: the two-unit bottleneck saturates at both ends of the grid exactly
-as in the paper's Fig. 18.</p>
+n = 40000 — within ~1 SE. The old <code>sin-cs</code> error of ~1.0 was the misread
+2-unit-bottleneck net, not "reference capacity" (retracted 2026-09-02): with
+hidden (25, 25) the fit lands on Fig. 18 including its small −1-endpoint
+deviation, and the paper's figure never plots beyond [−1, 0].</p>
 <h2 id="triangle-mixed-triangle_mixedpy-paper-sec-62-app-c4-app-b">Triangle, mixed (<code>triangle_mixed.py</code>) — paper Sec. 6.2, App. C.4, App. B<a class="headerlink" href="#triangle-mixed-triangle_mixedpy-paper-sec-62-app-c4-app-b" title="Permanent link">&para;</a></h2>
 <p><strong>DGP</strong> (<code>triangle_structured_mixed.R</code>): x1, x2 as above; x3 ordinal with four
 levels, cutpoints θ = (−2, 0.42, 1.02) (from the R code — the paper does not
@@ -1777,13 +1786,13 @@ E[x3 | do(x2 = a)] = −0.25 + 0.25 a. The paper's Sec. 5.2 text says a ∈ {−
 <td>epochs</td>
 <td>10000 (<code>Figure_Triangle_Linear_Bimodal.R</code>, the sourcing script — not in our copy of the R code, so EPOCHS/M/nTrain for VACA rest on that reading)</td>
 <td>400 in chunks of 50, then 120 "polish"</td>
-<td><strong>4800</strong>, one run — the CI deviation, see the tuning round</td>
+<td><strong>10000</strong>, one run — the reference, 1:1 (the 2026-09-01 4800-epoch cut was reverted 2026-09-02)</td>
 </tr>
 <tr>
 <td>lr</td>
 <td>0.001</td>
 <td>0.01, polish 0.001</td>
-<td><strong>0.002</strong> — the CI deviation</td>
+<td><strong>0.001</strong> — the reference</td>
 </tr>
 <tr>
 <td>batch</td>
@@ -1795,7 +1804,7 @@ E[x3 | do(x2 = a)] = −0.25 + 0.25 a. The paper's Sec. 5.2 text says a ∈ {−
 <td>schedule</td>
 <td><code>update_learning_rate</code>: ReduceLROnPlateau on the summed val NLL, factor 0.1, patience 50, min_lr 1e-7, strict <code>&lt;</code></td>
 <td>none</td>
-<td><strong>none</strong> — dropped 2026-09-01 with the epoch cut: on the lr-0.002 trajectory the summed val NLL keeps strictly improving past the all-bounds window (x1 still converging), so the rule cannot fire inside it</td>
+<td><strong>the same rule</strong> (restored 2026-09-02 with the reference epochs; it fires ~epoch 9050 and freezes an all-bounds point)</td>
 </tr>
 <tr>
 <td>input scaling</td>
@@ -1820,7 +1829,7 @@ E[x3 | do(x2 = a)] = −0.25 + 0.25 a. The paper's Sec. 5.2 text says a ∈ {−
 <th>previous</th>
 <th>R 1:1, torch init, per-node plateau (08-25)</th>
 <th>R 1:1, glorot, global plateau (08-26)</th>
-<th>now: 4800 epochs @ lr 0.002, no schedule — the pinned ground truth</th>
+<th>now: the reference 10000 @ 0.001 + plateau — the pinned ground truth</th>
 </tr>
 </thead>
 <tbody>
@@ -1930,11 +1939,9 @@ grid −3 / −2 / 0):</p>
 <p>Under the exact protocol the result is <strong>seed-sensitive at the off-manifold
 point</strong> do(x2 = −3): 0.03–0.27 over four init draws, 0.005–0.026 at do(x2 = 0)
 (measured under the 10000-epoch protocol; the paper shows one run's
-densities). The committed bound is 2.5× the seed-7 measurement of the tuned
-4800-epoch run, and this table is the honest picture. Note the trace's
-"the rule is what stops the full-batch overfit" holds at lr 0.001 over 10000
-epochs; the tuned config replaces the rule with a fixed stop at 4800 — inside
-the compressed trajectory's all-bounds window, see the tuning round below.</p>
+densities). The committed bound is 2.5× the seed-7 measurement of the
+reference 10000-epoch run (the 2026-09-01 4800-epoch cut was reverted
+2026-09-02), and this table is the honest picture.</p>
 <h2 id="carefl-benchmark-careflpy-paper-sec-53-app-c2">CAREFL benchmark (<code>carefl.py</code>) — paper Sec. 5.3, App. C.2<a class="headerlink" href="#carefl-benchmark-careflpy-paper-sec-53-app-c2" title="Permanent link">&para;</a></h2>
 <p><strong>DGP</strong> (Khemakhem et al. 2021): x1, x2 ~ Laplace(0, 1/√2); x3 = x1 + 0.5 x2³ + ε;
 x4 = −x2 + 0.5 x1² + ε, ε ~ Laplace(0, 1/√2). Counterfactuals are analytic by
@@ -1968,7 +1975,7 @@ same <code>make_model</code> nets as VACA.</p>
 <td>epochs</td>
 <td>7000</td>
 <td>300 in chunks of 50 + 100 polish</td>
-<td><strong>3000</strong> — the CI deviation, see the tuning round</td>
+<td><strong>7000</strong> — the reference, 1:1 (the 2026-09-01 3000-epoch cut was reverted 2026-09-02)</td>
 </tr>
 <tr>
 <td>lr, batch, schedule, input scaling, init</td>
@@ -2039,7 +2046,7 @@ same <code>make_model</code> nets as VACA.</p>
 </tr>
 </tbody>
 </table>
-<p>Five of the six held-out MAEs are better at 3000 @ 0.002 than at the
+<p>(Historical, reverted 2026-09-02.) Five of the six held-out MAEs are better at 3000 @ 0.002 than at the
 reference's 7000 @ 0.001 (only x3 at α = −1.5 is worse, 0.208 vs 0.181); the
 Fig. 6 single-point errors are larger — one noisy yardstick, which is why the
 held-out rows are scored next to it.</p>
@@ -2189,12 +2196,12 @@ each config's YAML header.</p>
 <tr>
 <td>vaca</td>
 <td>10000 full-batch epochs @ lr 0.001, plateau</td>
-<td>4800 @ lr 0.002, <strong>no schedule</strong></td>
+<td>reverted 2026-09-02: back to the reference 10000 @ 0.001 + plateau</td>
 </tr>
 <tr>
 <td>carefl</td>
 <td>7000 full-batch epochs @ lr 0.001, plateau</td>
-<td>3000 @ lr 0.002, plateau kept</td>
+<td>reverted 2026-09-02: back to the reference 7000 @ 0.001</td>
 </tr>
 <tr>
 <td>validate_ls <code>adam</code> (misc)</td>
@@ -2240,7 +2247,7 @@ raw parents saturates outright, 0.731); minibatch stepping (batch 256, even
 with minmax + tanh) converges with a systematic −0.11 common-mode offset of
 all three do-means — 2.4× the do(x2=+0) bound — while the observational fit
 stays perfect.</p>
-<p><strong>CAREFL</strong> (full batch + plateau kept): 3000 @ 0.002 replaces 7000 @ 0.001;
+<p><strong>CAREFL</strong> (full batch + plateau kept): 3000 @ 0.002 replaced 7000 @ 0.001 (reverted 2026-09-02 — the reference protocol cuts the Fig. 6 curve errors ~30%);
 five of the six held-out counterfactual MAEs come out better than the
 7000-epoch pins. Rejected: raw parents — sigmoid saturates on the Laplace
 parents just like tanh, and relu underfits x3 (val NLL 1.46–1.47 vs the
