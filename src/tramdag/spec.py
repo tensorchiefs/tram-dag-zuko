@@ -213,6 +213,13 @@ def _intercept_basis(terms, *, ordinal: bool):
     return name, dict(intercept_term.transform_kwargs or ())
 
 
+def feat_width(spec: dict[str, NodeSpec], parents) -> int:
+    """Total feature width of the parents (ordinal one-hot, continuous raw)."""
+    return sum(
+        spec[p].levels if isinstance(spec[p], OrdinalNode) else 1 for p in parents
+    )
+
+
 def _check_term(name: str, term: Term, spec: dict[str, NodeSpec]) -> tuple[str, ...]:
     """Validate one term of a node and give its edge-owning parents.
 

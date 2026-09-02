@@ -19,6 +19,7 @@ import torch
 from torch import Tensor
 
 from .callbacks import Callback
+from .terms import ShiftTerm
 
 if TYPE_CHECKING:
     from .flow import CausalFlowDAG
@@ -196,10 +197,10 @@ def fit(
     flow._fit_validated = val_vals is not None
     opt = optimizer or torch.optim.Adam(flow.parameters(), lr=learning_rate)
     penalized = [
-        nd.shifts[g.on]
+        m
         for nd in flow.nodes.values()
-        for g in nd._vc_groups
-        if g.mods and nd.shifts[g.on].penalty > 0
+        for m in nd.shifts.values()
+        if isinstance(m, ShiftTerm) and m.has_regularizer
     ]
     for cb in cbs:
         cb.on_fit_begin(flow, opt)

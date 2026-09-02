@@ -15,7 +15,12 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, ClassVar
 
+from torch import Tensor, nn
+
+from .conditioners import ComplexShift, LinearShift, VaryingCoef
+
 if TYPE_CHECKING:
+    from .nodes import _Node
     from .spec import NodeSpec, Term
 
 # %% global variables ------------------------------------------------------------------
@@ -62,6 +67,48 @@ class TermDef:
         return term.parents
 
 
+class ShiftTerm(TermDef):
+    """A shift term's behavior hooks, mixed into its conditioner.
+
+    A built term instance carries ``key`` (its ModuleDict key), ``parents``
+    (the term's written parents) and ``net_parents`` (the parents whose
+    columns feed its *network* — empty for ``LS``, the modifiers for
+    ``VC``). ``build`` constructs the module exactly as the node used to,
+    so state-dict paths and the seeded RNG stream stay bit-stable.
+    """
+
+    is_classical: ClassVar[bool] = False
+    finalizes = False  # set per instance when a post-fit step is needed
+
+    key: str
+    parents: tuple
+    net_parents: tuple
+
+    @classmethod
+    def build(cls, term: Term, spec: dict[str, NodeSpec]) -> ShiftTerm:
+        """Construct the term module from its spec Term."""
+        raise NotImplementedError
+
+    def shift_value(self, node: _Node, feats: dict, vc_ehat: dict | None) -> Tensor:
+        """Give this term's contribution to the node's shift, shape ``(n,)``."""
+        raise NotImplementedError
+
+    def post_init(self) -> None:
+        """Re-apply construction-time invariants after a global weight init."""
+
+    @property
+    def has_regularizer(self) -> bool:
+        """``True`` when :meth:`regularizer` joins the training loss."""
+        return False
+
+    def regularizer(self) -> Tensor:
+        """Give the term's penalty on the total-likelihood scale."""
+        raise NotImplementedError
+
+    def finalize(self, node: _Node, feats: dict) -> None:
+        """Run the term's post-fit step (after the after-fit callbacks)."""
+
+
 @register_term
 class InterceptDef(TermDef):
     """``I``/``SI``/``CI`` — the transform-parameter slot."""
@@ -71,11 +118,12 @@ class InterceptDef(TermDef):
 
 
 @register_term
-class LinearShiftDef(TermDef):
+class LSTerm(ShiftTerm, LinearShift):
     """``LS`` — one raw-unit coefficient per (single) parent."""
 
     effect = "LS"
     slot = "shift"
+    is_classical = True
 
     @staticmethod
     def check_arity(name: str, term: Term) -> None:
@@ -83,21 +131,112 @@ class LinearShiftDef(TermDef):
         if len(term.parents) != 1:
             raise ValueError(f"Node '{name}': LS term must have exactly one parent.")
 
+    @classmethod
+    def build(cls, term: Term, spec: dict[str, NodeSpec]) -> LSTerm:
+        """One weight per feature of the single parent; keyed by its name."""
+        from .spec import feat_width
+
+        m = cls(feat_width(spec, term.parents))
+        m.key = term.parents[0]
+        m.parents = tuple(term.parents)
+        m.net_parents = ()
+        return m
+
+    def shift_value(self, node: _Node, feats: dict, vc_ehat: dict | None) -> Tensor:
+        """Give the raw parent column times the weight — no input transform."""
+        import torch
+
+        return self(torch.cat([feats[p] for p in self.parents], dim=1))
+
 
 @register_term
-class ComplexShiftDef(TermDef):
+class CSTerm(ShiftTerm, ComplexShift):
     """``CS`` — a network shift over its parents."""
 
     effect = "CS"
     slot = "shift"
 
+    @classmethod
+    def build(cls, term: Term, spec: dict[str, NodeSpec]) -> CSTerm:
+        """One net over the concatenated parents; keyed 'a' or 'a+b'."""
+        from .spec import feat_width
+
+        ps = tuple(term.parents)
+        m = cls(feat_width(spec, ps), units=term.units, activation=term.activation)
+        m.key = ps[0] if len(ps) == 1 else "+".join(ps)
+        m.parents = ps
+        m.net_parents = ps
+        return m
+
+    def shift_value(self, node: _Node, feats: dict, vc_ehat: dict | None) -> Tensor:
+        """Give the net over this term's (possibly input-transformed) features."""
+        return self(node.net_input(feats, self.parents, self.key))
+
 
 @register_term
-class VaryingCoefDef(TermDef):
+class VCTerm(ShiftTerm, VaryingCoef):
     """``VC`` — ``beta(modifiers) * x_t``; only the treatment owns an edge."""
 
     effect = "VC"
     slot = "shift"
+
+    @classmethod
+    def build(cls, term: Term, spec: dict[str, NodeSpec]) -> VCTerm:
+        """Build the effect head over the modifiers; keyed by the treatment name."""
+        from .spec import OrdinalNode, feat_width
+
+        on, mods = term.parents[0], tuple(term.parents[1:])
+        m = cls(
+            feat_width(spec, mods),
+            penalty=term.penalty,
+            units=term.units,
+            activation=term.activation,
+        )
+        m.key = on
+        m.parents = tuple(term.parents)
+        m.net_parents = mods
+        m.mods = mods
+        m.on_is_ord = isinstance(spec[on], OrdinalNode)
+        m.vc_center = term.center
+        m.finalizes = bool(mods)
+        return m
+
+    def shift_value(self, node: _Node, feats: dict, vc_ehat: dict | None) -> Tensor:
+        """``beta(modifiers) * regressor``, with the centered-term guard."""
+        if self.vc_center and (vc_ehat is None or self.key not in vc_ehat):
+            raise RuntimeError(
+                f"centered VC term on {self.key!r} needs e_hat. Internal "
+                "callers must supply vc_ehat. Never evaluate a centered "
+                "term without its propensity."
+            )
+        t = node.vc_column(self.group, feats, vc_ehat)
+        mod_feat = node.net_input(feats, self.mods, self.key) if self.mods else None
+        return self(t, mod_feat)
+
+    def post_init(self) -> None:
+        """Re-zero the head's output layer: ``beta(x) == beta0`` at start."""
+        if self.net is not None:
+            nn.init.zeros_(self.net[-1].weight)
+
+    @property
+    def has_regularizer(self) -> bool:
+        """Penalized whenever the term has a head to shrink."""
+        return self.net is not None and self.penalty > 0
+
+    def regularizer(self) -> Tensor:
+        """``penalty * ||b_theta weights||^2`` on the total-likelihood scale."""
+        return self.penalty * self.l2()
+
+    def finalize(self, node: _Node, feats: dict) -> None:
+        """Re-split ``beta0``/``b_theta``: the head sums to zero over train."""
+        self.recenter(node.net_input(feats, self.mods, self.key))
+
+    @property
+    def group(self):
+        """Give the term as the legacy ``_VCGroup`` view (scores/read-outs)."""
+        from .nodes import _VCGroup
+
+        return _VCGroup(self.key, self.mods, self.on_is_ord, self.vc_center)
 
     @staticmethod
     def edge_parents(name: str, term: Term, spec: dict[str, NodeSpec]) -> tuple:

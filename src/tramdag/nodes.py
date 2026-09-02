@@ -25,15 +25,12 @@ from torch import Tensor, nn
 
 from .conditioners import (
     ComplexIntercept,
-    ComplexShift,
-    LinearShift,
     SimpleIntercept,
-    VaryingCoef,
 )
 from .spec import (
     ContinuousNode,
     NodeSpec,
-    OrdinalNode,
+    feat_width,
     node_parents,
 )
 from .transforms import (
@@ -47,13 +44,6 @@ from .transforms import (
 
 
 # %% private functions -----------------------------------------------------------------
-def _feat_width(spec: dict[str, NodeSpec], parents) -> int:
-    """Total feature width of the parents (ordinal one-hot, continuous raw)."""
-    return sum(
-        spec[p].levels if isinstance(spec[p], OrdinalNode) else 1 for p in parents
-    )
-
-
 def _term_cells(term) -> list[tuple[str, str]]:
     """Give a term's adjacency cells as ``(parent, tag)`` pairs.
 
@@ -238,7 +228,7 @@ class _Node(nn.Module):
             self.intercept_nets = None
         elif len(i_groups) == 1:
             self.intercept = ComplexIntercept(
-                _feat_width(spec, i_groups[0]),
+                feat_width(spec, i_groups[0]),
                 n_params,
                 units=i_term.units,
                 activation=i_term.activation,
@@ -248,7 +238,7 @@ class _Node(nn.Module):
             self.intercept = None
             self.intercept_nets = nn.ModuleList(
                 ComplexIntercept(
-                    _feat_width(spec, grp),
+                    feat_width(spec, grp),
                     n_params,
                     units=i_term.units,
                     activation=i_term.activation,
@@ -257,50 +247,34 @@ class _Node(nn.Module):
             )
 
     def _build_shifts(self, terms, spec: dict[str, NodeSpec]):
-        """Build one shift network per LS/CS/VC term.
+        """Build one shift term module per LS/CS/VC term, via the registry.
 
-        Single-parent terms key the ModuleDict by the parent name (so
-        ls_coefficients/introspection keep working); a joint CS over several
-        parents keys by "a+b" and runs over their concatenated features. A VC
-        term keys by its treatment (on) name — validation guarantees ``on``
-        owns that edge — and carries (on, modifiers, on-is-ordinal) in
-        ``_vc_groups``.
+        Each term class constructs itself exactly as this method used to
+        (same widths, same order — the seeded RNG stream is pinned) and
+        names its own ModuleDict key: the parent for single-parent terms,
+        "a+b" for a joint CS, the treatment for a VC.
         """
+        from .terms import ShiftTerm, get_term
+
         self.shifts = nn.ModuleDict()
         self._shift_groups: list[tuple[str, tuple[str, ...]]] = []
-        self._vc_groups: list[_VCGroup] = []
         for term in terms:
-            if term.effect == "VC":
-                on, mods = term.parents[0], tuple(term.parents[1:])
-                self.shifts[on] = VaryingCoef(
-                    _feat_width(spec, mods),
-                    penalty=term.penalty,
-                    units=term.units,
-                    activation=term.activation,
-                )
-                self._add_input_transform(on, term, mods, spec)
-                self._vc_groups.append(
-                    _VCGroup(
-                        on,
-                        mods,
-                        isinstance(spec[on], OrdinalNode),
-                        term.center,
-                    )
-                )
-            elif term.effect in ("LS", "CS"):
-                ps = tuple(term.parents)
-                key = ps[0] if len(ps) == 1 else "+".join(ps)
-                feat_width = _feat_width(spec, ps)
-                self.shifts[key] = (
-                    LinearShift(feat_width)
-                    if term.effect == "LS"
-                    else ComplexShift(
-                        feat_width, units=term.units, activation=term.activation
-                    )
-                )
-                if term.effect == "CS":
-                    self._add_input_transform(key, term, ps, spec)
-                self._shift_groups.append((key, ps))
+            entry = get_term(term.effect)
+            if entry.slot != "shift":
+                continue
+            assert issubclass(entry, ShiftTerm), term.effect
+            m = entry.build(term, spec)
+            self.shifts[m.key] = m
+            self._add_input_transform(m.key, term, m.net_parents, spec)
+            if term.effect != "VC":  # VC evaluates after the plain shifts
+                self._shift_groups.append((m.key, m.parents))
+
+    @property
+    def _vc_groups(self) -> list[_VCGroup]:
+        """The node's VC terms in the legacy group view (scores/read-outs)."""
+        from .terms import VCTerm
+
+        return [m.group for m in self.shifts.values() if isinstance(m, VCTerm)]
 
     def vc_column(self, g, feats: dict, vc_ehat: dict | None) -> Tensor:
         """Give the ``(n, 1)`` regressor a VC term multiplies its ``beta`` by.
@@ -365,18 +339,6 @@ class _Node(nn.Module):
             return self.intercept(self.net_input(feats, self.ci_parents, "@I"))
         return self.intercept(n)  # simple (free) intercept
 
-    def _vc_shift(self, g, feats: dict, vc_ehat: dict | None) -> Tensor:
-        """Give one VC term's contribution to the shift, shape ``(n,)``."""
-        if g.center and (vc_ehat is None or g.on not in vc_ehat):
-            raise RuntimeError(
-                f"centered VC term on {g.on!r} needs e_hat. Internal "
-                "callers must supply vc_ehat. Never evaluate a centered "
-                "term without its propensity."
-            )
-        t = self.vc_column(g, feats, vc_ehat)
-        mod_feat = self.net_input(feats, g.mods, g.on) if g.mods else None
-        return self.shifts[g.on](t, mod_feat)
-
     def theta_shift(
         self, feats: dict[str, Tensor], n: int, vc_ehat: dict[str, Tensor] | None = None
     ) -> tuple[Tensor, Tensor]:
@@ -405,18 +367,16 @@ class _Node(nn.Module):
         RuntimeError
             If a centered VC term is evaluated without its propensity.
         """
+        from .terms import VCTerm
+
         theta = self._theta(feats, n)
         shift = torch.zeros(n, dtype=theta.dtype, device=theta.device)
-        for key, ps in self._shift_groups:
-            module = self.shifts[key]
-            feat = (  # a linear shift stays raw: its weight is the paper's beta
-                torch.cat([feats[p] for p in ps], dim=1)
-                if isinstance(module, LinearShift)
-                else self.net_input(feats, ps, key)
-            )
-            shift = shift + module(feat)
-        for g in self._vc_groups:
-            shift = shift + self._vc_shift(g, feats, vc_ehat)
+        # plain shifts first, then the VC terms — today's accumulation order
+        for key, _ps in self._shift_groups:
+            shift = shift + self.shifts[key].shift_value(self, feats, vc_ehat)
+        for m in self.shifts.values():
+            if isinstance(m, VCTerm):
+                shift = shift + m.shift_value(self, feats, vc_ehat)
         return theta, shift
 
 

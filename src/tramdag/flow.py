@@ -26,7 +26,7 @@ from torch import Tensor, nn
 
 from . import fitting as _fitting
 from . import readouts as _readouts
-from .conditioners import SimpleIntercept, VaryingCoef
+from .conditioners import SimpleIntercept
 from .nodes import (
     _init_linear,
     _is_classical_term,
@@ -46,6 +46,7 @@ from .spec import (
     spec_to_dict,
     validate_and_sort,
 )
+from .terms import ShiftTerm
 from .transforms import (
     RANGE_Q,
     StandardLogistic,
@@ -136,8 +137,8 @@ class CausalFlowDAG(nn.Module):
             if isinstance(m, nn.Linear):
                 _init_linear(m, init)
         for m in self.modules():
-            if isinstance(m, VaryingCoef) and m.net is not None:
-                nn.init.zeros_(m.net[-1].weight)
+            if isinstance(m, ShiftTerm):
+                m.post_init()
 
     def _encode_parent(self, name: str, values: Tensor) -> Tensor:
         """Encode the values of a node for use as a parent feature.
@@ -696,20 +697,20 @@ class CausalFlowDAG(nn.Module):
 
     @torch.no_grad()
     def _recenter_vc(self, values: dict[str, Tensor]) -> None:
-        """Re-split every VC term so ``b_theta`` sums to zero over the train rows.
+        """Run every shift term's post-fit ``finalize`` (the VC re-centering).
 
-        The removed constant moves into ``beta0``, so the modelled function does
-        not change.
+        A VC term re-splits ``beta0``/``b_theta`` so the head sums to zero
+        over the train rows; the modelled function does not change.
         """
         feats: dict[str, Tensor] | None = None
         for name in self.order:
             nd = self.nodes[name]
-            for g in nd._vc_groups:
-                if not g.mods:
+            for m in nd.shifts.values():
+                if not getattr(m, "finalizes", False):
                     continue
                 if feats is None:
                     feats = self._features(values)
-                nd.shifts[g.on].recenter(nd.net_input(feats, g.mods, g.on))
+                m.finalize(nd, feats)
 
     @torch.no_grad()
     def varying_coef(
