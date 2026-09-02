@@ -110,8 +110,7 @@ class CausalFlowDAG(_FitMixin, _ReadoutsMixin, nn.Module):
         )
         self._apply_init(init)
         self.device = torch.device(device)
-        # the data-dependent state (ranges, net min-max, calibrated start) is
-        # taken once, by calibrate(); a checkpoint carries the flag
+        # calibrate() takes the data-dependent state once; checkpoints carry the flag
         self.register_buffer("calibrated", torch.tensor(False))
         self.history: dict = {"train": []}  # per-node mean train NLL per epoch
         self._fit_validated = (
@@ -210,10 +209,11 @@ class CausalFlowDAG(_FitMixin, _ReadoutsMixin, nn.Module):
         return self.nodes[name]
 
     def _features(self, values: dict[str, Tensor]) -> dict[str, Tensor]:
-        # side columns (a VC's propensities) are not nodes: they pass raw
+        # spec columns only; side columns travel through _side_feats
         return {
-            name: self._encode_parent(name, vals) if name in self.spec else vals
+            name: self._encode_parent(name, vals)
             for name, vals in values.items()
+            if name in self.spec
         }
 
     def _side_feats(
@@ -226,10 +226,10 @@ class CausalFlowDAG(_FitMixin, _ReadoutsMixin, nn.Module):
         """
         out = {}
         for m in nd.shifts.values():
-            for col in m.side_columns():
-                if col in values:
-                    out[col] = values[col]
-            if any(c not in out for c in m.side_columns()):
+            cols = m.side_columns()
+            if all(c in values for c in cols):
+                out.update({c: values[c] for c in cols})
+            else:
                 out.update(m.live_side(self, values, n))
         return out
 
@@ -527,9 +527,7 @@ class CausalFlowDAG(_FitMixin, _ReadoutsMixin, nn.Module):
                 continue
             node = self.nodes[name]
             feats = self._features({p: values[p] for p in node.parents})
-            # centered VC: e_hat(pa_on) is re-derived from the already-sampled
-            # ancestor values — under do the regressor is t_do - e_hat(x), never
-            # a cached training value
+            # under do, a centered VC re-derives t_do - e_hat(x); never cached
             theta, shift = node.theta_shift(
                 feats | self._side_feats(node, values, n), n
             )
@@ -613,6 +611,7 @@ class CausalFlowDAG(_FitMixin, _ReadoutsMixin, nn.Module):
         ValueError
             If ``node`` is continuous.
         """
+        self._node(node)  # the friendly unknown-node error, before the kind check
         if not isinstance(self.spec[node], OrdinalNode):
             # a domain error (wrong node kind), not a Python type error
             raise ValueError(  # noqa: TRY004
@@ -657,6 +656,7 @@ class CausalFlowDAG(_FitMixin, _ReadoutsMixin, nn.Module):
         ValueError
             If ``node`` is ordinal; use :meth:`pmf` for it.
         """
+        self._node(node)  # the friendly unknown-node error, before the kind check
         if not isinstance(self.spec[node], ContinuousNode):
             # a domain error (wrong node kind), not a Python type error
             raise ValueError(  # noqa: TRY004
@@ -810,8 +810,7 @@ class CausalFlowDAG(_FitMixin, _ReadoutsMixin, nn.Module):
             init=ckpt.get("init", "torch"),
         )
         for name, t in ckpt["state_dict"].items():
-            # a callable input_transform's train buffer is shaped at
-            # calibrate; give it the checkpoint's shape before loading
+            # a callable transform's train buffer takes the checkpoint's shape
             if not name.endswith(".train_cols"):
                 continue
             buf = flow.get_buffer(name)

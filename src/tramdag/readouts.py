@@ -32,7 +32,7 @@ class _ReadoutsMixin:
         Returns the shift values as a flat array — the curve a replication plots
         against the data-generating truth.
         """
-        nd = self.nodes[node]
+        nd = self._node(node)
         if parent not in nd.shifts:
             raise KeyError(
                 f"node {node!r} has no shift term keyed {parent!r}; "

@@ -18,7 +18,6 @@ import torch
 from torch import Tensor
 
 from .callbacks import Callback
-from .terms import ShiftTerm
 
 if TYPE_CHECKING:
     from .flow import CausalFlowDAG
@@ -320,25 +319,21 @@ class _FitMixin:
         train_df, validation_data = _split_validation(
             train_df, validation_data, validation_split
         )
-        # side columns are validated BEFORE calibrate: a malformed frame fails
-        # while the flow is still untouched (calibrate sets ranges and the
-        # marginal start — a half-mutated flow after an error would be worse
-        # than no fit at all)
+        # validate BEFORE calibrate: a malformed frame must not half-mutate the flow
         side_cols = self._check_side_columns(train_df)
         self.calibrate(train_df)
         vals = self._tensorize(train_df, list(self.order) + side_cols)
         val_vals = (
             self._tensorize(validation_data) if validation_data is not None else None
         )
-        # the shipped callbacks check this: an unvalidated fit in between must
-        # not let them read a stale history["val"] entry as the current epoch
+        # callbacks read this: no stale history["val"] entry from an earlier fit
         self._fit_validated = val_vals is not None
         opt = optimizer or torch.optim.Adam(self.parameters(), lr=learning_rate)
         penalized = [
             m
             for nd in self.nodes.values()
             for m in nd.shifts.values()
-            if isinstance(m, ShiftTerm) and m.has_regularizer
+            if m.has_regularizer
         ]
         for cb in cbs:
             cb.on_fit_begin(self, opt)

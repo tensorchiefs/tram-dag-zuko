@@ -197,8 +197,8 @@ def test_ls_node_equals_proportional_odds():
     )
 
     # our model: P(Y<=k) = sigmoid(theta_k - (w1 x1 + w2 x2)); statsmodels likewise
-    w1 = float(flow.nodes["Y"].shifts["X1"].weight)
-    w2 = float(flow.nodes["Y"].shifts["X2"].weight)
+    coefs = flow.ls_coefficients()["Y"]
+    w1, w2 = float(coefs["X1"][0]), float(coefs["X2"][0])
     assert w1 == pytest.approx(res.params["X1"], abs=0.05)
     assert w2 == pytest.approx(res.params["X2"], abs=0.05)
 

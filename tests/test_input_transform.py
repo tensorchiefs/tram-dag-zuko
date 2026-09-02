@@ -153,12 +153,13 @@ def test_mixed_node_transforms_only_its_own_term():
     flow.fit(df, epochs=1, batch_size=100)
     nd = flow.nodes["x3"]
     feats = flow._features(_tensors(df))
+    grid = df["x1"].to_numpy()
     with torch.no_grad():
         _, shift = nd.theta_shift(feats, len(df))
-        expected = nd.shifts["x1"](nd.net_input(feats, ("x1",), "x1")) + nd.shifts[
-            "x2"
-        ](feats["x2"])
-    assert torch.allclose(shift, expected)
+    # public routes: the CS curve (through its input transform) + the raw LS
+    cs = flow.shift_curve("x3", "x1", grid)
+    ls = float(flow.ls_coefficients()["x3"]["x2"][0]) * df["x2"].to_numpy()
+    np.testing.assert_allclose(shift.numpy(), cs + ls, atol=1e-5)
 
 
 def test_read_outs_use_the_transformed_inputs():

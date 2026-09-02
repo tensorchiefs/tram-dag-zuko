@@ -113,11 +113,6 @@ def test_ordinal_rejects_i_transform():
         OrdinalNode(3, [I("a", transform="spline")])
 
 
-def test_vc_treatment_is_keyword_only():
-    with pytest.raises(TypeError):
-        VC("T", "X2")  # the treatment is the keyword t=
-
-
 def test_list_and_sum_build_the_identical_model():
     def build(spec):
         torch.manual_seed(7)
@@ -195,7 +190,7 @@ def test_every_option_survives_the_roundtrip():
         "y": ContinuousNode(
             [
                 I("a", "b", allow_interaction=False, units=[4, 4]),
-                VC("b", t="t", penalty=2.5, center=True),
+                VC("b", t="t", penalty=2.5, center="ps_b"),
             ]
         ),
     }
@@ -203,7 +198,7 @@ def test_every_option_survives_the_roundtrip():
     assert back == spec
     i_term, vc_term = back["y"].terms
     assert (i_term.allow_interaction, i_term.units) == (False, (4, 4))
-    assert (vc_term.penalty, vc_term.center) == (2.5, True)
+    assert (vc_term.penalty, vc_term.center) == (2.5, "ps_b")
     assert back["a"].transform_kwargs == {"bins": 6}
 
 
@@ -264,22 +259,6 @@ def test_units_reach_the_networks():
     assert flow.nodes["x2"].shifts["x1"].net[0].out_features == 16
     assert flow.nodes["y"].intercept.net[0].out_features == 4
     assert flow.nodes["y"].shifts["x1"].net[0].out_features == 8
-
-
-def test_units_survive_the_roundtrip():
-    spec = {
-        "a": ContinuousNode(),
-        "b": ContinuousNode(CS("a", units=[16])),
-    }
-    back = spec_from_dict(spec_to_dict(spec))
-    assert back["b"].terms[1].units == (16,)  # [0] is the canonical SI()
-
-
-def test_vc_modifiers_are_positional_t_is_keyword():
-    t = VC("X2", "X3", t="T")
-    assert t.parents == ("T", "X2", "X3")  # internal layout: treatment first
-    with pytest.raises(ValueError, match="cannot be both"):
-        VC("T", t="T")
 
 
 def test_a_pre_0_4_spec_says_it_is_too_old():

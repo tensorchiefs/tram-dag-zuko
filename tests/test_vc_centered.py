@@ -266,3 +266,46 @@ def test_propensities_must_be_probabilities(confounded):
     bad[0] = 1.4
     with pytest.raises(ValueError, match="probabilities"):
         flow.fit(df.assign(ps=bad), epochs=1)
+
+
+def test_centered_fit_with_managed_validation(confounded):
+    """Fit-managed validation composes with a centered spec: the frozen OOF
+    column trains, the per-epoch validation NLL falls back to the LIVE
+    propensity (validation frames carry no OOF column by design), and
+    EarlyStopping restores best weights.
+    """
+    from tramdag.callbacks import EarlyStopping
+
+    df = confounded["draw"](800, 3)
+    val = confounded["draw"](300, 30)  # no 'ps' column: live e_hat by design
+    flow = CausalFlowDAG(_misspecified_spec(True), seed=0)
+    early = EarlyStopping()
+    flow.fit(
+        df.assign(ps=_oof_propensity(df)[0]),
+        epochs=8,
+        seed=0,
+        validation_data=val,
+        callbacks=early,
+    )
+    assert len(flow.history["val"]) == 8
+    assert np.isfinite(early.best_nll)
+    # restored best: the flow's val NLL equals the callback's best
+    assert sum(flow.nll(val).values()) == pytest.approx(early.best_nll, rel=1e-6)
+
+
+def test_stray_propensity_column_is_ignored_on_an_uncentered_fit(confounded):
+    """Pin: a stray 'ps' column on an UNCENTERED spec is silently ignored.
+
+    Frames often carry extra columns; only a declared center= reads one.
+    Forgetting center= therefore fits uncentered — documented behavior.
+    """
+    df = confounded["draw"](400, 5)
+    plain = CausalFlowDAG(_misspecified_spec(False), seed=0)
+    with_stray = CausalFlowDAG(_misspecified_spec(False), seed=0)
+    plain.fit(df, epochs=2, seed=0)
+    with_stray.fit(df.assign(ps=0.5), epochs=2, seed=0)
+    for (ka, pa), (kb, pb) in zip(
+        plain.state_dict().items(), with_stray.state_dict().items(), strict=True
+    ):
+        assert ka == kb
+        assert torch.equal(pa, pb), ka

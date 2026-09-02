@@ -37,12 +37,11 @@ def test_fn_shift_offsets_the_latent_and_round_trips(ls_chain, tmp_path):
     flow = CausalFlowDAG(_two_node(fn_shift("x1", fn=_double)), seed=0)
     flow.fit(df, epochs=5, batch_size=200)
     assert Fn is fn_shift
-    # the shift really is fn: u(x2 | x1) moves by exactly 2*x1
-    base = CausalFlowDAG({"x1": ContinuousNode(), "x2": ContinuousNode()}, seed=0)
-    base.load_state_dict(dict(flow.state_dict()), strict=False)
-    u_with = flow.abduct(df, seed=0)["x2"].to_numpy()
-    u_wo = base.abduct(df, seed=0)["x2"].to_numpy()
-    np.testing.assert_allclose(u_with - u_wo, 2.0 * df["x1"].to_numpy(), atol=1e-5)
+    # the shift really is fn (the grid read-out goes through shift_value)
+    grid = np.linspace(-2, 2, 9)
+    np.testing.assert_allclose(
+        flow.shift_curve("x2", "x1", grid), 2.0 * grid, atol=1e-6
+    )
     flow.save(tmp_path / "m.pt")
     loaded = CausalFlowDAG.load(tmp_path / "m.pt")
     assert torch.equal(loaded.log_prob(df), flow.log_prob(df))

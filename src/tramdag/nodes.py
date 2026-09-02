@@ -26,6 +26,7 @@ from .spec import (
     NodeSpec,
     node_parents,
 )
+from .terms import ShiftTerm, VCTerm, get_term
 from .transforms import (
     StandardLogistic,
     make_univariate_transform,
@@ -122,7 +123,6 @@ class _Node(nn.Module):
         if isinstance(node, ContinuousNode):
             self.ut = make_univariate_transform(node.transform, **node.transform_kwargs)
             n_params = self.ut.n_params
-            self.levels = None
         else:
             self.ut = None
             self.levels = node.levels
@@ -150,8 +150,6 @@ class _Node(nn.Module):
         theta_0, one joint ComplexIntercept, or one net per parent summed in
         unconstrained coefficient space (``allow_interaction=False``).
         """
-        from .terms import get_term
-
         if i_term.parents:
             self._add_input_transform("@I", i_term, i_term.parents, spec)
         self.intercept = get_term(i_term.effect).build(i_term, spec, n_params)
@@ -164,8 +162,6 @@ class _Node(nn.Module):
         names its own ModuleDict key: the parent for single-parent terms,
         "a+b" for a joint CS, the treatment for a VC.
         """
-        from .terms import ShiftTerm, get_term
-
         self.shifts = nn.ModuleDict()
         for term in terms:
             entry = get_term(term.effect)
@@ -179,8 +175,7 @@ class _Node(nn.Module):
     def set_input_stats(self, train_df: pd.DataFrame) -> None:
         """Freeze every term's input-transform statistics (``calibrate``)."""
         for tr in self.input_transforms.values():
-            # a constant column fails calibrate's quantile check on the
-            # parent's own node first, so the statistics are well defined
+            # constant columns already failed calibrate's quantile check
             cols = torch.stack(
                 [
                     torch.as_tensor(train_df[p].to_numpy(dtype=np.float32).copy())
@@ -236,18 +231,11 @@ class _Node(nn.Module):
             If a centered VC term is evaluated without its propensity
             column in ``feats``.
         """
-        from .terms import VCTerm
-
         theta = self.intercept.theta_value(self, feats, n)
         shift = torch.zeros(n, dtype=theta.dtype, device=theta.device)
-        # plain shifts first, then the VC terms — the pinned accumulation order
-        modules = list(self.shifts.values())
-        for m in modules:
-            if not isinstance(m, VCTerm):
-                shift = shift + m.shift_value(self, feats)
-        for m in modules:
-            if isinstance(m, VCTerm):
-                shift = shift + m.shift_value(self, feats)
+        # plain shifts first, then VC (stable sort keeps the pinned order)
+        for m in sorted(self.shifts.values(), key=lambda m: isinstance(m, VCTerm)):
+            shift = shift + m.shift_value(self, feats)
         return theta, shift
 
 

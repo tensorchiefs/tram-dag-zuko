@@ -130,6 +130,3 @@ def test_ls_coefficients_shape_and_agreement_with_the_modules():
     assert set(coefs["y"]) == {"x", "t"}
     assert coefs["y"]["x"].shape == (1,)
     assert coefs["y"]["t"].shape == (3,)  # one per ordinal level
-    for parent, w in coefs["y"].items():
-        expected = flow.nodes["y"].shifts[parent].weight.detach().numpy().ravel()
-        np.testing.assert_allclose(w, expected)

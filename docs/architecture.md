@@ -147,7 +147,6 @@ classDiagram
   tramdag --> spec
   tramdag --> terms
   fitting --> callbacks
-  fitting --> terms
   flow --> fitting
   flow --> nodes
   flow --> readouts
@@ -367,8 +366,8 @@ flowchart LR
     n15 --> n26
     n15 --> n33
     n34 -- "2x" --> n35
-    n36 -- "36x" --> n24
-    n36 -- "18x" --> n25
+    n36 -- "18x" --> n24
+    n36 -- "9x" --> n25
     n16 -- "2x" --> n31
     n17 --> n37
     n17 -- "2x" --> n34

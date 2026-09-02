@@ -265,9 +265,8 @@ def _check_term(name: str, term: Term, spec: dict[str, NodeSpec]) -> tuple[str, 
         ) from None
     entry.check_arity(name, term)
     if entry.slot == "intercept" and term.effect != "I":
-        # _normalize_terms classifies intercepts by effect "I"; a custom
-        # intercept-slot effect would silently land in the shift pass and
-        # never be built — refuse instead of misbuilding
+        # normalization keys intercepts on effect "I": a custom intercept
+        # slot would silently never build — refuse instead
         raise ValueError(
             f"Node '{name}': custom intercept-slot effects are not supported "
             f"yet — '{term.effect}' registers slot='intercept'. Custom terms "

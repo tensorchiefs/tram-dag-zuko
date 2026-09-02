@@ -106,13 +106,12 @@ class ShiftTerm(TermDef):
     so state-dict paths and the seeded RNG stream stay bit-stable.
     """
 
-    is_classical: ClassVar[bool] = False
     scored: ClassVar[bool] = False  # True when score_columns gives coefficients
     finalizes = False  # set per instance when a post-fit step is needed
 
     key: str
     parents: tuple
-    net_parents: tuple
+    net_parents: tuple = ()  # the parents feeding the term's NETWORK
 
     @classmethod
     def build(cls, term: Term, spec: dict[str, NodeSpec]) -> ShiftTerm:
@@ -180,7 +179,6 @@ class InterceptTerm(TermDef):
     ``ci_parents`` their flat order.
     """
 
-    is_classical: ClassVar[bool] = False
     has_marginal_start: ClassVar[bool] = False
 
     groups: list[tuple[str, ...]]
@@ -235,13 +233,7 @@ class InterceptDef(InterceptTerm):
         "input_transform": None,
     }
 
-    @classmethod
-    def cells(cls, term: Term) -> list[tuple[str, str]]:
-        """Tag a parented intercept's cells ``CI``."""
-        tag = "CI"
-        if len(term.parents) > 1:
-            tag = f"{tag}{list(term.parents)}"
-        return [(p, tag) for p in term.parents]
+    cell_tag = "CI"
 
     @classmethod
     def term_is_classical(cls, term: Term) -> bool:
@@ -252,9 +244,6 @@ class InterceptDef(InterceptTerm):
 class SITerm(InterceptTerm, SimpleIntercept):
     """The free simple intercept: one theta vector, no parents."""
 
-    effect = "I"
-    slot = "intercept"
-    is_classical = True
     has_marginal_start = True
 
     def theta_value(self, node: _Node, feats: dict, n: int) -> Tensor:
@@ -270,9 +259,6 @@ class SITerm(InterceptTerm, SimpleIntercept):
 class CITerm(InterceptTerm, ComplexIntercept):
     """A single (possibly joint multi-parent) complex intercept net."""
 
-    effect = "I"
-    slot = "intercept"
-
     def theta_value(self, node: _Node, feats: dict, n: int) -> Tensor:
         """Run the one net over the joint parent features."""
         return self(node.net_input(feats, self.ci_parents, "@I"))
@@ -284,9 +270,6 @@ class AdditiveCITerm(InterceptTerm, nn.Module):
     Each parent reshapes the transform independently, in unconstrained
     coefficient space.
     """
-
-    effect = "I"
-    slot = "intercept"
 
     def __init__(self, groups, n_params: int, spec, units, activation):
         nn.Module.__init__(self)
@@ -311,7 +294,6 @@ class LSTerm(ShiftTerm, LinearShift):
 
     effect = "LS"
     slot = "shift"
-    is_classical = True
     scored = True
 
     @classmethod
@@ -338,7 +320,6 @@ class LSTerm(ShiftTerm, LinearShift):
         m = cls(feat_width(spec, term.parents))
         m.key = term.parents[0]
         m.parents = tuple(term.parents)
-        m.net_parents = ()
         return m
 
     def shift_value(self, node: _Node, feats: dict) -> Tensor:

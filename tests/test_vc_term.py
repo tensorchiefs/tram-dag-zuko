@@ -55,8 +55,11 @@ def small_fitted(vc_hetero):
 
 def test_vc_constructor():
     t = VC("X2", "X3", penalty=2.5, t="T")
+    # internal layout: treatment first, modifiers positional
     assert (t.effect, t.parents, t.penalty) == ("VC", ("T", "X2", "X3"), 2.5)
     assert VC(t="T").penalty == 1.0  # the documented default
+    with pytest.raises(TypeError):
+        VC("T", "X2")  # the treatment is the keyword t=
     with pytest.raises(
         ValueError, match=r"cannot be both the treatment \(t\) and a modifier"
     ):
@@ -183,6 +186,7 @@ def test_serialization_roundtrip_spec():
     assert t == VC("X2", "X3", penalty=3.0, t="T")
 
 
+@pytest.mark.slow
 def test_nesting_large_penalty_matches_classical_ls(vc_hetero):
     """Acceptance (issue #28): with `penalty` large the head is shrunk to the
     zero function and the fitted beta0 matches the fit_classical LS coefficient.
