@@ -11,7 +11,7 @@ Conventions follow the original TRAM-DAG implementation
 - continuous: ``u = h(x) + s(parents)`` with ``h`` Bernstein / RQ-spline / affine,
   fitted on the value range scaled from the train 5%/95% quantiles to ``[-B, B]``
   and linearly extrapolated outside.
-- ordinal:    ``P(x <= k) = sigmoid(theta_k - s(parents))`` with increasing
+- ordinal:    ``P(y <= k) = sigmoid(theta_k - s(parents))`` with increasing
   cutpoints ``theta``. This is the parametrization of
   ``transform_intercepts_ordinal`` in the original implementation.
 """

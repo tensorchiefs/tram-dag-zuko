@@ -464,6 +464,7 @@ class CausalFlowDAG(_FitMixin, _ReadoutsMixin, nn.Module):
                 m.finalize(nd, feats)
 
     def _is_classical(self) -> bool:
+        """Say whether every term is one the exact classical fit handles."""
         return all(
             get_term(term.effect).term_is_classical(term)
             for node in self.spec.values()

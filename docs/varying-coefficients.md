@@ -92,11 +92,12 @@ framework.
   the abduct-difference `u(x, t=1, y) − u(x, t=0, y)` identically (pinned by
   a test).
 
-## Propensity-centered VC: `center=True` (R-learner orthogonalization)
+## Propensity-centered VC: `center="col"` (R-learner orthogonalization)
 
 ```python
-td.VC("X2", "X3", t="T", penalty=1.0, center=True)
-# contributes  beta(x) * (t - e_hat(x))  to the shift; e_hat comes from you
+td.VC("X2", "X3", t="T", penalty=1.0, center="ps")
+# contributes  beta(x) * (t - e_hat(x))  to the shift; e_hat comes from you,
+# out of fold, as the training-frame column named by center=
 ```
 
 This is Robinson/R-learner centering inside the likelihood. Dandl et al.
@@ -158,6 +159,6 @@ recovery corr ≥ 0.9 at n = 5000 (measured ≈ 0.99, min over 3 seeds 0.986), a
 fitted `beta0` that matches `fit_classical` under a large penalty, and the
 read-out identities. The centering claims are measured against the
 `confounded` DGP in the same file. Both former follow-ups have since
-shipped: propensity centering (#30) is `center=True`, documented above, and the
+shipped: propensity centering (#30) is `center="col"`, documented above, and the
 per-observation scores for effect-modifier scans (#29) are `flow.scores` and
 `flow.effect_modifier_scan` — see [scores.md](scores.md).

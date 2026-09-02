@@ -152,8 +152,8 @@ def _normalize_terms(value):
         return [simple_intercept()]  # a source node: the free intercept alone
     written = value if isinstance(value, (list, tuple)) else [value]
     items = [_as_term(e) for e in written]
-    intercepts = [i for i, t in enumerate(items) if t.effect == "I"]
-    if len(intercepts) > 1:
+    intercept_at = [i for i, t in enumerate(items) if t.effect == "I"]
+    if len(intercept_at) > 1:
         parented = [t for t in items if t.effect == "I" and t.parents]
         if len(parented) > 1:
             raise ValueError(
@@ -166,9 +166,9 @@ def _normalize_terms(value):
             "a formula takes exactly one intercept term, and CI(...) already "
             "contains the baseline — drop the extra I/SI."
         )
-    if not intercepts:
+    if not intercept_at:
         return [simple_intercept(), *items]  # canonical form: intercept first
-    if intercepts[0] != 0:
+    if intercept_at[0] != 0:
         raise ValueError(
             "the intercept term comes first: write "
             "I(...) + <shifts>, not the other way around."
@@ -888,27 +888,30 @@ class Term:
 
     Terms add: ``I("a") + CS("b")`` is the same transformation as
     ``[I("a"), CS("b")]``. Build terms with the constructors :func:`I`,
-    :func:`LS`, :func:`CS` and :func:`VC`, not directly.
+    :func:`LS`, :func:`CS`, :func:`VC` and :func:`Fn`, not directly.
 
     Attributes
     ----------
     effect : str
-        One of ``"I"``, ``"LS"``, ``"CS"``, ``"VC"``.
+        A registered effect name: ``"I"``, ``"LS"``, ``"CS"``, ``"VC"``,
+        ``"Fn"``, or a :func:`tramdag.terms.register_term` custom name.
     parents : tuple[str, ...]
         Ordered parent names the term depends on. Empty only for the bare
         simple-intercept ``I()``. For a ``VC`` term, ``parents[0]`` is the
-        treatment (``on``) and the rest are the effect modifiers.
+        treatment (``on``) and the rest are the effect modifiers; every
+        other built-in term's parents all own their edges.
     options : tuple[tuple[str, object], ...]
         Effect-specific settings as canonical ``(key, value)`` pairs:
-        sorted by key, defaults omitted. Attribute access serves them
-        with their defaults, so ``term.penalty`` stays valid on every
-        term. Keys: ``penalty`` and ``center`` (VC, see :func:`VC`);
-        ``transform`` and ``transform_kwargs`` (I, the basis of the monotone
-        transform, kwargs stored as sorted pairs);
-        ``units`` and ``activation`` (the term's network);
-        ``input_transform`` (I/CS/VC: the network-input transform);
-        ``allow_interaction`` (multi-parent I: one joint net or one net
-        per parent).
+        sorted by key, defaults omitted. Attribute access serves this
+        effect's options with their defaults; a key another effect takes
+        raises ``AttributeError`` instead of answering with a foreign
+        default. Keys per effect: ``penalty`` and ``center`` (VC, see
+        :func:`VC`); ``transform`` and ``transform_kwargs`` (I, the basis
+        of the monotone transform, kwargs stored as sorted pairs);
+        ``units`` and ``activation`` (the term's network); ``fn`` (Fn, the
+        custom shift callable); ``input_transform`` (I/CS/VC/Fn: the
+        network-input transform); ``allow_interaction`` (multi-parent I:
+        one joint net or one net per parent).
     """
 
     effect: str

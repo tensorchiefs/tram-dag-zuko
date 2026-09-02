@@ -6,8 +6,10 @@ treatment/centering rules of ``VC``. ``spec.py`` consults the registry
 lazily, so the generic checks (parents exist, ``input_transform`` shape,
 edge ownership) stay there and run in the same order as before.
 
-``register_term`` is the extension point for a custom effect; the built-ins
-register themselves at import.
+A custom effect subclasses :class:`ShiftTerm` (or, once supported,
+:class:`InterceptTerm`), sets ``effect``/``slot``/``option_defaults``,
+implements ``build`` and ``shift_value``, and calls :func:`register_term`;
+the built-ins register themselves at import.
 """
 
 # %% imports ---------------------------------------------------------------------------
@@ -102,8 +104,10 @@ class ShiftTerm(TermDef):
     A built term instance carries ``key`` (its ModuleDict key), ``parents``
     (the term's written parents) and ``net_parents`` (the parents whose
     columns feed its *network* — empty for ``LS``, the modifiers for
-    ``VC``). ``build`` constructs the module exactly as the node used to,
-    so state-dict paths and the seeded RNG stream stay bit-stable.
+    ``VC``); subclasses may add term-specific attributes (``VCTerm`` keeps
+    ``mods``/``on_is_ord``/``center_col``). ``build`` constructs the module
+    exactly as the node used to, so state-dict paths and the seeded RNG
+    stream stay bit-stable.
     """
 
     scored: ClassVar[bool] = False  # True when score_columns gives coefficients
@@ -404,6 +408,51 @@ class VCTerm(ShiftTerm, VaryingCoef):
         m.finalizes = bool(mods)
         return m
 
+    @staticmethod
+    def edge_parents(name: str, term: Term, spec: dict[str, NodeSpec]) -> tuple:
+        """Check treatment, penalty and centering; the treatment owns the edge."""
+        if not term.parents:
+            raise ValueError(f"Node '{name}': VC term needs a treatment parent.")
+        on = term.parents[0]
+        if on in term.parents[1:]:
+            raise ValueError(
+                f"Node '{name}': VC treatment '{on}' cannot also be a modifier."
+            )
+        if term.penalty is None or term.penalty < 0:
+            raise ValueError(f"Node '{name}': VC penalty must be >= 0.")
+        if term.center is not False and not isinstance(term.center, str):
+            raise ValueError(
+                f"Node '{name}': VC(center=) names the propensity COLUMN of "
+                "the training frame (out-of-fold P(t=1|pa_t) per row), or is "
+                f"False — got {term.center!r}. Cross-fit the propensities "
+                "outside and merge them as a column."
+            )
+        if term.center and term.center in spec:
+            raise ValueError(
+                f"Node '{name}': the propensity column {term.center!r} "
+                "collides with a node name."
+            )
+        on_node = spec[on]
+        if isinstance(on_node, OrdinalNode) and on_node.levels != 2:
+            raise ValueError(
+                f"Node '{name}': VC treatment '{on}' is ordinal with "
+                f"{on_node.levels} levels. Only a 2-level (binary) "
+                "ordinal treatment is supported. Multi-level is a "
+                "follow-up."
+            )
+        if term.center and not isinstance(on_node, OrdinalNode):
+            raise ValueError(
+                f"Node '{name}': VC(center=...) needs a binary ordinal "
+                f"treatment, and '{on}' is continuous. E[T|x] centering "
+                "is a follow-up."
+            )
+        if term.center and any(t.effect == "VC" and t.center for t in on_node.terms):
+            raise ValueError(
+                f"Node '{name}': treatment '{on}' carries a centered VC term "
+                "itself; chained centering is not supported."
+            )
+        return (on,)
+
     def regressor(self, feats: dict) -> Tensor:
         """Give the ``(n, 1)`` column ``beta`` multiplies — the treatment, raw.
 
@@ -484,51 +533,6 @@ class VCTerm(ShiftTerm, VaryingCoef):
     def extra_columns(self, flow) -> list[str]:
         """Give the treatment's parents (a treatment cannot be centered itself)."""
         return list(flow.nodes[self.key].parents) if self.center_col else []
-
-    @staticmethod
-    def edge_parents(name: str, term: Term, spec: dict[str, NodeSpec]) -> tuple:
-        """Check treatment, penalty and centering; the treatment owns the edge."""
-        if not term.parents:
-            raise ValueError(f"Node '{name}': VC term needs a treatment parent.")
-        on = term.parents[0]
-        if on in term.parents[1:]:
-            raise ValueError(
-                f"Node '{name}': VC treatment '{on}' cannot also be a modifier."
-            )
-        if term.penalty is None or term.penalty < 0:
-            raise ValueError(f"Node '{name}': VC penalty must be >= 0.")
-        if term.center is not False and not isinstance(term.center, str):
-            raise ValueError(
-                f"Node '{name}': VC(center=) names the propensity COLUMN of "
-                "the training frame (out-of-fold P(t=1|pa_t) per row), or is "
-                f"False — got {term.center!r}. Cross-fit the propensities "
-                "outside and merge them as a column."
-            )
-        if term.center and term.center in spec:
-            raise ValueError(
-                f"Node '{name}': the propensity column {term.center!r} "
-                "collides with a node name."
-            )
-        on_node = spec[on]
-        if isinstance(on_node, OrdinalNode) and on_node.levels != 2:
-            raise ValueError(
-                f"Node '{name}': VC treatment '{on}' is ordinal with "
-                f"{on_node.levels} levels. Only a 2-level (binary) "
-                "ordinal treatment is supported. Multi-level is a "
-                "follow-up."
-            )
-        if term.center and not isinstance(on_node, OrdinalNode):
-            raise ValueError(
-                f"Node '{name}': VC(center=...) needs a binary ordinal "
-                f"treatment, and '{on}' is continuous. E[T|x] centering "
-                "is a follow-up."
-            )
-        if term.center and any(t.effect == "VC" and t.center for t in on_node.terms):
-            raise ValueError(
-                f"Node '{name}': treatment '{on}' carries a centered VC term "
-                "itself; chained centering is not supported."
-            )
-        return (on,)
 
 
 @register_term

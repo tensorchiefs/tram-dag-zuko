@@ -8,9 +8,9 @@ Internal-but-stable surface
 ---------------------------
 scores.py, callbacks recipes, the read-outs and the test suite read these
 names by design; renaming any of them is an API change, not a cleanup:
-``shifts`` (term modules with ``key``/``parents``/``mods``…), ``intercept``
-(+ ``.groups``/``.ci_parents``/``.nets``), ``ut``, ``input_transforms``,
-``net_input``, ``theta_shift``.
+``kind``, ``parents``, ``shifts`` (term modules with ``key``/``parents``/
+``mods``…), ``intercept`` (+ ``.groups``/``.ci_parents``/``.nets``), ``ut``,
+``input_transforms``, ``net_input``, ``theta_shift``.
 """
 
 # %% imports ---------------------------------------------------------------------------

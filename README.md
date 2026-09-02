@@ -5,12 +5,10 @@
 [![CI](https://github.com/tensorchiefs/tramdag/actions/workflows/ci.yml/badge.svg)](https://github.com/tensorchiefs/tramdag/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-> ⚠️ **Status: beta (0.x), under active development.** The API may change
-> between releases until 1.0, so pin a version for reproducibility. Note that
-> this README documents the **unreleased 0.4** API: the term constructors
-> (`SI`/`CI`/`VC`), `scores`, `varying_coef` and `intercept_contributions` are
-> not in `0.3.0` on PyPI. Until 0.4 ships, install from git to follow the docs
-> below.
+> ⚠️ **Status: 1.0 release candidate.** This README documents the
+> **unreleased 1.0** API (term registry, `callbacks=`, `flow.shift_curve`,
+> `VC(center="col")`); `0.3.0` on PyPI predates all of it. Until 1.0 ships,
+> install from git to follow the docs below.
 
 **TRAM-DAGs** model each variable of a structural causal model with a
 (transformation-model) flow: one triangular normalizing flow from iid
