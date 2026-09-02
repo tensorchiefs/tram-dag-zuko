@@ -14,24 +14,17 @@
 #   * weights start from Keras' Dense default, glorot_uniform / zero bias
 #     (`init: glorot`, make_model's layer_dense);
 #   * input_transform: minmax on the CI terms (comparison/utils.R::scale_df) — kept, see below.
-# CI-runtime deviation (repo decision 2026-09-01), documented in
-# docs/paper-replication.md: the reference runs 10000 epochs at lr 0.001 with
-# ReduceLROnPlateau on the summed validation NLL (update_learning_rate) —
-# ~355 s on the 2-core CI runner. Measured on that exact trajectory (probe,
-# 2026-09-01): the do(x2) mean errors descend until epoch ~6000-8500 (best
-# 0.005-0.10), then creep back up, and the anneal fires at epoch ~9050,
-# freezing 0.101/0.099/0.030 — the reference protocol's quality IS its anneal
-# landing inside that window. At lr 0.002 the same smooth full-batch descent
-# runs 2x compressed and its all-bounds window is epochs ~4350-5000 (the
-# binding edges: x1's marginal std reaches the 2.0766 +/- 0.08 band only at
-# ~4320, and the do(x2=+0) error creeps past its 0.047 bound after ~5000).
-# This config stops at the window's center — epochs 4800, no schedule, final
-# weights: do errors 0.096/0.080/0.022, std_x1 2.036, every margin >= 2x, at
-# under half the reference's wall clock. The plateau rule is dropped because
-# on the compressed trajectory the summed validation NLL keeps strictly
-# improving past the window (x1 still converging), so it cannot fire inside
-# it; lr 0.004 is out because x1's std clock does not compress with lr (at
-# its do-window, epochs ~2050-2350, std_x1 is still 1.978).
+# Optimization = the reference 1:1 since 2026-09-02: 10000 epochs at
+# lr 0.001 with ReduceLROnPlateau on the summed validation NLL
+# (update_learning_rate; factor 0.1, patience 50, min_lr 1e-7, strict <) —
+# the anneal fires late (~epoch 9050 on the 2026-09-01 probe) and freezes a
+# point where every pinned bound holds (measured 2026-09-02: do errors
+# 0.096/0.086/0.018, std_x1 2.044). The earlier CI-runtime compression
+# (4800 epochs @ lr 0.002, no schedule — the plateau cannot fire on that
+# 2x-compressed trajectory) was reverted after the visual pass against
+# paper Fig. 5; its window analysis lives in the git history and
+# docs/paper-replication.md. lr 0.004 remains out: x1's std clock does not
+# compress with lr (at its do-window, epochs ~2050-2350, std_x1 is 1.978).
 # Rejected deviations, both measured 2026-09-01: minibatch stepping (batch
 # 256, lr 0.001-0.004, 300-3000 epochs, constant or plateau) misses the
 # interventional bounds — its optima carry a systematic -0.11 common-mode
@@ -52,10 +45,14 @@ variants:
   flexible:
     n_train: 2500               # nTrain
     n_val: 5000                 # val = dgp(5000)
-    epochs: 4800                # reference: 10000 at lr 0.001 (CI-runtime deviation)
-    learning_rate: 0.002        # reference: 0.001 (CI-runtime deviation)
+    epochs: 10000               # the reference protocol, 1:1
+    learning_rate: 0.001
     batch_size: 2500            # = n_train: one full-batch step per epoch
-    schedule:                   # reference: plateau — cannot fire in the window (header)
+    schedule: plateau           # update_learning_rate, the reference rule
+    plateau_patience: 50
+    plateau_factor: 0.1
+    plateau_min_lr: 1.0e-7
+    min_delta: 0.0
     transform: bernstein
     # M = 30, len_theta = M + 1 = 31 unconstrained coefficients; zuko ties two
     # extra control points on (order 32 against the reference's 30); the

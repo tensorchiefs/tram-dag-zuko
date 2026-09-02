@@ -20,13 +20,12 @@
 # Keras' Dense default, glorot_uniform / zero bias (`init: glorot`, make_model's
 # layer_dense).
 #
-# ONE allowed deviation from the R optimization (repo decision 2026-09-01,
-# taken for CI runtime — the 1:1 protocol, 7000 epochs at lr 0.001, took
-# ~338 s on the 2-core CI runner): 3000 epochs at lr 0.002 instead of 7000
-# at 0.001 — same full-batch steps, same plateau rule, ~2.3x fewer epochs
-# for the same converged fit (measured 2026-09-01: every pinned metric holds,
-# five of the six held-out counterfactual MAEs better than the 7000-epoch
-# pins). Two rejected candidates, both measured:
+# Optimization = the reference 1:1 since 2026-09-02: 7000 epochs at
+# lr 0.001 with the plateau rule. The earlier CI-runtime compression
+# (3000 @ 0.002, 2026-09-01) was reverted after the visual pass against
+# paper Fig. 6 — the reference protocol cuts the Fig. 6 curve errors ~30%
+# (x3 2.69->1.87, x4 0.59) and every held-out MAE stays within the old
+# bounds. Two rejected candidates, both measured 2026-09-01:
 #   * minibatch (batch 256, 400-800 epochs): 3-5x faster still, but the
 #     fig6 curve ends and the do(x2)=+1.5 MAE live in the sparse x2 tail,
 #     which minibatch gradients underweight — cf_mae_x3_do_x2_+1.5 0.40
@@ -49,8 +48,8 @@ variants:
   flexible:
     n_train: 2500               # nTrain
     n_val: 5000                 # val = dgp(5000)
-    epochs: 3000                # deviation: 7000 @ 0.001 -> 3000 @ 0.002 (header)
-    learning_rate: 0.002
+    epochs: 7000                # the reference protocol, 1:1
+    learning_rate: 0.001
     batch_size: 2500            # = n_train: one full-batch step per epoch
     schedule: plateau           # update_learning_rate
     plateau_patience: 50

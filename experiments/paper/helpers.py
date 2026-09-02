@@ -193,6 +193,25 @@ def finish(fig, path: Path) -> None:
     plt.close(fig)
 
 
+def continuous_density(ax, dgp, flow, grid_points: int = 200) -> None:
+    """Draw one panel as smoothed densities, the paper's Fig. 5 style.
+
+    Plain gaussian KDE (Scott's rule) on a common grid — the DGP filled,
+    the flow as a line; no dependency beyond numpy.
+    """
+
+    def kde(x, grid):
+        x = np.asarray(x)
+        h = x.std() * len(x) ** (-1 / 5)  # Scott's rule
+        z = (grid[:, None] - x[None, :]) / h
+        return np.exp(-0.5 * z**2).mean(axis=1) / (h * np.sqrt(2 * np.pi))
+
+    low, high = np.quantile(dgp, [0.001, 0.999])
+    grid = np.linspace(low, high, grid_points)
+    ax.fill_between(grid, kde(dgp, grid), alpha=0.45, label="DGP")
+    ax.plot(grid, kde(flow, grid), lw=1.8, label="flow", color="C3")
+
+
 def continuous_hist(ax, dgp, flow, bins: int = 50) -> None:
     """Draw one panel: the DGP histogram filled, the flow histogram stepped.
 

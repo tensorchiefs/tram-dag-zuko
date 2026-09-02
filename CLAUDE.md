@@ -174,13 +174,13 @@ instead of the paper's 500 at Keras-default batch 32 / lr 0.001, the
 deviations taken for CI runtime (every metric kept; grid, epoch floors and
 the 2026-09-01 tuning round in docs/paper-replication.md); the
 VACA/CAREFL comparisons take one full-batch step per epoch on nTrain = 2500 —
-VACA 4800 epochs at lr 0.002 with no schedule, CAREFL 3000 at lr 0.002 with
-the reference's ReduceLROnPlateau (factor 0.1, patience 50, min_lr 1e-7;
-torch's scheduler on the summed validation NLL, global as in
-`update_learning_rate`) — against the reference's 10000 / 7000 at lr 0.001
-with plateau, the same CI-runtime deviation (VACA's rule cannot fire inside
-the compressed run's all-bounds window, so it is dropped there; minibatch and
-raw-parent alternatives measurably fail, see docs/paper-replication.md).
+VACA and CAREFL run the reference protocols 1:1 since 2026-09-02 — 10000 /
+7000 full-batch epochs at lr 0.001 with the reference's ReduceLROnPlateau
+(factor 0.1, patience 50, min_lr 1e-7; torch's scheduler on the summed
+validation NLL, global as in `update_learning_rate`); the 2026-09-01
+CI-runtime cuts (4800 / 3000 @ lr 0.002) were reverted after a visual pass
+against paper Figs. 5/6 (minibatch and raw-parent alternatives measurably
+fail, see docs/paper-replication.md).
 Seeds: the triangle scripts run
 unseeded, the comparison scripts seed R's RNG with 42 (not replayable in
 torch), so every seed here is a repo choice. Init follows each reference:
@@ -190,8 +190,8 @@ full-batch protocol the init decides the fit (VACA do(x2) errors
 0.52/0.33/0.13 with torch's default init, 0.098/0.159/0.026 with glorot at
 the config's seed — both measured on the earlier −3/−2/0 grid; on the shipped
 −3/−1/0 grid glorot scored 0.097/0.088/0.019 under the old 10000-epoch
-plateau protocol and scores 0.096/0.080/0.022 under the tuned 4800-epoch
-config). Known, documented deviations: the triangle scripts also
+plateau protocol and 0.096/0.086/0.018 under the restored reference
+protocol). Known, documented deviations: the triangle scripts also
 use 5%/95% quantiles for the Bernstein domain (a match), the comparison
 scripts min-max (`scale_df`) — we keep the quantiles there and scale the
 *network inputs* min-max (`input_transform: minmax` on the CI terms; raw parents saturate

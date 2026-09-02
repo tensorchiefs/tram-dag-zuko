@@ -22,7 +22,7 @@ from __future__ import annotations
 import matplotlib.pyplot as plt
 from common import cli, load_variant, make_output_dir, save_metrics, write_report
 
-from paper.helpers import continuous_hist, finish, fit_paper
+from paper.helpers import continuous_density, continuous_hist, finish, fit_paper
 from paper.simulations.vaca import DO_X2_VALUES, VacaTriangle
 from tramdag import CI, SI, ContinuousNode
 
@@ -96,7 +96,7 @@ def plot_interventional(generator, flow, config, truth, path) -> dict:
         sampled = flow.sample(
             config["n_compare"], do={"x2": value}, seed=config["sample_seed"]
         )
-        continuous_hist(ax, dgp["x3"], sampled["x3"], config["hist_bins"])
+        continuous_density(ax, dgp["x3"], sampled["x3"])
         ax.set_title(f"do($x_2$ = {value:+.0f})")
         ax.set_xlabel("$x_3$")
 
