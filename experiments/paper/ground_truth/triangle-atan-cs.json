@@ -1,16 +1,16 @@
 {
-  "_note": "Protocol = the paper's R code 1:1 up to the CI batch/lr deviation (see the YAML header): measured 2026-08-26 on the refactor/lean-fit branch. Paper Fig. 7/15/16. The complex shift must recover -f(x2) up to a constant; cs_curve_max_abs_err is measured after anchoring at x2=0. mean_x3_flow_do_x1 stays unpinned on purpose: the DGP center plus the abs-err bound covers it. Re-pinned 2026-09-01 from the tuned protocol (fewer epochs; see the YAML header).",
+  "_note": "Protocol = the paper's R code 1:1 up to the CI batch/lr deviation (see the YAML header): measured 2026-08-26 on the refactor/lean-fit branch. Paper Fig. 7/15/16. The complex shift must recover -f(x2) up to a constant; cs_curve_max_abs_err is measured after anchoring at x2=0. mean_x3_flow_do_x1 stays unpinned on purpose: the DGP center plus the abs-err bound covers it. Re-pinned 2026-09-01 from the tuned protocol (fewer epochs; see the YAML header). ARCHITECTURE CORRECTED 2026-09-02: hidden_features_CS = c(2,25,25,2) reads as in/out dims around the hidden stack (25,25) \u2014 under the earlier literal [2,25,25,2] reading a 2-sigmoid input bottleneck flattened every CS curve (sin could not reproduce paper Fig. 18 at ANY protocol; (25,25) lands on it). Centers re-pinned from the corrected runs; {max} bounds 2.5x the new measurement where tighter.",
   "beta12": {
-    "value": 1.9808402061462402,
+    "value": 1.9808403253555298,
     "atol": 0.05
   },
   "beta13": {
-    "value": -0.16748405992984772,
+    "value": -0.16771695017814636,
     "atol": 0.05,
     "why": "weakly identified: the coefficient multiplies the mixture x1 (sd 0.254 vs unit-scale siblings) \u2014 see the _note and docs/paper-replication.md"
   },
   "val_nll_x3": {
-    "value": 2.460599184036255,
+    "value": 2.460574150085449,
     "atol": 0.05
   },
   "cs_curve_max_abs_err": {

@@ -57,7 +57,12 @@ True weights in the flow's convention: β12 = +2, β13 = −0.2, β23 = +0.3 (li
 
 **Model**: `x1: SI`, `x2: SI + LS(x1)`, `x3: SI + LS(x1) + {LS(x2) | CS(x2)}`, Bernstein.
 CS net = reference `hidden_features_CS = c(2, 25, 25, 2)`, sigmoid (the ReLU line
-in `create_param_net` is commented out).
+in `create_param_net` is commented out). **Corrected 2026-09-02**: the vector
+reads as in/out dims around the hidden stack **(25, 25)** — the earlier
+literal `[2, 25, 25, 2]` reading put a 2-sigmoid bottleneck on the input and
+could not reproduce paper Fig. 18 (sin) at any protocol; (25, 25) lands on
+Figs. 17/18 (linear cs err 0.13 → 0.025, sin 1.22 → 0.24 on the paper's
+[−1, 0] window). Mixed likewise: c(2, 2, 2, 2) → hidden (2, 2).
 
 | hyperparameter | paper / R code | previous | now |
 |---|---|---|---|
@@ -75,15 +80,16 @@ in `create_param_net` is commented out).
 |---|---|---|---|---|---|
 | linear-ls | β12 / β13 / β23 | Fig. 14 trajectories; App. C.3 text: 1.98 / −0.21 / 0.26 | 1.983 / −0.145 / 0.285 | 1.987 / −0.170 / 0.282 | 1.981 / −0.161 / 0.281 |
 | linear-cs | β13; max \|ĝ − (−f)\| on [−1, 1] | Fig. 17: fitted CS is a straight line | −0.151; 0.507 | −0.173; 0.122 (glorot init: 0.110, torch: 0.116) | −0.178; 0.088 |
-| atan-cs | β13; cs max err | Fig. 7 right / 15 / 16: CS on −f; text: β12 = 2.07, β13 = −0.203 | −0.149; 0.229 | −0.168; 0.059 (glorot: 0.080, torch: 0.085) | −0.167; 0.104 |
-| sin-cs | β13; cs max err | Fig. 18: CS follows the non-monotone f, saturating at the grid ends | −0.185; 2.29 | −0.195; 1.10 (glorot: 0.997, torch: 1.016) | −0.206; 1.016 |
+| atan-cs | β13; cs max err | Fig. 7 right / 15 / 16: CS on −f; text: β12 = 2.07, β13 = −0.203 | −0.149; 0.229 | −0.168; 0.059 (glorot: 0.080, torch: 0.085) | −0.168; 0.108 (hidden (25,25), 2026-09-02) |
+| sin-cs | β13; cs max err | Fig. 18: CS follows the non-monotone f on x2 ∈ [−1, 0] | −0.185; 2.29 | −0.195; 1.10 (glorot: 0.997, torch: 1.016) | −0.168; 0.240 on the paper's [−1, 0] window (hidden (25,25), 2026-09-02) |
 | all | \|E[x3 \| do(x1 = −1)] flow − DGP\| | Figs. 16/17: histograms overlap | — | 0.09–0.14 | 0.08–0.11 |
 | all | val NLL x3 | — | 2.4603–2.4731 | 2.4607–2.4764 | 2.4606–2.4764 |
 
 β13 at −0.16 to −0.18 instead of −0.2: x1 has sd 0.254, so SE(β13) ≈ 0.036 at
-n = 40000 — within ~1 SE. The `sin-cs` error of 1.0 is the reference architecture's
-capacity: the two-unit bottleneck saturates at both ends of the grid exactly
-as in the paper's Fig. 18.
+n = 40000 — within ~1 SE. The old `sin-cs` error of ~1.0 was the misread
+2-unit-bottleneck net, not "reference capacity" (retracted 2026-09-02): with
+hidden (25, 25) the fit lands on Fig. 18 including its small −1-endpoint
+deviation, and the paper's figure never plots beyond [−1, 0].
 
 ## Triangle, mixed (`triangle_mixed.py`) — paper Sec. 6.2, App. C.4, App. B
 
