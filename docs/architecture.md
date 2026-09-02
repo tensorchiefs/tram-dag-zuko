@@ -60,12 +60,12 @@ classDiagram
     class ShiftTerm {
         key / parents / net_parents
         build(term, spec)
-        shift_value(node, feats, vc_ehat)
+        shift_value(node, feats)
         post_init()
         has_regularizer / regularizer()
         finalizes / finalize(node, feats)
         score_columns(node, flow, feats, dlds, ehat)
-        side_keys() / check_side() / live_side() / extra_columns()
+        side_columns() / check_column() / live_side() / extra_columns()
     }
     class InterceptTerm {
         groups / ci_parents
@@ -266,13 +266,13 @@ flowchart LR
     n3["_last_val"]
   end
   subgraph conditioners
-    n55["ComplexShift.forward"]
-    n57["LinearShift.forward"]
-    n58["SimpleIntercept.forward"]
+    n51["ComplexShift.forward"]
+    n53["LinearShift.forward"]
+    n54["SimpleIntercept.forward"]
     n6["VaryingCoef.beta"]
     n5["VaryingCoef.forward"]
-    n60["VaryingCoef.l2"]
-    n59["VaryingCoef.recenter"]
+    n56["VaryingCoef.l2"]
+    n55["VaryingCoef.recenter"]
   end
   subgraph fitting
     n7["_FitMixin.fit"]
@@ -281,63 +281,59 @@ flowchart LR
     n20["_fit_epoch"]
     n11["_log_epoch"]
     n12["_normalize_callbacks"]
-    n22["_slice_ehat"]
-    n25["_slice_vc_ehat"]
     n13["_split_validation"]
     n21["_val_nll"]
   end
   subgraph flow
-    n41["CausalFlowDAG._check_levels"]
+    n37["CausalFlowDAG._check_levels"]
+    n14["CausalFlowDAG._check_side_columns"]
     n32["CausalFlowDAG._dtype"]
     n27["CausalFlowDAG._encode_parent"]
     n26["CausalFlowDAG._features"]
     n28["CausalFlowDAG._marginal_start"]
     n31["CausalFlowDAG._np_dtype"]
-    n14["CausalFlowDAG._recenter_vc"]
+    n15["CausalFlowDAG._recenter_vc"]
     n34["CausalFlowDAG._set_range"]
-    n15["CausalFlowDAG._tensorize"]
-    n36["CausalFlowDAG._vc_ehat_live"]
-    n16["CausalFlowDAG._vc_ehat_train"]
+    n36["CausalFlowDAG._side_feats"]
+    n16["CausalFlowDAG._tensorize"]
     n17["CausalFlowDAG.calibrate"]
-    n42["CausalFlowDAG.init_marginals"]
-    n23["CausalFlowDAG.node_log_prob"]
+    n38["CausalFlowDAG.init_marginals"]
+    n22["CausalFlowDAG.node_log_prob"]
   end
   subgraph nodes
-    n56["_Node.net_input"]
-    n43["_Node.set_input_stats"]
-    n44["_Node.theta_shift"]
-    n45["kind_log_prob"]
+    n52["_Node.net_input"]
+    n39["_Node.set_input_stats"]
+    n40["_Node.theta_shift"]
+    n41["kind_log_prob"]
     n29["kind_marginal_theta"]
   end
   subgraph terms
-    n46["CSTerm.shift_value"]
-    n47["LSTerm.shift_value"]
+    n42["CSTerm.shift_value"]
+    n43["LSTerm.shift_value"]
     n30["SITerm.marginal_start"]
-    n48["SITerm.theta_value"]
+    n44["SITerm.theta_value"]
     n18["ShiftTerm.has_regularizer"]
-    n37["ShiftTerm.live_side"]
-    n39["ShiftTerm.side_keys"]
+    n24["ShiftTerm.side_columns"]
     n33["VCTerm.finalize"]
     n19["VCTerm.has_regularizer"]
-    n38["VCTerm.live_side"]
-    n61["VCTerm.regressor"]
-    n24["VCTerm.regularizer"]
-    n49["VCTerm.shift_value"]
-    n40["VCTerm.side_keys"]
+    n57["VCTerm.regressor"]
+    n23["VCTerm.regularizer"]
+    n45["VCTerm.shift_value"]
+    n25["VCTerm.side_columns"]
   end
   subgraph transforms
-    n62["BernsteinUT._build"]
-    n53["BernsteinUT.marginal_init_theta"]
-    n50["StandardLogistic.log_prob"]
-    n63["_ScaledUT._log_dt_dx"]
-    n64["_ScaledUT._scale"]
-    n51["_ScaledUT.forward"]
+    n58["BernsteinUT._build"]
+    n49["BernsteinUT.marginal_init_theta"]
+    n46["StandardLogistic.log_prob"]
+    n59["_ScaledUT._log_dt_dx"]
+    n60["_ScaledUT._scale"]
+    n47["_ScaledUT.forward"]
     n35["_ScaledUT.set_range"]
-    n67["_log1mexp"]
-    n65["ordinal_bounds"]
-    n66["ordinal_cutpoints"]
-    n52["ordinal_log_prob"]
-    n54["ordinal_marginal_init_theta"]
+    n63["_log1mexp"]
+    n61["ordinal_bounds"]
+    n62["ordinal_cutpoints"]
+    n48["ordinal_log_prob"]
+    n50["ordinal_marginal_init_theta"]
   end
     n0 --> n1
     n2 -- "3x" --> n3
@@ -352,8 +348,8 @@ flowchart LR
     n7 --> n12
     n7 --> n13
     n7 --> n14
-    n7 -- "2x" --> n15
-    n7 --> n16
+    n7 --> n15
+    n7 -- "2x" --> n16
     n7 --> n17
     n7 -- "2x" --> n18
     n7 --> n19
@@ -361,55 +357,53 @@ flowchart LR
     n10 -- "3x" --> n21
     n20 -- "6x" --> n22
     n20 -- "6x" --> n23
-    n20 -- "6x" --> n24
-    n13 --> n25
-    n21 -- "3x" --> n23
+    n21 -- "3x" --> n22
+    n14 -- "2x" --> n24
+    n14 --> n25
     n26 -- "30x" --> n27
     n28 -- "3x" --> n29
     n28 -- "3x" --> n30
     n31 -- "2x" --> n32
-    n14 --> n26
-    n14 --> n33
+    n15 --> n26
+    n15 --> n33
     n34 -- "2x" --> n35
-    n15 -- "2x" --> n31
-    n36 -- "18x" --> n37
-    n36 -- "9x" --> n38
-    n16 -- "2x" --> n39
-    n16 --> n40
-    n17 --> n41
+    n36 -- "36x" --> n24
+    n36 -- "18x" --> n25
+    n16 -- "2x" --> n31
+    n17 --> n37
     n17 -- "2x" --> n34
-    n17 --> n42
-    n17 -- "3x" --> n43
-    n42 --> n41
-    n42 -- "3x" --> n28
-    n23 -- "9x" --> n26
-    n23 -- "27x" --> n36
-    n23 -- "27x" --> n44
-    n23 -- "27x" --> n45
-    n44 -- "9x" --> n46
-    n44 -- "9x" --> n47
-    n44 -- "27x" --> n48
-    n44 -- "9x" --> n49
-    n45 -- "18x" --> n50
-    n45 -- "18x" --> n51
+    n17 --> n38
+    n17 -- "3x" --> n39
+    n38 --> n37
+    n38 -- "3x" --> n28
+    n22 -- "9x" --> n26
+    n22 -- "27x" --> n36
+    n22 -- "27x" --> n40
+    n22 -- "27x" --> n41
+    n40 -- "9x" --> n42
+    n40 -- "9x" --> n43
+    n40 -- "27x" --> n44
+    n40 -- "9x" --> n45
+    n41 -- "18x" --> n46
+    n41 -- "18x" --> n47
+    n41 -- "9x" --> n48
+    n29 -- "2x" --> n49
+    n29 --> n50
+    n42 -- "9x" --> n51
+    n42 -- "9x" --> n52
+    n43 -- "9x" --> n53
+    n44 -- "27x" --> n54
+    n33 --> n55
+    n33 --> n52
+    n23 -- "6x" --> n56
+    n45 -- "9x" --> n5
     n45 -- "9x" --> n52
-    n29 -- "2x" --> n53
-    n29 --> n54
-    n46 -- "9x" --> n55
-    n46 -- "9x" --> n56
-    n47 -- "9x" --> n57
-    n48 -- "27x" --> n58
-    n33 --> n59
-    n33 --> n56
-    n24 -- "6x" --> n60
-    n49 -- "9x" --> n5
-    n49 -- "9x" --> n56
-    n49 -- "9x" --> n61
-    n51 -- "18x" --> n62
-    n51 -- "18x" --> n63
-    n51 -- "18x" --> n64
-    n65 -- "9x" --> n66
-    n52 -- "9x" --> n67
-    n52 -- "9x" --> n65
+    n45 -- "9x" --> n57
+    n47 -- "18x" --> n58
+    n47 -- "18x" --> n59
+    n47 -- "18x" --> n60
+    n61 -- "9x" --> n62
+    n48 -- "9x" --> n63
+    n48 -- "9x" --> n61
 ```
 <!-- AUTOGEN:end -->

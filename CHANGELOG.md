@@ -11,6 +11,12 @@ conventions, seeding and all ten experiment ground truths are unchanged
 (verified per step by a seeded state-dict smoke and replications); the fit
 API, queries and read-outs keep their exact signatures as flow methods.
 
+- **`fit(vc_ehat=)` is gone**: a centered VC names its out-of-fold
+  propensity COLUMN — `VC("X", t="T", center="ps")` reads column ``ps`` of
+  the training frame (``df.assign(ps=e_oof)``), which splits, shuffles and
+  minibatches like any data; queries still recompute the propensity live
+  from the treatment node. ``center=True`` refuses with the new spelling
+  named. No term-specific argument crosses ``fit`` any more.
 - `fitting.py` and `readouts.py` are mixins `CausalFlowDAG` composes —
   every method defined once, no delegate layer; `shift_curve` is a flow
   METHOD (`flow.shift_curve(node, parent, grid)`), and it evaluates
@@ -56,7 +62,7 @@ this repository's own DGPs — not the TRAM-DAG model, and each of them had a
 default the paper replication or the tests had to switch off.
 
 - **`fit(train_df, *, epochs, learning_rate=1e-2, batch_size=512, seed=None,
-  optimizer=None, callbacks=None, vc_ehat=None)`.** One optimizer over all
+  optimizer=None, callbacks=None)`.** One optimizer over all
   parameters (the per-node NLLs have independent gradients, so this equals
   per-node training); `optimizer=` takes any torch optimizer, which is how a
   `torch.optim.lr_scheduler` attaches. `callbacks=` takes one entry or a
@@ -220,8 +226,7 @@ default the paper replication or the tests had to switch off.
   and calibrates) make `fit` compute the per-node validation NLL once per
   epoch into `flow.history["val"]`, in `validation_batch_size=` chunks.
   `verbose=N` prints every Nth epoch plus the final one (0, the default,
-  is silent — no progress bars). A `validation_split` slices `vc_ehat`
-  with the same cut.
+  is silent — no progress bars).
 - **`tramdag.callbacks`** — the common training recipes as shipped, opt-in
   callbacks on a small `Callback` base (`on_fit_begin` / `on_epoch_end` /
   `on_fit_end`, each resetting its state at fit begin so instances are

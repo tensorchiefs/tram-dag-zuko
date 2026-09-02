@@ -96,7 +96,7 @@ class _ScaledLS(ShiftTerm, nn.Module):
         m.net_parents = ()
         return m
 
-    def shift_value(self, node, feats, vc_ehat):
+    def shift_value(self, node, feats):
         return self.scale * self.w * feats[self.parents[0]][:, 0]
 
 
@@ -160,7 +160,7 @@ class _PenShift(ShiftTerm, nn.Module):
         m.net_parents = ()
         return m
 
-    def shift_value(self, node, feats, vc_ehat):
+    def shift_value(self, node, feats):
         return self.w * feats[self.parents[0]][:, 0]
 
     @property

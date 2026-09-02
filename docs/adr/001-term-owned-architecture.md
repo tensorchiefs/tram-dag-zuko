@@ -53,8 +53,12 @@ drafted against a seven-subsystem survey and judged from three lenses
   every pinned number depends on it.
 - No collapse of ComplexIntercept/ComplexShift into factories: their names
   anchor checkpoint paths and the seeded RNG stream that ten CI ground truths pin.
-- No new `fit` arguments: `vc_ehat=` stays the public spelling of the (now
-  generic) side-input channel.
+- No side-input channel at all (revised 2026-09-02): the first RC kept
+  `fit(vc_ehat=)`; the final one deletes it — a centered `VC` names its
+  out-of-fold propensity COLUMN (`VC(center="ps")`) and the values ride the
+  training frame like any data, so splitting/slicing/validation come free
+  and no term-specific argument crosses `fit`. Queries still recompute the
+  propensity live from the treatment node (`ShiftTerm.live_side`).
 - Error messages reworded only where a responsibility physically moved.
 
 ## Consequences

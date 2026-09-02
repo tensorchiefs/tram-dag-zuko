@@ -44,15 +44,13 @@ CRIT_5PCT = 1.3581
 
 
 # %% private functions -----------------------------------------------------------------
-def _dl_ds(
-    nd, feats: dict, x: torch.Tensor, n: int, vc_ehat: dict | None = None
-) -> torch.Tensor:
+def _dl_ds(nd, feats: dict, x: torch.Tensor, n: int) -> torch.Tensor:
     """Give ``d l_i / d s_i``, shape ``(n,)``.
 
     This is the closed-form derivative of the per-row log-likelihood with
     respect to the total shift of the node.
     """
-    theta, shift = nd.theta_shift(feats, n, vc_ehat=vc_ehat)
+    theta, shift = nd.theta_shift(feats, n)
     if nd.kind == "continuous":
         z0, _ = nd.ut.forward(theta, x)
         return 1.0 - 2.0 * torch.sigmoid(z0 + shift)
@@ -107,18 +105,18 @@ def node_scores(flow, df: pd.DataFrame, node: str) -> pd.DataFrame:
         )
 
     # not y-free: l_i needs x. Plus the e_hat inputs of centered terms.
-    needed = [*nd.parents, node, *flow._vc_ehat_columns(nd)]
+    needed = [*nd.parents, node, *flow._query_side_columns(nd)]
     missing = [c for c in needed if c not in df.columns]
     if missing:
         raise KeyError(f"data is missing column(s): {missing}")
     values = flow._tensorize(df, needed)
     feats = flow._features({p: values[p] for p in nd.parents})
-    ehat = flow._vc_ehat_live(nd, values, len(df))
-    dlds = _dl_ds(nd, feats, values[node], len(df), vc_ehat=ehat)
+    feats |= flow._side_feats(nd, values, len(df))
+    dlds = _dl_ds(nd, feats, values[node], len(df))
 
     cols: dict[str, np.ndarray] = {}
     for m in scored:
-        cols.update(m.score_columns(nd, flow, feats, dlds, ehat))
+        cols.update(m.score_columns(nd, flow, feats, dlds))
     return pd.DataFrame(cols, index=df.index)
 
 

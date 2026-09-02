@@ -40,7 +40,7 @@ class _ReadoutsMixin:
             )
         x = torch.as_tensor(np.asarray(grid), dtype=torch.float32).view(-1, 1)
         # through the term's own evaluation, so Fn and custom terms work too
-        curve = nd.shifts[parent].shift_value(nd, {parent: x}, None)
+        curve = nd.shifts[parent].shift_value(nd, {parent: x})
         return curve.cpu().numpy().ravel()
 
     @torch.no_grad()

@@ -66,7 +66,7 @@ config in `experiments/paper/` states `units=` and `activation=` itself.
 | [`CausalFlowDAG`][tramdag.flow.CausalFlowDAG] | The flow: one `_Node` per variable in topological order. Construction seeds the weights (`seed=` is the reproducibility knob). |
 | [`calibrate()`][tramdag.flow.CausalFlowDAG.calibrate] | Once, from the training rows: transform ranges (train 5%/95% quantiles onto the domain), network-input min-max, the calibrated start (`marginal_init=True`). Called by the first fit; a checkpoint carries the flag. |
 | [`init_marginals()`][tramdag.flow.CausalFlowDAG.init_marginals] | The calibrated start as an explicit step, callable any time: resets every simple intercept to its column's marginal (Bernstein map / ordinal class log-odds; spline and affine have no calibrated start). Not once-guarded — on a trained flow it restarts those intercepts. Calibrates a fresh flow's ranges itself. |
-| [`fit()`][tramdag.flow.CausalFlowDAG.fit] | Joint maximum likelihood: one minibatch Adam loop over all parameters (exact per node, because the NLL decomposes), final weights kept. Keras-shaped validation (`validation_data=`/`validation_split=` fill `history["val"]` per epoch, `validation_batch_size=` chunks the pass) and progress (`verbose=`). Hooks: `optimizer=` (any torch optimizer, for schedulers) and `callbacks=` (one entry or a list; a `Callback` hooks `on_fit_begin`/`on_epoch_end`/`on_fit_end`, a bare callable is an `on_epoch_end` hook `cb(flow, epoch, opt)` — any `True` stops); the recipes in `callbacks.py` read `history["val"]`. `vc_ehat=` carries the out-of-fold propensities of centered VC terms. A second call continues training. |
+| [`fit()`][tramdag.flow.CausalFlowDAG.fit] | Joint maximum likelihood: one minibatch Adam loop over all parameters (exact per node, because the NLL decomposes), final weights kept. Keras-shaped validation (`validation_data=`/`validation_split=` fill `history["val"]` per epoch, `validation_batch_size=` chunks the pass) and progress (`verbose=`). Hooks: `optimizer=` (any torch optimizer, for schedulers) and `callbacks=` (one entry or a list; a `Callback` hooks `on_fit_begin`/`on_epoch_end`/`on_fit_end`, a bare callable is an `on_epoch_end` hook `cb(flow, epoch, opt)` — any `True` stops); the recipes in `callbacks.py` read `history["val"]`. A centered VC's out-of-fold propensities ride the training frame as the column its `center=` names. A second call continues training. |
 | [`fit_classical()`][tramdag.flow.CausalFlowDAG.fit_classical] | Float64 full-batch L-BFGS for all-`ls` specs: deterministic, exact MLE, matches `statsmodels`/R `polr`. Refuses flexible specs. |
 | [`sample()`][tramdag.flow.CausalFlowDAG.sample] | Observational, interventional (`do=`, graph mutilation) and counterfactual (`u=`) sampling. |
 | [`abduct()`][tramdag.flow.CausalFlowDAG.abduct] | Pearl step 1: recover the latents. Continuous exactly, ordinal by truncated draw. |
@@ -82,7 +82,7 @@ config in `experiments/paper/` states `units=` and `activation=` itself.
 | [`to_matrix()`][tramdag.flow.CausalFlowDAG.to_matrix] | The labeled meta-adjacency matrix of term effects. |
 | [`save()`][tramdag.flow.CausalFlowDAG.save] / [`load()`][tramdag.flow.CausalFlowDAG.load] | Checkpoints with history and provenance (version, time, device). `load` requires a complete checkpoint and fails loudly otherwise. |
 | (`_node`, `_encode_parent`, `_features`, `_tensorize`, `_generator`, `_dtype`, `_np_dtype`) | Node lookup with one shared error; parent encoding (continuous raw, ordinal one-hot); `_tensorize(df, cols=None)` for any column subset; seeded-generator and dtype plumbing. |
-| (`_vc_ehat_train`, `_binary_p1`, `_vc_ehat_live`, `_vc_ehat_columns`, `_recenter_vc`) | The generic side-input plumbing (each term declares/validates/recomputes its own inputs via the `ShiftTerm` hooks) plus the binary propensity fit and the post-fit `finalize` loop. |
+| (`_check_side_columns`, `_binary_p1`, `_side_feats`, `_query_side_columns`, `_recenter_vc`) | The generic side-column plumbing (each term names/validates/recomputes its own columns via the `ShiftTerm` hooks) plus the binary propensity fit and the post-fit `finalize` loop. |
 | (`_is_classical`) | Guard for `fit_classical`: every term's `term_is_classical` — `LS`, or a parentless `I()` basis carrier. |
 
 
@@ -112,7 +112,7 @@ contract diagram.
 | Name | Role |
 |---|---|
 | [`fit()`][tramdag.flow.CausalFlowDAG.fit] / [`fit_classical()`][tramdag.flow.CausalFlowDAG.fit_classical] | Defined here once, methods of the flow via the mixin. |
-| (`_split_validation`, `_slice_vc_ehat`, `_slice_ehat`, `_normalize_callbacks`, `_check_epoch_hook`, `_check_fit_sizes`, `_epoch_pass`, `_log_epoch`, `_val_nll`, `_fit_epoch`, `_FnCallback`) | The loop plumbing: Keras-shaped validation split, callback normalization and pre-fit signature checks, the epoch/validation passes, verbose printing. |
+| (`_split_validation`, `_normalize_callbacks`, `_check_epoch_hook`, `_check_fit_sizes`, `_epoch_pass`, `_log_epoch`, `_val_nll`, `_fit_epoch`, `_FnCallback`) | The loop plumbing: Keras-shaped validation split, callback normalization and pre-fit signature checks, the epoch/validation passes, verbose printing. |
 
 ## `readouts.py` — `_ReadoutsMixin`
 
@@ -158,8 +158,8 @@ default you can read at the call site. Nothing numeric is buried.
 | validation, progress | `fit(validation_data=, validation_split=, validation_batch_size=, verbose=)` | per-node val NLL into `history["val"]` each epoch; `verbose=N` prints every Nth + final epoch (default 0, silent) |
 | schedules, early stopping | `fit(optimizer=, callbacks=)` | `tramdag.callbacks` ships `EarlyStopping`, `PerNodePlateau`; anything else is torch's `lr_scheduler` and a few lines of callback ([fitting.md](fitting.md)) |
 | calibrated init | `calibrate(marginal_init=)` | True (pure init, MLE unchanged; `False` = zuko's zero start; called by the first fit) |
-| VC stage-1 propensities | `fit(vc_ehat=)` | required for a centered VC term, out of fold, computed by the caller |
-| VC penalty and centering | `VC(penalty=, center=)` | 1.0 / False (centering needs `fit(vc_ehat=)`) |
+| VC stage-1 propensities | the training-frame column `VC(center=)` names | required for a centered VC term, out of fold, computed by the caller |
+| VC penalty and centering | `VC(penalty=, center=)` | 1.0 / False (`center="col"` names the propensity column) |
 | L-BFGS budget | `fit_classical(max_iter=, tol=, history_size=)` | 400 / 1e-9 (torch `tolerance_change`; `tolerance_grad` is off) / 50 — one full-batch run, no chunks |
 | training budget | `fit(epochs=)` | **required** — a fixed default is wrong in both directions ([training-speed](training-speed.md)) |
 | network widths | `units=` on `I`/`CS`/`VC` | (8, 8) / (64, 128, 64) — parity with the PyTorch reference's default classes; VC's (16,) has no counterpart there and comes from the recovery measurement |

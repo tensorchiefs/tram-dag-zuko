@@ -119,8 +119,13 @@ class ShiftTerm(TermDef):
         """Construct the term module from its spec Term."""
         raise NotImplementedError
 
-    def shift_value(self, node: _Node, feats: dict, vc_ehat: dict | None) -> Tensor:
-        """Give this term's contribution to the node's shift, shape ``(n,)``."""
+    def shift_value(self, node: _Node, feats: dict) -> Tensor:
+        """Give this term's contribution to the node's shift, shape ``(n,)``.
+
+        ``feats`` holds the node's encoded parents plus this term's side
+        columns (frozen from the data frame during training, injected live
+        by the flow at query time).
+        """
         raise NotImplementedError
 
     def post_init(self) -> None:
@@ -138,26 +143,30 @@ class ShiftTerm(TermDef):
     def finalize(self, node: _Node, feats: dict) -> None:
         """Run the term's post-fit step (after the after-fit callbacks)."""
 
-    def score_columns(self, node: _Node, flow, feats: dict, dlds, ehat) -> dict:
+    def score_columns(self, node: _Node, flow, feats: dict, dlds) -> dict:
         """Give the per-observation score columns of this term's coefficients.
 
         Empty for a term with no interpretable coefficient (``CS``).
         """
         return {}
 
-    def side_keys(self) -> tuple[str, ...]:
-        """Name the per-row side inputs this term demands from ``fit(vc_ehat=)``."""
+    def side_columns(self) -> tuple[str, ...]:
+        """Name the data-frame columns this term needs beyond the parents.
+
+        Training reads them from ``train_df`` like any other column (so the
+        validation split and the minibatch slicing come for free).
+        """
         return ()
 
-    def check_side(self, node_name: str, key: str, e) -> None:
-        """Validate one supplied side-input array (values, not shape)."""
+    def check_column(self, node_name: str, col: str, values) -> None:
+        """Validate one side column's values at fit time."""
 
     def live_side(self, flow, values: dict, n: int) -> dict:
-        """Recompute this term's side inputs from the fitted flow, at query time."""
+        """Recompute the side columns from the fitted flow, at query time."""
         return {}
 
     def extra_columns(self, flow) -> list[str]:
-        """List columns beyond the node's parents that the side inputs need."""
+        """List the extra columns queries must tensorize for :meth:`live_side`."""
         return []
 
 
@@ -332,11 +341,11 @@ class LSTerm(ShiftTerm, LinearShift):
         m.net_parents = ()
         return m
 
-    def shift_value(self, node: _Node, feats: dict, vc_ehat: dict | None) -> Tensor:
+    def shift_value(self, node: _Node, feats: dict) -> Tensor:
         """Give the raw parent column times the weight — no input transform."""
         return self(torch.cat([feats[p] for p in self.parents], dim=1))
 
-    def score_columns(self, node: _Node, flow, feats: dict, dlds, ehat) -> dict:
+    def score_columns(self, node: _Node, flow, feats: dict, dlds) -> dict:
         """One column per weight: the parent (continuous) or its one-hot levels.
 
         ``d l_i / d beta = (d l_i / d s_i) * x_i`` — analytic and exact.
@@ -370,7 +379,7 @@ class CSTerm(ShiftTerm, ComplexShift):
         m.net_parents = ps
         return m
 
-    def shift_value(self, node: _Node, feats: dict, vc_ehat: dict | None) -> Tensor:
+    def shift_value(self, node: _Node, feats: dict) -> Tensor:
         """Give the net over this term's (possibly input-transformed) features."""
         return self(node.net_input(feats, self.parents, self.key))
 
@@ -410,32 +419,32 @@ class VCTerm(ShiftTerm, VaryingCoef):
         m.net_parents = mods
         m.mods = mods
         m.on_is_ord = isinstance(spec[on], OrdinalNode)
-        m.vc_center = term.center
+        m.center_col = term.center or None
         m.finalizes = bool(mods)
         return m
 
-    def regressor(self, feats: dict, vc_ehat: dict | None) -> Tensor:
+    def regressor(self, feats: dict) -> Tensor:
         """Give the ``(n, 1)`` column ``beta`` multiplies — the treatment, raw.
 
         The one-hot level-1 indicator for a binary ordinal treatment, the
-        value itself for a continuous one; a centered term subtracts the
-        propensity (the Robinson regressor ``t - e_hat(x)``). It is also the
-        score of ``beta0``, so :meth:`score_columns` reads it from here.
+        value itself for a continuous one; a centered term subtracts its
+        propensity column (the Robinson regressor ``t - e_hat(x)``). It is
+        also the score of ``beta0``, so :meth:`score_columns` reads it here.
         """
+        if self.center_col and self.center_col not in feats:
+            raise RuntimeError(
+                f"centered VC term on {self.key!r} needs its propensity "
+                f"column {self.center_col!r}. Internal callers inject it; "
+                "never evaluate a centered term without its propensity."
+            )
         t = feats[self.key][:, -1:] if self.on_is_ord else feats[self.key]
-        if self.vc_center:
-            t = t - vc_ehat[self.key].view(-1, 1)
+        if self.center_col:
+            t = t - feats[self.center_col].view(-1, 1)
         return t
 
-    def shift_value(self, node: _Node, feats: dict, vc_ehat: dict | None) -> Tensor:
+    def shift_value(self, node: _Node, feats: dict) -> Tensor:
         """``beta(modifiers) * regressor``, with the centered-term guard."""
-        if self.vc_center and (vc_ehat is None or self.key not in vc_ehat):
-            raise RuntimeError(
-                f"centered VC term on {self.key!r} needs e_hat. Internal "
-                "callers must supply vc_ehat. Never evaluate a centered "
-                "term without its propensity."
-            )
-        t = self.regressor(feats, vc_ehat)
+        t = self.regressor(feats)
         mod_feat = node.net_input(feats, self.mods, self.key) if self.mods else None
         return self(t, mod_feat)
 
@@ -457,24 +466,25 @@ class VCTerm(ShiftTerm, VaryingCoef):
         """Re-split ``beta0``/``b_theta``: the head sums to zero over train."""
         self.recenter(node.net_input(feats, self.mods, self.key))
 
-    def score_columns(self, node: _Node, flow, feats: dict, dlds, ehat) -> dict:
+    def score_columns(self, node: _Node, flow, feats: dict, dlds) -> dict:
         """One column, keyed by the treatment: the ``beta0`` score.
 
         ``d s / d beta0`` is the term's own :meth:`regressor`, so forward
         and score share one definition by construction.
         """
-        t = self.regressor(feats, ehat)
+        t = self.regressor(feats)
         return {self.key: (dlds * t.squeeze(-1)).cpu().numpy()}
 
-    def side_keys(self) -> tuple[str, ...]:
-        """Demand the treatment's out-of-fold propensities when centered."""
-        return (self.key,) if self.vc_center else ()
+    def side_columns(self) -> tuple[str, ...]:
+        """Name the propensity column a centered term reads from the frame."""
+        return (self.center_col,) if self.center_col else ()
 
-    def check_side(self, node_name: str, key: str, e) -> None:
+    def check_column(self, node_name: str, col: str, values) -> None:
         """Propensities are probabilities."""
-        if not ((e >= 0) & (e <= 1)).all():
+        if not ((values >= 0) & (values <= 1)).all():
             raise ValueError(
-                f"vc_ehat[{node_name!r}][{key!r}] must hold probabilities in [0, 1]"
+                f"column {col!r} (centered VC on node {node_name!r}) must "
+                "hold probabilities in [0, 1]"
             )
 
     def live_side(self, flow, values: dict, n: int) -> dict:
@@ -483,15 +493,16 @@ class VCTerm(ShiftTerm, VaryingCoef):
         Detached — no gradient reaches the treatment node from this node's
         loss — and derived from the current parent values, so
         ``do``-mutilated sampling centers with the intervened ``t`` (the DML
-        prediction convention; training uses the frozen out-of-fold values).
+        prediction convention; training uses the frozen out-of-fold column).
         """
-        if not self.vc_center:
+        if not self.center_col:
             return {}
-        return {self.key: flow._binary_p1(flow.nodes[self.key], values, n).detach()}
+        p1 = flow._binary_p1(flow.nodes[self.key], values, n).detach()
+        return {self.center_col: p1}
 
     def extra_columns(self, flow) -> list[str]:
         """Give the treatment's parents (a treatment cannot be centered itself)."""
-        return list(flow.nodes[self.key].parents) if self.vc_center else []
+        return list(flow.nodes[self.key].parents) if self.center_col else []
 
     @staticmethod
     def edge_parents(name: str, term: Term, spec: dict[str, NodeSpec]) -> tuple:
@@ -505,6 +516,18 @@ class VCTerm(ShiftTerm, VaryingCoef):
             )
         if term.penalty is None or term.penalty < 0:
             raise ValueError(f"Node '{name}': VC penalty must be >= 0.")
+        if term.center is not False and not isinstance(term.center, str):
+            raise ValueError(
+                f"Node '{name}': VC(center=) names the propensity COLUMN of "
+                "the training frame (out-of-fold P(t=1|pa_t) per row), or is "
+                f"False — got {term.center!r}. Cross-fit the propensities "
+                "outside and merge them as a column."
+            )
+        if term.center and term.center in spec:
+            raise ValueError(
+                f"Node '{name}': the propensity column {term.center!r} "
+                "collides with a node name."
+            )
         on_node = spec[on]
         if isinstance(on_node, OrdinalNode) and on_node.levels != 2:
             raise ValueError(
@@ -554,7 +577,7 @@ class FnTerm(ShiftTerm, nn.Module):
         m.net_parents = ps
         return m
 
-    def shift_value(self, node: _Node, feats: dict, vc_ehat: dict | None) -> Tensor:
+    def shift_value(self, node: _Node, feats: dict) -> Tensor:
         """Run ``fn`` on the term's features; accept ``(n,)`` or ``(n, 1)``."""
         out = self.fn(node.net_input(feats, self.parents, self.key))
         return out.squeeze(-1) if out.dim() > 1 else out

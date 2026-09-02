@@ -13,7 +13,6 @@ import inspect
 import time
 from typing import TYPE_CHECKING
 
-import numpy as np
 import pandas as pd
 import torch
 from torch import Tensor
@@ -56,17 +55,16 @@ def _split_validation(
     train_df: pd.DataFrame,
     validation_data: pd.DataFrame | None,
     validation_split: float | None,
-    vc_ehat: dict | None,
 ):
     """Resolve fit's validation arguments (the Keras rules).
 
     ``validation_split`` takes the LAST fraction of ``train_df`` as
     validation without shuffling, exactly like Keras — deterministic, no
-    hidden RNG. ``vc_ehat`` rows are sliced with the same split, so the
-    caller supplies propensities for the frame they passed.
+    hidden RNG. Side columns (a centered VC's propensities) are ordinary
+    columns of the frame, so they split with it.
     """
     if validation_split is None:
-        return train_df, validation_data, vc_ehat
+        return train_df, validation_data
     if validation_data is not None:
         raise ValueError("pass validation_data OR validation_split, not both")
     if not 0.0 < validation_split < 1.0:
@@ -77,30 +75,7 @@ def _split_validation(
             f"validation_split={validation_split} leaves no rows on one side "
             f"of the {len(train_df)}-row frame"
         )
-    vc_ehat = _slice_vc_ehat(vc_ehat, len(train_df), cut)
-    return train_df.iloc[:cut], train_df.iloc[cut:], vc_ehat
-
-
-def _slice_vc_ehat(vc_ehat: dict | None, n_full: int, cut: int) -> dict | None:
-    """Slice the caller's propensities with the validation split.
-
-    The rows must cover the FULL frame passed to ``fit`` — a wrong length
-    fails here instead of being silently truncated by the slice.
-    """
-    if vc_ehat is None:
-        return None
-    for node, d in vc_ehat.items():
-        for t, e in d.items():
-            if len(np.asarray(e)) != n_full:
-                raise ValueError(
-                    f"vc_ehat[{node!r}][{t!r}] has {len(np.asarray(e))} rows, "
-                    f"not the {n_full} of the frame passed to fit — supply "
-                    "propensities for that frame; the split slices them"
-                )
-    return {
-        node: {t: np.asarray(e)[:cut] for t, e in d.items()}
-        for node, d in vc_ehat.items()
-    }
+    return train_df.iloc[:cut], train_df.iloc[cut:]
 
 
 def _normalize_callbacks(cbs) -> list[Callback]:
@@ -150,26 +125,12 @@ def _check_epoch_hook(cb) -> None:
         ) from None
 
 
-def _slice_ehat(
-    vc_ehat: dict[str, dict[str, Tensor]] | None, idx: Tensor
-) -> dict[str, dict[str, Tensor]] | None:
-    """Slice the frozen out-of-fold propensities down to one minibatch."""
-    if vc_ehat is None:
-        return None
-    return {nm: {on: e[idx] for on, e in d.items()} for nm, d in vc_ehat.items()}
-
-
-# %% public functions ------------------------------------------------------------------
-
-
 def _epoch_pass(
-    flow, vals, ehat, opt, batch_size, penalized, val_vals, validation_batch_size
+    flow, vals, opt, batch_size, penalized, val_vals, validation_batch_size
 ) -> None:
     """Run one training epoch and, when configured, the validation pass."""
     flow.train()
-    flow.history["train"].append(
-        _fit_epoch(flow, vals, ehat, opt, batch_size, penalized)
-    )
+    flow.history["train"].append(_fit_epoch(flow, vals, opt, batch_size, penalized))
     flow.eval()
     if val_vals is not None:
         flow.history.setdefault("val", []).append(
@@ -208,7 +169,6 @@ def _val_nll(flow, vals: dict[str, Tensor], batch_size: int | None) -> dict[str,
 def _fit_epoch(
     flow,
     vals: dict[str, Tensor],
-    ehat: dict[str, dict[str, Tensor]] | None,
     opt: torch.optim.Optimizer,
     batch_size: int,
     penalized: list,
@@ -218,7 +178,7 @@ def _fit_epoch(
     acc = dict.fromkeys(flow.order, 0.0)
     for idx in torch.randperm(n, device=flow.device).split(batch_size):
         batch = {k: v[idx] for k, v in vals.items()}
-        per_node = flow.node_log_prob(batch, vc_ehat=_slice_ehat(ehat, idx))
+        per_node = flow.node_log_prob(batch)
         nlls = {k: -v.mean() for k, v in per_node.items()}
         loss = torch.stack(list(nlls.values())).sum()
         for m in penalized:  # the penalty joins the loss, not the history
@@ -250,7 +210,6 @@ class _FitMixin:
         seed: int | None = None,
         optimizer: torch.optim.Optimizer | None = None,
         callbacks=None,
-        vc_ehat: dict | None = None,
     ) -> CausalFlowDAG:
         """Fit all nodes jointly by maximum likelihood — one minibatch Adam loop.
 
@@ -324,10 +283,6 @@ class _FitMixin:
             coefficient trajectories. :mod:`tramdag.callbacks` ships
             ``EarlyStopping`` and ``PerNodePlateau``, all
             reading ``history["val"]``.
-        vc_ehat : dict | None, optional
-            Out-of-fold propensities ``{node: {t: array}}`` for every centered
-            ``VC`` term, one value per training row; required when the spec
-            has one (see docs/varying-coefficients.md).
 
         Returns
         -------
@@ -339,8 +294,8 @@ class _FitMixin:
         ValueError
             If ``epochs`` or ``batch_size`` is below 1, ``verbose`` is
             negative, both validation arguments are given, the split leaves
-            an empty side, or ``vc_ehat`` does not match the centered VC
-            terms of the spec.
+            an empty side, or a centered VC term's propensity column is
+            missing from the training frame or out of [0, 1].
         TypeError
             If a callback does not accept its hook's arguments — checked
             before the first epoch, so a mis-registered callback cannot
@@ -362,16 +317,16 @@ class _FitMixin:
         cbs = _normalize_callbacks(callbacks)
         if seed is not None:
             torch.manual_seed(seed)
-        train_df, validation_data, vc_ehat = _split_validation(
-            train_df, validation_data, validation_split, vc_ehat
+        train_df, validation_data = _split_validation(
+            train_df, validation_data, validation_split
         )
-        # vc_ehat is validated BEFORE calibrate: a malformed dict must fail
+        # side columns are validated BEFORE calibrate: a malformed frame fails
         # while the flow is still untouched (calibrate sets ranges and the
         # marginal start — a half-mutated flow after an error would be worse
         # than no fit at all)
-        ehat = self._vc_ehat_train(train_df, vc_ehat)
+        side_cols = self._check_side_columns(train_df)
         self.calibrate(train_df)
-        vals = self._tensorize(train_df)
+        vals = self._tensorize(train_df, list(self.order) + side_cols)
         val_vals = (
             self._tensorize(validation_data) if validation_data is not None else None
         )
@@ -391,7 +346,6 @@ class _FitMixin:
             _epoch_pass(
                 self,
                 vals,
-                ehat,
                 opt,
                 batch_size,
                 penalized,

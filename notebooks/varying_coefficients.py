@@ -236,11 +236,11 @@ print(f"max |beta(x) - (u(T=1) - u(T=0))| = {np.abs(beta_hat - (u1 - u0)).max():
 # The configuration where this bites hardest is deliberately simple: one
 # covariate, a strong propensity $e(x)=\sigma(2x)$, a constant true effect
 # $\tau = -1$, and a quadratic prognostic part fitted with a linear term.
-# `center=True` replaces $t$ by $t - \hat e(x)$ using **cross-fitted**
-# (out-of-fold) propensities, so the head sees the part of the treatment that
-# the covariates do not explain. Stage 1 — the propensities — is yours: any
-# classifier, predicted out of fold, handed to `fit(vc_ehat=)`. Here, five
-# classical fits of the treatment spec.
+# `center="ps"` replaces $t$ by $t - \hat e(x)$ using **cross-fitted**
+# (out-of-fold) propensities from the training-frame column `ps`, so the head
+# sees the part of the treatment that the covariates do not explain. Stage 1 —
+# the propensities — is yours: any classifier, predicted out of fold, merged
+# into the frame as a column. Here, five classical fits of the treatment spec.
 
 # %%
 TAU = -1.0
@@ -269,7 +269,7 @@ for j in range(5):
     proxy.fit_classical(c_train.iloc[fold_id != j][["X", "T"]])
     e_oof[fold_id == j] = proxy.pmf(c_train.iloc[fold_id == j], "T")[:, 1]
 
-for center in (False, True):
+for center in (False, "ps"):
     spec_c = {
         "X": ContinuousNode([I(transform="affine")]),
         "T": OrdinalNode(2, [LS("X")]),
@@ -278,18 +278,18 @@ for center in (False, True):
     }
     fc = CausalFlowDAG(spec_c, seed=0)
     fc.fit(
-        c_train,
+        # the out-of-fold propensities ride the frame as the column center= names
+        c_train.assign(ps=e_oof) if center else c_train,
         epochs=250,
         learning_rate=1e-2,
         batch_size=512,
         validation_data=c_val,
         seed=0,
         callbacks=EarlyStopping(),  # keep the best-validation weights
-        vc_ehat={"Y": {"T": e_oof}} if center else None,
     )
     b = fc.varying_coef(c_test, "Y")
     print(
-        f"center={center!s:5s}  mean |beta - tau| = {np.abs(b - TAU).mean():.3f}"
+        f"center={bool(center)!s:5s}  mean |beta - tau| = {np.abs(b - TAU).mean():.3f}"
         f"   mean beta = {b.mean():+.3f}  (true tau {TAU:+.1f})"
     )
 

@@ -573,7 +573,7 @@ def varying_coefficient(
     *modifiers: str,
     t: str,
     penalty: float = 1.0,
-    center: bool = False,
+    center: str | bool = False,
     units: list[int] | tuple[int, ...] | None = None,
     activation: str | None = None,
     input_transform=None,
@@ -617,16 +617,20 @@ def varying_coefficient(
         the known ``beta(x)`` of the ``vc_hetero`` DGP at corr ~ 0.99. The
         penalty is on the total-NLL scale, so its effective strength moves
         with ``n``: raise it for small ``n`` or many modifiers.
-    center : bool, optional
+    center : str | False, optional
         Propensity centering (issue #30), by default ``False``, which is
         bit-identical to the uncentered term — so a plain ``VC`` stays what
         it was before centering existed, and every committed number keeps
         reproducing. ``docs/varying-coefficients.md`` measures a 5-10x bias
         reduction from turning it on, so turn it on for an effect estimate.
-        ``True`` uses the **propensity-centered** regressor
-        ``beta(x) * (x_t - e_hat(pa_t))`` — the Robinson/R-learner
-        orthogonalization inside the likelihood. Requires a binary ordinal
-        ``t``.
+        A string names the **training-frame column** holding the
+        out-of-fold propensities ``P(t = 1 | pa_t)`` per row — compute them
+        with any cross-fitted classifier OUTSIDE the flow and merge them as
+        a column (in-sample values reintroduce the own-observation bias).
+        The regressor becomes ``beta(x) * (x_t - e_hat(pa_t))`` — the
+        Robinson/R-learner orthogonalization inside the likelihood; every
+        query after the fit recomputes the propensity live from the flow's
+        own treatment node. Requires a binary ordinal ``t``.
     units : list[int] | tuple[int, ...] | None, optional
         Hidden layers of ``b_theta``, by default ``[16]`` — see
         :class:`tramdag.conditioners.VaryingCoef` for why that size.
@@ -646,9 +650,10 @@ def varying_coefficient(
 
     Notes
     -----
-    With ``center=True``, training needs **out-of-fold** ``e_hat`` for every
-    training row, passed as ``fit(vc_ehat=)`` — the DML cross-fitting
-    requirement; in-sample centering can be *worse* than none. The values
+    With ``center="col"``, training reads **out-of-fold** ``e_hat`` for
+    every row from that column of the training frame — the DML
+    cross-fitting requirement; in-sample centering can be *worse* than
+    none. The values
     are frozen as data, so no gradient reaches the ``t`` node from this
     node's loss. Inference (``log_prob``/``sample``/``abduct``/``pmf``)
     recomputes ``e_hat`` from the flow's own fitted ``t`` node — the

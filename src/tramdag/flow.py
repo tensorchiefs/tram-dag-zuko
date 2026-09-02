@@ -196,7 +196,7 @@ class CausalFlowDAG(_FitMixin, _ReadoutsMixin, nn.Module):
         """Give ``P(node = 1 | parents)`` for a binary ordinal node.
 
         ``P(x <= 0) = sigmoid(theta_0 - s)``, so the answer is
-        ``sigmoid(s - theta_0)``. No ``vc_ehat``: chained centering is refused
+        ``sigmoid(s - theta_0)``. No side columns: chained centering is refused
         by the spec, so a treatment node never carries a centered term itself.
         """
         feats = self._features({p: values[p] for p in nd.parents})
@@ -210,22 +210,31 @@ class CausalFlowDAG(_FitMixin, _ReadoutsMixin, nn.Module):
         return self.nodes[name]
 
     def _features(self, values: dict[str, Tensor]) -> dict[str, Tensor]:
-        return {name: self._encode_parent(name, vals) for name, vals in values.items()}
+        # side columns (a VC's propensities) are not nodes: they pass raw
+        return {
+            name: self._encode_parent(name, vals) if name in self.spec else vals
+            for name, vals in values.items()
+        }
 
-    def _vc_ehat_live(
+    def _side_feats(
         self, nd: _Node, values: dict[str, Tensor], n: int
-    ) -> dict[str, Tensor] | None:
-        """Collect every term's live side inputs (see ``ShiftTerm.live_side``).
+    ) -> dict[str, Tensor]:
+        """Give the node's side columns: frozen from ``values``, else live.
 
-        Training uses the frozen out-of-fold values instead (:meth:`fit`).
+        Training frames carry them as ordinary columns; queries recompute
+        them from the fitted flow (``ShiftTerm.live_side``).
         """
         out = {}
         for m in nd.shifts.values():
-            out.update(m.live_side(self, values, n))
-        return out or None
+            for col in m.side_columns():
+                if col in values:
+                    out[col] = values[col]
+            if any(c not in out for c in m.side_columns()):
+                out.update(m.live_side(self, values, n))
+        return out
 
-    def _vc_ehat_columns(self, nd: _Node) -> list[str]:
-        """List the extra columns needed for the centered VC terms of ``nd``.
+    def _query_side_columns(self, nd: _Node) -> list[str]:
+        """List the extra columns a query needs to recompute live side inputs.
 
         These are the columns beyond ``nd.parents``: the parents of the
         treatment nodes (which cannot be centered themselves, so one level
@@ -238,7 +247,6 @@ class CausalFlowDAG(_FitMixin, _ReadoutsMixin, nn.Module):
         self,
         values: dict[str, Tensor],
         nodes: list[str] | None = None,
-        vc_ehat: dict[str, dict[str, Tensor]] | None = None,
     ) -> dict[str, Tensor]:
         """Compute the per-node log-likelihood contributions.
 
@@ -250,12 +258,6 @@ class CausalFlowDAG(_FitMixin, _ReadoutsMixin, nn.Module):
             Restrict the computation to these nodes. A subset is exact
             because the per-node losses
             are independent. ``None`` (default) computes every node.
-        vc_ehat : dict[str, dict[str, Tensor]] | None, optional
-            Propensity override for centered VC terms, as
-            ``{node: {on: e_hat}}``. ``fit`` passes the frozen
-            **out-of-fold** values for the training rows. When omitted,
-            the live full-fit propensity is recomputed from the flow's
-            own treatment node.
 
         Returns
         -------
@@ -267,12 +269,9 @@ class CausalFlowDAG(_FitMixin, _ReadoutsMixin, nn.Module):
         out = {}
         for name in self.order if nodes is None else nodes:
             node = self.nodes[name]
-            ehat = (
-                vc_ehat.get(name)
-                if vc_ehat is not None
-                else self._vc_ehat_live(node, values, n)
+            theta, shift = node.theta_shift(
+                feats | self._side_feats(node, values, n), n
             )
-            theta, shift = node.theta_shift(feats, n, vc_ehat=ehat)
             out[name] = kind_log_prob(node, theta, shift, values[name])
         return out
 
@@ -421,49 +420,33 @@ class CausalFlowDAG(_FitMixin, _ReadoutsMixin, nn.Module):
                 f"{' (non-integer)' if fractional else ''}"
             )
 
-    def _vc_ehat_train(
-        self, train_df: pd.DataFrame, vc_ehat: dict | None
-    ) -> dict[str, dict[str, Tensor]] | None:
-        """Turn the user's stage-1 propensities into the training-time tensors.
+    def _check_side_columns(self, train_df: pd.DataFrame) -> list[str]:
+        """Check the terms' side columns in the frame; give their names.
 
-        A centered ``VC`` term needs ``vc_ehat[node][t]``: ``P(t = 1 | pa_t)``
-        for every training row, positionally aligned with ``train_df``,
-        computed **out of fold** (the cross-fitting
+        A centered ``VC`` needs its propensity column: ``P(t = 1 | pa_t)``
+        per training row, computed **out of fold** (the cross-fitting
         requirement of the DML design; in-sample values reintroduce the
-        own-observation bias). How they are computed is the user's choice —
+        own-observation bias). How it is computed is the caller's choice —
         a ``fit_classical`` on the treatment spec per fold, or any
-        classifier. The training loss uses these frozen values; every query
-        after the fit uses the live treatment node (:meth:`_vc_ehat_live`).
+        classifier — merged into ``train_df`` as an ordinary column. The
+        training loss uses the frozen column; every query after the fit
+        recomputes the value live from the treatment node.
         """
-        demanders = {
-            (name, key): m
-            for name in self.order
-            for m in self.nodes[name].shifts.values()
-            for key in m.side_keys()
-        }
-        centered = set(demanders)
-        given = {(node, on) for node, d in (vc_ehat or {}).items() for on in d}
-        if centered != given:
-            raise ValueError(
-                "fit(vc_ehat=) must hold exactly the centered VC terms "
-                f"{sorted(centered)} as {{node: {{t: P(t=1|pa_t) per row}}}}, "
-                f"got {sorted(given)}. The values must be out of fold."
-            )
-        if not centered:
-            return None
-        n = len(train_df)
-        out: dict[str, dict[str, Tensor]] = {}
-        for node, on in centered:
-            e = np.asarray(vc_ehat[node][on], dtype=self._np_dtype).reshape(-1)
-            if len(e) != n:
-                raise ValueError(
-                    f"vc_ehat[{node!r}][{on!r}] has {len(e)} rows, not {n}"
-                )
-            demanders[(node, on)].check_side(node, on, e)
-            out.setdefault(node, {})[on] = torch.as_tensor(e, device=self.device)
-        return out
+        cols: list[str] = []
+        for name in self.order:
+            for m in self.nodes[name].shifts.values():
+                for col in m.side_columns():
+                    if col not in train_df.columns:
+                        raise ValueError(
+                            f"the centered VC on node {name!r} needs its "
+                            f"propensity column {col!r} in the training "
+                            "frame — compute P(t=1|pa_t) out of fold and "
+                            "merge it as a column."
+                        )
+                    m.check_column(name, col, train_df[col].to_numpy())
+                    cols.append(col)
+        return list(dict.fromkeys(cols))
 
-    @torch.no_grad()
     def _recenter_vc(self, values: dict[str, Tensor]) -> None:
         """Run every shift term's post-fit ``finalize`` (the VC re-centering).
 
@@ -548,7 +531,7 @@ class CausalFlowDAG(_FitMixin, _ReadoutsMixin, nn.Module):
             # ancestor values — under do the regressor is t_do - e_hat(x), never
             # a cached training value
             theta, shift = node.theta_shift(
-                feats, n, vc_ehat=self._vc_ehat_live(node, values, n)
+                feats | self._side_feats(node, values, n), n
             )
             values[name] = kind_sample(node, theta, shift, u_vals[name])
         return self._to_frame(values)
@@ -583,7 +566,7 @@ class CausalFlowDAG(_FitMixin, _ReadoutsMixin, nn.Module):
         for name in self.order:
             node = self.nodes[name]
             theta, shift = node.theta_shift(
-                feats, n, vc_ehat=self._vc_ehat_live(node, values, n)
+                feats | self._side_feats(node, values, n), n
             )
             u[name] = kind_abduct(node, theta, shift, values[name], generator=gen)
         return pd.DataFrame({k: v.cpu().numpy() for k, v in u.items()}, index=df.index)
@@ -600,11 +583,9 @@ class CausalFlowDAG(_FitMixin, _ReadoutsMixin, nn.Module):
         nd = self._node(node)
         df = df.assign(**(do or {}))
         n = len(df)
-        values = self._tensorize(df, list(nd.parents) + self._vc_ehat_columns(nd))
+        values = self._tensorize(df, list(nd.parents) + self._query_side_columns(nd))
         feats = self._features({p: values[p] for p in nd.parents})
-        theta, shift = nd.theta_shift(
-            feats, n, vc_ehat=self._vc_ehat_live(nd, values, n)
-        )
+        theta, shift = nd.theta_shift(feats | self._side_feats(nd, values, n), n)
         return nd, theta, shift, n
 
     @torch.no_grad()

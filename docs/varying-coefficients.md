@@ -115,7 +115,7 @@ The naive implementations are wrong. Thus this is a **two-stage frozen**
 design:
 
 - **Training** uses **out-of-fold** ê that *you* compute and pass as
-  `fit(vc_ehat={"Y": {"T": e_oof}})`, one value per training row: any
+  the frame column `VC(center=)` names (`df.assign(ps=e_oof)`), one value per training row: any
   propensity model, each fold predicted by a fit that never saw it. This is
   the DML cross-fitting requirement — in-sample ê reintroduces the
   own-observation bias and can be *worse* than no centering. Six lines with
@@ -133,7 +133,7 @@ design:
   The OOF values enter the outcome loss as frozen data. Thus **no gradient
   reaches the treatment node** from the outcome node, and the per-node
   factorization stays intact (pinned by a gradient-isolation test). `fit`
-  refuses a centered spec without `vc_ehat` and a `vc_ehat` that does not
+  refuses a centered spec whose frame lacks the column, and one that does not
   match the spec.
 - **Inference** (`log_prob` / `sample` / `abduct` / `pmf` / `scores`)
   recomputes ê from the flow's **own fitted treatment node**, the full-data

@@ -212,22 +212,17 @@ class _Node(nn.Module):
             cols.append(x)
         return torch.cat(cols, dim=1)
 
-    def theta_shift(
-        self, feats: dict[str, Tensor], n: int, vc_ehat: dict[str, Tensor] | None = None
-    ) -> tuple[Tensor, Tensor]:
+    def theta_shift(self, feats: dict[str, Tensor], n: int) -> tuple[Tensor, Tensor]:
         """Compute the transform parameters and the total shift of the node.
 
         Parameters
         ----------
         feats : dict[str, Tensor]
-            Encoded parent features, keyed by parent name.
+            Encoded parent features keyed by parent name, plus the terms'
+            side columns (a centered VC's propensities — frozen from the
+            training frame, injected live by the flow at query time).
         n : int
             Batch size.
-        vc_ehat : dict[str, Tensor] | None, optional
-            Propensity ``e_hat(pa_on)`` per centered VC treatment, keyed by
-            treatment name. Required whenever a term has ``center``.
-            Training passes the frozen out-of-fold values. Inference passes
-            the live full-fit values.
 
         Returns
         -------
@@ -238,7 +233,8 @@ class _Node(nn.Module):
         Raises
         ------
         RuntimeError
-            If a centered VC term is evaluated without its propensity.
+            If a centered VC term is evaluated without its propensity
+            column in ``feats``.
         """
         from .terms import VCTerm
 
@@ -248,10 +244,10 @@ class _Node(nn.Module):
         modules = list(self.shifts.values())
         for m in modules:
             if not isinstance(m, VCTerm):
-                shift = shift + m.shift_value(self, feats, vc_ehat)
+                shift = shift + m.shift_value(self, feats)
         for m in modules:
             if isinstance(m, VCTerm):
-                shift = shift + m.shift_value(self, feats, vc_ehat)
+                shift = shift + m.shift_value(self, feats)
         return theta, shift
 
 
