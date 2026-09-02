@@ -236,7 +236,7 @@ def test_shift_curve_matches_the_manual_composition(ls_chain):
     """``shift_curve`` equals the nd.shifts + net_input reach-in it replaces,
     and refuses an unknown shift key with the available ones named.
     """
-    from tramdag import CS, ContinuousNode, shift_curve
+    from tramdag import CS, ContinuousNode
 
     df = ls_chain["draw"](400, 0)[["x1", "x2"]]
     spec = {"x1": ContinuousNode(), "x2": ContinuousNode([CS("x1")])}
@@ -247,6 +247,6 @@ def test_shift_curve_matches_the_manual_composition(ls_chain):
     nd = flow.nodes["x2"]
     with torch.no_grad():
         manual = nd.shifts["x1"](nd.net_input({"x1": x}, ("x1",), "x1")).numpy().ravel()
-    assert np.allclose(shift_curve(flow, "x2", "x1", grid), manual)
+    assert np.allclose(flow.shift_curve("x2", "x1", grid), manual)
     with pytest.raises(KeyError, match="available"):
-        shift_curve(flow, "x2", "nope", grid)
+        flow.shift_curve("x2", "nope", grid)

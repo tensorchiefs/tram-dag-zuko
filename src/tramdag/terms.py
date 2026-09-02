@@ -412,10 +412,20 @@ class VCTerm(ShiftTerm, VaryingCoef):
         m.on_is_ord = isinstance(spec[on], OrdinalNode)
         m.vc_center = term.center
         m.finalizes = bool(mods)
-        from .nodes import _VCGroup
-
-        m.group = _VCGroup(on, mods, m.on_is_ord, m.vc_center)
         return m
+
+    def regressor(self, feats: dict, vc_ehat: dict | None) -> Tensor:
+        """Give the ``(n, 1)`` column ``beta`` multiplies — the treatment, raw.
+
+        The one-hot level-1 indicator for a binary ordinal treatment, the
+        value itself for a continuous one; a centered term subtracts the
+        propensity (the Robinson regressor ``t - e_hat(x)``). It is also the
+        score of ``beta0``, so :meth:`score_columns` reads it from here.
+        """
+        t = feats[self.key][:, -1:] if self.on_is_ord else feats[self.key]
+        if self.vc_center:
+            t = t - vc_ehat[self.key].view(-1, 1)
+        return t
 
     def shift_value(self, node: _Node, feats: dict, vc_ehat: dict | None) -> Tensor:
         """``beta(modifiers) * regressor``, with the centered-term guard."""
@@ -425,7 +435,7 @@ class VCTerm(ShiftTerm, VaryingCoef):
                 "callers must supply vc_ehat. Never evaluate a centered "
                 "term without its propensity."
             )
-        t = node.vc_column(self.group, feats, vc_ehat)
+        t = self.regressor(feats, vc_ehat)
         mod_feat = node.net_input(feats, self.mods, self.key) if self.mods else None
         return self(t, mod_feat)
 
@@ -450,10 +460,10 @@ class VCTerm(ShiftTerm, VaryingCoef):
     def score_columns(self, node: _Node, flow, feats: dict, dlds, ehat) -> dict:
         """One column, keyed by the treatment: the ``beta0`` score.
 
-        ``d s / d beta0`` is the term's own regressor (``vc_column``), so
-        forward and score share one definition by construction.
+        ``d s / d beta0`` is the term's own :meth:`regressor`, so forward
+        and score share one definition by construction.
         """
-        t = node.vc_column(self.group, feats, ehat)
+        t = self.regressor(feats, ehat)
         return {self.key: (dlds * t.squeeze(-1)).cpu().numpy()}
 
     def side_keys(self) -> tuple[str, ...]:

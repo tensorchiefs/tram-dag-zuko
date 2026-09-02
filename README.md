@@ -199,8 +199,9 @@ See the [`tests/README.md`](tests/README.md) file for more details.
 ## Layout
 
 ```
-src/tramdag/            spec.py transforms.py conditioners.py flow.py
-                        scores.py                 <- the framework, and nothing else
+src/tramdag/            spec.py terms.py transforms.py conditioners.py
+                        nodes.py flow.py fitting.py readouts.py scores.py
+                        callbacks.py              <- the framework, and nothing else
 tests/                  unit tests, identities, acceptance bars, three inline DGPs
 experiments/            research code, one directory per area, each self-contained:
                           paper/       the replications + generators + frozen data
@@ -211,10 +212,10 @@ experiments/            research code, one directory per area, each self-contain
                         other areas' data and pins no ground truth)
 notebooks/              four executed examples: didactic intro, Colab demo,
                         additive-vs-joint intercepts, varying coefficients
-docs/                   code-map.md (every class/function + all knobs),
-                        fitting.md, notation.md, training-speed.md,
-                        paper-replication.md, varying-coefficients.md,
-                        scores.md
+docs/                   architecture.md + adr/ (the 1.0 design and its
+                        refusals), code-map.md, fitting.md, notation.md,
+                        training-speed.md, paper-replication.md,
+                        varying-coefficients.md, scores.md
 ```
 
 Implementation conventions (latent-scale signs, raw/one-hot parent encoding,

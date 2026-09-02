@@ -118,3 +118,77 @@ def test_register_term_round_trip_and_collision(ls_chain):
         CausalFlowDAG(
             {"x1": ContinuousNode(), "x2": ContinuousNode([Term("NOPE", ("x1",), ())])}
         )
+
+
+def test_custom_intercept_slot_refuses_instead_of_misbuilding(ls_chain):
+    """A registered slot='intercept' custom effect must refuse loudly —
+    normalization would otherwise drop it silently from the built model.
+    """
+
+    class _CustomI(ShiftTerm):  # slot lies on purpose; class shape irrelevant
+        effect = "MYI"
+        slot = "intercept"
+        option_defaults: ClassVar[dict] = {}
+
+    if "MYI" not in _REGISTRY:
+        register_term(_CustomI)
+    spec = {
+        "x1": ContinuousNode(),
+        "x2": ContinuousNode([Term("MYI", ("x1",), ())]),
+    }
+    with pytest.raises(ValueError, match="not supported yet"):
+        CausalFlowDAG(spec)
+
+
+class _PenShift(ShiftTerm, nn.Module):
+    """A custom penalized term: the regularizer hook must reach the loss."""
+
+    effect = "PEN"
+    slot = "shift"
+    option_defaults: ClassVar[dict] = {}
+
+    def __init__(self):
+        nn.Module.__init__(self)
+        self.w = nn.Parameter(torch.zeros(()))
+        self.calls = 0
+
+    @classmethod
+    def build(cls, term, spec):
+        m = cls()
+        m.key = term.parents[0]
+        m.parents = tuple(term.parents)
+        m.net_parents = ()
+        return m
+
+    def shift_value(self, node, feats, vc_ehat):
+        return self.w * feats[self.parents[0]][:, 0]
+
+    @property
+    def has_regularizer(self):
+        return True
+
+    def regularizer(self):
+        self.calls += 1
+        return self.w**2
+
+
+def test_custom_regularizer_joins_the_loss(ls_chain):
+    """Fit adds regularizer()/n — the hook, not VC's internals."""
+    df = ls_chain["draw"](300, 0)[["x1", "x2"]]
+    if "PEN" not in _REGISTRY:
+        register_term(_PenShift)
+    spec = {"x1": ContinuousNode(), "x2": ContinuousNode([Term("PEN", ("x1",), ())])}
+    flow = CausalFlowDAG(spec, seed=0)
+    flow.fit(df, epochs=2, batch_size=150)
+    assert flow.nodes["x2"].shifts["x1"].calls >= 4  # every minibatch
+
+
+def test_shift_curve_covers_fn_terms(ls_chain):
+    """shift_curve evaluates through shift_value, so an Fn term works."""
+    df = ls_chain["draw"](300, 0)[["x1", "x2"]]
+    flow = CausalFlowDAG(_two_node(fn_shift("x1", fn=_double)), seed=0)
+    flow.fit(df, epochs=1, batch_size=150)
+    grid = np.linspace(-1, 1, 5)
+    np.testing.assert_allclose(
+        flow.shift_curve("x2", "x1", grid), 2.0 * grid, atol=1e-6
+    )

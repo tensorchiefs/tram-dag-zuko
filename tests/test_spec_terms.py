@@ -43,7 +43,7 @@ def test_terms_spec_builds_and_scores():
 
 def test_node_internal_structure_matches():
     flow = CausalFlowDAG(_terms_spec(), seed=0)
-    assert flow.nodes["X3"].ci_parents == ["X1"]  # I("X1") -> ci-parent
+    assert flow.nodes["X3"].intercept.ci_parents == ["X1"]  # I("X1") -> ci-parent
     assert set(flow.nodes["X3"].shifts) == {"X2"}  # CS("X2") -> shift
     assert flow.nodes["X3"].parents == ("X1", "X2")  # ordered parent names
 
@@ -65,7 +65,7 @@ def test_joint_terms_build(term, n_shift, n_ci):
     }
     node = CausalFlowDAG(spec, seed=0).nodes["X3"]
     assert len(node.shifts) == n_shift  # joint CS -> a single shift module
-    assert len(node.ci_parents) == n_ci  # joint I  -> both parents pooled
+    assert len(node.intercept.ci_parents) == n_ci  # joint I -> both parents pooled
 
 
 def test_duplicate_parent_across_terms_raises():

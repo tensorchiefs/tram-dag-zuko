@@ -11,13 +11,21 @@ conventions, seeding and all ten experiment ground truths are unchanged
 (verified per step by a seeded state-dict smoke and replications); the fit
 API, queries and read-outs keep their signatures via one-line delegates.
 
+- `fitting.py` and `readouts.py` are mixins `CausalFlowDAG` composes —
+  every method defined once, no delegate layer; `shift_curve` is a flow
+  METHOD (`flow.shift_curve(node, parent, grid)`), and it evaluates
+  through the term's own `shift_value`, so `Fn` and custom terms plot
+  too. The internal legacy views died with the compat pass: `_VCGroup`,
+  `node.vc_column` (now `VCTerm.regressor`), `node._vc_groups`,
+  `node._shift_groups`, and the `ci_parents`/`_intercept_groups`
+  pass-through properties (read `node.intercept.ci_parents`/`.groups`).
 - New modules: `nodes.py` (the node model + the ONLY four continuous/ordinal
   branches: `kind_log_prob`/`kind_sample`/`kind_abduct`/`kind_marginal_theta`),
   `fitting.py` (fit/fit_classical as free functions), `readouts.py`
   (stateless read-outs), `terms.py` (the registry and the term classes:
   LSTerm/CSTerm/VCTerm/FnTerm, SITerm/CITerm/AdditiveCITerm on
   ShiftTerm/InterceptTerm hooks).
-- New public API: `shift_curve(flow, node, parent, grid)` (replaces reaching
+- New public API: `flow.shift_curve(node, parent, grid)` (replaces reaching
   into `nd.shifts[..]`/`net_input`); `fn_shift(*parents, fn=)`/`Fn` (a
   callable or trainable `nn.Module` in the additive shifts);
   `register_term` (whole custom effects as `ShiftTerm` subclasses);

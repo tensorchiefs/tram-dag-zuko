@@ -264,6 +264,15 @@ def _check_term(name: str, term: Term, spec: dict[str, NodeSpec]) -> tuple[str, 
             "the spec is built or loaded."
         ) from None
     entry.check_arity(name, term)
+    if entry.slot == "intercept" and term.effect != "I":
+        # _normalize_terms classifies intercepts by effect "I"; a custom
+        # intercept-slot effect would silently land in the shift pass and
+        # never be built — refuse instead of misbuilding
+        raise ValueError(
+            f"Node '{name}': custom intercept-slot effects are not supported "
+            f"yet — '{term.effect}' registers slot='intercept'. Custom terms "
+            "are shifts (tramdag.terms.ShiftTerm)."
+        )
     for p in term.parents:
         if p not in spec:
             raise ValueError(f"Node '{name}': unknown parent '{p}'.")

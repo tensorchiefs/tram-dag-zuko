@@ -160,78 +160,6 @@ def _slice_ehat(
 
 
 # %% public functions ------------------------------------------------------------------
-def fit(
-    flow: CausalFlowDAG,
-    train_df: pd.DataFrame,
-    *,
-    epochs: int,
-    learning_rate: float = 1e-2,
-    batch_size: int = 512,
-    validation_data: pd.DataFrame | None = None,
-    validation_split: float | None = None,
-    validation_batch_size: int | None = None,
-    verbose: int = 0,
-    seed: int | None = None,
-    optimizer: torch.optim.Optimizer | None = None,
-    callbacks=None,
-    vc_ehat: dict | None = None,
-) -> CausalFlowDAG:
-    """Fit by minibatch Adam — the full contract is on ``CausalFlowDAG.fit``."""
-    _check_fit_sizes(epochs, batch_size, verbose, validation_batch_size)
-    cbs = _normalize_callbacks(callbacks)
-    if seed is not None:
-        torch.manual_seed(seed)
-    train_df, validation_data, vc_ehat = _split_validation(
-        train_df, validation_data, validation_split, vc_ehat
-    )
-    # vc_ehat is validated BEFORE calibrate: a malformed dict must fail
-    # while the flow is still untouched (calibrate sets ranges and the
-    # marginal start — a half-mutated flow after an error would be worse
-    # than no fit at all)
-    ehat = flow._vc_ehat_train(train_df, vc_ehat)
-    flow.calibrate(train_df)
-    vals = flow._tensorize(train_df)
-    val_vals = flow._tensorize(validation_data) if validation_data is not None else None
-    # the shipped callbacks check this: an unvalidated fit in between must
-    # not let them read a stale history["val"] entry as the current epoch
-    flow._fit_validated = val_vals is not None
-    opt = optimizer or torch.optim.Adam(flow.parameters(), lr=learning_rate)
-    penalized = [
-        m
-        for nd in flow.nodes.values()
-        for m in nd.shifts.values()
-        if isinstance(m, ShiftTerm) and m.has_regularizer
-    ]
-    for cb in cbs:
-        cb.on_fit_begin(flow, opt)
-    for epoch in range(1, epochs + 1):
-        _epoch_pass(
-            flow,
-            vals,
-            ehat,
-            opt,
-            batch_size,
-            penalized,
-            val_vals,
-            validation_batch_size,
-        )
-        # every callback runs (a stop must not skip a monitoring one)
-        stops = [bool(cb.on_epoch_end(flow, epoch, opt)) for cb in cbs]
-        _log_epoch(
-            flow,
-            epoch,
-            epochs,
-            verbose,
-            stopped=any(stops),
-            has_val=val_vals is not None,
-        )
-        if any(stops):
-            break
-    for cb in cbs:
-        cb.on_fit_end(flow, opt)  # before re-centering: restored weights re-center
-    flow._recenter_vc(vals)
-    flow.eval()
-    return flow
 
 
 def _epoch_pass(
@@ -294,7 +222,7 @@ def _fit_epoch(
         nlls = {k: -v.mean() for k, v in per_node.items()}
         loss = torch.stack(list(nlls.values())).sum()
         for m in penalized:  # the penalty joins the loss, not the history
-            loss = loss + m.penalty * m.l2() / n
+            loss = loss + m.regularizer() / n
         opt.zero_grad()
         loss.backward()
         opt.step()
@@ -304,75 +232,321 @@ def _fit_epoch(
     return acc
 
 
-def fit_classical(
-    flow: CausalFlowDAG,
-    train_df: pd.DataFrame,
-    *,
-    max_iter: int = 400,
-    tol: float = 1e-9,
-    history_size: int = 50,
-) -> dict:
-    """Fit an all-``ls`` model by L-BFGS — contract on the flow method."""
-    if not flow._is_classical():
-        raise ValueError(
-            "fit_classical requires an all-`ls` spec, that is every edge "
-            "term 'ls'. This spec has cs, ci or vc terms. Use fit() for "
-            "flexible models."
+# %% public classes --------------------------------------------------------------------
+class _FitMixin:
+    """The two fitting paths, mixed into :class:`~tramdag.CausalFlowDAG`."""
+
+    def fit(
+        self,
+        train_df: pd.DataFrame,
+        *,
+        epochs: int,
+        learning_rate: float = 1e-2,
+        batch_size: int = 512,
+        validation_data: pd.DataFrame | None = None,
+        validation_split: float | None = None,
+        validation_batch_size: int | None = None,
+        verbose: int = 0,
+        seed: int | None = None,
+        optimizer: torch.optim.Optimizer | None = None,
+        callbacks=None,
+        vc_ehat: dict | None = None,
+    ) -> CausalFlowDAG:
+        """Fit all nodes jointly by maximum likelihood — one minibatch Adam loop.
+
+        The joint NLL decomposes per node with independent gradients, so one
+        optimizer over all parameters is the same as one per node. The loop
+        keeps the **final** weights: an all-``ls`` model trained to
+        convergence reproduces the classical maximum-likelihood estimate and
+        matches ``statsmodels`` and R ``polr``. A second ``fit`` call
+        continues the training. Everything else — validation monitoring,
+        learning-rate schedules, early stopping, best-weight restoration,
+        logging — is the caller's, through ``optimizer`` and ``callbacks``;
+        :mod:`tramdag.callbacks` ships the common recipes::
+
+            from tramdag.callbacks import EarlyStopping
+
+            flow.fit(
+                train_df,
+                epochs=4000,
+                validation_data=val_df,
+                verbose=50,
+                callbacks=EarlyStopping(patience=200),
+            )
+
+        Parameters
+        ----------
+        train_df : pd.DataFrame
+            Training data, one column per node.
+        epochs : int
+            Number of passes over the data. There is no default: a fixed
+            budget over-spends on some workloads and under-spends on others
+            (docs/training-speed.md).
+        learning_rate : float, optional
+            Adam step size of the default optimizer, by default 1e-2.
+            Ignored when ``optimizer`` is given.
+        batch_size : int, optional
+            Rows per gradient step, by default 512. ``len(train_df)`` is one
+            full-batch step per epoch.
+        validation_data : pd.DataFrame | None, optional
+            Validation rows, one column per node. When given (or split off),
+            the per-node validation NLL is computed after every epoch and
+            appended to ``flow.history["val"]`` — once, centrally; the
+            shipped callbacks read it there.
+        validation_split : float | None, optional
+            Keras' rule: the LAST fraction of ``train_df`` becomes the
+            validation set, without shuffling, and only the remaining rows
+            train (and calibrate — no leakage into the frozen statistics).
+            Mutually exclusive with ``validation_data``.
+        validation_batch_size : int | None, optional
+            Chunk size of the validation pass — a MEMORY ceiling for large
+            validation frames, by default one full batch (which is also the
+            fastest; chunk only when the full pass does not fit).
+        verbose : int, optional
+            0 (default) is silent. ``N >= 1`` prints one line every ``N``
+            epochs and on the final epoch: epoch counter, summed train NLL,
+            summed validation NLL when validation is configured. No
+            progress bars.
+        seed : int | None, optional
+            Seeds torch's global RNG before the loop, for the minibatch
+            shuffling. Weight initialization is seeded at construction
+            (``CausalFlowDAG(spec, seed=...)``).
+        optimizer : torch.optim.Optimizer | None, optional
+            Any torch optimizer over ``flow.parameters()``; the default is
+            ``Adam(lr=learning_rate)``. Build it yourself to attach a
+            ``torch.optim.lr_scheduler`` or to continue with its state.
+        callbacks : Callback | callable | list | None, optional
+            One entry or a list. A :class:`~tramdag.callbacks.Callback`
+            hooks all three points of the fit — its docstring is the
+            contract (begin/epoch/end timing, the stop rule, the VC
+            re-centering order). A bare callable is an ``on_epoch_end``
+            hook, ``cb(flow, epoch, optimizer)`` — use it for schedules and
+            coefficient trajectories. :mod:`tramdag.callbacks` ships
+            ``EarlyStopping`` and ``PerNodePlateau``, all
+            reading ``history["val"]``.
+        vc_ehat : dict | None, optional
+            Out-of-fold propensities ``{node: {t: array}}`` for every centered
+            ``VC`` term, one value per training row; required when the spec
+            has one (see docs/varying-coefficients.md).
+
+        Returns
+        -------
+        CausalFlowDAG
+            ``self``, fitted, in eval mode.
+
+        Raises
+        ------
+        ValueError
+            If ``epochs`` or ``batch_size`` is below 1, ``verbose`` is
+            negative, both validation arguments are given, the split leaves
+            an empty side, or ``vc_ehat`` does not match the centered VC
+            terms of the spec.
+        TypeError
+            If a callback does not accept its hook's arguments — checked
+            before the first epoch, so a mis-registered callback cannot
+            waste a run.
+
+        Notes
+        -----
+        For ``VC`` terms the objective is the **penalized** NLL on the
+        total-likelihood scale: each term adds
+        ``penalty * ||b_theta weights||^2`` to the summed NLL, that is
+        ``penalty * ||w||^2 / n_train`` to the mean loss — a fixed Gaussian
+        prior whose shrinkage vanishes as n grows. ``beta0`` is not
+        penalized, and ``history["train"]`` holds pure likelihoods. After
+        the loop each ``b_theta`` is re-centered to mean zero over the
+        training rows; the constant moves into ``beta0``, the function is
+        unchanged.
+        """
+        _check_fit_sizes(epochs, batch_size, verbose, validation_batch_size)
+        cbs = _normalize_callbacks(callbacks)
+        if seed is not None:
+            torch.manual_seed(seed)
+        train_df, validation_data, vc_ehat = _split_validation(
+            train_df, validation_data, validation_split, vc_ehat
         )
-    flow.calibrate(train_df, marginal_init=False)  # L-BFGS needs no warm start
-    # a callback used manually afterwards must not read a pre-classical
-    # validation entry as current — this fit computes none
-    flow._fit_validated = False
-
-    flow.double()  # parameters + buffers (xmin/xmax) -> float64, one call
-    t0 = time.perf_counter()
-    try:
-        vals = flow._tensorize(train_df)
-        flow.train()
-        opt = torch.optim.LBFGS(
-            flow.parameters(),
-            lr=1.0,
-            max_iter=max_iter,
-            history_size=history_size,
-            tolerance_grad=0.0,  # |grad| never settles on the flat ridges
-            tolerance_change=tol,
-            line_search_fn="strong_wolfe",
+        # vc_ehat is validated BEFORE calibrate: a malformed dict must fail
+        # while the flow is still untouched (calibrate sets ranges and the
+        # marginal start — a half-mutated flow after an error would be worse
+        # than no fit at all)
+        ehat = self._vc_ehat_train(train_df, vc_ehat)
+        self.calibrate(train_df)
+        vals = self._tensorize(train_df)
+        val_vals = (
+            self._tensorize(validation_data) if validation_data is not None else None
         )
+        # the shipped callbacks check this: an unvalidated fit in between must
+        # not let them read a stale history["val"] entry as the current epoch
+        self._fit_validated = val_vals is not None
+        opt = optimizer or torch.optim.Adam(self.parameters(), lr=learning_rate)
+        penalized = [
+            m
+            for nd in self.nodes.values()
+            for m in nd.shifts.values()
+            if isinstance(m, ShiftTerm) and m.has_regularizer
+        ]
+        for cb in cbs:
+            cb.on_fit_begin(self, opt)
+        for epoch in range(1, epochs + 1):
+            _epoch_pass(
+                self,
+                vals,
+                ehat,
+                opt,
+                batch_size,
+                penalized,
+                val_vals,
+                validation_batch_size,
+            )
+            # every callback runs (a stop must not skip a monitoring one)
+            stops = [bool(cb.on_epoch_end(self, epoch, opt)) for cb in cbs]
+            _log_epoch(
+                self,
+                epoch,
+                epochs,
+                verbose,
+                stopped=any(stops),
+                has_val=val_vals is not None,
+            )
+            if any(stops):
+                break
+        for cb in cbs:
+            cb.on_fit_end(self, opt)  # before re-centering: restored weights re-center
+        self._recenter_vc(vals)
+        self.eval()
+        return self
 
-        def closure():
-            opt.zero_grad()
-            nll = torch.stack(
-                [-lp.mean() for lp in flow.node_log_prob(vals).values()]
-            ).sum()
-            nll.backward()
-            return nll
+    def fit_classical(
+        self,
+        train_df: pd.DataFrame,
+        *,
+        max_iter: int = 400,
+        tol: float = 1e-9,
+        history_size: int = 50,
+    ) -> dict:
+        """Fit an all-``ls`` model the classical way.
 
-        opt.step(closure)
-        n_iter = next(iter(opt.state.values()))["n_iter"]
-        converged = n_iter < max_iter  # torch stopped on a tolerance
-        with torch.no_grad():
-            final_nll = float(
-                torch.stack(
-                    [-lp.mean() for lp in flow.node_log_prob(vals).values()]
+        The fit uses full batches, float64, and L-BFGS with a strong-Wolfe
+        line search. There are no minibatches, no schedule and no early
+        stopping, so the fit is deterministic and bit-reproducible. It lands
+        on the exact maximum-likelihood estimate and matches classical
+        software, that is ``statsmodels`` ``OrderedModel`` and R ``polr`` or
+        ``Colr``. It is much faster than minibatch Adam.
+
+        This method is valid only when every edge is ``ls``, because each
+        node-conditional is then a classical transformation model. Any other
+        model raises. For a ``cs`` or ``ci`` model use :meth:`fit`, where
+        the minibatch noise also regularizes the NNs.
+
+        Parameters
+        ----------
+        train_df : pd.DataFrame
+            Training data, one column per node.
+        max_iter : int, optional
+            Upper limit on L-BFGS iterations, by default 400.
+        tol : float, optional
+            torch's ``tolerance_change``: the NLL (or parameter) change below
+            which L-BFGS stops, by default 1e-9. Measured on the classical
+            anchor: 1e-6 stops on a plateau step and leaves a rare one-hot
+            level 0.24 off statsmodels; 1e-9 lands within 0.03, the same as
+            running to the iteration cap.
+        history_size : int, optional
+            L-BFGS memory, by default 50.
+
+        Returns
+        -------
+        dict
+            A convergence report: ``converged``, ``n_iter``, ``final_nll``,
+            ``grad_norm``, ``seconds``, and the fitted ``coefficients``
+            from :meth:`ls_coefficients`.
+
+        Raises
+        ------
+        ValueError
+            If the spec has ``cs``, ``ci`` or ``vc`` terms.
+
+        Notes
+        -----
+        float64 is a transient compute mode. The model is upcast for the
+        fit, and ``self.double()`` converts the parameters and the range
+        buffers of the transforms in one call. Afterwards the model returns
+        to float32, so the stored model and ``save``/``load`` stay float32.
+        Double precision is what lets the line search resolve the optimum
+        cleanly.
+
+        Convergence is torch's own: L-BFGS stops when the NLL or the
+        parameters move by less than ``tol`` (``tolerance_grad`` is set to
+        0, so the gradient never ends the run). ``|grad|`` and individual
+        coefficients do *not* settle to machine precision. A continuous
+        node's Bernstein intercept, and weakly-identified directions such
+        as rare one-hot levels or a flat treatment-effect ridge, keep
+        drifting along near-zero-curvature valleys long after the
+        likelihood and the well-identified coefficients reach the MLE.
+        Correctness is therefore verified by comparison to classical
+        software (see ``experiments/misc/validate_ls.py``), not by this flag.
+        """
+        if not self._is_classical():
+            raise ValueError(
+                "fit_classical requires an all-`ls` spec, that is every edge "
+                "term 'ls'. This spec has cs, ci or vc terms. Use fit() for "
+                "flexible models."
+            )
+        self.calibrate(train_df, marginal_init=False)  # L-BFGS needs no warm start
+        # a callback used manually afterwards must not read a pre-classical
+        # validation entry as current — this fit computes none
+        self._fit_validated = False
+
+        self.double()  # parameters + buffers (xmin/xmax) -> float64, one call
+        t0 = time.perf_counter()
+        try:
+            vals = self._tensorize(train_df)
+            self.train()
+            opt = torch.optim.LBFGS(
+                self.parameters(),
+                lr=1.0,
+                max_iter=max_iter,
+                history_size=history_size,
+                tolerance_grad=0.0,  # |grad| never settles on the flat ridges
+                tolerance_change=tol,
+                line_search_fn="strong_wolfe",
+            )
+
+            def closure():
+                opt.zero_grad()
+                nll = torch.stack(
+                    [-lp.mean() for lp in self.node_log_prob(vals).values()]
                 ).sum()
-            )
-        grad_norm = float(
-            torch.nn.utils.get_total_norm(
-                [p.grad for p in flow.parameters() if p.grad is not None]
-            )
-        )
-        coefs = flow.ls_coefficients()  # read while still float64
-    finally:
-        flow.float()  # restore canonical float32 (lossy ~1e-7, harmless)
-    flow.eval()
+                nll.backward()
+                return nll
 
-    report = {
-        "converged": converged,
-        "n_iter": n_iter,
-        "final_nll": final_nll,
-        "grad_norm": grad_norm,
-        "seconds": time.perf_counter() - t0,
-        "coefficients": coefs,
-    }
-    flow.history["classical"] = {k: v for k, v in report.items() if k != "coefficients"}
-    return report
+            opt.step(closure)
+            n_iter = next(iter(opt.state.values()))["n_iter"]
+            converged = n_iter < max_iter  # torch stopped on a tolerance
+            with torch.no_grad():
+                final_nll = float(
+                    torch.stack(
+                        [-lp.mean() for lp in self.node_log_prob(vals).values()]
+                    ).sum()
+                )
+            grad_norm = float(
+                torch.nn.utils.get_total_norm(
+                    [p.grad for p in self.parameters() if p.grad is not None]
+                )
+            )
+            coefs = self.ls_coefficients()  # read while still float64
+        finally:
+            self.float()  # restore canonical float32 (lossy ~1e-7, harmless)
+        self.eval()
+
+        report = {
+            "converged": converged,
+            "n_iter": n_iter,
+            "final_nll": final_nll,
+            "grad_norm": grad_norm,
+            "seconds": time.perf_counter() - t0,
+            "coefficients": coefs,
+        }
+        self.history["classical"] = {
+            k: v for k, v in report.items() if k != "coefficients"
+        }
+        return report

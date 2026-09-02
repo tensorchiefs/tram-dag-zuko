@@ -19,9 +19,9 @@ graph TD
         nodes["nodes.py<br/>_Node (intercept + shifts),<br/>_InputTransform,<br/>kind_log_prob/sample/abduct/<br/>marginal_theta"]
         flow["flow.py<br/>CausalFlowDAG: build, calibrate,<br/>log_prob, sample/abduct/pmf/density,<br/>save/load, delegates"]
     end
-    subgraph functions["free functions over a flow"]
-        fitting["fitting.py<br/>fit (Adam loop, callbacks),<br/>fit_classical (L-BFGS)"]
-        readouts["readouts.py<br/>ls_coefficients, varying_coef,<br/>to_matrix, contributions,<br/>design_matrix, shift_curve"]
+    subgraph functions["flow behavior by concern"]
+        fitting["fitting.py<br/>_FitMixin: fit (Adam loop, callbacks),<br/>fit_classical (L-BFGS)"]
+        readouts["readouts.py<br/>_ReadoutsMixin: ls_coefficients,<br/>varying_coef, to_matrix, contributions,<br/>design_matrix, shift_curve"]
         scores["scores.py<br/>node_scores,<br/>effect_modifier_scan"]
     end
     callbacks["callbacks.py<br/>Callback, EarlyStopping,<br/>PerNodePlateau, per_node_adam"]
@@ -39,8 +39,9 @@ graph TD
 ```
 
 (`spec.py` consults the registry lazily, so the data layer stays importable
-without torch executing any model code; `fitting.py`/`readouts.py` import
-`flow` under `TYPE_CHECKING` only — the graph is acyclic.)
+without torch executing any model code; `fitting.py`/`readouts.py` are
+mixins `CausalFlowDAG` composes and import `flow` under `TYPE_CHECKING`
+only — the graph is acyclic.)
 
 ## The term contract
 

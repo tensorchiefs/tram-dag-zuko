@@ -8,15 +8,13 @@ Internal-but-stable surface
 ---------------------------
 scores.py, callbacks recipes, the read-outs and the test suite read these
 names by design; renaming any of them is an API change, not a cleanup:
-``shifts``, ``intercept`` (+ ``.nets``/``.groups``) / ``_intercept_groups``,
-``_shift_groups``, ``_vc_groups``, ``ut``, ``input_transforms``,
-``net_input``, ``theta_shift``, ``vc_column``.
+``shifts`` (term modules with ``key``/``parents``/``mods``…), ``intercept``
+(+ ``.groups``/``.ci_parents``/``.nets``), ``ut``, ``input_transforms``,
+``net_input``, ``theta_shift``.
 """
 
 # %% imports ---------------------------------------------------------------------------
 from __future__ import annotations
-
-from typing import NamedTuple
 
 import numpy as np
 import pandas as pd
@@ -97,29 +95,6 @@ class _InputTransform(nn.Module):
         return self.fn(x, self.train_cols[:, i : i + 1])
 
 
-class _VCGroup(NamedTuple):
-    """Bookkeeping for one VC term of a node.
-
-    Attributes
-    ----------
-    on : str
-        Name of the treatment node. The VC term owns this edge.
-    mods : tuple[str, ...]
-        Names of the effect-modifier nodes. Empty for a constant effect.
-    on_is_ord : bool
-        ``True`` when the treatment is a binary ordinal node. The raw
-        treatment column is then the level-1 one-hot indicator.
-    center : bool
-        ``True`` centers the regressor with the caller's out-of-fold
-        propensities (``fit(vc_ehat=)``).
-    """
-
-    on: str
-    mods: tuple[str, ...]
-    on_is_ord: bool
-    center: bool
-
-
 class _Node(nn.Module):
     """One dimension of the flow: an intercept plus additive shift terms.
 
@@ -181,16 +156,6 @@ class _Node(nn.Module):
             self._add_input_transform("@I", i_term, i_term.parents, spec)
         self.intercept = get_term(i_term.effect).build(i_term, spec, n_params)
 
-    @property
-    def _intercept_groups(self) -> list[tuple[str, ...]]:
-        """The intercept term's parent groups (legacy view for read-outs)."""
-        return self.intercept.groups
-
-    @property
-    def ci_parents(self) -> list[str]:
-        """The intercept term's flat parent order, for introspection."""
-        return self.intercept.ci_parents
-
     def _build_shifts(self, terms, spec: dict[str, NodeSpec]):
         """Build one shift term module per LS/CS/VC term, via the registry.
 
@@ -199,10 +164,9 @@ class _Node(nn.Module):
         names its own ModuleDict key: the parent for single-parent terms,
         "a+b" for a joint CS, the treatment for a VC.
         """
-        from .terms import ShiftTerm, VCTerm, get_term
+        from .terms import ShiftTerm, get_term
 
         self.shifts = nn.ModuleDict()
-        self._shift_groups: list[tuple[str, tuple[str, ...]]] = []
         for term in terms:
             entry = get_term(term.effect)
             if entry.slot != "shift":
@@ -211,29 +175,6 @@ class _Node(nn.Module):
             m = entry.build(term, spec)
             self.shifts[m.key] = m
             self._add_input_transform(m.key, term, m.net_parents, spec)
-            if not isinstance(m, VCTerm):  # VC evaluates after the plain shifts
-                self._shift_groups.append((m.key, m.parents))
-
-    @property
-    def _vc_groups(self) -> list[_VCGroup]:
-        """The node's VC terms in the legacy group view (scores/read-outs)."""
-        from .terms import VCTerm
-
-        return [m.group for m in self.shifts.values() if isinstance(m, VCTerm)]
-
-    def vc_column(self, g, feats: dict, vc_ehat: dict | None) -> Tensor:
-        """Give the ``(n, 1)`` regressor a VC term multiplies its ``beta`` by.
-
-        The treatment enters raw: the one-hot level-1 indicator for a binary
-        ordinal treatment, the value itself for a continuous one. A centered
-        term subtracts the propensity, which is the Robinson regressor
-        ``t - e_hat(x)``. It is also the score of ``beta0``, so
-        :mod:`tramdag.scores` reads it from here.
-        """
-        t = feats[g.on][:, -1:] if g.on_is_ord else feats[g.on]
-        if g.center:
-            t = t - vc_ehat[g.on].view(-1, 1)
-        return t
 
     def set_input_stats(self, train_df: pd.DataFrame) -> None:
         """Freeze every term's input-transform statistics (``calibrate``)."""
@@ -303,10 +244,12 @@ class _Node(nn.Module):
 
         theta = self.intercept.theta_value(self, feats, n)
         shift = torch.zeros(n, dtype=theta.dtype, device=theta.device)
-        # plain shifts first, then the VC terms — today's accumulation order
-        for key, _ps in self._shift_groups:
-            shift = shift + self.shifts[key].shift_value(self, feats, vc_ehat)
-        for m in self.shifts.values():
+        # plain shifts first, then the VC terms — the pinned accumulation order
+        modules = list(self.shifts.values())
+        for m in modules:
+            if not isinstance(m, VCTerm):
+                shift = shift + m.shift_value(self, feats, vc_ehat)
+        for m in modules:
             if isinstance(m, VCTerm):
                 shift = shift + m.shift_value(self, feats, vc_ehat)
         return theta, shift

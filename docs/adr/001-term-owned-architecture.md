@@ -17,9 +17,12 @@ drafted against a seven-subsystem survey and judged from three lenses
 **Term-owned flow, executed in the seam-split's order.**
 
 1. Verbatim code motion first: `nodes.py` (node model), `fitting.py`
-   (fit/fit_classical as free functions), `readouts.py` (stateless read-outs +
-   the new public `shift_curve`) — state-dict paths and the seeded RNG stream
-   untouched, one-line delegates keep the public API on `CausalFlowDAG`.
+   (`_FitMixin`: fit/fit_classical), `readouts.py` (`_ReadoutsMixin`: the
+   stateless read-outs + the new `shift_curve`) — state-dict paths and the
+   seeded RNG stream untouched. The methods stay methods of
+   `CausalFlowDAG` (it composes the two mixins), each defined once in its
+   module; a first draft used free functions behind one-line delegates and
+   the delegate layer was cut as duplication.
 2. The **registry** (`terms.py`): one definition per effect. Built-in shift terms
    subclass their conditioners (`LSTerm(ShiftTerm, LinearShift)` …), so
    checkpoints and RNG draws stay bit-stable; each term owns validation
@@ -29,7 +32,7 @@ drafted against a seven-subsystem survey and judged from three lenses
    (`side_keys`/`check_side`/`live_side`/`extra_columns`), adjacency `cells`,
    `term_is_classical` and its `option_defaults`.
 3. The intercept slot is a term too (`SITerm`/`CITerm`/`AdditiveCITerm`);
-   `_Node._theta` is one line and the marginal init is a hook
+   the theta read is inline in `theta_shift` and the marginal init is a hook
    (`has_marginal_start`/`marginal_start`, `transform.marginal_init_theta`).
 4. **Node kinds stay an if/else in ONE place**: the four adjacent functions
    `kind_log_prob`/`kind_sample`/`kind_abduct`/`kind_marginal_theta` in

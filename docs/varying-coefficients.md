@@ -30,7 +30,7 @@ flow = td.CausalFlowDAG(spec, seed=0).fit(
 )  # best-validation weights: callbacks.EarlyStopping, see fitting.md
 
 beta = flow.varying_coef(df_new, "Y")  # (n,) array beta(x) — deterministic, y-free
-beta0 = float(flow.nodes["Y"].shifts["T"].beta0)  # interpretable main effect
+beta0 = float(flow.nodes["Y"].shifts["T"].beta0.detach())  # interpretable main effect
 ```
 
 `X2` and `X3` appear **twice**: as prognostic parents through `CS` and as
