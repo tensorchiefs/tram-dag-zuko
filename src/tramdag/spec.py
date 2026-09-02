@@ -70,8 +70,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 # %% global variables ------------------------------------------------------------------
-EFFECTS = ("I", "LS", "CS", "VC")
-
 # bernstein, because zuko's spline extrapolates with a fixed slope outside
 # [-B, B] while bernstein follows its own boundary derivative -- see the
 # `transform` parameter of simple_intercept.
@@ -215,65 +213,13 @@ def _intercept_basis(terms, *, ordinal: bool):
     return name, dict(intercept_term.transform_kwargs or ())
 
 
-def _check_vc_term(name: str, term: Term, spec: dict[str, NodeSpec]) -> tuple[str, ...]:
-    """Validate a VC term and give its edge-owning parents.
-
-    Only the treatment ``parents[0]`` owns its edge; the modifiers are
-    exempt from edge ownership.
-
-    Parameters
-    ----------
-    name : str
-        Name of the node the term belongs to, for the error messages.
-    term : Term
-        The VC term.
-    spec : dict[str, NodeSpec]
-        The DAG specification, to look up the treatment node.
-
-    Returns
-    -------
-    tuple[str, ...]
-        The edge-owning parents: ``(treatment,)``.
-
-    Raises
-    ------
-    ValueError
-        If the term has no treatment, the treatment repeats as a modifier,
-        the penalty is negative, or the treatment is unsupported.
-    """
-    if not term.parents:
-        raise ValueError(f"Node '{name}': VC term needs a treatment parent.")
-    on = term.parents[0]
-    if on in term.parents[1:]:
-        raise ValueError(
-            f"Node '{name}': VC treatment '{on}' cannot also be a modifier."
-        )
-    if term.penalty is None or term.penalty < 0:
-        raise ValueError(f"Node '{name}': VC penalty must be >= 0.")
-    on_node = spec[on]
-    if isinstance(on_node, OrdinalNode) and on_node.levels != 2:
-        raise ValueError(
-            f"Node '{name}': VC treatment '{on}' is ordinal with "
-            f"{on_node.levels} levels. Only a 2-level (binary) "
-            "ordinal treatment is supported. Multi-level is a "
-            "follow-up."
-        )
-    if term.center and not isinstance(on_node, OrdinalNode):
-        raise ValueError(
-            f"Node '{name}': VC(center=...) needs a binary ordinal "
-            f"treatment, and '{on}' is continuous. E[T|x] centering "
-            "is a follow-up."
-        )
-    if term.center and any(t.effect == "VC" and t.center for t in on_node.terms):
-        raise ValueError(
-            f"Node '{name}': treatment '{on}' carries a centered VC term itself; "
-            "chained centering is not supported."
-        )
-    return (on,)
-
-
 def _check_term(name: str, term: Term, spec: dict[str, NodeSpec]) -> tuple[str, ...]:
     """Validate one term of a node and give its edge-owning parents.
+
+    The effect-specific rules (LS arity, the VC treatment/centering rules)
+    live on the term's registry entry (:mod:`tramdag.terms`); the generic
+    checks — the effect is known, parents exist, ``input_transform`` is
+    well-formed — run here, in the original order.
 
     Parameters
     ----------
@@ -296,17 +242,20 @@ def _check_term(name: str, term: Term, spec: dict[str, NodeSpec]) -> tuple[str, 
         If the effect is unknown, an LS term has not exactly one parent,
         a parent is unknown, or a VC term is malformed.
     """
-    if term.effect not in EFFECTS:
-        raise ValueError(f"Node '{name}': unknown term effect '{term.effect}'.")
-    if term.effect == "LS" and len(term.parents) != 1:
-        raise ValueError(f"Node '{name}': LS term must have exactly one parent.")
+    from .terms import get_term
+
+    try:
+        entry = get_term(term.effect)
+    except KeyError:
+        raise ValueError(
+            f"Node '{name}': unknown term effect '{term.effect}'."
+        ) from None
+    entry.check_arity(name, term)
     for p in term.parents:
         if p not in spec:
             raise ValueError(f"Node '{name}': unknown parent '{p}'.")
     _check_input_transform(name, term)
-    if term.effect == "VC":
-        return _check_vc_term(name, term, spec)
-    return term.parents
+    return entry.edge_parents(name, term, spec)
 
 
 def _check_input_transform(name: str, term: Term) -> None:
