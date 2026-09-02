@@ -51,7 +51,7 @@ def test_baseline_plus_contributions_reproduces_theta():
     with torch.no_grad():
         theta = sum(
             net(torch.cat([feats[p] for p in grp], dim=1))
-            for net, grp in zip(nd.intercept_nets, nd._intercept_groups, strict=True)
+            for net, grp in zip(nd.intercept.nets, nd.intercept.groups, strict=True)
         )
     np.testing.assert_allclose(recon, theta.numpy(), rtol=1e-5, atol=1e-5)
 
@@ -115,7 +115,7 @@ def test_works_for_any_continuous_transform(transform, P):
     with torch.no_grad():
         theta = sum(
             net(torch.cat([feats[p] for p in grp], dim=1))
-            for net, grp in zip(nd.intercept_nets, nd._intercept_groups, strict=True)
+            for net, grp in zip(nd.intercept.nets, nd.intercept.groups, strict=True)
         )
     np.testing.assert_allclose(recon, theta.numpy(), rtol=1e-5, atol=1e-5)
     for contrib in res["contributions"].values():

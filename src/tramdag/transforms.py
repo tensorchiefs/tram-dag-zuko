@@ -11,7 +11,7 @@ Conventions follow the original TRAM-DAG implementation
 - continuous: ``u = h(x) + s(parents)`` with ``h`` Bernstein / RQ-spline / affine,
   fitted on the value range scaled from the train 5%/95% quantiles to ``[-B, B]``
   and linearly extrapolated outside.
-- ordinal:    ``P(x <= k) = sigmoid(theta_k - s(parents))`` with increasing
+- ordinal:    ``P(y <= k) = sigmoid(theta_k - s(parents))`` with increasing
   cutpoints ``theta``. This is the parametrization of
   ``transform_intercepts_ordinal`` in the original implementation.
 """
@@ -67,7 +67,9 @@ _U_EPS = 1e-7
 
 
 # %% private functions -----------------------------------------------------------------
-def _bounds(theta_tilde: Tensor, shift: Tensor, y: Tensor) -> tuple[Tensor, Tensor]:
+def ordinal_bounds(
+    theta_tilde: Tensor, shift: Tensor, y: Tensor
+) -> tuple[Tensor, Tensor]:
     """Give the shifted cutpoint interval of each observed level."""
     cut = ordinal_cutpoints(theta_tilde) - shift.view(-1, 1)
     idx = torch.arange(theta_tilde.shape[0], device=theta_tilde.device)
@@ -87,13 +89,16 @@ def _log1mexp(x: Tensor) -> Tensor:
 
 
 # %% public functions ------------------------------------------------------------------
-def make_univariate_transform(name: str, **kwargs) -> _ScaledUT:
-    """Build a scaled univariate transform by name.
+def make_univariate_transform(name, **kwargs) -> _ScaledUT:
+    """Build a scaled univariate transform by name — or from a class.
 
     Parameters
     ----------
-    name : str
-        One of the registered names: ``"bernstein"``, ``"spline"``, ``"affine"``.
+    name : str | type[_ScaledUT]
+        One of the registered names — ``"bernstein"``, ``"spline"``,
+        ``"affine"`` — or a ``_ScaledUT`` subclass itself, the custom-basis
+        hatch (``I(transform=MyUT)``; note a class in a spec serializes
+        through pickle only, like a callable ``input_transform``).
     **kwargs
         Passed to the transform class.
 
@@ -105,13 +110,16 @@ def make_univariate_transform(name: str, **kwargs) -> _ScaledUT:
     Raises
     ------
     ValueError
-        If ``name`` is not registered.
+        If ``name`` is neither registered nor a ``_ScaledUT`` subclass.
     """
+    if isinstance(name, type) and issubclass(name, _ScaledUT):
+        return name(**kwargs)
     try:
         cls = _TRANSFORMS[name]
-    except KeyError:
+    except (KeyError, TypeError):
         raise ValueError(
-            f"unknown transform {name!r}; choose one of {sorted(_TRANSFORMS)}"
+            f"unknown transform {name!r}; choose one of {sorted(_TRANSFORMS)} "
+            "or pass a _ScaledUT subclass"
         ) from None
     return cls(**kwargs)
 
@@ -221,7 +229,7 @@ def ordinal_log_prob(theta_tilde: Tensor, shift: Tensor, y: Tensor) -> Tensor:
     initialised node freezes at its starting values forever. The log-space form
     keeps the gradient non-zero, so such a node recovers.
     """
-    lower, upper = _bounds(theta_tilde, shift, y)
+    lower, upper = ordinal_bounds(theta_tilde, shift, y)
     ls = torch.nn.functional.logsigmoid
     # Pick the better-conditioned side per element by *flipping the inputs*
     # rather than by computing both sides and discarding one: the survival
@@ -303,7 +311,7 @@ def ordinal_abduct(
     Tensor
         The latents, shape ``(n,)``.
     """
-    lower, upper = _bounds(theta_tilde, shift, y)
+    lower, upper = ordinal_bounds(theta_tilde, shift, y)
     u_lo, u_hi = torch.sigmoid(lower), torch.sigmoid(upper)
     u = u_lo + (u_hi - u_lo) * torch.rand(
         lower.shape, device=lower.device, generator=generator
@@ -325,6 +333,14 @@ class _ScaledUT(torch.nn.Module):
         self.bound = BOUND
         self.register_buffer("xmin", torch.tensor(0.0))
         self.register_buffer("xmax", torch.tensor(1.0))
+
+    def marginal_init_theta(self) -> Tensor | None:
+        """Give the calibrated marginal start, or ``None`` — no such start.
+
+        ``BernsteinUT`` overrides with its linear-map start; a spline or
+        affine transform has none and silently skips the marginal init.
+        """
+        return None
 
     @property
     def n_params(self) -> int:  # pragma: no cover - abstract

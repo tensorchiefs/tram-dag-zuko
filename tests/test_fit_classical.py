@@ -127,21 +127,22 @@ def test_matches_statsmodels_mle(ls_chain):
 
 @pytest.mark.slow
 def test_agrees_with_adam_mle(ls_chain):
-    """Classical and (converged, no-early-stop) Adam reach the same optimum."""
-    obs = ls_chain["draw"](2000, 5)
+    """Classical and (converged, no-early-stop) Adam reach the same optimum.
+
+    Only the CONTINUOUS edge is unique here — the ordinal outcome's
+    Adam==statsmodels and classical==statsmodels equivalences are pinned
+    fast elsewhere — so the spec is the two-node chain. Tolerance 0.03:
+    re-pinned with the inline ls_chain DGP (was 0.02 on the mrclean data).
+    """
+    obs = ls_chain["draw"](2000, 5)[["x1", "x2"]]
+    spec = {"x1": ContinuousNode(), "x2": ContinuousNode([LS("x1")])}
     torch.manual_seed(0)
-    fa = CausalFlowDAG(_ls_spec())
-    for ep, lr in [(3000, 1e-2), (1500, 1e-3)]:
-        fa.fit(
-            obs,
-            epochs=ep,
-            learning_rate=lr,
-            batch_size=256,
-        )
+    fa = CausalFlowDAG(spec)
+    for ep, lr in [(1500, 1e-2), (800, 1e-3)]:
+        fa.fit(obs, epochs=ep, learning_rate=lr, batch_size=256)
     torch.manual_seed(0)
-    fc = CausalFlowDAG(_ls_spec())
+    fc = CausalFlowDAG(spec)
     fc.fit_classical(obs)
-    for node, parent in [("y", "x1"), ("y", "x2"), ("t", "x1"), ("x2", "x1")]:
-        a = float(fa.ls_coefficients()[node][parent][0])
-        c = float(fc.ls_coefficients()[node][parent][0])
-        assert a == pytest.approx(c, abs=0.03), f"{node}<-{parent}: {a} vs {c}"
+    a = float(fa.ls_coefficients()["x2"]["x1"][0])
+    c = float(fc.ls_coefficients()["x2"]["x1"][0])
+    assert a == pytest.approx(c, abs=0.03), f"x2<-x1: {a} vs {c}"

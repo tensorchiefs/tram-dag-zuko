@@ -95,8 +95,9 @@ learning rates and freezing (a callback, below) and the all-`ls` classical fit.
   `tramdag.callbacks`: `EarlyStopping` (best-validation weights restored
   automatically; optional patience) and `PerNodePlateau` + `per_node_adam`
   (per-node decay and freezing), all reading `history["val"]`.
-- **`vc_ehat=`**: the out-of-fold propensities a centered `VC` term needs,
-  `{node: {t: array}}` with one value per training row (see
+- **Centered `VC` propensities are a column**: `VC(center="ps")` names the
+  training-frame column holding the out-of-fold `P(t=1|pa_t)` per row — it
+  splits and minibatches with the frame (see
   [varying-coefficients.md](varying-coefficients.md)).
 
 ### Training strategies

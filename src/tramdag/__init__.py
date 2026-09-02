@@ -11,16 +11,23 @@ from .spec import (
     SI,
     VC,
     ContinuousNode,
+    Fn,
     I,
     OrdinalNode,
     Term,
     complex_intercept,
     complex_shift,
+    fn_shift,
     intercept,
     linear_shift,
+    node_parents,
     simple_intercept,
+    spec_from_dict,
+    spec_to_dict,
+    validate_and_sort,
     varying_coefficient,
 )
+from .terms import register_term
 
 # %% global variables ------------------------------------------------------------------
 __all__ = [
@@ -31,14 +38,21 @@ __all__ = [
     "VC",
     "CausalFlowDAG",
     "ContinuousNode",
+    "Fn",
     "I",
     "OrdinalNode",
     "Term",
     "complex_intercept",
     "complex_shift",
+    "fn_shift",
     "intercept",
     "linear_shift",
+    "node_parents",
+    "register_term",
     "simple_intercept",
+    "spec_from_dict",
+    "spec_to_dict",
+    "validate_and_sort",
     "varying_coefficient",
 ]
 __version__ = version("tramdag")

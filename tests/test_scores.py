@@ -188,3 +188,23 @@ def test_scores_error_paths(mle_flow):
         flow.scores(df, node="T")  # T is a source: no shift terms
     with pytest.raises(KeyError, match="no score column"):
         flow.effect_modifier_scan(df, node="Y", t="X9")
+
+
+def test_scan_column_override_scans_a_level_contrast(ls_chain):
+    """``column=`` scans a named score column directly — the route for a
+    multi-level ordinal treatment, whose default lookup has no single column.
+    """
+    df = ls_chain["draw"](800, 0)
+    spec = {
+        "x1": ContinuousNode(),
+        "x2": ContinuousNode([LS("x1")]),
+        "t": OrdinalNode(2, [LS("x1"), LS("x2")]),
+        "y": OrdinalNode(4, [LS("x1"), LS("x2"), LS("t")]),
+    }
+    flow = CausalFlowDAG(spec, seed=0)
+    flow.fit_classical(df)
+    by_default = flow.effect_modifier_scan(df, "y", t="t")
+    by_column = flow.effect_modifier_scan(df, "y", t="t", column="t[1]")
+    pd.testing.assert_frame_equal(by_default, by_column)
+    with pytest.raises(KeyError, match="no score column 'nope'"):
+        flow.effect_modifier_scan(df, "y", t="t", column="nope")

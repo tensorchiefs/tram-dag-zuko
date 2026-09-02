@@ -5,12 +5,10 @@
 [![CI](https://github.com/tensorchiefs/tramdag/actions/workflows/ci.yml/badge.svg)](https://github.com/tensorchiefs/tramdag/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-> ⚠️ **Status: beta (0.x), under active development.** The API may change
-> between releases until 1.0, so pin a version for reproducibility. Note that
-> this README documents the **unreleased 0.4** API: the term constructors
-> (`SI`/`CI`/`VC`), `scores`, `varying_coef` and `intercept_contributions` are
-> not in `0.3.0` on PyPI. Until 0.4 ships, install from git to follow the docs
-> below.
+> ⚠️ **Status: 1.0 release candidate.** This README documents the
+> **unreleased 1.0** API (term registry, `callbacks=`, `flow.shift_curve`,
+> `VC(center="col")`); `0.3.0` on PyPI predates all of it. Until 1.0 ships,
+> install from git to follow the docs below.
 
 **TRAM-DAGs** model each variable of a structural causal model with a
 (transformation-model) flow: one triangular normalizing flow from iid
@@ -199,8 +197,9 @@ See the [`tests/README.md`](tests/README.md) file for more details.
 ## Layout
 
 ```
-src/tramdag/            spec.py transforms.py conditioners.py flow.py
-                        scores.py                 <- the framework, and nothing else
+src/tramdag/            spec.py terms.py transforms.py conditioners.py
+                        nodes.py flow.py fitting.py readouts.py scores.py
+                        callbacks.py              <- the framework, and nothing else
 tests/                  unit tests, identities, acceptance bars, three inline DGPs
 experiments/            research code, one directory per area, each self-contained:
                           paper/       the replications + generators + frozen data
@@ -211,10 +210,10 @@ experiments/            research code, one directory per area, each self-contain
                         other areas' data and pins no ground truth)
 notebooks/              four executed examples: didactic intro, Colab demo,
                         additive-vs-joint intercepts, varying coefficients
-docs/                   code-map.md (every class/function + all knobs),
-                        fitting.md, notation.md, training-speed.md,
-                        paper-replication.md, varying-coefficients.md,
-                        scores.md
+docs/                   architecture.md + adr/ (the 1.0 design and its
+                        refusals), code-map.md, fitting.md, notation.md,
+                        training-speed.md, paper-replication.md,
+                        varying-coefficients.md, scores.md
 ```
 
 Implementation conventions (latent-scale signs, raw/one-hot parent encoding,

@@ -122,3 +122,7 @@ unrelated acceptance bars.
 - Framework tests must not depend on `experiments/`: the research generators
   and their frozen CSVs live there and are checked by the experiments
   workflow — see the testing policy in [`CLAUDE.md`](../CLAUDE.md).
+
+Note: the additive-CI / joint-CS *known-truth* acceptance tests are
+slow-marked, so the fast (`-m "not slow"`) lane covers those features with
+build/finiteness smokes only — the truth bars run in the full suite.

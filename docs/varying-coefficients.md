@@ -30,7 +30,7 @@ flow = td.CausalFlowDAG(spec, seed=0).fit(
 )  # best-validation weights: callbacks.EarlyStopping, see fitting.md
 
 beta = flow.varying_coef(df_new, "Y")  # (n,) array beta(x) — deterministic, y-free
-beta0 = float(flow.nodes["Y"].shifts["T"].beta0)  # interpretable main effect
+beta0 = float(flow.nodes["Y"].shifts["T"].beta0.detach())  # interpretable main effect
 ```
 
 `X2` and `X3` appear **twice**: as prognostic parents through `CS` and as
@@ -92,11 +92,12 @@ framework.
   the abduct-difference `u(x, t=1, y) − u(x, t=0, y)` identically (pinned by
   a test).
 
-## Propensity-centered VC: `center=True` (R-learner orthogonalization)
+## Propensity-centered VC: `center="col"` (R-learner orthogonalization)
 
 ```python
-td.VC("X2", "X3", t="T", penalty=1.0, center=True)
-# contributes  beta(x) * (t - e_hat(x))  to the shift; e_hat comes from you
+td.VC("X2", "X3", t="T", penalty=1.0, center="ps")
+# contributes  beta(x) * (t - e_hat(x))  to the shift; e_hat comes from you,
+# out of fold, as the training-frame column named by center=
 ```
 
 This is Robinson/R-learner centering inside the likelihood. Dandl et al.
@@ -115,7 +116,7 @@ The naive implementations are wrong. Thus this is a **two-stage frozen**
 design:
 
 - **Training** uses **out-of-fold** ê that *you* compute and pass as
-  `fit(vc_ehat={"Y": {"T": e_oof}})`, one value per training row: any
+  the frame column `VC(center=)` names (`df.assign(ps=e_oof)`), one value per training row: any
   propensity model, each fold predicted by a fit that never saw it. This is
   the DML cross-fitting requirement — in-sample ê reintroduces the
   own-observation bias and can be *worse* than no centering. Six lines with
@@ -133,7 +134,7 @@ design:
   The OOF values enter the outcome loss as frozen data. Thus **no gradient
   reaches the treatment node** from the outcome node, and the per-node
   factorization stays intact (pinned by a gradient-isolation test). `fit`
-  refuses a centered spec without `vc_ehat` and a `vc_ehat` that does not
+  refuses a centered spec whose frame lacks the column, and one that does not
   match the spec.
 - **Inference** (`log_prob` / `sample` / `abduct` / `pmf` / `scores`)
   recomputes ê from the flow's **own fitted treatment node**, the full-data
@@ -158,6 +159,6 @@ recovery corr ≥ 0.9 at n = 5000 (measured ≈ 0.99, min over 3 seeds 0.986), a
 fitted `beta0` that matches `fit_classical` under a large penalty, and the
 read-out identities. The centering claims are measured against the
 `confounded` DGP in the same file. Both former follow-ups have since
-shipped: propensity centering (#30) is `center=True`, documented above, and the
+shipped: propensity centering (#30) is `center="col"`, documented above, and the
 per-observation scores for effect-modifier scans (#29) are `flow.scores` and
 `flow.effect_modifier_scan` — see [scores.md](scores.md).

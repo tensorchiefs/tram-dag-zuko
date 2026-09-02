@@ -197,8 +197,8 @@ def test_ls_node_equals_proportional_odds():
     )
 
     # our model: P(Y<=k) = sigmoid(theta_k - (w1 x1 + w2 x2)); statsmodels likewise
-    w1 = float(flow.nodes["Y"].shifts["X1"].weight)
-    w2 = float(flow.nodes["Y"].shifts["X2"].weight)
+    coefs = flow.ls_coefficients()["Y"]
+    w1, w2 = float(coefs["X1"][0]), float(coefs["X2"][0])
     assert w1 == pytest.approx(res.params["X1"], abs=0.05)
     assert w2 == pytest.approx(res.params["X2"], abs=0.05)
 
@@ -230,3 +230,23 @@ def test_affine_zero_theta_is_the_logistic_density():
     # the transform ranges are the train 5%/95% quantiles, as calibrate documents
     q = df["x"].quantile([0.05, 0.95])
     assert (xmin, xmax) == pytest.approx((q.iloc[0], q.iloc[1]))
+
+
+def test_shift_curve_matches_the_manual_composition(ls_chain):
+    """``shift_curve`` equals the nd.shifts + net_input reach-in it replaces,
+    and refuses an unknown shift key with the available ones named.
+    """
+    from tramdag import CS, ContinuousNode
+
+    df = ls_chain["draw"](400, 0)[["x1", "x2"]]
+    spec = {"x1": ContinuousNode(), "x2": ContinuousNode([CS("x1")])}
+    flow = CausalFlowDAG(spec, seed=0)
+    flow.fit(df, epochs=5, batch_size=200)
+    grid = np.linspace(-2, 2, 41)
+    x = torch.as_tensor(grid, dtype=torch.float32).view(-1, 1)
+    nd = flow.nodes["x2"]
+    with torch.no_grad():
+        manual = nd.shifts["x1"](nd.net_input({"x1": x}, ("x1",), "x1")).numpy().ravel()
+    assert np.allclose(flow.shift_curve("x2", "x1", grid), manual)
+    with pytest.raises(KeyError, match="available"):
+        flow.shift_curve("x2", "nope", grid)

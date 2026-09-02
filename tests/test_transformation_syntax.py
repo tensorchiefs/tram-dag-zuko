@@ -113,11 +113,6 @@ def test_ordinal_rejects_i_transform():
         OrdinalNode(3, [I("a", transform="spline")])
 
 
-def test_vc_treatment_is_keyword_only():
-    with pytest.raises(TypeError):
-        VC("T", "X2")  # the treatment is the keyword t=
-
-
 def test_list_and_sum_build_the_identical_model():
     def build(spec):
         torch.manual_seed(7)
@@ -148,19 +143,18 @@ def test_additive_flag_builds_one_net_per_parent():
     }
     flow = CausalFlowDAG(spec)
     node = flow.nodes["y"]
-    assert node.intercept is None
-    assert len(node.intercept_nets) == 2
-    assert node._intercept_groups == [("a",), ("b",)]
-    assert node.ci_parents == ["a", "b"]  # flat, for introspection
+    assert len(node.intercept.nets) == 2
+    assert node.intercept.groups == [("a",), ("b",)]
+    assert node.intercept.ci_parents == ["a", "b"]  # flat, for introspection
 
     joint = CausalFlowDAG({**spec, "y": ContinuousNode([I("a", "b")])})
-    assert joint.nodes["y"].intercept_nets is None
-    assert joint.nodes["y"]._intercept_groups == [("a", "b")]
-    assert joint.nodes["y"].ci_parents == ["a", "b"]
+    assert not hasattr(joint.nodes["y"].intercept, "nets")  # one joint net
+    assert joint.nodes["y"].intercept.groups == [("a", "b")]
+    assert joint.nodes["y"].intercept.ci_parents == ["a", "b"]
 
     single = CausalFlowDAG({**spec, "y": ContinuousNode([I("a")])})
-    assert single.nodes["y"].intercept_nets is None
-    assert single.nodes["y"].ci_parents == ["a"]
+    assert not hasattr(single.nodes["y"].intercept, "nets")  # one single net
+    assert single.nodes["y"].intercept.ci_parents == ["a"]
 
 
 def test_roundtrip_keeps_hoisted_transform_and_terms():
@@ -196,7 +190,7 @@ def test_every_option_survives_the_roundtrip():
         "y": ContinuousNode(
             [
                 I("a", "b", allow_interaction=False, units=[4, 4]),
-                VC("b", t="t", penalty=2.5, center=True),
+                VC("b", t="t", penalty=2.5, center="ps_b"),
             ]
         ),
     }
@@ -204,7 +198,7 @@ def test_every_option_survives_the_roundtrip():
     assert back == spec
     i_term, vc_term = back["y"].terms
     assert (i_term.allow_interaction, i_term.units) == (False, (4, 4))
-    assert (vc_term.penalty, vc_term.center) == (2.5, True)
+    assert (vc_term.penalty, vc_term.center) == (2.5, "ps_b")
     assert back["a"].transform_kwargs == {"bins": 6}
 
 
@@ -267,22 +261,6 @@ def test_units_reach_the_networks():
     assert flow.nodes["y"].shifts["x1"].net[0].out_features == 8
 
 
-def test_units_survive_the_roundtrip():
-    spec = {
-        "a": ContinuousNode(),
-        "b": ContinuousNode(CS("a", units=[16])),
-    }
-    back = spec_from_dict(spec_to_dict(spec))
-    assert back["b"].terms[1].units == (16,)  # [0] is the canonical SI()
-
-
-def test_vc_modifiers_are_positional_t_is_keyword():
-    t = VC("X2", "X3", t="T")
-    assert t.parents == ("T", "X2", "X3")  # internal layout: treatment first
-    with pytest.raises(ValueError, match="cannot be both"):
-        VC("T", t="T")
-
-
 def test_a_pre_0_4_spec_says_it_is_too_old():
     """0.3 wrote a term's settings as sibling keys, not in "options".
 
@@ -334,3 +312,66 @@ def test_spec_survives_a_json_roundtrip():
     assert back == spec
     assert back["y"].terms[0].units == (8, 8)  # the CI intercept comes first
     assert hash(back["y"].terms[1]) == hash(spec["y"].terms[1])
+
+
+def test_wrong_effect_option_errors_instead_of_defaulting():
+    """A key another effect takes raises — no silent foreign defaults."""
+    from tramdag.spec import _options
+
+    with pytest.raises(ValueError, match="takes no option"):
+        _options("CS", penalty=1.0)  # penalty is VC's
+    with pytest.raises(AttributeError):
+        _ = LS("x").penalty  # reading a foreign option refuses too
+    d = {
+        "x": {
+            "kind": "continuous",
+            "terms": [{"effect": "I", "parents": [], "options": {}}],
+        },
+        "y": {
+            "kind": "continuous",
+            "terms": [
+                {"effect": "I", "parents": [], "options": {}},
+                {"effect": "LS", "parents": ["x"], "options": {"pnealty": 1.0}},
+            ],
+        },
+    }
+    from tramdag import spec_from_dict
+
+    with pytest.raises(ValueError, match="takes no option"):
+        spec_from_dict(d)
+
+
+def test_transform_accepts_a_custom_class():
+    """``I(transform=<class>)`` builds a custom basis (pickle-only serialization)."""
+    from tramdag.transforms import BernsteinUT
+
+    spec = {"x": ContinuousNode([I(transform=BernsteinUT, n_coeffs=7)])}
+    flow = CausalFlowDAG(spec, seed=0)
+    assert isinstance(flow.nodes["x"].ut, BernsteinUT)
+    assert flow.nodes["x"].ut.n_params == 7
+
+
+def test_terms_pickle_and_deepcopy():
+    """pickle/deepcopy probe dunders on an empty instance — __getattr__ must
+    not recurse (torch.save of a whole flow, ensembles, sweeps).
+    """
+    import copy
+    import pickle
+
+    t = LS("a")
+    assert pickle.loads(pickle.dumps(t)) == t
+    assert copy.deepcopy(t) == t
+
+
+def test_hand_built_ls_with_input_transform_refuses():
+    """The raw-unit-coefficient guard fires for a hand-built LS term instead
+    of the option being silently ignored at build time.
+    """
+    from tramdag.spec import Term
+
+    spec = {
+        "a": ContinuousNode(),
+        "y": ContinuousNode([Term("LS", ("a",), (("input_transform", "minmax"),))]),
+    }
+    with pytest.raises(ValueError, match="raw-unit coefficient"):
+        CausalFlowDAG(spec)

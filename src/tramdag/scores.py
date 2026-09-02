@@ -34,9 +34,7 @@ import numpy as np
 import pandas as pd
 import torch
 
-from .conditioners import LinearShift
-from .spec import OrdinalNode
-from .transforms import _bounds
+from .transforms import ordinal_bounds
 
 # %% global variables ------------------------------------------------------------------
 __all__ = ["effect_modifier_scan", "node_scores", "sup_bb_pvalue"]
@@ -46,56 +44,19 @@ CRIT_5PCT = 1.3581
 
 
 # %% private functions -----------------------------------------------------------------
-def _dl_ds(
-    nd, feats: dict, x: torch.Tensor, n: int, vc_ehat: dict | None = None
-) -> torch.Tensor:
+def _dl_ds(nd, feats: dict, x: torch.Tensor) -> torch.Tensor:
     """Give ``d l_i / d s_i``, shape ``(n,)``.
 
     This is the closed-form derivative of the per-row log-likelihood with
     respect to the total shift of the node.
     """
-    theta, shift = nd.theta_shift(feats, n, vc_ehat=vc_ehat)
+    theta, shift = nd.theta_shift(feats, x.shape[0])
     if nd.kind == "continuous":
         z0, _ = nd.ut.forward(theta, x)
         return 1.0 - 2.0 * torch.sigmoid(z0 + shift)
-    lower, upper = _bounds(theta, shift, x)  # already include -s
+    lower, upper = ordinal_bounds(theta, shift, x)  # already include -s
     sl, su = torch.sigmoid(lower), torch.sigmoid(upper)
     return (sl * (1 - sl) - su * (1 - su)) / (su - sl)
-
-
-def _ls_score_columns(
-    flow, ls_groups: list, feats: dict, dlds: torch.Tensor
-) -> dict[str, np.ndarray]:
-    """Give the score columns of the ``LS`` coefficients.
-
-    Parameters
-    ----------
-    flow : CausalFlowDAG
-        The fitted flow, to look up parent kinds.
-    ls_groups : list
-        The ``(key, parents)`` shift groups whose conditioner is a
-        :class:`~tramdag.conditioners.LinearShift`.
-    feats : dict
-        The encoded parent features.
-    dlds : torch.Tensor
-        ``d l_i / d s_i``, shape ``(n,)``.
-
-    Returns
-    -------
-    dict[str, np.ndarray]
-        One entry per coefficient: a continuous parent gives one column
-        named after the parent, an ordinal parent one column per one-hot
-        level, named ``"{parent}[{k}]"``.
-    """
-    cols: dict[str, np.ndarray] = {}
-    for key, (parent,) in ls_groups:  # an LS term has exactly one parent
-        psi = (dlds.unsqueeze(1) * feats[parent]).cpu().numpy()
-        if isinstance(flow.spec[parent], OrdinalNode):
-            for k in range(psi.shape[1]):  # one column per one-hot level
-                cols[f"{parent}[{k}]"] = psi[:, k]
-        else:
-            cols[key] = psi[:, 0]
-    return cols
 
 
 # %% public functions ------------------------------------------------------------------
@@ -136,31 +97,26 @@ def node_scores(flow, df: pd.DataFrame, node: str) -> pd.DataFrame:
         If the node has no ``LS`` or ``VC`` term.
     """
     nd = flow._node(node)
-    ls_groups = [
-        (key, ps)
-        for key, ps in nd._shift_groups
-        if isinstance(nd.shifts[key], LinearShift)
-    ]
-    if not ls_groups and not nd._vc_groups:
+    scored = [m for m in nd.shifts.values() if getattr(m, "scored", False)]
+    if not scored:
         raise ValueError(
             f"node {node!r} has no LS or VC terms. Shift scores need "
             "at least one interpretable shift coefficient."
         )
 
     # not y-free: l_i needs x. Plus the e_hat inputs of centered terms.
-    needed = [*nd.parents, node, *flow._vc_ehat_columns(nd)]
+    needed = [*nd.parents, node, *flow._query_side_columns(nd)]
     missing = [c for c in needed if c not in df.columns]
     if missing:
         raise KeyError(f"data is missing column(s): {missing}")
     values = flow._tensorize(df, needed)
     feats = flow._features({p: values[p] for p in nd.parents})
-    ehat = flow._vc_ehat_live(nd, values, len(df))
-    dlds = _dl_ds(nd, feats, values[node], len(df), vc_ehat=ehat)
+    feats |= flow._side_feats(nd, values, len(df))
+    dlds = _dl_ds(nd, feats, values[node])
 
-    cols = _ls_score_columns(flow, ls_groups, feats, dlds)
-    for g in nd._vc_groups:  # d s / d beta0 is the term's own regressor
-        t = nd.vc_column(g, feats, ehat)
-        cols[g.on] = (dlds * t.squeeze(-1)).cpu().numpy()
+    cols: dict[str, np.ndarray] = {}
+    for m in scored:
+        cols.update(m.score_columns(nd, flow, feats, dlds))
     return pd.DataFrame(cols, index=df.index)
 
 
@@ -187,7 +143,12 @@ def sup_bb_pvalue(stat: float) -> float:
 
 
 def effect_modifier_scan(
-    flow, df: pd.DataFrame, node: str, t: str, candidates: list[str] | None = None
+    flow,
+    df: pd.DataFrame,
+    node: str,
+    t: str,
+    candidates: list[str] | None = None,
+    column: str | None = None,
 ) -> pd.DataFrame:
     """Scan the ``t``-coefficient scores for effect-modifier drift.
 
@@ -219,6 +180,10 @@ def effect_modifier_scan(
     candidates : list[str] | None, optional
         Candidate covariates. Defaults to every column of ``df`` except
         ``node`` and ``t``.
+    column : str | None, optional
+        Score column to scan, overriding the ``t``-derived choice — the
+        way to scan one level contrast of a multi-level ordinal
+        treatment (e.g. ``"t[2]"``), which has no single default column.
 
     Returns
     -------
@@ -235,14 +200,22 @@ def effect_modifier_scan(
         If the score column is constant.
     """
     psi_df = node_scores(flow, df, node)
-    if t in psi_df.columns:
+    if column is not None:
+        if column not in psi_df.columns:
+            raise KeyError(
+                f"no score column {column!r} on node {node!r} "
+                f"(have {list(psi_df.columns)})."
+            )
+        col = column
+    elif t in psi_df.columns:
         col = t
     elif f"{t}[1]" in psi_df.columns and f"{t}[2]" not in psi_df.columns:
         col = f"{t}[1]"  # binary ordinal LS: the contrast
     else:
         raise KeyError(
             f"no score column for treatment {t!r} on node {node!r} "
-            f"(have {list(psi_df.columns)})."
+            f"(have {list(psi_df.columns)}). For a multi-level ordinal "
+            "treatment pass column= with the level contrast to scan."
         )
     psi = psi_df[col].to_numpy()
     n = len(psi)

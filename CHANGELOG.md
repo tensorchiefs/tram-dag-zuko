@@ -1,5 +1,65 @@
 # Changelog
 
+## 1.0.0-rc (unreleased, branch rc/1.0-architecture)
+
+### Changed — tag-driven releases (the skeleton convention)
+
+The version is now the git tag: hatch-vcs derives it (`no-local-version`),
+`pyproject` carries no version field any more, and pushing a `v*` tag runs
+the new release workflow — build with uv, publish to PyPI via trusted
+publishing (no token secret), sigstore-sign and create the GitHub release.
+`cz bump` computes the next tag from the conventional commits. One-time
+setup outside the repo: the PyPI trusted-publisher registration and the
+`pypi` GitHub environment.
+
+### Changed — term-owned architecture (docs/adr/001, docs/architecture.md)
+
+The 0.4 monolith split along its seams and every per-effect behavior moved
+onto one registry entry per effect in the new `terms.py` — no effect
+string-switch survives outside it. Public behavior, error messages, sign
+conventions, seeding and all ten experiment ground truths are unchanged
+(verified per step by a seeded state-dict smoke and replications); the fit
+API, queries and read-outs keep their exact signatures as flow methods.
+
+- **`fit(vc_ehat=)` is gone**: a centered VC names its out-of-fold
+  propensity COLUMN — `VC("X", t="T", center="ps")` reads column ``ps`` of
+  the training frame (``df.assign(ps=e_oof)``), which splits, shuffles and
+  minibatches like any data; queries still recompute the propensity live
+  from the treatment node. ``center=True`` refuses with the new spelling
+  named. No term-specific argument crosses ``fit`` any more.
+- `fitting.py` and `readouts.py` are mixins `CausalFlowDAG` composes —
+  every method defined once, no delegate layer; `shift_curve` is a flow
+  METHOD (`flow.shift_curve(node, parent, grid)`), and it evaluates
+  through the term's own `shift_value`, so `Fn` and custom terms plot
+  too. The internal legacy views died with the compat pass: `_VCGroup`,
+  `node.vc_column` (now `VCTerm.regressor`), `node._vc_groups`,
+  `node._shift_groups`, and the `ci_parents`/`_intercept_groups`
+  pass-through properties (read `node.intercept.ci_parents`/`.groups`).
+- New modules: `nodes.py` (the node model + the ONLY four continuous/ordinal
+  branches: `kind_log_prob`/`kind_sample`/`kind_abduct`/`kind_marginal_theta`),
+  `fitting.py` (`_FitMixin`: fit/fit_classical), `readouts.py`
+  (`_ReadoutsMixin`: the stateless read-outs), `terms.py` (the registry and the term classes:
+  LSTerm/CSTerm/VCTerm/FnTerm, SITerm/CITerm/AdditiveCITerm on
+  ShiftTerm/InterceptTerm hooks).
+- New public API: `flow.shift_curve(node, parent, grid)` (replaces reaching
+  into `nd.shifts[..]`/`net_input`); `fn_shift(*parents, fn=)`/`Fn` (a
+  callable or trainable `nn.Module` in the additive shifts);
+  `register_term` (whole custom effects as `ShiftTerm` subclasses);
+  `effect_modifier_scan(column=)` (scan a named level contrast of a
+  multi-level ordinal treatment); `transforms.ordinal_bounds`; `I(transform=)` accepts
+  a `_ScaledUT` subclass; `node_parents`/`validate_and_sort`/
+  `spec_to_dict`/`spec_from_dict` exported; `flow._fit_validated` declared.
+- Stricter spec: a wrong-effect option errors at construction instead of
+  silently defaulting; `spec_from_dict` rejects stale/misspelled option
+  keys; the unknown-effect error names `register_term`; `spec_to_dict`
+  documents the callable/`fn`/class pickle-only caveat; `node_terms` is
+  gone (`node.terms` is canonical); `_fit_validated` is set `False` by
+  `fit_classical` so callbacks cannot read a pre-classical validation entry.
+- BREAKING (0.4 was unreleased): additive-CI checkpoints re-key,
+  `nodes.*.intercept_nets.*` → `nodes.*.intercept.nets.*` (parameters
+  bit-identical under the rename — refit or re-key, no shim);
+  `RestoreBest` had already merged into `EarlyStopping`.
+
 ## 0.4.0 (unreleased)
 
 ### Changed (breaking) — `fit` is one loop, the strategies are yours
@@ -12,7 +72,7 @@ this repository's own DGPs — not the TRAM-DAG model, and each of them had a
 default the paper replication or the tests had to switch off.
 
 - **`fit(train_df, *, epochs, learning_rate=1e-2, batch_size=512, seed=None,
-  optimizer=None, callbacks=None, vc_ehat=None)`.** One optimizer over all
+  optimizer=None, callbacks=None)`.** One optimizer over all
   parameters (the per-node NLLs have independent gradients, so this equals
   per-node training); `optimizer=` takes any torch optimizer, which is how a
   `torch.optim.lr_scheduler` attaches. `callbacks=` takes one entry or a
@@ -176,8 +236,7 @@ default the paper replication or the tests had to switch off.
   and calibrates) make `fit` compute the per-node validation NLL once per
   epoch into `flow.history["val"]`, in `validation_batch_size=` chunks.
   `verbose=N` prints every Nth epoch plus the final one (0, the default,
-  is silent — no progress bars). A `validation_split` slices `vc_ehat`
-  with the same cut.
+  is silent — no progress bars).
 - **`tramdag.callbacks`** — the common training recipes as shipped, opt-in
   callbacks on a small `Callback` base (`on_fit_begin` / `on_epoch_end` /
   `on_fit_end`, each resetting its state at fit begin so instances are
