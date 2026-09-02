@@ -1,9 +1,9 @@
-"""The two fitting paths, as free functions over a flow.
+"""The two fitting paths: ``_FitMixin``, composed into ``CausalFlowDAG``.
 
 `fit` is one minibatch Adam loop (validation, verbose printing and the
 callback hooks included); `fit_classical` is the float64 full-batch L-BFGS
-exact-MLE route for all-`ls` specs. `CausalFlowDAG.fit`/`.fit_classical` are
-one-line delegates into this module, so the public API lives on the flow.
+exact-MLE route for all-`ls` specs. Both are defined here once and are
+ordinary methods of the flow.
 """
 
 # %% imports ---------------------------------------------------------------------------

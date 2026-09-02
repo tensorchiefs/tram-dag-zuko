@@ -9,7 +9,7 @@ onto one registry entry per effect in the new `terms.py` — no effect
 string-switch survives outside it. Public behavior, error messages, sign
 conventions, seeding and all ten experiment ground truths are unchanged
 (verified per step by a seeded state-dict smoke and replications); the fit
-API, queries and read-outs keep their signatures via one-line delegates.
+API, queries and read-outs keep their exact signatures as flow methods.
 
 - `fitting.py` and `readouts.py` are mixins `CausalFlowDAG` composes —
   every method defined once, no delegate layer; `shift_curve` is a flow
@@ -21,8 +21,8 @@ API, queries and read-outs keep their signatures via one-line delegates.
   pass-through properties (read `node.intercept.ci_parents`/`.groups`).
 - New modules: `nodes.py` (the node model + the ONLY four continuous/ordinal
   branches: `kind_log_prob`/`kind_sample`/`kind_abduct`/`kind_marginal_theta`),
-  `fitting.py` (fit/fit_classical as free functions), `readouts.py`
-  (stateless read-outs), `terms.py` (the registry and the term classes:
+  `fitting.py` (`_FitMixin`: fit/fit_classical), `readouts.py`
+  (`_ReadoutsMixin`: the stateless read-outs), `terms.py` (the registry and the term classes:
   LSTerm/CSTerm/VCTerm/FnTerm, SITerm/CITerm/AdditiveCITerm on
   ShiftTerm/InterceptTerm hooks).
 - New public API: `flow.shift_curve(node, parent, grid)` (replaces reaching

@@ -1,9 +1,9 @@
-"""Stateless read-outs over a fitted flow.
+"""Stateless read-outs: ``_ReadoutsMixin``, composed into ``CausalFlowDAG``.
 
-Free functions taking the flow; `CausalFlowDAG` exposes each as a one-line
-delegate method, which carries the public docstring. `shift_curve` is the
-public replacement for reaching into ``flow.nodes[..].shifts[..]`` +
-``net_input`` when plotting a fitted shift against a grid.
+Each read-out is defined here once and is an ordinary method of the flow.
+`shift_curve` is the public replacement for reaching into
+``flow.nodes[..].shifts[..]`` + ``net_input`` when plotting a fitted shift
+against a grid.
 """
 
 # %% imports ---------------------------------------------------------------------------

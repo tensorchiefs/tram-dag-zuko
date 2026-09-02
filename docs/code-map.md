@@ -89,7 +89,9 @@ config in `experiments/paper/` states `units=` and `activation=` itself.
 ## `terms.py` — the effect registry (the 1.0 architecture's core)
 
 One `TermDef` per effect; see [architecture.md](architecture.md) for the
-contract diagram. | Name | Role |
+contract diagram.
+
+| Name | Role |
 |---|---|
 | [`register_term()`][tramdag.terms.register_term] / [`get_term()`][tramdag.terms.get_term] | The registry: custom effects register a `ShiftTerm` subclass under a new effect name; collisions refuse. |
 | [`ShiftTerm`][tramdag.terms.ShiftTerm] / [`InterceptTerm`][tramdag.terms.InterceptTerm] | The behavior hooks a term owns: validation, `build`, `shift_value`/`theta_value`, `post_init`, `regularizer`, post-fit `finalize`, `score_columns`, the side-input contract, `cells`, `term_is_classical`, `option_defaults`. |
