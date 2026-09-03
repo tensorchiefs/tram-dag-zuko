@@ -1,7 +1,9 @@
 """Regenerate the auto-generated architecture views in docs/architecture.md.
 
 Two sources, both from the code itself:
-- pyreverse (``uvx --from pylint pyreverse -o mmd``) for the package/class UML;
+- pyreverse (``uvx --from pylint pyreverse -o mmd``) for the package UML and
+  the class UML (``-k``: names and inheritance only — full attributes over
+  ~30 classes are unreadable);
 - a ``sys.setprofile`` trace of one flow construction and one ``fit`` on a
   3-node SI/LS/CS/VC spec for the call graphs (tramdag-internal edges only).
 
@@ -94,6 +96,7 @@ def main() -> None:
                 "pyreverse",
                 "-o",
                 "mmd",
+                "-k",  # class names + inheritance only
                 "-p",
                 "tramdag",
                 str(ROOT / "src/tramdag"),
@@ -103,6 +106,7 @@ def main() -> None:
             capture_output=True,
         )
         packages = (Path(td) / "packages_tramdag.mmd").read_text()
+        classes = (Path(td) / "classes_tramdag.mmd").read_text()
 
     rng = np.random.default_rng(0)
     n = 300
@@ -131,15 +135,26 @@ def main() -> None:
     section = f"""{marker}
 ## Generated views
 
-Regenerate with ``uv run python tools/gen_diagrams.py`` — the package UML
-comes from pyreverse, the call graphs from a profile trace of one flow
-construction and one three-epoch ``fit`` on a 3-node SI/LS/CS/VC spec
-(tramdag-internal edges only; ``3x`` = once per node).
+Regenerate with ``uv run python tools/gen_diagrams.py`` — the package and
+class UML come from pyreverse (classes: names and inheritance only), the
+call graphs from a profile trace of one flow construction and one
+three-epoch ``fit`` on a 3-node SI/LS/CS/VC spec (tramdag-internal edges
+only; ``3x`` = once per node).
 
 ### Package UML (pyreverse)
 
 ```mermaid
 {packages.strip()}
+```
+
+### Class UML (pyreverse)
+
+The built-in terms are conditioners with a term-hook mixin: each concrete
+term class inherits its network from ``conditioners`` and its contract
+from ``ShiftTerm``/``InterceptTerm``.
+
+```mermaid
+{classes.strip()}
 ```
 
 ### Call graph — flow construction (traced)
