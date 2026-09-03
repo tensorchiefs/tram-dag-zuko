@@ -70,6 +70,35 @@ paper_protocol: &paper_protocol
   cf_draws: 200                # abduction draws averaged into a per-row PMF
   cf_seed: 1000
 
+# shared node specs
+x1: &x1
+  kind: continuous
+  terms:
+  - {effect: I, parents: [], options: {transform: bernstein, transform_kwargs: {n_coeffs: 20}}}
+
+x2: &x2
+  kind: continuous
+  terms:
+  - {effect: I, parents: [], options: {transform: bernstein, transform_kwargs: {n_coeffs: 20}}}
+  - {effect: LS, parents: [x1], options: {}}
+
+x3_ls: &x3_ls
+  kind: ordinal
+  levels: 4
+  terms:
+  - {effect: I, parents: [], options: {}}
+  - {effect: LS, parents: [x1], options: {}}
+  - {effect: LS, parents: [x2], options: {}}
+
+x3_cs: &x3_cs
+  kind: ordinal
+  levels: 4
+  terms:
+  - {effect: I, parents: [], options: {}}
+  - {effect: LS, parents: [x1], options: {}}
+  # hidden (2, 2), sigmoid: create_param_net's reference CS net (mixed)
+  - {effect: CS, parents: [x2], options: {units: [2, 2], activation: sigmoid}}
+
 variants:
   # the paper's headline mixed case (Fig. 9/19 + the C.4 odds-ratio check);
   # the only variant with a true beta23 (+0.3 in the flow's convention)
@@ -87,22 +116,9 @@ variants:
                             # slightly closer to the 500-epoch pins than lr
                             # 0.004 does (beta23 0.333 vs 0.337, pin 0.306)
     spec:
-      x1:
-        kind: continuous
-        terms:
-        - {effect: I, parents: [], options: {transform: bernstein, transform_kwargs: {n_coeffs: 20}}}
-      x2:
-        kind: continuous
-        terms:
-        - {effect: I, parents: [], options: {transform: bernstein, transform_kwargs: {n_coeffs: 20}}}
-        - {effect: LS, parents: [x1], options: {}}
-      x3:
-        kind: ordinal
-        levels: 4
-        terms:
-        - {effect: I, parents: [], options: {}}
-        - {effect: LS, parents: [x1], options: {}}
-        - {effect: LS, parents: [x2], options: {}}
+      x1: *x1
+      x2: *x2
+      x3: *x3_ls
 
   # a nonlinear f on the ordinal node: the complex shift must recover -f(x2)
   exp-cs:
@@ -110,20 +126,6 @@ variants:
     f: exp
     shift: cs
     spec:
-      x1:
-        kind: continuous
-        terms:
-        - {effect: I, parents: [], options: {transform: bernstein, transform_kwargs: {n_coeffs: 20}}}
-      x2:
-        kind: continuous
-        terms:
-        - {effect: I, parents: [], options: {transform: bernstein, transform_kwargs: {n_coeffs: 20}}}
-        - {effect: LS, parents: [x1], options: {}}
-      x3:
-        kind: ordinal
-        levels: 4
-        terms:
-        - {effect: I, parents: [], options: {}}
-        - {effect: LS, parents: [x1], options: {}}
-        # hidden (2, 2), sigmoid: create_param_net's reference CS net (mixed)
-        - {effect: CS, parents: [x2], options: {units: [2, 2], activation: sigmoid}}
+      x1: *x1
+      x2: *x2
+      x3: *x3_cs

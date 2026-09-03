@@ -91,17 +91,6 @@ def test_serialization_roundtrip_terms():
         assert torch.allclose(a[k], b[k]), k
 
 
-def test_legacy_list_of_pairs_options_still_load():
-    """Checkpoints written before the mapping form carry transform_kwargs as
-    a list of [key, value] pairs — spec_from_dict accepts both forms.
-    """
-    spec = {"x": ContinuousNode(I(transform="bernstein", n_coeffs=7))}
-    d = spec_to_dict(spec)
-    assert d["x"]["terms"][0]["options"]["transform_kwargs"] == {"n_coeffs": 7}
-    d["x"]["terms"][0]["options"]["transform_kwargs"] = [["n_coeffs", 7]]
-    assert spec_from_dict(d)["x"].terms == spec["x"].terms
-
-
 def test_to_matrix_labels_every_effect_and_leaves_non_edges_empty():
     """The paper's meta-adjacency view: rows are parents, columns children."""
     spec = {

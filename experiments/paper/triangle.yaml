@@ -64,6 +64,33 @@ paper_protocol: &paper_protocol
   grid_high: 1.0
   grid_points: 81
 
+# shared node specs — one place to change if the intercept or LS edge varies
+x1: &x1
+  kind: continuous
+  terms:
+  - {effect: I, parents: [], options: {transform: bernstein, transform_kwargs: {n_coeffs: 20}}}
+
+x2: &x2
+  kind: continuous
+  terms:
+  - {effect: I, parents: [], options: {transform: bernstein, transform_kwargs: {n_coeffs: 20}}}
+  - {effect: LS, parents: [x1], options: {}}
+
+x3_ls: &x3_ls
+  kind: continuous
+  terms:
+  - {effect: I, parents: [], options: {transform: bernstein, transform_kwargs: {n_coeffs: 20}}}
+  - {effect: LS, parents: [x1], options: {}}
+  - {effect: LS, parents: [x2], options: {}}
+
+x3_cs: &x3_cs
+  kind: continuous
+  terms:
+  - {effect: I, parents: [], options: {transform: bernstein, transform_kwargs: {n_coeffs: 20}}}
+  - {effect: LS, parents: [x1], options: {}}
+  # hidden (25, 25), sigmoid: create_param_net's reference CS net
+  - {effect: CS, parents: [x2], options: {units: [25, 25], activation: sigmoid}}
+
 variants:
   # the linear DGP is the only one with a true beta23 (+0.3) to recover
   linear-ls:
@@ -71,21 +98,9 @@ variants:
     f: linear
     shift: ls             # which coefficients the trajectory plot reads
     spec:
-      x1:
-        kind: continuous
-        terms:
-        - {effect: I, parents: [], options: {transform: bernstein, transform_kwargs: {n_coeffs: 20}}}
-      x2:
-        kind: continuous
-        terms:
-        - {effect: I, parents: [], options: {transform: bernstein, transform_kwargs: {n_coeffs: 20}}}
-        - {effect: LS, parents: [x1], options: {}}
-      x3:
-        kind: continuous
-        terms:
-        - {effect: I, parents: [], options: {transform: bernstein, transform_kwargs: {n_coeffs: 20}}}
-        - {effect: LS, parents: [x1], options: {}}
-        - {effect: LS, parents: [x2], options: {}}
+      x1: *x1
+      x2: *x2
+      x3: *x3_ls
 
   # the misspecified case (paper App. C.3.3, Fig. 17): the DGP's x2 -> x3
   # effect is linear, but it is fitted with a complex shift, which must
@@ -99,22 +114,9 @@ variants:
       batch_size: 256
       seed: 0
     spec:
-      x1:
-        kind: continuous
-        terms:
-        - {effect: I, parents: [], options: {transform: bernstein, transform_kwargs: {n_coeffs: 20}}}
-      x2:
-        kind: continuous
-        terms:
-        - {effect: I, parents: [], options: {transform: bernstein, transform_kwargs: {n_coeffs: 20}}}
-        - {effect: LS, parents: [x1], options: {}}
-      x3:
-        kind: continuous
-        terms:
-        - {effect: I, parents: [], options: {transform: bernstein, transform_kwargs: {n_coeffs: 20}}}
-        - {effect: LS, parents: [x1], options: {}}
-        # hidden (25, 25), sigmoid: create_param_net's reference CS net
-        - {effect: CS, parents: [x2], options: {units: [25, 25], activation: sigmoid}}
+      x1: *x1
+      x2: *x2
+      x3: *x3_cs
 
   # the headline complex-shift experiment (Fig. 7/15/16)
   atan-cs:
@@ -122,21 +124,9 @@ variants:
     f: atan
     shift: cs
     spec:
-      x1:
-        kind: continuous
-        terms:
-        - {effect: I, parents: [], options: {transform: bernstein, transform_kwargs: {n_coeffs: 20}}}
-      x2:
-        kind: continuous
-        terms:
-        - {effect: I, parents: [], options: {transform: bernstein, transform_kwargs: {n_coeffs: 20}}}
-        - {effect: LS, parents: [x1], options: {}}
-      x3:
-        kind: continuous
-        terms:
-        - {effect: I, parents: [], options: {transform: bernstein, transform_kwargs: {n_coeffs: 20}}}
-        - {effect: LS, parents: [x1], options: {}}
-        - {effect: CS, parents: [x2], options: {units: [25, 25], activation: sigmoid}}
+      x1: *x1
+      x2: *x2
+      x3: *x3_cs
 
   # a second nonlinear f, to show the shift recovery is not atan-specific
   sin-cs:
@@ -148,18 +138,6 @@ variants:
     grid_low: -1.0
     grid_high: 0.0
     spec:
-      x1:
-        kind: continuous
-        terms:
-        - {effect: I, parents: [], options: {transform: bernstein, transform_kwargs: {n_coeffs: 20}}}
-      x2:
-        kind: continuous
-        terms:
-        - {effect: I, parents: [], options: {transform: bernstein, transform_kwargs: {n_coeffs: 20}}}
-        - {effect: LS, parents: [x1], options: {}}
-      x3:
-        kind: continuous
-        terms:
-        - {effect: I, parents: [], options: {transform: bernstein, transform_kwargs: {n_coeffs: 20}}}
-        - {effect: LS, parents: [x1], options: {}}
-        - {effect: CS, parents: [x2], options: {units: [25, 25], activation: sigmoid}}
+      x1: *x1
+      x2: *x2
+      x3: *x3_cs

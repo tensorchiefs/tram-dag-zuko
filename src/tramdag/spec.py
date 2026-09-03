@@ -103,9 +103,9 @@ def _options(effect: str, **kwargs) -> tuple:
 def _tupled(value):
     """Take a serialized option value back to its canonical tuple form.
 
-    Lists are what JSON gives back for tuples; mappings are how nested
-    kwargs (``transform_kwargs``) read best in a hand-written YAML spec —
-    both become the sorted tuple-of-pairs the constructors produce.
+    Mappings become sorted tuple-of-pairs (for nested kwargs like
+    ``transform_kwargs``); lists become tuples (for ``units``, ``parents``,
+    etc.).
     """
     if isinstance(value, dict):
         return tuple(sorted((k, _tupled(v)) for k, v in value.items()))
