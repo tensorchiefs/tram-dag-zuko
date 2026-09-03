@@ -74,7 +74,13 @@ markdown_extensions:
 - admonition
 - tables
 - toc: {permalink: true}
-- pymdownx.superfences
+# the mermaid fence renders the architecture diagrams; Material ships the
+# mermaid.js integration once the fence class is "mermaid"
+- pymdownx.superfences:
+    custom_fences:
+    - name: mermaid
+      class: mermaid
+      format: !!python/name:pymdownx.superfences.fence_code_format
 - pymdownx.arithmatex: {generic: true}
 
 extra_javascript:

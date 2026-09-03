@@ -18,6 +18,8 @@ repos:
   - id: check-shebang-scripts-are-executable
   - id: check-toml
   - id: check-yaml
+    # syntax-only: mkdocs.yml needs the !!python/name mermaid-fence tag
+    args: [--unsafe]
   - id: end-of-file-fixer
   - id: mixed-line-ending
   - id: trailing-whitespace
