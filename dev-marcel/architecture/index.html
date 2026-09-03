@@ -642,6 +642,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#class-uml-pyreverse" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Class UML (pyreverse)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#call-graph-flow-construction-traced" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1400,6 +1411,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#class-uml-pyreverse" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Class UML (pyreverse)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#call-graph-flow-construction-traced" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1545,10 +1567,11 @@ adjacent in nodes.py. A third kind is the trigger for a protocol, not before.</p
 </ul>
 <!-- AUTOGEN:diagrams (tools/gen_diagrams.py) — do not edit by hand -->
 <h2 id="generated-views">Generated views<a class="headerlink" href="#generated-views" title="Permanent link">&para;</a></h2>
-<p>Regenerate with <code>uv run python tools/gen_diagrams.py</code> — the package UML
-comes from pyreverse, the call graphs from a profile trace of one flow
-construction and one three-epoch <code>fit</code> on a 3-node SI/LS/CS/VC spec
-(tramdag-internal edges only; <code>3x</code> = once per node).</p>
+<p>Regenerate with <code>uv run python tools/gen_diagrams.py</code> — the package and
+class UML come from pyreverse (classes: names and inheritance only), the
+call graphs from a profile trace of one flow construction and one
+three-epoch <code>fit</code> on a 3-node SI/LS/CS/VC spec (tramdag-internal edges
+only; <code>3x</code> = once per node).</p>
 <h3 id="package-uml-pyreverse">Package UML (pyreverse)<a class="headerlink" href="#package-uml-pyreverse" title="Permanent link">&para;</a></h3>
 <pre class="mermaid"><code>classDiagram
   class tramdag {
@@ -1595,6 +1618,100 @@ construction and one three-epoch <code>fit</code> on a 3-node SI/LS/CS/VC spec
   terms --&gt; spec
   fitting ..&gt; flow
   terms ..&gt; nodes</code></pre>
+<h3 id="class-uml-pyreverse">Class UML (pyreverse)<a class="headerlink" href="#class-uml-pyreverse" title="Permanent link">&para;</a></h3>
+<p>The built-in terms are conditioners with a term-hook mixin: each concrete
+term class inherits its network from <code>conditioners</code> and its contract
+from <code>ShiftTerm</code>/<code>InterceptTerm</code>.</p>
+<pre class="mermaid"><code>classDiagram
+  class AdditiveCITerm {
+  }
+  class AffineUT {
+  }
+  class BernsteinUT {
+  }
+  class CITerm {
+  }
+  class CSTerm {
+  }
+  class Callback {
+  }
+  class CausalFlowDAG {
+  }
+  class ComplexIntercept {
+  }
+  class ComplexShift {
+  }
+  class ContinuousNode {
+  }
+  class EarlyStopping {
+  }
+  class FnTerm {
+  }
+  class InterceptDef {
+  }
+  class InterceptTerm {
+  }
+  class LSTerm {
+  }
+  class LinearShift {
+  }
+  class OrdinalNode {
+  }
+  class PerNodePlateau {
+  }
+  class SITerm {
+  }
+  class ShiftTerm {
+  }
+  class SimpleIntercept {
+  }
+  class SplineUT {
+  }
+  class StandardLogistic {
+  }
+  class Term {
+  }
+  class TermDef {
+  }
+  class VCTerm {
+  }
+  class VaryingCoef {
+  }
+  class _FitMixin {
+  }
+  class _FnCallback {
+  }
+  class _InputTransform {
+  }
+  class _Node {
+  }
+  class _ReadoutsMixin {
+  }
+  class _ScaledUT {
+  }
+  EarlyStopping --|&gt; Callback
+  PerNodePlateau --|&gt; Callback
+  _FnCallback --|&gt; Callback
+  CausalFlowDAG --|&gt; _FitMixin
+  CausalFlowDAG --|&gt; _ReadoutsMixin
+  AdditiveCITerm --|&gt; InterceptTerm
+  CITerm --|&gt; ComplexIntercept
+  CITerm --|&gt; InterceptTerm
+  CSTerm --|&gt; ComplexShift
+  CSTerm --|&gt; ShiftTerm
+  FnTerm --|&gt; ShiftTerm
+  InterceptDef --|&gt; InterceptTerm
+  InterceptTerm --|&gt; TermDef
+  LSTerm --|&gt; LinearShift
+  LSTerm --|&gt; ShiftTerm
+  SITerm --|&gt; SimpleIntercept
+  SITerm --|&gt; InterceptTerm
+  ShiftTerm --|&gt; TermDef
+  VCTerm --|&gt; VaryingCoef
+  VCTerm --|&gt; ShiftTerm
+  AffineUT --|&gt; _ScaledUT
+  BernsteinUT --|&gt; _ScaledUT
+  SplineUT --|&gt; _ScaledUT</code></pre>
 <h3 id="call-graph-flow-construction-traced">Call graph — flow construction (traced)<a class="headerlink" href="#call-graph-flow-construction-traced" title="Permanent link">&para;</a></h3>
 <pre class="mermaid"><code>flowchart LR
   subgraph conditioners
