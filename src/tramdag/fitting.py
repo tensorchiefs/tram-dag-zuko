@@ -360,7 +360,9 @@ class _FitMixin:
             if any(stops):
                 break
         for cb in cbs:
-            cb.on_fit_end(self, opt)  # before re-centering: restored weights re-center
+            # before the VC re-centering, so weights a callback restores
+            # (EarlyStopping) still take part in it
+            cb.on_fit_end(self, opt)
         self._recenter_vc(vals)
         self.eval()
         return self

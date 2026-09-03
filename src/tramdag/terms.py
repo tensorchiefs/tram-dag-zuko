@@ -149,7 +149,9 @@ class TermDef:
         """Freeze this term's data-dependent state: the input-transform stats.
 
         ``CausalFlowDAG.calibrate`` calls this once per term; a term without
-        an ``input_transform`` has nothing to freeze.
+        an ``input_transform`` has nothing to freeze. The intercept slot
+        overrides it with two extra arguments (its node's own column and
+        transform), which the flow passes only there.
         """
         tr = self.input_transform
         if tr is None:
@@ -493,7 +495,7 @@ class VCTerm(ShiftTerm, VaryingCoef):
     slot = "shift"
     scored = True
     option_defaults: ClassVar[dict] = {
-        "penalty": None,
+        "penalty": 1.0,
         "center": False,
         "units": None,
         "activation": None,
@@ -535,10 +537,11 @@ class VCTerm(ShiftTerm, VaryingCoef):
             raise ValueError(
                 f"Node '{name}': VC treatment '{on}' cannot also be a modifier."
             )
-        if term.penalty is None:
-            raise ValueError(f"Node '{name}': VC(penalty=) is required.")
-        if term.penalty < 0:
-            raise ValueError(f"Node '{name}': VC penalty must be >= 0.")
+        if term.penalty is None or term.penalty < 0:
+            raise ValueError(
+                f"Node '{name}': VC(penalty=) must be a number >= 0 "
+                f"(default 1.0) — got {term.penalty!r}."
+            )
         if term.center is not False and not isinstance(term.center, str):
             raise ValueError(
                 f"Node '{name}': VC(center=) names the propensity COLUMN of "

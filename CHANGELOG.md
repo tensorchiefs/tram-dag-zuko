@@ -32,8 +32,10 @@ setup outside the repo: the PyPI trusted-publisher registration and the
   whose groups lack the `initial_lr` stamp (build it with `per_node_adam`)
   instead of adopting a possibly-decayed current rate;
   `CI("a", allow_interaction=False)` raises — with one parent there is no
-  interaction to disallow (it was silently coerced to a joint net);
-  a `VC` without `penalty=` now says "required" instead of "must be >= 0".
+  interaction to disallow (it was silently coerced to a joint net); and
+  `VC`'s serialized penalty default now matches the constructor's (1.0 —
+  it was a phantom `None` that a hand-written spec without `penalty:`
+  tripped over), with `penalty: null` rejected as not a number.
 
 ### Removed — 1.0 is a clean cut, no pre-1.0 compatibility
 

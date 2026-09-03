@@ -365,8 +365,9 @@ class _ScaledUT(torch.nn.Module):
     def set_range(self, xmin: float, xmax: float) -> None:
         """Set the data range that maps onto the pre-scaled domain.
 
-        ``CausalFlowDAG.calibrate`` calls this once with the train 5%/95%
-        quantiles.
+        ``CausalFlowDAG.calibrate`` calls this once with the train
+        ``range_q``/``1 - range_q`` quantiles (default 5%/95%; ``range_q=0``
+        is the min/max).
 
         Parameters
         ----------
