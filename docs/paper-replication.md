@@ -10,11 +10,13 @@ this repository measured, and what the current 1:1 protocol measures.
 Measured 2026-08-26 on `refactor/lean-fit` (seeds: DGP 42, init 7, shuffle 0)
 with the exact reference protocol — global plateau rule and Keras init. On
 2026-09-01 the *optimization* was re-tuned for CI runtime (fewer epochs, lr
-scaled to match; data, model and init untouched); on **2026-09-02 the
-VACA and CAREFL cuts were reverted to the reference protocols 1:1** after a
-visual pass against paper Figs. 5/6 (the triangle cuts stay): the reference
-runs cut CAREFL's Fig. 6 curve errors ~30% and improved VACA's do(x2=0),
-with every bound holding — ground truths re-pinned from those runs. The
+scaled to match; data, model and init untouched); on **2026-09-02 VACA
+was restored to the reference protocol 1:1** (10000 @ 0.001 + plateau —
+every bound holds, do(x2=0) improves) after a visual pass against paper
+Fig. 5; CAREFL was tried both ways and **kept at 3000 @ 0.002**
+(settled 2026-09-03: the reference 7000 wins only the single-observation
+Fig. 6 curve — draw noise — while 3000 wins the held-out MAEs and x4's
+validation NLL; the triangle cuts stay). The
 tuning campaign, with what was tried and what failed, is in
 [the 2026-09-01 tuning round](#the-2026-09-01-tuning-round) below. The
 2026-08-25 numbers of `feat/followups` (per-node plateau, torch init; CI run
@@ -211,7 +213,7 @@ same `make_model` nets as VACA.
 | hyperparameter | R code (`carefl_fig5.r`) | previous | now |
 |---|---|---|---|
 | train / validation | CAREFL's own `data/CAREFL_CF/X.csv` (`USE_EXTERNAL_DATA = TRUE`), x3/x4 sd-standardized, **`val = train`** — the plateau rule watched the training NLL | 18000 / 2000 split | 2500 rows drawn from the same SCM / a separate `dgp(5000)` draw, raw units — **repo choice** |
-| epochs | 7000 | 300 in chunks of 50 + 100 polish | **7000** — the reference, 1:1 (the 2026-09-01 3000-epoch cut was reverted 2026-09-02) |
+| epochs | 7000 | 300 in chunks of 50 + 100 polish | **3000** — settled 2026-09-03: better held-out x4 MAEs and x4 val NLL than the reference 7000 (whose summed-NLL anneal hides x4's overfit); see the ground-truth note |
 | lr, batch, schedule, input scaling, init | 0.001, full batch, plateau 0.1/50/1e-7, `scale_df`, glorot | 0.01→0.001, 512, none, raw, torch | **0.002** (the CI deviation), 2500, the same global rule, `minmax`, glorot |
 | scoring | the single `x_obs`, curves over α (Fig. 6) | + 300 held-out rows at α ∈ {−1.5, 0, 1.5} | same |
 
@@ -298,7 +300,7 @@ each config's YAML header.
 | triangle-mixed `exp-cs` | 500 epochs | 350 epochs |
 | triangle-mixed `linear-ls` | 500 epochs @ lr 0.004 | 200 epochs @ lr 0.002 |
 | vaca | 10000 full-batch epochs @ lr 0.001, plateau | reverted 2026-09-02: back to the reference 10000 @ 0.001 + plateau |
-| carefl | 7000 full-batch epochs @ lr 0.001, plateau | reverted 2026-09-02: back to the reference 7000 @ 0.001 |
+| carefl | 7000 full-batch epochs @ lr 0.001, plateau | 3000 @ lr 0.002, plateau kept — settled 2026-09-03 after measuring both (held-out x4 wins over the Fig-6 single point) |
 | validate_ls `adam` (misc) | phases 4000/2000/1000 @ 1e-2/1e-3/1e-4 | 800/700/500, batch 256 kept |
 
 **Triangle** (batch 256 / lr 0.004 / sigmoid / `init: normal` / raw parents
@@ -341,7 +343,7 @@ with minmax + tanh) converges with a systematic −0.11 common-mode offset of
 all three do-means — 2.4× the do(x2=+0) bound — while the observational fit
 stays perfect.
 
-**CAREFL** (full batch + plateau kept): 3000 @ 0.002 replaced 7000 @ 0.001 (reverted 2026-09-02 — the reference protocol cuts the Fig. 6 curve errors ~30%);
+**CAREFL** (full batch + plateau kept): 3000 @ 0.002 replaces 7000 @ 0.001 (measured both ways, settled 2026-09-03: the reference wins only the draw-noise Fig. 6 point and overtrains x4 — held-out MAEs and x4 val NLL prefer 3000);
 five of the six held-out counterfactual MAEs come out better than the
 7000-epoch pins. Rejected: raw parents — sigmoid saturates on the Laplace
 parents just like tanh, and relu underfits x3 (val NLL 1.46–1.47 vs the

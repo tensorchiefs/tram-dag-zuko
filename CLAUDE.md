@@ -173,14 +173,15 @@ epochs (linear-cs 500, mixed exp-cs 350, mixed linear-ls 200 @ lr 0.002)
 instead of the paper's 500 at Keras-default batch 32 / lr 0.001, the
 deviations taken for CI runtime (every metric kept; grid, epoch floors and
 the 2026-09-01 tuning round in docs/paper-replication.md); the
-VACA/CAREFL comparisons take one full-batch step per epoch on nTrain = 2500,
-running the reference protocols 1:1 since 2026-09-02 — 10000 /
-7000 full-batch epochs at lr 0.001 with the reference's ReduceLROnPlateau
+VACA/CAREFL comparisons take one full-batch step per epoch on nTrain = 2500 —
+VACA 10000 epochs at lr 0.001 with the reference's ReduceLROnPlateau
 (factor 0.1, patience 50, min_lr 1e-7; torch's scheduler on the summed
-validation NLL, global as in `update_learning_rate`); the 2026-09-01
-CI-runtime cuts (4800 / 3000 @ lr 0.002) were reverted after a visual pass
-against paper Figs. 5/6 (minibatch and raw-parent alternatives measurably
-fail, see docs/paper-replication.md).
+validation NLL, global as in `update_learning_rate`; restored 1:1
+2026-09-02), CAREFL 3000 at lr 0.002 with the same plateau rule — settled
+2026-09-03 after measuring both: the reference 7000 @ 0.001 wins only the
+draw-noise Fig. 6 point and overtrains x4 (its anneal watches the summed
+NLL), while 3000 wins the held-out MAEs and x4's val NLL (minibatch and
+raw-parent alternatives measurably fail, see docs/paper-replication.md).
 Seeds: the triangle scripts run
 unseeded, the comparison scripts seed R's RNG with 42 (not replayable in
 torch), so every seed here is a repo choice. Init follows each reference:
