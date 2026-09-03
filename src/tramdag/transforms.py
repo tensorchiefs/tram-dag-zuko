@@ -521,8 +521,9 @@ class BernsteinUT(_ScaledUT):
 
         The coefficients describe the linear map from the pre-scaled domain
         ``[-B, B]`` onto the standard-logistic quantiles
-        ``[logit(range_q), logit(1-range_q)]`` (``RANGE_Q`` when
-        ``range_q=0``, whose own logit is infinite).
+        ``[logit(range_q), logit(1-range_q)]``. With ``range_q=0`` the
+        target falls back to ``RANGE_Q`` — ``logit(0)`` is undefined, and
+        this is an initialization only.
 
         Returns
         -------
