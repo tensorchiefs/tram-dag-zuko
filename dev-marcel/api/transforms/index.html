@@ -2167,6 +2167,22 @@ flow from the standard-logistic latent to the observed variables.</p>
                   <code>20</code>
             </td>
           </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>range_q</code>
+            </td>
+            <td>
+                  <code><span title="float">float</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Domain quantile level, see <code>_ScaledUT</code>.</p>
+              </div>
+            </td>
+            <td>
+                  <code><span title="tramdag.transforms.RANGE_Q">RANGE_Q</span></code>
+            </td>
+          </tr>
       </tbody>
     </table>
 
@@ -2231,7 +2247,32 @@ flow from the standard-logistic latent to the observed variables.</p>
         <p>Give the unconstrained Bernstein coefficients of the calibrated map.</p>
 <p>The coefficients describe the linear map from the pre-scaled domain
 <code>[-B, B]</code> onto the standard-logistic quantiles
-<code>[logit(RANGE_Q), logit(1-RANGE_Q)]</code>.</p>
+<code>[logit(range_q), logit(1-range_q)]</code>.</p>
+
+
+<p><span class="doc-section-title">Raises:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="ValueError">ValueError</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>With <code>range_q=0</code>: the domain ends are the data min/max, whose
+latent quantile target <code>logit(0)</code> is undefined — skip
+<code>init_marginals</code> for a min-max-domain model.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
 
 
     <p><span class="doc-section-title">Returns:</span></p>
@@ -2328,6 +2369,22 @@ spline node reproduces upstream unless asked otherwise.</p>
             </td>
             <td>
                   <code>8</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>range_q</code>
+            </td>
+            <td>
+                  <code><span title="float">float</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Domain quantile level, see <code>_ScaledUT</code>.</p>
+              </div>
+            </td>
+            <td>
+                  <code><span title="tramdag.transforms.RANGE_Q">RANGE_Q</span></code>
             </td>
           </tr>
       </tbody>

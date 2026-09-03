@@ -1513,17 +1513,16 @@ learning rates and freezing (a callback, below) and the all-<code>ls</code> clas
 <li><strong>Minibatches</strong>: a fresh <code>torch.randperm</code> shuffle each epoch (<code>seed=</code> seeds
   it). The loss is the summed per-node mean NLL on the batch, plus the <code>VC</code>
   penalty.</li>
-<li><strong><code>calibrate(train_df, marginal_init=True)</code></strong>, called by the first <code>fit</code>:
-  the transform ranges from the train 5%/95% quantiles (each Bernstein/spline
-  domain), the statistics of every term-level <code>input_transform=</code>, and
-  the calibrated start — Bernstein nodes at the linear map onto the latent
-  5%/95% quantiles, ordinal cutpoints at the empirical class log-odds, a pure
-  init that leaves the MLE unchanged. Call it yourself to switch the start
-  off. A checkpoint carries the flag, so a loaded model is never recalibrated.
-  The start itself is also a public step: <code>flow.init_marginals(train_df)</code>
-  resets every Bernstein/ordinal simple intercept to its column's marginal
-  (spline and affine have no calibrated start), any time — e.g. to
-  restart a trained or loaded flow (<code>calibrate</code> won't, it is once-only).</li>
+<li><strong><code>calibrate(train_df)</code></strong>, called by the first <code>fit</code>: every term freezes
+  its own data-dependent state — the intercept maps the train
+  <code>range_q</code>/<code>1-range_q</code> quantiles onto its transform's domain, and every
+  term-level <code>input_transform=</code> freezes its statistics. Calibration never
+  touches the weights. A checkpoint carries the flag, so a loaded model is
+  never recalibrated. The calibrated start is a separate, always-explicit
+  step: <code>flow.init_marginals(train_df)</code> resets every Bernstein/ordinal
+  simple intercept to its column's marginal — a pure init that leaves the
+  MLE unchanged (spline, affine and <code>range_q=0</code> transforms have none) —
+  any time, including on a trained or loaded flow.</li>
 <li><strong>Validation, Keras-shaped</strong> — <code>validation_data=</code> (a DataFrame) or
   <code>validation_split=</code> (a float: the LAST fraction of <code>train_df</code>, no shuffle,
   and only the head calibrates — no leakage) makes <code>fit</code> compute the

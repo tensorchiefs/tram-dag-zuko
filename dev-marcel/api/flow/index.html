@@ -2214,29 +2214,24 @@ are independent. <code>None</code> (default) computes every node.</p>
 
 
 <a href="#tramdag.flow.CausalFlowDAG.calibrate" class="headerlink" title="Permanent link">&para;</a></h4>
-<div class="doc-signature highlight"><pre><span></span><code><span class="nf">calibrate</span><span class="p">(</span><span class="n">train_df</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">marginal_init</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">calibrate</span><span class="p">(</span><span class="n">train_df</span><span class="p">)</span>
 </code></pre></div>
 
     <div class="doc doc-contents ">
 
         <p>Take the data-dependent state from the training rows, once.</p>
-<p>Per continuous node the transform's domain: the train <code>RANGE_Q</code> /
-<code>1 - RANGE_Q</code> quantiles map onto <code>[-5, 5]</code> (the min-max scaling
-of the original implementation, made robust to outliers). The
-statistics of every term-level <code>input_transform=</code> (minmax lo/hi,
-standardize mean/std, a callable's frozen train columns). With
-<code>marginal_init</code> a calibrated start:
-a Bernstein simple intercept starts at the data marginal instead of
-zuko's default (about 2.5x too steep), an ordinal simple intercept at
-the marginal class log-odds. The optimum is unchanged, the path to
-it is shorter (docs/training-speed.md).</p>
+<p>Every term calibrates itself: the intercept term maps its node's
+train <code>range_q</code>/<code>1 - range_q</code> quantiles (an intercept option,
+default 5%/95%) onto the transform's pre-scaled domain — <code>0.0</code> is
+the min-max scaling of the reference comparison scripts' <code>scale_df</code>
+— and every term with an <code>input_transform=</code> freezes its statistics
+(minmax lo/hi, standardize mean/std, a callable's frozen train
+columns).</p>
 <p>The first <code>fit</code> or <code>fit_classical</code> calls this when it has not run
 yet; a loaded model is already calibrated, and later fits on other rows
-reuse this state — data on a new scale needs a new flow. Calling it
-yourself is how to choose <code>marginal_init=False</code> (the paper
-replications do, to match a reference that has no such step). To
-re-apply the calibrated start later — a loaded or already-trained
-model — call :meth:<code>init_marginals</code> directly.</p>
+reuse this state — data on a new scale needs a new flow. Calibration
+never touches the weights: a calibrated start is a separate, always
+explicit step, :meth:<code>init_marginals</code>.</p>
 
 
     <p><span class="doc-section-title">Returns:</span></p>
@@ -2280,19 +2275,18 @@ model — call :meth:<code>init_marginals</code> directly.</p>
     <div class="doc doc-contents ">
 
         <p>Set every simple intercept to the marginal of its column — any time.</p>
-<p>The calibrated start, as an explicit step: a Bernstein simple
-intercept starts at the data marginal instead of zuko's default
-(about 2.5x too steep), an ordinal simple intercept at the marginal
-class log-odds; spline/affine intercepts and intercepts with parents
-are untouched. The optimum is unchanged, the path to it is shorter
-(docs/training-speed.md). <code>calibrate(marginal_init=True)</code> — and so
-the first <code>fit</code> — runs this once; unlike <code>calibrate</code> it is NOT
-guarded by the calibrated flag, so calling it on a loaded or
-already-trained flow <strong>discards those intercepts' weights</strong> and
-restarts them at the marginal. An uncalibrated flow takes its ranges
-from the same rows first. On a calibrated flow the Bernstein start
-comes from the stored range alone (the canonical map; the df is not
-read) — only ordinal intercepts re-read the rows.</p>
+<p>The calibrated start, always explicit — nothing runs it for you: a
+Bernstein simple intercept starts at the data marginal instead of
+zuko's default (about 2.5x too steep), an ordinal simple intercept
+at the marginal class log-odds; spline/affine intercepts and
+intercepts with parents are untouched. The optimum is unchanged, the
+path to it is shorter (docs/training-speed.md). It is NOT guarded by
+the calibrated flag, so calling it on a loaded or already-trained
+flow <strong>discards those intercepts' weights</strong> and restarts them at the
+marginal. An uncalibrated flow takes its ranges from the same rows
+first. On a calibrated flow the Bernstein start comes from the
+stored range alone (the canonical map; the df is not read) — only
+ordinal intercepts re-read the rows.</p>
 
 
     <p><span class="doc-section-title">Returns:</span></p>

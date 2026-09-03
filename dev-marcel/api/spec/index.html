@@ -2745,7 +2745,8 @@ explains why a paper replication sets this explicitly.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>If no parent is given.</p>
+                <p>If no parent is given, or <code>allow_interaction=False</code> comes with
+fewer than two parents (an interaction to disallow needs two).</p>
               </div>
             </td>
           </tr>
@@ -3528,11 +3529,13 @@ cycle.</p>
         <p>Give the serialized representation of a spec, for checkpoints.</p>
 <p><code>Term.options</code> is already canonical — sorted by key, defaults
 dropped — so a term serializes as its three fields and nothing else.
-The result is JSON-safe: tuples become lists, and :func:<code>spec_from_dict</code>
-turns them back, so a spec round-trips through <code>json</code> as well as
-through <code>torch.save</code> — except when a term carries a <em>callable</em>
-<code>input_transform</code>, which serializes only through pickle
-(<code>torch.save</code>) and only as a module-level function.</p>
+The result is JSON- and YAML-safe: plain tuples become lists and
+nested kwargs tuples (<code>transform_kwargs</code>) become mappings, which is
+also how a hand-written YAML spec reads best; :func:<code>spec_from_dict</code>
+accepts both forms and turns them back, so a spec round-trips through
+<code>json</code>/YAML as well as through <code>torch.save</code> — except when a term
+carries a <em>callable</em> <code>input_transform</code>, which serializes only
+through pickle (<code>torch.save</code>) and only as a module-level function.</p>
 
 
 <p><span class="doc-section-title">Parameters:</span></p>

@@ -1615,7 +1615,7 @@ are the same object, so <code>LS is linear_shift</code>.</p>
 </tr>
 <tr>
 <td><a class="autorefs autorefs-internal" title="BernsteinUT" href="../api/transforms/#tramdag.transforms.BernsteinUT"><code>BernsteinUT</code></a></td>
-<td>Bernstein-polynomial transform (default basis, <code>n_coeffs=20</code>). Linear tail extrapolation follows the boundary derivative. <code>marginal_init_theta()</code> gives the calibrated start used by <code>calibrate(marginal_init=True)</code>.</td>
+<td>Bernstein-polynomial transform (default basis, <code>n_coeffs=20</code>). Linear tail extrapolation follows the boundary derivative. <code>marginal_init_theta()</code> gives the calibrated start <code>init_marginals</code> applies.</td>
 </tr>
 <tr>
 <td><a class="autorefs autorefs-internal" title="SplineUT" href="../api/transforms/#tramdag.transforms.SplineUT"><code>SplineUT</code></a></td>
@@ -1643,7 +1643,7 @@ are the same object, so <code>LS is linear_shift</code>.</p>
 </tr>
 <tr>
 <td><a class="autorefs autorefs-internal" title="ordinal_marginal_init_theta" href="../api/transforms/#tramdag.transforms.ordinal_marginal_init_theta"><code>ordinal_marginal_init_theta()</code></a></td>
-<td>Cutpoint start that matches the empirical class frequencies (<code>calibrate(marginal_init=True)</code>).</td>
+<td>Cutpoint start that matches the empirical class frequencies (<code>init_marginals</code>).</td>
 </tr>
 <tr>
 <td>(<code>_ScaledUT</code>, <code>_bounds</code>, <code>_log1mexp</code>)</td>
@@ -1714,7 +1714,7 @@ config in <code>experiments/paper/</code> states <code>units=</code> and <code>a
 </tr>
 <tr>
 <td><a class="autorefs autorefs-internal" title="calibrate" href="../api/flow/#tramdag.flow.CausalFlowDAG.calibrate"><code>calibrate()</code></a></td>
-<td>Once, from the training rows: transform ranges (train 5%/95% quantiles onto the domain), network-input min-max, the calibrated start (<code>marginal_init=True</code>). Called by the first fit; a checkpoint carries the flag.</td>
+<td>Once, from the training rows, each term for itself: transform ranges (train <code>range_q</code> quantiles onto the domain), input-transform statistics. Never touches the weights. Called by the first fit; a checkpoint carries the flag.</td>
 </tr>
 <tr>
 <td><a class="autorefs autorefs-internal" title="init_marginals" href="../api/flow/#tramdag.flow.CausalFlowDAG.init_marginals"><code>init_marginals()</code></a></td>
@@ -1979,8 +1979,8 @@ default you can read at the call site. Nothing numeric is buried.</p>
 </tr>
 <tr>
 <td>calibrated init</td>
-<td><code>calibrate(marginal_init=)</code></td>
-<td>True (pure init, MLE unchanged; <code>False</code> = zuko's zero start; called by the first fit)</td>
+<td><code>init_marginals(train_df)</code></td>
+<td>never implicit — an always-explicit step (pure init, MLE unchanged; without it zuko's zero start)</td>
 </tr>
 <tr>
 <td>VC stage-1 propensities</td>

@@ -1613,28 +1613,28 @@ construction and one three-epoch <code>fit</code> on a 3-node SI/LS/CS/VC spec
   end
   subgraph nodes
     n5["_Node.__init__"]
-    n14["_Node._add_input_transform"]
     n7["_Node._build_intercept"]
     n8["_Node._build_shifts"]
   end
   subgraph spec
-    n20["_check_input_transform"]
-    n18["_check_node"]
-    n19["_check_term"]
-    n25["_kahn_sort"]
-    n26["feat_width"]
+    n19["_check_input_transform"]
+    n17["_check_node"]
+    n18["_check_term"]
+    n24["_kahn_sort"]
+    n25["feat_width"]
     n9["node_parents"]
     n6["validate_and_sort"]
   end
   subgraph terms
-    n15["CSTerm.build"]
+    n14["CSTerm.build"]
     n12["InterceptTerm.build"]
-    n16["LSTerm.build"]
-    n21["LSTerm.check_arity"]
-    n22["TermDef.check_arity"]
-    n23["TermDef.edge_parents"]
-    n17["VCTerm.build"]
-    n24["VCTerm.edge_parents"]
+    n15["LSTerm.build"]
+    n20["LSTerm.check_arity"]
+    n21["TermDef.check_arity"]
+    n22["TermDef.edge_parents"]
+    n16["VCTerm.build"]
+    n23["VCTerm.edge_parents"]
+    n26["_attach_input_transform"]
     n13["get_term"]
   end
   subgraph transforms
@@ -1655,28 +1655,29 @@ construction and one three-epoch <code>fit</code> on a 3-node SI/LS/CS/VC spec
     n5 -- "2x" --&gt; n11
     n7 -- "3x" --&gt; n12
     n7 -- "3x" --&gt; n13
-    n8 -- "3x" --&gt; n14
+    n8 --&gt; n14
     n8 --&gt; n15
     n8 --&gt; n16
-    n8 --&gt; n17
     n8 -- "6x" --&gt; n13
+    n17 -- "6x" --&gt; n18
     n18 -- "6x" --&gt; n19
-    n19 -- "6x" --&gt; n20
-    n19 --&gt; n21
-    n19 -- "5x" --&gt; n22
-    n19 -- "5x" --&gt; n23
-    n19 --&gt; n24
-    n19 -- "6x" --&gt; n13
-    n25 -- "3x" --&gt; n9
-    n6 -- "3x" --&gt; n18
-    n6 --&gt; n25
-    n15 --&gt; n0
-    n15 --&gt; n26
+    n18 --&gt; n20
+    n18 -- "5x" --&gt; n21
+    n18 -- "5x" --&gt; n22
+    n18 --&gt; n23
+    n18 -- "6x" --&gt; n13
+    n24 -- "3x" --&gt; n9
+    n6 -- "3x" --&gt; n17
+    n6 --&gt; n24
+    n14 --&gt; n0
+    n14 --&gt; n25
+    n14 --&gt; n26
     n12 -- "3x" --&gt; n27
-    n16 --&gt; n28
+    n15 --&gt; n28
+    n15 --&gt; n25
+    n16 --&gt; n2
+    n16 --&gt; n25
     n16 --&gt; n26
-    n17 --&gt; n2
-    n17 --&gt; n26
     n29 -- "2x" --&gt; n30
     n11 -- "2x" --&gt; n29
 </code></pre></div>
@@ -1691,13 +1692,13 @@ construction and one three-epoch <code>fit</code> on a 3-node SI/LS/CS/VC spec
     n3["_last_val"]
   end
   subgraph conditioners
-    n51["ComplexShift.forward"]
-    n53["LinearShift.forward"]
-    n54["SimpleIntercept.forward"]
+    n46["ComplexShift.forward"]
+    n48["LinearShift.forward"]
+    n49["SimpleIntercept.forward"]
     n6["VaryingCoef.beta"]
     n5["VaryingCoef.forward"]
-    n56["VaryingCoef.l2"]
-    n55["VaryingCoef.recenter"]
+    n51["VaryingCoef.l2"]
+    n50["VaryingCoef.recenter"]
   end
   subgraph fitting
     n7["_FitMixin.fit"]
@@ -1710,55 +1711,50 @@ construction and one three-epoch <code>fit</code> on a 3-node SI/LS/CS/VC spec
     n21["_val_nll"]
   end
   subgraph flow
-    n37["CausalFlowDAG._check_levels"]
+    n32["CausalFlowDAG._check_levels"]
     n14["CausalFlowDAG._check_side_columns"]
-    n32["CausalFlowDAG._dtype"]
+    n29["CausalFlowDAG._dtype"]
     n27["CausalFlowDAG._encode_parent"]
     n26["CausalFlowDAG._features"]
-    n28["CausalFlowDAG._marginal_start"]
-    n31["CausalFlowDAG._np_dtype"]
+    n28["CausalFlowDAG._np_dtype"]
     n15["CausalFlowDAG._recenter_vc"]
-    n34["CausalFlowDAG._set_range"]
-    n36["CausalFlowDAG._side_feats"]
+    n31["CausalFlowDAG._side_feats"]
     n16["CausalFlowDAG._tensorize"]
     n17["CausalFlowDAG.calibrate"]
-    n38["CausalFlowDAG.init_marginals"]
     n22["CausalFlowDAG.node_log_prob"]
   end
   subgraph nodes
-    n52["_Node.net_input"]
-    n39["_Node.set_input_stats"]
-    n40["_Node.theta_shift"]
-    n41["kind_log_prob"]
-    n29["kind_marginal_theta"]
+    n37["_Node.net_input"]
+    n35["_Node.theta_shift"]
+    n36["kind_log_prob"]
   end
   subgraph terms
-    n42["CSTerm.shift_value"]
-    n43["LSTerm.shift_value"]
-    n30["SITerm.marginal_start"]
-    n44["SITerm.theta_value"]
+    n39["CSTerm.shift_value"]
+    n33["InterceptTerm.calibrate"]
+    n40["LSTerm.shift_value"]
+    n41["SITerm.theta_value"]
     n18["ShiftTerm.has_regularizer"]
     n24["ShiftTerm.side_columns"]
-    n33["VCTerm.finalize"]
+    n34["TermDef.calibrate"]
+    n38["TermDef.input_transform"]
+    n30["VCTerm.finalize"]
     n19["VCTerm.has_regularizer"]
-    n57["VCTerm.regressor"]
+    n52["VCTerm.regressor"]
     n23["VCTerm.regularizer"]
-    n45["VCTerm.shift_value"]
+    n42["VCTerm.shift_value"]
     n25["VCTerm.side_columns"]
   end
   subgraph transforms
-    n58["BernsteinUT._build"]
-    n49["BernsteinUT.marginal_init_theta"]
-    n46["StandardLogistic.log_prob"]
-    n59["_ScaledUT._log_dt_dx"]
-    n60["_ScaledUT._scale"]
-    n47["_ScaledUT.forward"]
-    n35["_ScaledUT.set_range"]
-    n63["_log1mexp"]
-    n61["ordinal_bounds"]
-    n62["ordinal_cutpoints"]
-    n48["ordinal_log_prob"]
-    n50["ordinal_marginal_init_theta"]
+    n53["BernsteinUT._build"]
+    n43["StandardLogistic.log_prob"]
+    n54["_ScaledUT._log_dt_dx"]
+    n55["_ScaledUT._scale"]
+    n44["_ScaledUT.forward"]
+    n47["_ScaledUT.set_range"]
+    n58["_log1mexp"]
+    n56["ordinal_bounds"]
+    n57["ordinal_cutpoints"]
+    n45["ordinal_log_prob"]
   end
     n0 --&gt; n1
     n2 -- "3x" --&gt; n3
@@ -1786,50 +1782,46 @@ construction and one three-epoch <code>fit</code> on a 3-node SI/LS/CS/VC spec
     n14 -- "2x" --&gt; n24
     n14 --&gt; n25
     n26 -- "30x" --&gt; n27
-    n28 -- "3x" --&gt; n29
-    n28 -- "3x" --&gt; n30
-    n31 -- "2x" --&gt; n32
+    n28 -- "2x" --&gt; n29
     n15 --&gt; n26
-    n15 --&gt; n33
-    n34 -- "2x" --&gt; n35
-    n36 -- "18x" --&gt; n24
-    n36 -- "9x" --&gt; n25
-    n16 -- "2x" --&gt; n31
-    n17 --&gt; n37
-    n17 -- "2x" --&gt; n34
-    n17 --&gt; n38
-    n17 -- "3x" --&gt; n39
-    n38 --&gt; n37
-    n38 -- "3x" --&gt; n28
+    n15 --&gt; n30
+    n31 -- "18x" --&gt; n24
+    n31 -- "9x" --&gt; n25
+    n16 -- "2x" --&gt; n28
+    n17 --&gt; n32
+    n17 -- "3x" --&gt; n33
+    n17 -- "3x" --&gt; n34
     n22 -- "9x" --&gt; n26
+    n22 -- "27x" --&gt; n31
+    n22 -- "27x" --&gt; n35
     n22 -- "27x" --&gt; n36
-    n22 -- "27x" --&gt; n40
-    n22 -- "27x" --&gt; n41
-    n40 -- "9x" --&gt; n42
-    n40 -- "9x" --&gt; n43
-    n40 -- "27x" --&gt; n44
-    n40 -- "9x" --&gt; n45
-    n41 -- "18x" --&gt; n46
-    n41 -- "18x" --&gt; n47
-    n41 -- "9x" --&gt; n48
-    n29 -- "2x" --&gt; n49
-    n29 --&gt; n50
-    n42 -- "9x" --&gt; n51
+    n37 -- "19x" --&gt; n38
+    n35 -- "9x" --&gt; n39
+    n35 -- "9x" --&gt; n40
+    n35 -- "27x" --&gt; n41
+    n35 -- "9x" --&gt; n42
+    n36 -- "18x" --&gt; n43
+    n36 -- "18x" --&gt; n44
+    n36 -- "9x" --&gt; n45
+    n39 -- "9x" --&gt; n46
+    n39 -- "9x" --&gt; n37
+    n33 -- "3x" --&gt; n34
+    n33 -- "2x" --&gt; n47
+    n40 -- "9x" --&gt; n48
+    n41 -- "27x" --&gt; n49
+    n34 -- "6x" --&gt; n38
+    n30 --&gt; n50
+    n30 --&gt; n37
+    n23 -- "6x" --&gt; n51
+    n42 -- "9x" --&gt; n5
+    n42 -- "9x" --&gt; n37
     n42 -- "9x" --&gt; n52
-    n43 -- "9x" --&gt; n53
-    n44 -- "27x" --&gt; n54
-    n33 --&gt; n55
-    n33 --&gt; n52
-    n23 -- "6x" --&gt; n56
-    n45 -- "9x" --&gt; n5
-    n45 -- "9x" --&gt; n52
-    n45 -- "9x" --&gt; n57
-    n47 -- "18x" --&gt; n58
-    n47 -- "18x" --&gt; n59
-    n47 -- "18x" --&gt; n60
-    n61 -- "9x" --&gt; n62
-    n48 -- "9x" --&gt; n63
-    n48 -- "9x" --&gt; n61
+    n44 -- "18x" --&gt; n53
+    n44 -- "18x" --&gt; n54
+    n44 -- "18x" --&gt; n55
+    n56 -- "9x" --&gt; n57
+    n45 -- "9x" --&gt; n58
+    n45 -- "9x" --&gt; n56
 </code></pre></div>
 <!-- AUTOGEN:end -->
 
