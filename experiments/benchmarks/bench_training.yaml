@@ -1,0 +1,105 @@
+# The training-speed benchmark (bench_training.py): workload specs, data,
+# targets and the measured recipe grid. The script reads no defaults of its
+# own — each workload's `spec` is the whole DAG (tramdag.spec_from_dict);
+# the specs deliberately carry NO options, so the benchmark measures the
+# framework's defaults.
+#
+# 'onecycle' and 'cosine' were measured in the June 2026 grid and are still
+# in the table of docs/training-speed.md, but were dropped in 0.4 (they lost
+# to plateau on every workload), so they cannot be run again here. The
+# plateau+freeze recipe itself left fit() in 0.4 as well — it is
+# tramdag.callbacks.PerNodePlateau, a callback, which is what the benchmark
+# measures.
+
+workloads:
+  # W1: all-`ls` 5-node DAG on the frozen synthetic cohort (n=1275,
+  # full-data fit) — the optimum is the classical proportional-odds MLE
+  stroke-ls:
+    data: ../misc/data/magic-mrclean/ls/obs.csv   # relative to this file
+    val_split:                # full-data MLE fit: val = train
+    # two target tiers (NLL gap vs the long-run reference): tight =
+    # exact-MLE equivalence; practical = coefficient-/density-equivalent
+    # (a stroke-ls fit with gap ~3e-3 already matches the R coefficients
+    # within the test tolerances, see tests/test_fit_hooks.py)
+    tol_tight: 1.0e-3
+    tol_pract: 5.0e-3
+    # (schedule label, fit phases [epochs, lr], plateau+freeze settings)
+    configs:
+    - {label: baseline-2phase, phases: [[3000, 0.01], [1000, 0.001]], extra: {}}
+    - {label: constant, phases: [[4000, 0.01]], extra: {}}
+    # min_delta 1e-5: the stroke metric is train NLL (full-data MLE fit),
+    # evaluated deterministically -> a fine threshold is noise-safe and
+    # lets the schedule keep recognizing slow progress near the optimum
+    - {label: plateau+freeze, phases: [[4000, 0.01]], extra: {patience: 30, freeze: 120, min_delta: 1.0e-5}}
+    # the tests' full-MLE recipe, cached to reference.json
+    reference: {phases: [[4000, 0.01], [2000, 0.001], [1000, 0.0001]], extra: {}, batch: 512, seed: 123}
+    spec:
+      Age:
+        kind: continuous
+        terms:
+        - {effect: I, parents: [], options: {}}
+      mRS_pre:
+        kind: ordinal
+        levels: 6
+        terms:
+        - {effect: I, parents: [], options: {}}
+        - {effect: LS, parents: [Age], options: {}}
+      NIHSSa:
+        kind: continuous
+        terms:
+        - {effect: I, parents: [], options: {}}
+        - {effect: LS, parents: [Age], options: {}}
+        - {effect: LS, parents: [mRS_pre], options: {}}
+      T:
+        kind: ordinal
+        levels: 2
+        terms:
+        - {effect: I, parents: [], options: {}}
+        - {effect: LS, parents: [Age], options: {}}
+        - {effect: LS, parents: [mRS_pre], options: {}}
+        - {effect: LS, parents: [NIHSSa], options: {}}
+      mRS_3m:
+        kind: ordinal
+        levels: 7
+        terms:
+        - {effect: I, parents: [], options: {}}
+        - {effect: LS, parents: [Age], options: {}}
+        - {effect: LS, parents: [mRS_pre], options: {}}
+        - {effect: LS, parents: [NIHSSa], options: {}}
+        - {effect: LS, parents: [T], options: {}}
+
+  # W2: all-`ci` flow on the frozen VACA cohort (n=5000, 90/10 split)
+  vaca-ci:
+    data: ../paper/data/vaca/obs.csv
+    val_split: 0.1            # last 10% of the frozen rows
+    tol_tight: 2.0e-3
+    tol_pract: 1.0e-2
+    configs:
+    - {label: baseline-2phase, phases: [[400, 0.01], [120, 0.001]], extra: {}}
+    - {label: constant, phases: [[520, 0.01]], extra: {}}
+    - {label: plateau+freeze, phases: [[1500, 0.01]], extra: {patience: 15, freeze: 50}}
+    # plateau+freeze, then the constant-lr polish (per-phase extras)
+    reference: {phases: [[3000, 0.01], [300, 0.001]], extra: [{patience: 25, freeze: 120}, {}], batch: 512, seed: 123}
+    spec:
+      x1:
+        kind: continuous
+        terms:
+        - {effect: I, parents: [], options: {}}
+      x2:
+        kind: continuous
+        terms:
+        - {effect: I, parents: [x1], options: {}}
+      x3:
+        kind: continuous
+        terms:
+        - {effect: I, parents: [x1, x2], options: {}}
+
+# full-batch LBFGS on stroke-ls, cold and Adam-warm-started
+lbfgs:
+  lr: 1.0
+  max_iter: 40              # inner iterations per opt.step
+  history_size: 30
+  chunks: 15                # up to chunks x max_iter inner iterations
+  warm_epochs: [0, 150]     # 0 = cold start
+  warm_lr: 0.01
+  warm_batch: 512

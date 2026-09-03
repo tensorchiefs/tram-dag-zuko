@@ -12,6 +12,40 @@ publishing (no token secret), sigstore-sign and create the GitHub release.
 setup outside the repo: the PyPI trusted-publisher registration and the
 `pypi` GitHub environment.
 
+### Changed (breaking) — no magic: calibration is per term, the start is yours
+
+- **`calibrate` never touches the weights.** The `marginal_init` parameter
+  is gone; `flow.init_marginals(train_df)` is the one way to a calibrated
+  start and nothing calls it for you — not the first `fit`, not
+  `fit_classical`. A recipe tuned with the warm start now says so in its
+  own code (`validate_ls` does). With `range_q=0` (a min-max domain) the
+  marginal start is undefined and `init_marginals` raises instead of
+  silently retargeting the 5% quantiles.
+- **Each term calibrates itself.** `calibrate` loops over the node's terms;
+  the intercept term maps its own column's `range_q` quantiles onto the
+  transform domain and every term freezes its own `input_transform`
+  statistics. The `_InputTransform` modules move from the node's
+  `input_transforms` ModuleDict onto the owning term (state-dict paths
+  change: `nodes.X.input_transforms.@I.*` → `nodes.X.intercept.*`,
+  shift keys likewise) — pre-1.0 checkpoints do not load, refit.
+- **Misconfiguration fails plainly.** `PerNodePlateau` refuses an optimizer
+  whose groups lack the `initial_lr` stamp (build it with `per_node_adam`)
+  instead of adopting a possibly-decayed current rate;
+  `CI("a", allow_interaction=False)` raises — with one parent there is no
+  interaction to disallow (it was silently coerced to a joint net); and
+  `VC`'s serialized penalty default now matches the constructor's (1.0 —
+  it was a phantom `None` that a hand-written spec without `penalty:`
+  tripped over), with `penalty: null` rejected as not a number.
+
+### Removed — 1.0 is a clean cut, no pre-1.0 compatibility
+
+- The 0.3-spec detector in `spec_from_dict` (the "predates 0.4" error):
+  a spec without an `"options"` mapping now fails as malformed input.
+- `load()` no longer defaults a checkpoint's missing `init` field to
+  `"torch"`; every 1.0 checkpoint carries it.
+Checkpoints and serialized specs from any pre-1.0 version do not load —
+refit and save again.
+
 ### Changed — term-owned architecture (docs/adr/001, docs/architecture.md)
 
 The 0.4 monolith split along its seams and every per-effect behavior moved
@@ -160,6 +194,24 @@ default the paper replication or the tests had to switch off.
   `torch.logit(u, eps)`.
 
 ### Added
+
+- **Specs serialize YAML-readably.** `spec_to_dict` emits nested kwargs
+  tuples (`transform_kwargs`) as mappings and `spec_from_dict` accepts both
+  the mapping and the old list-of-pairs form, so a spec can be written by
+  hand in YAML and round-trips through JSON/YAML unchanged. This is what
+  the experiments' blueprint builds on: every experiment variant now
+  carries its full DAG as a `spec:` block in its sibling YAML
+  (`experiments/README.md`).
+
+- **`range_q` — the transform-domain quantile is an intercept option.**
+  `SI(range_q=0.0)` (any intercept, any basis) calibrates that node's
+  domain to the train min/max instead of the default 5%/95% quantiles —
+  the original implementation's `scale_df` scaling, exactly. The option
+  rides the existing transform-kwargs path, serializes with the spec, and
+  validates to `[0, 0.5)`. The CAREFL replication uses it (measured there:
+  Fig. 6 max errors 0.37 → 0.20 for x4, 0.20 → 0.07 for x3); VACA measured
+  worse with it and keeps the quantile default — the tails matter
+  per-problem, which is why it is per-node.
 
 - **`notebooks/classical_fit_tram_dag.py` is back**, ported to the 0.4 term
   syntax. It had been deleted along with `notebooks/stale/`; the deletion

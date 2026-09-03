@@ -7,7 +7,7 @@ import pytest
 import torch
 
 from tramdag import CS, LS, CausalFlowDAG, ContinuousNode, I, OrdinalNode
-from tramdag.spec import validate_and_sort
+from tramdag.spec import spec_from_dict, spec_to_dict, validate_and_sort
 from tramdag.transforms import (
     BOUND,
     AffineUT,
@@ -217,7 +217,7 @@ def test_affine_zero_theta_is_the_logistic_density():
     """
     df = pd.DataFrame({"x": np.linspace(-4.0, 6.0, 400)})
     flow = CausalFlowDAG({"x": ContinuousNode(I(transform="affine"))}, seed=0)
-    flow.calibrate(df, marginal_init=False)
+    flow.calibrate(df)
     with torch.no_grad():
         flow.nodes["x"].intercept.theta.zero_()
     xmin, xmax = (float(v) for v in (flow.nodes["x"].ut.xmin, flow.nodes["x"].ut.xmax))
@@ -230,6 +230,22 @@ def test_affine_zero_theta_is_the_logistic_density():
     # the transform ranges are the train 5%/95% quantiles, as calibrate documents
     q = df["x"].quantile([0.05, 0.95])
     assert (xmin, xmax) == pytest.approx((q.iloc[0], q.iloc[1]))
+
+
+def test_range_q_option_sets_the_domain():
+    """``range_q`` is an intercept option: 0.0 calibrates the domain to the
+    train min/max (the reference comparisons' ``scale_df``), and the value
+    survives a save/load round-trip through the spec.
+    """
+    df = pd.DataFrame({"x": np.linspace(-4.0, 6.0, 400)})
+    flow = CausalFlowDAG({"x": ContinuousNode(I(range_q=0.0))}, seed=0)
+    flow.calibrate(df)
+    ut = flow.nodes["x"].ut
+    assert (float(ut.xmin), float(ut.xmax)) == pytest.approx((-4.0, 6.0))
+    d = spec_from_dict(spec_to_dict(flow.spec))
+    assert d["x"].terms[0] == flow.spec["x"].terms[0]
+    with pytest.raises(ValueError, match="range_q"):
+        CausalFlowDAG({"x": ContinuousNode(I(range_q=0.6))})
 
 
 def test_shift_curve_matches_the_manual_composition(ls_chain):

@@ -59,21 +59,21 @@ carries its own copy of the bimodal DGP. `benchmarks/tests/` pins that copy to
 the maintained generator, because a drifted copy would silently make the
 collected `final_val_nll` values incomparable.
 
-Runtime and the CI deviations (re-tuned 2026-09-01): the triangle configs run
-batch 256 / lr 0.004 for 300 epochs (`linear-cs` 500, mixed `exp-cs` 350,
-mixed `linear-ls` 200 @ lr 0.002) instead of the paper's 500 at batch 32 / lr
-0.001, VACA runs 4800 full-batch epochs @ lr 0.002 with no schedule and CAREFL
-3000 @ 0.002 with the plateau rule (reference: 10000 / 7000 @ 0.001, both with
-plateau) — every ground-truth metric kept. The selection grid, the epoch
-floors and the rejected alternatives with their numbers are in
-`docs/paper-replication.md`; locally, run variants one or two at a time
-(`OMP_NUM_THREADS=2`; the step is overhead-bound).
+Runtime and the CI deviations: the triangle configs run batch 256 / lr 0.004
+for 300 epochs (`linear-cs` 500, mixed `exp-cs` 350, mixed `linear-ls` 200 @
+lr 0.002) instead of the paper's 500 at batch 32 / lr 0.001 (re-tuned
+2026-09-01) — every ground-truth metric kept. VACA and CAREFL run their
+references 1:1: 10000 / 7000 full-batch epochs @ lr 0.001 with the plateau
+rule, CAREFL on the reference's own committed rows (`paper/data/carefl-cf`).
+The selection grid, the epoch floors and the rejected alternatives with
+their numbers are in `docs/paper-replication.md`; locally, run variants one
+or two at a time (`OMP_NUM_THREADS=2`; the step is overhead-bound).
 
-`vaca.py` and `carefl.py` keep `net_input_scaling: minmax` and tanh because
-the reference trains in `scale_df` space and every raw-parent alternative was
-tried and measurably fails (tanh/sigmoid saturate, relu wanders or
-underfits — measured in `docs/paper-replication.md`). The triangle scripts'
-reference fits raw parents, so those configs leave it unset.
+`vaca.py` and `carefl.py` keep `input_transform: minmax` and tanh on their CI
+terms because the reference trains in `scale_df` space and every raw-parent
+alternative was tried and measurably fails (tanh/sigmoid saturate, relu
+wanders or underfits — measured in `docs/paper-replication.md`). The triangle
+scripts' reference fits raw parents, so those specs leave it unset.
 
 Which paper figure each variant reproduces — and what is deliberately not
 reproduced — is listed in [`paper/PAPER_COVERAGE.md`](paper/PAPER_COVERAGE.md);
@@ -84,7 +84,7 @@ All five have the same shape: imports, function definitions, a `run(variant)`
 function holding the whole experiment, and a `__main__` block whose argparse
 call selects the variant.
 
-## Hyperparameters live in YAML, not in code
+## The blueprint: spec and hyperparameters live in YAML, not in code
 
 Each script reads its sibling `<script>.yaml` and **nothing else**: no defaults
 in the code, no CLI flags that change a number. `common.py::load_variant` parses
@@ -93,6 +93,30 @@ Both live here, so the package depends on no config parser and ships no config
 helper.
 Values shared by several variants are written once under a YAML anchor and
 merged with `<<`, which keeps the merge visible in the file.
+
+Since 2026-09 every variant carries the **whole model and training recipe**
+(deliberately verbose — duplication over indirection, so one variant reads
+top to bottom):
+
+- `spec:` — the full DAG in `tramdag.spec_from_dict` form: per node `kind`
+  (+ `levels` for ordinal), and one `{effect, parents, options}` entry per
+  term. Everything about the model — basis, `n_coeffs`, `range_q`, network
+  `units`/`activation`, `input_transform` — is a term option here, not a
+  separate config key.
+- `flow_kwargs:` — passed to `CausalFlowDAG(spec, **flow_kwargs)` verbatim
+  (`seed`, `init`).
+- `fit_kwargs:` — passed to `flow.fit(train, **fit_kwargs)` verbatim
+  (`epochs`, `batch_size`, `seed`). The optimizer's `learning_rate` and the
+  `schedule`/`plateau_*` keys stay top-level: they configure the optimizer
+  and scheduler the script builds, not `fit` itself.
+- everything else is data and scoring configuration (`n_train`, `dgp_seed`,
+  grids, ...).
+
+`benchmarks/bench_training.yaml` is workloads-shaped rather than
+variants-shaped (its subject is a recipe grid), but follows the same rule:
+specs, data descriptors, targets and every recipe number live in the YAML,
+the script is harness only. The one exemption is `perf_machine.py`, which is
+deliberately a single curl-and-run file with no sibling anything.
 
 To change what a run does, edit the YAML. To add a variant, add a section —
 `argparse` picks it up automatically, because its choices come from the file.

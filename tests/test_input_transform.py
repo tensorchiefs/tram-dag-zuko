@@ -69,7 +69,7 @@ def test_net_inputs_span_unit_interval_after_first_fit():
         assert torch.allclose(scaled.max(0).values, torch.ones(scaled.shape[1]))
     # a second fit on other rows keeps the first frozen statistics
     flow.fit(df + 10.0, epochs=1, batch_size=100)
-    lo = float(flow.nodes["x2"].input_transforms["@I"].lo[0])
+    lo = float(flow.nodes["x2"].intercept.input_transform.lo[0])
     assert lo == pytest.approx(df["x1"].min())
 
 
@@ -139,7 +139,7 @@ def test_save_load_keeps_option_and_calibration(tmp_path):
     flow.fit(df, epochs=1, batch_size=100)
     flow.save(tmp_path / "flow.pt")
     loaded = CausalFlowDAG.load(tmp_path / "flow.pt")
-    assert loaded.nodes["x2"].input_transforms["@I"].kind == "minmax"
+    assert loaded.nodes["x2"].intercept.input_transform.kind == "minmax"
     u = pd.DataFrame(np.random.default_rng(1).logistic(size=(20, 3)), columns=SPEC)
     pd.testing.assert_frame_equal(
         flow.sample(20, u=u, do={"x1": 9.0}), loaded.sample(20, u=u, do={"x1": 9.0})

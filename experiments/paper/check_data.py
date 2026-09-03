@@ -13,7 +13,9 @@ the same data. Anything larger means the generator changed.
 ``magic-mrclean/ls`` is not listed: its generator left with the stroke
 storyline, so that cohort is frozen input data with no generator to check
 it against. Recover the generator from the ``pre-experiments-cut`` tag if
-it ever needs regenerating.
+it ever needs regenerating. ``carefl-cf`` is not listed either: it is
+CAREFL's own committed data (see its ``truth.json``), external frozen
+input with no generator here.
 
 Usage (from experiments/)::
 

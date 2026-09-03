@@ -35,30 +35,13 @@ from paper.helpers import (
     fit_paper,
     level_bars,
     plot_trajectories,
-    shift_term,
     snapshot,
     true_coefficients,
 )
 from paper.simulations.triangle import TriangleMixed
-from tramdag import LS, SI, ContinuousNode, OrdinalNode
 
 
 # %% public functions ------------------------------------------------------------------
-def build_spec(config: dict) -> dict:
-    """Give the DAG spec with an ordinal x3.
-
-    Every network and transform setting comes from the config, so the
-    architecture is visible in one file. The ordinal node has no monotone
-    basis — its intercept is the cutpoint vector.
-    """
-    basis = dict(transform=config["transform"], n_coeffs=config["n_coeffs"])
-    return {
-        "x1": ContinuousNode([SI(**basis)]),
-        "x2": ContinuousNode([SI(**basis), LS("x1")]),
-        "x3": OrdinalNode(config["levels"], [LS("x1"), shift_term(config)]),
-    }
-
-
 def odds_below(values, threshold: float) -> float:
     """Give the odds that a variable is at or below a threshold."""
     probability = float((values <= threshold).mean())
@@ -184,11 +167,13 @@ def run(variant: str) -> dict:
     generator = TriangleMixed(f=config["f"], seed=config["dgp_seed"])
     print(
         f"fitting triangle-mixed/{config['f']} with a {config['shift']} shift "
-        f"on n={config['n_train']} for {config['epochs']} epochs ..."
+        f"on n={config['n_train']} for {config['fit_kwargs']['epochs']} epochs ..."
     )
-    flow, _, val, trajectory, fit_seconds = fit_paper(
-        generator,
-        build_spec(config),
+    train = generator.observational(config["n_train"])
+    val = generator.observational(config["n_val"], seed_offset=1)
+    flow, trajectory, fit_seconds = fit_paper(
+        train,
+        val,
         config,
         out,
         record=partial(snapshot, shift=config["shift"]),

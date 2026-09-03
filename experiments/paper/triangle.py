@@ -31,29 +31,13 @@ from paper.helpers import (
     cs_curve_error,
     fit_paper,
     plot_trajectories,
-    shift_term,
     snapshot,
     true_coefficients,
 )
 from paper.simulations.triangle import TriangleContinuous
-from tramdag import LS, SI, ContinuousNode
 
 
 # %% public functions ------------------------------------------------------------------
-def build_spec(config: dict) -> dict:
-    """Give the DAG spec, with the x2 -> x3 edge as a linear or complex shift.
-
-    Every network and transform setting is taken from the config rather than
-    from a framework default, so the architecture is visible in one file.
-    """
-    basis = dict(transform=config["transform"], n_coeffs=config["n_coeffs"])
-    return {
-        "x1": ContinuousNode([SI(**basis)]),
-        "x2": ContinuousNode([SI(**basis), LS("x1")]),
-        "x3": ContinuousNode([SI(**basis), LS("x1"), shift_term(config)]),
-    }
-
-
 def run(variant: str) -> dict:
     """Run one variant end to end and give its metrics."""
     config = load_variant(__file__, variant)
@@ -63,12 +47,14 @@ def run(variant: str) -> dict:
     generator = TriangleContinuous(f=config["f"], seed=config["dgp_seed"])
     print(
         f"fitting triangle/{config['f']} with a {config['shift']} shift on "
-        f"n={config['n_train']} for {config['epochs']} epochs "
+        f"n={config['n_train']} for {config['fit_kwargs']['epochs']} epochs "
         f"at lr {config['learning_rate']:g} ..."
     )
-    flow, _, val, trajectory, fit_seconds = fit_paper(
-        generator,
-        build_spec(config),
+    train = generator.observational(config["n_train"])
+    val = generator.observational(config["n_val"], seed_offset=1)
+    flow, trajectory, fit_seconds = fit_paper(
+        train,
+        val,
         config,
         out,
         record=partial(snapshot, shift=config["shift"]),

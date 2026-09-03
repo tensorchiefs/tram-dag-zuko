@@ -67,17 +67,16 @@ learning rates and freezing (a callback, below) and the all-`ls` classical fit.
 - **Minibatches**: a fresh `torch.randperm` shuffle each epoch (`seed=` seeds
   it). The loss is the summed per-node mean NLL on the batch, plus the `VC`
   penalty.
-- **`calibrate(train_df, marginal_init=True)`**, called by the first `fit`:
-  the transform ranges from the train 5%/95% quantiles (each Bernstein/spline
-  domain), the statistics of every term-level `input_transform=`, and
-  the calibrated start — Bernstein nodes at the linear map onto the latent
-  5%/95% quantiles, ordinal cutpoints at the empirical class log-odds, a pure
-  init that leaves the MLE unchanged. Call it yourself to switch the start
-  off. A checkpoint carries the flag, so a loaded model is never recalibrated.
-  The start itself is also a public step: `flow.init_marginals(train_df)`
-  resets every Bernstein/ordinal simple intercept to its column's marginal
-  (spline and affine have no calibrated start), any time — e.g. to
-  restart a trained or loaded flow (`calibrate` won't, it is once-only).
+- **`calibrate(train_df)`**, called by the first `fit`: every term freezes
+  its own data-dependent state — the intercept maps the train
+  `range_q`/`1-range_q` quantiles onto its transform's domain, and every
+  term-level `input_transform=` freezes its statistics. Calibration never
+  touches the weights. A checkpoint carries the flag, so a loaded model is
+  never recalibrated. The calibrated start is a separate, always-explicit
+  step: `flow.init_marginals(train_df)` resets every Bernstein/ordinal
+  simple intercept to its column's marginal — a pure init that leaves the
+  MLE unchanged (spline, affine and `range_q=0` transforms have none) —
+  any time, including on a trained or loaded flow.
 - **Validation, Keras-shaped** — `validation_data=` (a DataFrame) or
   `validation_split=` (a float: the LAST fraction of `train_df`, no shuffle,
   and only the head calibrates — no leakage) makes `fit` compute the

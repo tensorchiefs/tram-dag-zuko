@@ -1,71 +1,81 @@
-# Hyperparameters of the VACA/CNF benchmark (vaca.py).
-#
-# Every value the script uses is in this file; it reads no defaults of its own.
+# The VACA/CNF benchmark (vaca.py): full model spec + every training
+# hyperparameter. The script reads no defaults of its own — `spec` is the
+# whole DAG (tramdag.spec_from_dict), `flow_kwargs` construct the flow,
+# `fit_kwargs` go into flow.fit verbatim.
 #
 # Protocol = the reference implementation's own comparison run
 # (tensorchiefs/tram-dag, comparison/utils.R with
-# Figure_Triangle_Linear_Bimodal.R: EPOCHS = 10000), with data and model
-# matched 1:1 and the *optimization* deviating for CI runtime (see below):
+# Figure_Triangle_Linear_Bimodal.R: EPOCHS = 10000), 1:1 since 2026-09-02:
 #   * nTrain = 2500, validation = a separate dgp(5000) draw;
 #   * one full-batch gradient step per epoch (train_step: one apply_gradients
-#     over all rows), as in the reference;
+#     over all rows), 10000 epochs at Adam lr 0.001;
+#   * update_learning_rate: ReduceLROnPlateau on the summed validation NLL
+#     (factor 0.1, patience 50, min_lr 1e-7, strict <) — the anneal fires
+#     late (~epoch 9050 on the 2026-09-01 probe) and freezes a point where
+#     every pinned bound holds (measured 2026-09-02: do errors
+#     0.096/0.086/0.018, std_x1 2.044);
 #   * make_model: one net per node, dense(10, tanh) -> dense(100, tanh) ->
-#     dense(len_theta), M = 30 so len_theta = 31; final weights;
+#     dense(len_theta), M = 30 so len_theta = 31 (the spec's units and
+#     n_coeffs; zuko ties two extra control points on, order 32 against the
+#     reference's 30 — the free-parameter count is what matches);
 #   * weights start from Keras' Dense default, glorot_uniform / zero bias
 #     (`init: glorot`, make_model's layer_dense);
-#   * input_transform: minmax on the CI terms (comparison/utils.R::scale_df) — kept, see below.
-# Optimization = the reference 1:1 since 2026-09-02: 10000 epochs at
-# lr 0.001 with ReduceLROnPlateau on the summed validation NLL
-# (update_learning_rate; factor 0.1, patience 50, min_lr 1e-7, strict <) —
-# the anneal fires late (~epoch 9050 on the 2026-09-01 probe) and freezes a
-# point where every pinned bound holds (measured 2026-09-02: do errors
-# 0.096/0.086/0.018, std_x1 2.044). The earlier CI-runtime compression
-# (4800 epochs @ lr 0.002, no schedule — the plateau cannot fire on that
-# 2x-compressed trajectory) was reverted after the visual pass against
-# paper Fig. 5; its window analysis lives in the git history and
-# docs/paper-replication.md. lr 0.004 remains out: x1's std clock does not
-# compress with lr (at its do-window, epochs ~2050-2350, std_x1 is 1.978).
+#   * input_transform: minmax on the CI terms (comparison/utils.R::scale_df).
+# range_q: 0.05 in the spec — a DELIBERATE deviation from scale_df's min-max
+# Bernstein domain, measured 2026-09-03 (init seed 7, everything else 1:1):
+# the reference's min-max domain (range_q 0) scores do(x2) errors
+# 0.289 / 0.040 / 0.067 against the quantile domain's 0.097 / 0.088 / 0.018
+# — worse at the off-manifold do(x2=-3) and at do(x2=0), where the bounds
+# are pinned. CAREFL, same nets and scaling, measures the opposite way and
+# uses range_q 0 (carefl.yaml).
+# The earlier CI-runtime compression (4800 epochs @ lr 0.002, no schedule)
+# was reverted 2026-09-02 after the visual pass against paper Fig. 5; its
+# window analysis lives in the git history and docs/paper-replication.md.
 # Rejected deviations, both measured 2026-09-01: minibatch stepping (batch
 # 256, lr 0.001-0.004, 300-3000 epochs, constant or plateau) misses the
 # interventional bounds — its optima carry a systematic -0.11 common-mode
-# offset of the do(x2) means (observational fit fine, off-manifold
-# decomposition biased), 2.4x the do(x2=+0) bound. Dropping
-# dropping the input transform fails likewise: with raw parents (span ~[-6, 5]) a relu
-# net's do(x2=-3) error wanders 0.17-0.45 and holds its bound only at
-# isolated epochs; tanh on raw parents saturates outright (0.731, CLAUDE.md).
-# The reference's scale_df + tanh stays.
-# Known framework-level deviations, documented in CLAUDE.md: the Bernstein
-# domain comes from the train 5%/95% quantiles, not min-max to [0, 1]
-# (scale_df); the intercept net's output layer has no bias (Keras dense has
-# one); the reference seeds R's RNG with 42, which torch cannot replay, so
-# every seed below is a repo choice.
-#
+# offset of the do(x2) means; dropping the input transform fails likewise
+# (raw parents saturate tanh outright: do(x2=-3) error 0.731, and a relu
+# net's error wanders 0.17-0.45). The reference's scale_df + tanh stays.
+# Known framework-level deviations, documented in CLAUDE.md: the intercept
+# net's output layer has no bias (Keras dense has one); the reference seeds
+# R's RNG with 42, which torch cannot replay, so every seed below is a
+# repo choice.
+
 variants:
   # all conditionals complex intercepts
   flexible:
-    n_train: 2500               # nTrain
-    n_val: 5000                 # val = dgp(5000)
-    epochs: 10000               # the reference protocol, 1:1
+    n_train: 2500             # nTrain
+    n_val: 5000               # val = dgp(5000)
+    flow_kwargs:
+      seed: 7                 # weight init (repo choice)
+      init: glorot            # Keras Dense default: glorot_uniform, zero bias
+    fit_kwargs:
+      epochs: 10000           # the reference protocol, 1:1
+      batch_size: 2500        # = n_train: one full-batch step per epoch
+      seed: 0                 # full batch: the shuffle seed has no effect
     learning_rate: 0.001
-    batch_size: 2500            # = n_train: one full-batch step per epoch
-    schedule: plateau           # update_learning_rate, the reference rule
+    schedule: plateau         # update_learning_rate, the reference rule
     plateau_patience: 50
     plateau_factor: 0.1
     plateau_min_lr: 1.0e-7
     min_delta: 0.0
-    transform: bernstein
-    # M = 30, len_theta = M + 1 = 31 unconstrained coefficients; zuko ties two
-    # extra control points on (order 32 against the reference's 30); the
-    # free-parameter count is what matches
-    n_coeffs: 31
-    intercept_units: [10, 100]  # make_model's two dense layers
-    activation: tanh            # make_model's activation
-    dgp_seed: 42                # repo choice
-    init_seed: 7                # repo choice
-    init: glorot                # Keras Dense default: glorot_uniform, zero bias
-    input_transform: minmax     # per CI term: comparison/utils.R::scale_df — raw parents saturate tanh
-    shuffle_seed: 0             # full batch: the shuffle seed has no effect
+    dgp_seed: 42              # repo choice
     sample_seed: 1
-    n_compare: 50000            # rows per interventional panel (Fig. 5)
-    n_scatter: 2000             # points per off-diagonal scatter (Fig. 4)
+    n_compare: 50000          # rows per interventional panel (Fig. 5)
+    n_scatter: 2000           # points per off-diagonal scatter (Fig. 4)
     hist_bins: 60
+    spec:
+      x1:
+        kind: continuous
+        terms:
+        - {effect: I, parents: [], options: {transform: bernstein, transform_kwargs: {n_coeffs: 31, range_q: 0.05}}}
+      x2:
+        kind: continuous
+        terms:
+        # make_model: dense(10, tanh) -> dense(100, tanh) -> dense(31)
+        - {effect: I, parents: [x1], options: {transform: bernstein, transform_kwargs: {n_coeffs: 31, range_q: 0.05}, units: [10, 100], activation: tanh, input_transform: minmax}}
+      x3:
+        kind: continuous
+        terms:
+        - {effect: I, parents: [x1, x2], options: {transform: bernstein, transform_kwargs: {n_coeffs: 31, range_q: 0.05}, units: [10, 100], activation: tanh, input_transform: minmax}}

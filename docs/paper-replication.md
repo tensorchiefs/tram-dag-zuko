@@ -10,11 +10,15 @@ this repository measured, and what the current 1:1 protocol measures.
 Measured 2026-08-26 on `refactor/lean-fit` (seeds: DGP 42, init 7, shuffle 0)
 with the exact reference protocol — global plateau rule and Keras init. On
 2026-09-01 the *optimization* was re-tuned for CI runtime (fewer epochs, lr
-scaled to match; data, model and init untouched); on **2026-09-02 the
-VACA and CAREFL cuts were reverted to the reference protocols 1:1** after a
-visual pass against paper Figs. 5/6 (the triangle cuts stay): the reference
-runs cut CAREFL's Fig. 6 curve errors ~30% and improved VACA's do(x2=0),
-with every bound holding — ground truths re-pinned from those runs. The
+scaled to match; data, model and init untouched); on **2026-09-02 VACA
+was restored to the reference protocol 1:1** (10000 @ 0.001 + plateau —
+every bound holds, do(x2=0) improves) after a visual pass against paper
+Fig. 5; on **2026-09-03 CAREFL became the reference run 1:1** — trained on
+CAREFL's own committed 2500 rows (`data/carefl-cf`, sd-standardized units)
+with `val = train`, 7000 @ 0.001 + plateau, and the min-max Bernstein
+domain (`range_q: 0`), which put the Fig. 6 curves on the paper's
+(the earlier 3000 @ 0.002 trade-off was an artifact of the fresh-draw
+data; the triangle cuts stay). The
 tuning campaign, with what was tried and what failed, is in
 [the 2026-09-01 tuning round](#the-2026-09-01-tuning-round) below. The
 2026-08-25 numbers of `feat/followups` (per-node plateau, torch init; CI run
@@ -34,19 +38,20 @@ the "paper" column names the figure and what it shows.
 | item | reference | here |
 |---|---|---|
 | latent | standard logistic, shifts added on the continuous scale, subtracted for ordinal `P(Y<=k) = sigmoid(theta_k - shift)` | same (tests pin both signs) |
-| Bernstein basis | `len_theta` unconstrained coefficients, `to_theta` softplus-cumsum, domain → [0, 1] with tangent-linear extrapolation outside; the domain comes from the train **5 %/95 % quantiles in the triangle scripts** (`quantile(..., c(0.05, 0.95))`, the min/max lines commented out) and from **min/max** in the comparison scripts (`scale_df`) | zuko Bernstein, `n_coeffs` unconstrained (zuko ties two control points on, so the free-parameter count matches), domain = train 5 %/95 % quantiles → [−5, 5], linear extrapolation. Triangle: a match up to the reparametrization [0,1] vs [−5,5], the tail rule and order 21 vs 19. VACA/CAREFL: quantiles instead of min/max — **deviation D1** |
+| Bernstein basis | `len_theta` unconstrained coefficients, `to_theta` softplus-cumsum, domain → [0, 1] with tangent-linear extrapolation outside; the domain comes from the train **5 %/95 % quantiles in the triangle scripts** (`quantile(..., c(0.05, 0.95))`, the min/max lines commented out) and from **min/max** in the comparison scripts (`scale_df`) | zuko Bernstein, `n_coeffs` unconstrained (zuko ties two control points on, so the free-parameter count matches), domain = train `range_q`/1−`range_q` quantiles → [−5, 5], linear extrapolation; `range_q` is an intercept option since 2026-09-03, default 0.05. Triangle: a match up to the reparametrization [0,1] vs [−5,5], the tail rule and order 21 vs 19. CAREFL: `range_q: 0` = the reference's min/max, a match. VACA: quantiles **kept deliberately — deviation D1**, measured (see VACA) |
 | init | triangle scripts: `LinearMasked` layers with Keras `random_normal` (N(0, 0.05²)) on weights and biases, the LS `beta` layer included; comparison scripts: `layer_dense` default, glorot-uniform weights and zero biases | `init: normal` (triangle) and `init: glorot` (VACA/CAREFL), `CausalFlowDAG(init=)`; torch's default init remains the framework default and was the decisive deviation under the full-batch protocol, see VACA |
 | optimizer | Keras Adam, eps 1e-7 | torch Adam, eps 1e-8 — measured: no effect (VACA identical to four digits) |
 | seeds | triangle scripts unseeded (`SEED = -1`); comparison scripts `dgp(..., seed=42)` on R's RNG | not replayable in torch, so every seed is a repo choice (42 for the DGP is kept as a nod to the reference) |
-| calibrated start | none | `flow.calibrate(train, marginal_init=False)` in `helpers.fit_paper` (framework default is True) |
+| calibrated start | none | none — `calibrate` never touches the weights; `init_marginals` is a separate explicit step no paper script calls |
 | intercept output layer | Keras dense with bias | bias-free — **D3** (the same function class; the bias adds a constant to all unconstrained coefficients) |
 | plateau rule (VACA/CAREFL) | `update_learning_rate`: one optimizer, reduce when the summed validation NLL has not improved for 50 epochs (strict `<`), factor 0.1, min 1e-7 | torch `ReduceLROnPlateau(patience=49, threshold=0, threshold_mode="abs", factor=0.1, min_lr=1e-7)` on the summed `history["val"]` entry (fit computes it) — the same rule, verified against torch's source; both keep it since 2026-09-02 (VACA's 2026-09-01 drop went with the reverted epoch cut) |
 
-D1 (VACA/CAREFL only) and D3 remain; both were measured (below). The per-node
-plateau approximation of 2026-08-25 (D4) is gone with the lean `fit`. Two
-further repo choices are CAREFL's: a fresh 2500-row draw with a separate
-validation draw where the R run used CAREFL's file with `val = train`, and raw
-units where the R run sd-standardized x3/x4.
+D1 (VACA only since 2026-09-03) and D3 remain; both were measured (below).
+The per-node plateau approximation of 2026-08-25 (D4) is gone with the lean
+`fit`. CAREFL's two former repo choices — a fresh 2500-row draw with a
+separate validation draw, in raw units — are gone the same day: the
+benchmark now trains on CAREFL's own committed rows with `val = train`,
+in the reference's sd-standardized units, exactly as `carefl_fig5.r` does.
 
 ## Triangle, continuous (`triangle.py`) — paper Sec. 6.1, App. C.3
 
@@ -139,6 +144,7 @@ E[x3 | do(x2 = a)] = −0.25 + 0.25 a. The paper's Sec. 5.2 text says a ∈ {−
 | batch | full batch (one `apply_gradients` per epoch) | 512 | 2500 = n_train |
 | schedule | `update_learning_rate`: ReduceLROnPlateau on the summed val NLL, factor 0.1, patience 50, min_lr 1e-7, strict `<` | none | **the same rule** (restored 2026-09-02 with the reference epochs; it fires ~epoch 9050 and freezes an all-bounds point) |
 | input scaling | `scale_df`: everything min-max to [0, 1] | raw | `input_transform: minmax` on the CI terms (network inputs; targets D1) |
+| Bernstein domain | train min/max (`scale_df`) | 5%/95% quantiles | quantiles kept (`range_q: 0.05`) — **D1, now measured under the final protocol** (2026-09-03, seed 7): the reference's min/max domain scores 0.289 / 0.040 / 0.067 against the quantiles' 0.096 / 0.080 / 0.022 — worse at the off-manifold do(x2 = −3) and at do(x2 = 0). CAREFL, same nets, measures the opposite way and matches the reference (`range_q: 0`) |
 | n_compare | — | 50000 | 50000 |
 
 **Results** — the check is the flow's error against the analytic mean, not a pinned flow value.
@@ -183,52 +189,66 @@ reference 10000-epoch run (the 2026-09-01 4800-epoch cut was reverted
 
 ## CAREFL benchmark (`carefl.py`) — paper Sec. 5.3, App. C.2
 
+**Since 2026-09-03 this benchmark is the reference run 1:1, on the
+reference's own data.** `carefl_fig5.r` sets `USE_EXTERNAL_DATA = TRUE`:
+it trains on CAREFL's own committed 2500 rows (`data/CAREFL_CF/X.csv`,
+x3/x4 sd-standardized by 6.0104/1.9114) with **`val = train`**, and its
+repository also commits the observation (`xObs.csv`), the analytic truth
+curves and CAREFL's own predictions on the grid `seq(-3, 2.9, 0.1)`. All
+of it is frozen here under `experiments/paper/data/carefl-cf` (external
+input, no generator — see its `truth.json`), so the Fig. 6 curves are
+comparable point by point and every metric is in the reference's
+standardized units.
+
 **DGP** (Khemakhem et al. 2021): x1, x2 ~ Laplace(0, 1/√2); x3 = x1 + 0.5 x2³ + ε;
-x4 = −x2 + 0.5 x1² + ε, ε ~ Laplace(0, 1/√2). Counterfactuals are analytic by
-noise abduction. Observation `x_obs`: noise (2, 1.5, 1.4, −1) → (2, 1.5, 5.0875, −0.5) in the
-SCM's units; the R code's `xObs.csv` is that point divided by CAREFL's sample
-sds (6.0104, 1.9114): (2, 1.5, 0.8465, −0.2616). The paper prints (2, 1.5, 0.81,
+x4 = −x2 + 0.5 x1² + ε, ε ~ Laplace(0, 1/√2); x3/x4 divided by their sample
+sds. Counterfactuals are analytic by noise abduction. Observation:
+`xObs.csv` = (2, 1.5, 0.8465, −0.2616); the paper prints (2, 1.5, 0.81,
 −0.28), slightly off it (CAREFL's own text). **Before `feat/followups` the
-repository used the printed values as raw coordinates**, a 4σ-off point. The R
-run also scores in sd-standardized units, so its Fig. 6 y-axis is 6× ours for
-x3 — the `fig6_max_abs_err` entries are in raw units.
-Queries: x3^cf | do(x2 = α) and x4^cf | do(x1 = α), α ∈ [−3, 3].
+repository used the printed values as raw coordinates**, a 4σ-off point.
+Queries: x3^cf | do(x2 = α) and x4^cf | do(x1 = α) on the committed grid.
 
 **Model**: `x1, x2: SI`, `x3, x4: CI(x1, x2)`, Bernstein `n_coeffs = 31`, the
-same `make_model` nets as VACA.
+same `make_model` nets as VACA; `range_q: 0` (the reference's `scale_df`
+min-max Bernstein domain — an intercept option since 2026-09-03).
 
-| hyperparameter | R code (`carefl_fig5.r`) | previous | now |
+| hyperparameter | R code (`carefl_fig5.r`) | 2026-09-02 era | now |
 |---|---|---|---|
-| train / validation | CAREFL's own `data/CAREFL_CF/X.csv` (`USE_EXTERNAL_DATA = TRUE`), x3/x4 sd-standardized, **`val = train`** — the plateau rule watched the training NLL | 18000 / 2000 split | 2500 rows drawn from the same SCM / a separate `dgp(5000)` draw, raw units — **repo choice** |
-| epochs | 7000 | 300 in chunks of 50 + 100 polish | **7000** — the reference, 1:1 (the 2026-09-01 3000-epoch cut was reverted 2026-09-02) |
-| lr, batch, schedule, input scaling, init | 0.001, full batch, plateau 0.1/50/1e-7, `scale_df`, glorot | 0.01→0.001, 512, none, raw, torch | **0.002** (the CI deviation), 2500, the same global rule, `minmax`, glorot |
-| scoring | the single `x_obs`, curves over α (Fig. 6) | + 300 held-out rows at α ∈ {−1.5, 0, 1.5} | same |
+| train / validation | CAREFL's own `X.csv`, sd-standardized, `val = train` | 2500 fresh SCM rows / a separate `dgp(5000)` draw, raw units | **the same committed `X.csv`, `val = train`** (a fresh standardized draw is scored, never trained or annealed on) |
+| epochs, lr | 7000 @ 0.001 | 3000 @ 0.002 | **7000 @ 0.001** |
+| batch, schedule, input scaling, init | full batch, plateau 0.1/50/1e-7, `scale_df`, glorot | same | same |
+| Bernstein domain | train min/max (`scale_df`) | 5%/95% quantiles (D1) | **train min/max** (`range_q: 0`) |
+| scoring | the single `x_obs`, curves over α (Fig. 6) | + 300 held-out rows at α ∈ {−1.5, 0, 1.5} | same, all in standardized units |
 
-**Results**
+**Results** (standardized units; the 09-02-era numbers were raw — divide
+x3 by 6.01 and x4 by 1.91 to compare):
 
-| metric | paper | previous (wrong x_obs) | R 1:1, torch init, per-node plateau (08-25) | R 1:1, glorot, global plateau, 7000 @ 0.001 (08-26) | now: 3000 epochs @ lr 0.002 — the pinned ground truth |
-|---|---|---|---|---|---|
-| Fig. 6 max \|x3^cf error\| over α at `x_obs` | Fig. 6: flow tracks the DGP curve | 1.64 | 1.52 (at α = 3, x3 ≈ 17) | 1.87 (at α = 3) | 2.68 (at α = 3) |
-| Fig. 6 max \|x4^cf error\| | Fig. 6 | 0.38 | 0.47 | 0.59 | 0.77 |
-| held-out CF MAE x3, α = −1.5 / 0 / 1.5 | — | 0.109 / 0.053 / 0.095 | 0.177 / 0.065 / 0.123 | 0.181 / 0.065 / 0.142 (seeds 8, 9: 0.158–0.171 / 0.069–0.084 / 0.136–0.154) | 0.208 / 0.060 / 0.128 |
-| held-out CF MAE x4, α = −1.5 / 0 / 1.5 | — | 0.078 / 0.059 / 0.085 | 0.117 / 0.059 / 0.115 | 0.204 / 0.134 / 0.162 (0.172–0.178 / 0.113–0.129 / 0.145–0.160) | 0.124 / 0.097 / 0.122 |
-| val NLL x3 / x4 | — | 1.376 / 1.345 | 1.395 / 1.373 | 1.403 / 1.419 | 1.405 / 1.393 |
+| metric | paper / CAREFL | 09-02 era (fresh draw, 3000 @ 0.002, quantile domain), rescaled | now — the pinned ground truth |
+|---|---|---|---|
+| Fig. 6 max \|x3^cf error\| | Fig. 6: flow tracks the DGP curve; CAREFL's committed x3 preds err up to ~0.7 at α = −3 | 0.45 (at α = 3) | **0.066** |
+| Fig. 6 max \|x4^cf error\| | CAREFL's committed x4 preds: max 0.174 | 0.40; ~0.29 near α = 0 (the "dip") | **0.204**, at the α = −3 grid edge; 0.074 at α = 0 |
+| held-out CF MAE x3, α = −1.5 / 0 / 1.5 | — | 0.035 / 0.010 / 0.021 | 0.015 / 0.009 / 0.013 |
+| held-out CF MAE x4, α = −1.5 / 0 / 1.5 | — | 0.065 / 0.051 / 0.064 | 0.080 / 0.027 / 0.048 |
 
-(Historical, reverted 2026-09-02.) Five of the six held-out MAEs are better at 3000 @ 0.002 than at the
-reference's 7000 @ 0.001 (only x3 at α = −1.5 is worse, 0.208 vs 0.181); the
-Fig. 6 single-point errors are larger — one noisy yardstick, which is why the
-held-out rows are scored next to it.
+Component attribution of the closed gap, each measured on 2026-09-03 with
+everything else held fixed: the fresh data draw → `X.csv` cut the Fig. 6
+x4 max from 0.77 (raw ≈ 0.40 std) to 0.34 std; the reference optimization
+(7000 @ 0.001 with `val = train`) fixed the parabola bottom (err at α = 0
+0.21 → 0.06); the min-max domain cut the grid edges (x4 0.37 → 0.20, x3
+0.20 → 0.07). The earlier 3000-vs-7000 trade-off (3000 won held-out MAEs,
+7000 the single-point curve) was an artifact of the fresh-draw data and is
+settled by using the reference's rows.
 
-The previous protocol trained on 7× more rows (18000), which is why its
-held-out MAEs are lower; they are not comparable to the paper's nTrain = 2500.
-Under the exact protocol the CAREFL numbers are stable across init seeds
-(spread ≈ 0.03) and the x4 query is 1.5–2× worse than under the per-node
-approximation — the reference's rule, faithfully applied, is not the best
-optimizer for this DGP, and the paper's Fig. 6 is a visual match either way.
-With D1 switched off (Bernstein domain on train min/max, `RANGE_Q = 0`, under
-the per-node protocol): x3 MAE 0.083 / 0.038 / 0.050 (better), x4 0.143 / 0.083
-/ 0.154 (worse), val NLL 1.444 / 1.476 (worse). The quantile domain stays the
-default; a `range_quantile` knob would make R's choice available.
+**The former Fig. 6 x4 "dip", root-caused 2026-09-03 before the data was
+adopted**: on fresh 2500-row draws the flow's parabola bottom sat well
+below the truth near α = 0 — finite-sample tail-quantile variance, not
+protocol or init (invariant to 3000 vs 7000 epochs, val choice, and init
+seeds 7/8/9 at 0.586/0.601/0.610 raw; the observed noise sits at the
+Laplace 12% quantile, whose fitted value errs +0.27 in the sparse
+observation region x1 = 2, ~190 nearby rows, against −0.19 in the dense
+middle); the magnitude moved with the data draw (0.54/0.31/0.43 raw at dgp
+seeds 42/43/44). CAREFL's own committed draw is a mild one — one more
+reason training on the committed rows is the right comparison.
 
 ## Runtime and the epochs
 
@@ -287,7 +307,7 @@ each config's YAML header.
 | triangle-mixed `exp-cs` | 500 epochs | 350 epochs |
 | triangle-mixed `linear-ls` | 500 epochs @ lr 0.004 | 200 epochs @ lr 0.002 |
 | vaca | 10000 full-batch epochs @ lr 0.001, plateau | reverted 2026-09-02: back to the reference 10000 @ 0.001 + plateau |
-| carefl | 7000 full-batch epochs @ lr 0.001, plateau | reverted 2026-09-02: back to the reference 7000 @ 0.001 |
+| carefl | 7000 full-batch epochs @ lr 0.001, plateau | reverted 2026-09-03: back to the reference 7000 @ 0.001 + plateau, on the reference's own committed rows (see the CAREFL section) |
 | validate_ls `adam` (misc) | phases 4000/2000/1000 @ 1e-2/1e-3/1e-4 | 800/700/500, batch 256 kept |
 
 **Triangle** (batch 256 / lr 0.004 / sigmoid / `init: normal` / raw parents
@@ -330,9 +350,11 @@ with minmax + tanh) converges with a systematic −0.11 common-mode offset of
 all three do-means — 2.4× the do(x2=+0) bound — while the observational fit
 stays perfect.
 
-**CAREFL** (full batch + plateau kept): 3000 @ 0.002 replaced 7000 @ 0.001 (reverted 2026-09-02 — the reference protocol cuts the Fig. 6 curve errors ~30%);
-five of the six held-out counterfactual MAEs come out better than the
-7000-epoch pins. Rejected: raw parents — sigmoid saturates on the Laplace
+**CAREFL** (full batch + plateau kept): the round's 3000 @ 0.002 pick was
+an artifact of the then-current fresh-draw data and was reverted on
+2026-09-03 with the move to the reference's own committed rows (see the
+CAREFL section — the 3000-vs-7000 trade-off does not exist on `X.csv`).
+Still standing from the round: raw parents rejected — sigmoid saturates on the Laplace
 parents just like tanh, and relu underfits x3 (val NLL 1.46–1.47 vs the
 1.403 ± 0.05 band) while growing a fragile Bernstein tail (one held-out row
 inverted to x4 ≈ 580, cf MAE 4.36 vs bound 0.33); minibatch — the fig6 grid

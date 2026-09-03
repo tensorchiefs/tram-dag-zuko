@@ -39,34 +39,10 @@ from common import (
 )
 from statsmodels.miscmodels.ordinal_model import OrderedModel
 
-from tramdag import LS, SI, CausalFlowDAG, ContinuousNode, OrdinalNode
+from tramdag import CausalFlowDAG, spec_from_dict
 
 
 # %% public functions ------------------------------------------------------------------
-def build_spec(config: dict) -> dict:
-    """Give the fully-connected all-``ls`` spec of the cohort.
-
-    Every edge is a linear shift, which is what makes each node conditional a
-    classical transformation model. The continuous nodes' basis comes from the
-    config rather than from a framework default, so this file plus its YAML
-    describe the model completely. The ordinal nodes have no basis: their
-    intercept is the cutpoint vector.
-    """
-    basis = dict(transform=config["transform"], n_coeffs=config["n_coeffs"])
-    return {
-        "Age": ContinuousNode([SI(**basis)]),
-        "mRS_pre": OrdinalNode(config["levels_mrs_pre"], [LS("Age")]),
-        "NIHSSa": ContinuousNode([SI(**basis), LS("Age"), LS("mRS_pre")]),
-        "T": OrdinalNode(
-            config["levels_treatment"], [LS("Age"), LS("mRS_pre"), LS("NIHSSa")]
-        ),
-        "mRS_3m": OrdinalNode(
-            config["levels_outcome"],
-            [LS("Age"), LS("mRS_pre"), LS("NIHSSa"), LS("T")],
-        ),
-    }
-
-
 def load_cohort(cohort: str) -> tuple:
     """Read the frozen cohort: observational rows, trial rows, truth, R reference."""
     base = Path(__file__).resolve().parent / "data" / cohort
@@ -80,7 +56,7 @@ def load_cohort(cohort: str) -> tuple:
     return observed, trial, truth, reference
 
 
-def fit_flow(spec: dict, observed: pd.DataFrame, config: dict) -> CausalFlowDAG:
+def fit_flow(observed: pd.DataFrame, config: dict) -> CausalFlowDAG:
     """Fit the flow to the maximum likelihood, by the configured route.
 
     Raises
@@ -88,10 +64,14 @@ def fit_flow(spec: dict, observed: pd.DataFrame, config: dict) -> CausalFlowDAG:
     ValueError
         If the configured fitter is unknown.
     """
-    flow = CausalFlowDAG(spec, seed=config["init_seed"])
+    flow = CausalFlowDAG(spec_from_dict(config["spec"]), **config["flow_kwargs"])
     if config["fitter"] == "classical":
         flow.fit_classical(observed, max_iter=config["classical_max_iter"])
     elif config["fitter"] == "adam":
+        # the calibrated start the phase budget was tuned with (an explicit
+        # step — the framework never runs it); the MLE itself is unchanged
+        flow.calibrate(observed)
+        flow.init_marginals(observed)
         for phase, (epochs, learning_rate) in enumerate(config["phases"]):
             flow.fit(
                 observed,
@@ -211,7 +191,7 @@ def run(variant: str) -> dict:
     )
 
     t0 = time.perf_counter()
-    flow = fit_flow(build_spec(config), observed, config)
+    flow = fit_flow(observed, config)
     fit_seconds = round(time.perf_counter() - t0, 1)
     flow.save(out / "flow.pt")
 

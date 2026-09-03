@@ -10,14 +10,13 @@ scores.py, callbacks recipes, the read-outs and the test suite read these
 names by design; renaming any of them is an API change, not a cleanup:
 ``kind``, ``parents``, ``shifts`` (term modules with ``key``/``parents``/
 ``mods``…), ``intercept`` (+ ``.groups``/``.ci_parents``/``.nets``), ``ut``,
-``input_transforms``, ``net_input``, ``theta_shift``.
+``net_input``, ``theta_shift``.
 """
 
 # %% imports ---------------------------------------------------------------------------
 from __future__ import annotations
 
 import numpy as np
-import pandas as pd
 import torch
 from torch import Tensor, nn
 
@@ -51,51 +50,6 @@ def _init_linear(m: nn.Linear, init: str) -> None:
 
 
 # %% private classes -------------------------------------------------------------------
-class _InputTransform(nn.Module):
-    """One term's frozen network-input transform.
-
-    ``calibrate`` takes the statistics from the training rows once:
-    ``"minmax"`` freezes per-column lo/hi, ``"standardize"`` mean/std, and a
-    callable keeps the raw training columns and is applied per batch as
-    ``fn(x, train)`` — so train statistics inside the callable are always the
-    frozen training data, never the batch's.
-    """
-
-    def __init__(self, value, cols: tuple[str, ...]):
-        super().__init__()
-        self.kind = "callable" if callable(value) else value
-        self.fn = value if callable(value) else None
-        self.cols = cols  # the term's continuous parents, in parent order
-        k = len(cols)
-        if self.kind == "minmax":
-            self.register_buffer("lo", torch.zeros(k))
-            self.register_buffer("hi", torch.ones(k))
-        elif self.kind == "standardize":
-            self.register_buffer("mean", torch.zeros(k))
-            self.register_buffer("std", torch.ones(k))
-        else:  # callable: the raw train columns, shaped at calibrate
-            self.register_buffer("train_cols", torch.zeros(0, k))
-
-    def set_stats(self, cols: Tensor) -> None:
-        """Freeze the statistics from the raw ``(n_train, k)`` train columns."""
-        if self.kind == "minmax":
-            self.lo.copy_(cols.min(0).values)
-            self.hi.copy_(cols.max(0).values)
-        elif self.kind == "standardize":
-            self.mean.copy_(cols.mean(0))
-            self.std.copy_(cols.std(0))
-        else:
-            self._buffers["train_cols"] = cols.detach().to(self.train_cols.device)
-
-    def forward(self, x: Tensor, i: int) -> Tensor:
-        """Transform one continuous parent column ``(n, 1)``."""
-        if self.kind == "minmax":
-            return (x - self.lo[i]) / (self.hi[i] - self.lo[i])
-        if self.kind == "standardize":
-            return (x - self.mean[i]) / self.std[i]
-        return self.fn(x, self.train_cols[:, i : i + 1])
-
-
 class _Node(nn.Module):
     """One dimension of the flow: an intercept plus additive shift terms.
 
@@ -119,7 +73,6 @@ class _Node(nn.Module):
         self.kind = node.kind
         terms = node.terms
         self.parents = tuple(node_parents(node))  # ordered parent names
-        self.input_transforms = nn.ModuleDict()
         if isinstance(node, ContinuousNode):
             self.ut = make_univariate_transform(node.transform, **node.transform_kwargs)
             n_params = self.ut.n_params
@@ -130,19 +83,6 @@ class _Node(nn.Module):
         self._build_intercept(terms[0], n_params, spec)
         self._build_shifts(terms, spec)
 
-    def _add_input_transform(self, key: str, term, parents, spec) -> None:
-        """Register one term's ``input_transform`` under its net key.
-
-        Keyed like the shift ModuleDict plus ``"@I"`` for the intercept term;
-        identity until ``calibrate`` freezes the statistics. Only continuous
-        parents transform — ordinal one-hots pass through.
-        """
-        if getattr(term, "input_transform", None) is None:  # LS takes none
-            return
-        cps = tuple(p for p in parents if isinstance(spec[p], ContinuousNode))
-        if cps:
-            self.input_transforms[key] = _InputTransform(term.input_transform, cps)
-
     def _build_intercept(self, i_term, n_params: int, spec: dict[str, NodeSpec]):
         """Build the node's one intercept term module, via the registry.
 
@@ -150,8 +90,6 @@ class _Node(nn.Module):
         theta_0, one joint ComplexIntercept, or one net per parent summed in
         unconstrained coefficient space (``allow_interaction=False``).
         """
-        if i_term.parents:
-            self._add_input_transform("@I", i_term, i_term.parents, spec)
         self.intercept = get_term(i_term.effect).build(i_term, spec, n_params)
 
     def _build_shifts(self, terms, spec: dict[str, NodeSpec]):
@@ -170,20 +108,6 @@ class _Node(nn.Module):
             assert issubclass(entry, ShiftTerm), term.effect
             m = entry.build(term, spec)
             self.shifts[m.key] = m
-            self._add_input_transform(m.key, term, m.net_parents, spec)
-
-    def set_input_stats(self, train_df: pd.DataFrame) -> None:
-        """Freeze every term's input-transform statistics (``calibrate``)."""
-        for tr in self.input_transforms.values():
-            # constant columns already failed calibrate's quantile check
-            cols = torch.stack(
-                [
-                    torch.as_tensor(train_df[p].to_numpy(dtype=np.float32).copy())
-                    for p in tr.cols
-                ],
-                dim=1,
-            )
-            tr.set_stats(cols)
 
     def net_input(self, feats: dict[str, Tensor], parents, key: str) -> Tensor:
         """Concatenate parent features for one term's network.
@@ -197,8 +121,8 @@ class _Node(nn.Module):
         shifts and the VC treatment column are not network inputs and never
         pass through.
         """
-        # no dict.get: nn.ModuleDict has no get()
-        tr = self.input_transforms[key] if key in self.input_transforms else None  # noqa: SIM401
+        term = self.intercept if key == "@I" else self.shifts[key]
+        tr = term.input_transform
         cols = []
         for p in parents:
             x = feats[p]

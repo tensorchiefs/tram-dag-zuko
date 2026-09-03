@@ -1,6 +1,7 @@
-# Hyperparameters of the continuous-triangle replication (triangle.py).
-#
-# Every value the script uses is in this file; it reads no defaults of its own.
+# The continuous-triangle replication (triangle.py): full model spec + every
+# training hyperparameter. The script reads no defaults of its own — `spec`
+# is the whole DAG (tramdag.spec_from_dict), `flow_kwargs` construct the
+# flow, `fit_kwargs` go into flow.fit verbatim.
 #
 # Protocol = the paper's own code, summerof24/triangle_structured_continous.R
 # (tensorchiefs/tram-dag), reproduced 1:1 where the framework allows:
@@ -10,51 +11,52 @@
 #     continuous optimizer run — the coefficients are read after every epoch
 #     (epochs, batch and lr are the deviations below, for CI runtime);
 #   * len_theta = 20, hidden_features_I = hidden_features_CS = c(2, 25, 25, 2),
-#     sigmoid activations (create_param_net; its ReLU line is commented out);
-#   * no learning-rate schedule, no early stopping, final weights.
-# Matched on purpose: the Bernstein domain comes from the train 5%/95%
-# quantiles, as in the R script (quantile(..., c(0.05, 0.95)); its min/max
-# lines are commented out), and every linear layer starts from Keras'
-# random_normal, sd 0.05, on weights and biases (`init: normal`, the
-# LinearMasked layers). A simple intercept's theta is not a linear layer: it
-# starts at zero here (marginal_init=False), as `bernp$beta` does in R.
+#     sigmoid activations (create_param_net; its ReLU line is commented out).
+#     The c(...) vector reads as in/out dims around the hidden stack (25, 25):
+#     the literal [2, 25, 25, 2] reading puts a 2-sigmoid bottleneck on the
+#     input and cannot reproduce paper Fig. 18 (sin curve err 1.22), while
+#     (25, 25) lands on the figure (0.24) — corrected 2026-09-02, source-
+#     verified against create_param_net 2026-09-03;
+#   * n_coeffs = len_theta = 20 unconstrained coefficients; zuko ties two
+#     more control points on (order 21 against the reference's 19); the
+#     free-parameter count is what matches;
+#   * no learning-rate schedule, no early stopping, final weights;
+#   * no input_transform on any term: the triangle scripts feed the nets raw
+#     parents (repo decision 2026-09-01); the Bernstein domain comes from the
+#     train 5%/95% quantiles as in the R script (range_q default 0.05).
+# Every linear layer starts from Keras' random_normal, sd 0.05, on weights
+# and biases (`init: normal`, the LinearMasked layers). A simple intercept's
+# theta is not a linear layer: it starts at zero here (no marginal init),
+# as `bernp$beta` does in R.
 # Known deviations, documented in CLAUDE.md: a [-5, 5] instead of a [0, 1]
 # domain (a reparametrization), zuko's tied end control points instead of the
 # reference's tangent extrapolation, order 21 vs 19 at equal free parameters;
 # the R script runs unseeded, so every seed below is a repo choice.
+#
+# CI-runtime deviations, documented in docs/paper-replication.md: the paper
+# trains 500 epochs at Keras' default batch 32 with optimizer_adam()'s lr
+# 0.001; that is 42-69 min per variant on the CI runners. Batch 256 with the
+# lr scaled 4x runs in 8x fewer steps and keeps every ground-truth metric.
+# Epochs 300 instead of 500 is a further runtime cut (measured 2026-09-01:
+# every metric within its ground-truth bound; 150 epochs is not enough — the
+# do(x1) error fails on atan, 0.235 > 0.206; linear-cs keeps 500 — at 300 its
+# curve visibly flattens past |x2| > 0.5, max err 0.140 vs 0.088, because the
+# DGP line spans only +-0.3 and the sigmoid net's slow tail convergence is
+# half of that); this config's own numbers are in ground_truth/.
 
 paper_protocol: &paper_protocol
   n_train: 40000          # dgp(40000)
   n_val: 40000            # test = dgp(40000), a separate draw
-  # CI-runtime deviations, documented in docs/paper-replication.md: the paper
-  # trains 500 epochs at Keras' default batch 32 with optimizer_adam()'s lr
-  # 0.001; that is 42-69 min per variant on the CI runners. Batch 256 with the
-  # lr scaled 4x runs in 8x fewer steps and keeps every ground-truth metric.
-  # The grid ran with glorot init (measured 2026-08-26: cs max err linear-cs
-  # 0.132 vs 0.110, atan-cs 0.073 vs 0.080, mixed exp-cs 0.072 vs 0.071;
-  # batch 512 / lr 0.01 and lr 0.008 degrade the cs curves, batch 128 /
-  # lr 0.001 too). Epochs 300 instead of 500 is a further runtime cut
-  # (measured 2026-09-01: every metric within its ground-truth bound; 150
-  # epochs is not enough — the do(x1) error fails on atan, 0.235 > 0.206;
-  # linear-cs keeps 500 below — at 300 its curve visibly flattens past
-  # |x2| > 0.5, max err 0.140 vs 0.088, because the DGP line spans only
-  # +-0.3 and the sigmoid net's slow tail convergence is half of that);
-  # this config's own numbers are in ground_truth/.
-  epochs: 300             # paper: 500 (num_epochs)
+  flow_kwargs:
+    seed: 7               # weight init (repo choice, the R script is unseeded)
+    init: normal          # LinearMasked: random_normal weights and biases (sd 0.05)
+  fit_kwargs:
+    epochs: 300           # paper: 500 (num_epochs)
+    batch_size: 256       # paper: 32 (Keras fit() default)
+    seed: 0               # minibatch shuffling
   learning_rate: 0.004    # paper: 0.001 (optimizer_adam() default)
-  batch_size: 256         # paper: 32 (Keras fit() default)
   schedule:               # the reference has no schedule
-  transform: bernstein
-  # len_theta = 20 unconstrained coefficients; zuko ties two more control
-  # points on (order 21 against the reference's 19); the free-parameter count
-  # is what matches
-  n_coeffs: 20
   dgp_seed: 42
-  init_seed: 7
-  init: normal                # LinearMasked: random_normal weights and biases (sd 0.05)
-  # no input_transform on any term: the triangle scripts feed the nets raw
-  # parents, matching the reference (repo decision 2026-09-01)
-  shuffle_seed: 0
   sample_seed: 0          # sampling for the distribution comparisons
   n_compare: 10000        # rows per distribution panel (Fig. 16/17)
   do_x1: -1.0             # the paper's L2 query, do(x1 = -1)
@@ -62,47 +64,80 @@ paper_protocol: &paper_protocol
   grid_high: 1.0
   grid_points: 81
 
-# the shift network, from the reference; only a complex-shift variant has one.
-# hidden_features_CS = c(2, 25, 25, 2) reads as in/out dims around the hidden
-# stack (25, 25): the literal [2, 25, 25, 2] reading puts a 2-sigmoid
-# bottleneck on the input and cannot reproduce paper Fig. 18 (sin curve err
-# 1.22 both at the CI and the full paper protocol), while (25, 25) lands on
-# the figure (0.24, incl. its small -1-endpoint deviation) — corrected
-# 2026-09-02, the figures being the criterion absent the sourcing R script.
-reference_net: &reference_net
-  shift_units: [25, 25]
-  activation: sigmoid           # create_param_net (relu at the OLD 2-unit
-                                # bottleneck died — beta13 +0.53; sigmoid is
-                                # the reference activation either way)
+# shared node specs — one place to change if the intercept or LS edge varies
+x1: &x1
+  kind: continuous
+  terms:
+  - {effect: I, parents: [], options: {transform: bernstein, transform_kwargs: {n_coeffs: 20}}}
+
+x2: &x2
+  kind: continuous
+  terms:
+  - {effect: I, parents: [], options: {transform: bernstein, transform_kwargs: {n_coeffs: 20}}}
+  - {effect: LS, parents: [x1], options: {}}
+
+x3_ls: &x3_ls
+  kind: continuous
+  terms:
+  - {effect: I, parents: [], options: {transform: bernstein, transform_kwargs: {n_coeffs: 20}}}
+  - {effect: LS, parents: [x1], options: {}}
+  - {effect: LS, parents: [x2], options: {}}
+
+x3_cs: &x3_cs
+  kind: continuous
+  terms:
+  - {effect: I, parents: [], options: {transform: bernstein, transform_kwargs: {n_coeffs: 20}}}
+  - {effect: LS, parents: [x1], options: {}}
+  # hidden (25, 25), sigmoid: create_param_net's reference CS net
+  - {effect: CS, parents: [x2], options: {units: [25, 25], activation: sigmoid}}
 
 variants:
   # the linear DGP is the only one with a true beta23 (+0.3) to recover
   linear-ls:
     <<: *paper_protocol
     f: linear
-    shift: ls
+    shift: ls             # which coefficients the trajectory plot reads
+    spec:
+      x1: *x1
+      x2: *x2
+      x3: *x3_ls
 
   # the misspecified case (paper App. C.3.3, Fig. 17): the DGP's x2 -> x3
   # effect is linear, but it is fitted with a complex shift, which must
   # recover that straight line instead of bending to noise
   linear-cs:
-    <<: [*paper_protocol, *reference_net]
+    <<: *paper_protocol
     f: linear
     shift: cs
-    epochs: 500             # not 300: see the epochs note above
+    fit_kwargs:
+      epochs: 500           # not 300: see the epochs note above
+      batch_size: 256
+      seed: 0
+    spec:
+      x1: *x1
+      x2: *x2
+      x3: *x3_cs
 
   # the headline complex-shift experiment (Fig. 7/15/16)
   atan-cs:
-    <<: [*paper_protocol, *reference_net]
+    <<: *paper_protocol
     f: atan
     shift: cs
+    spec:
+      x1: *x1
+      x2: *x2
+      x3: *x3_cs
 
   # a second nonlinear f, to show the shift recovery is not atan-specific
   sin-cs:
-    <<: [*paper_protocol, *reference_net]
+    <<: *paper_protocol
     f: sin
     shift: cs
     # the paper evaluates the sin fit on half a period (Fig. 18 plots
     # x2 in [-1, 0]) — the grid follows it
     grid_low: -1.0
     grid_high: 0.0
+    spec:
+      x1: *x1
+      x2: *x2
+      x3: *x3_cs

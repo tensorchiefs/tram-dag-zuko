@@ -24,7 +24,6 @@ from common import cli, load_variant, make_output_dir, save_metrics, write_repor
 
 from paper.helpers import continuous_density, continuous_hist, finish, fit_paper
 from paper.simulations.vaca import DO_X2_VALUES, VacaTriangle
-from tramdag import CI, SI, ContinuousNode
 
 
 # %% private functions -----------------------------------------------------------------
@@ -48,25 +47,6 @@ def _scatter_panel(ax, observed, sampled, x: str, y: str, n_scatter: int) -> Non
 
 
 # %% public functions ------------------------------------------------------------------
-def build_spec(config: dict) -> dict:
-    """Give the all-complex-intercept spec: every conditional fully flexible.
-
-    Every network and transform setting comes from the config, so nothing is
-    inherited from a framework default.
-    """
-    basis = dict(transform=config["transform"], n_coeffs=config["n_coeffs"])
-    net = dict(
-        units=config["intercept_units"],
-        activation=config["activation"],
-        input_transform=config["input_transform"],
-    )
-    return {
-        "x1": ContinuousNode([SI(**basis)]),
-        "x2": ContinuousNode([CI("x1", **basis, **net)]),
-        "x3": ContinuousNode([CI("x1", "x2", **basis, **net)]),
-    }
-
-
 def plot_pairs(observed, sampled, columns, bins, n_scatter, path):
     """Pairs plot: marginals on the diagonal, scatters off it (Fig. 4)."""
     k = len(columns)
@@ -125,11 +105,11 @@ def run(variant: str) -> dict:
 
     print(
         f"fitting the flexible flow on the VACA triangle, n={config['n_train']}: "
-        f"{config['epochs']} epochs at lr {config['learning_rate']:g} ..."
+        f"{config['fit_kwargs']['epochs']} epochs at lr {config['learning_rate']:g} ..."
     )
-    flow, train, val, _, fit_seconds = fit_paper(
-        generator, build_spec(config), config, out
-    )
+    train = generator.observational(config["n_train"])
+    val = generator.observational(config["n_val"], seed_offset=1)
+    flow, _, fit_seconds = fit_paper(train, val, config, out)
 
     sampled = flow.sample(len(train), seed=config["sample_seed"])
     plot_pairs(

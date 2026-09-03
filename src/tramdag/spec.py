@@ -101,8 +101,29 @@ def _options(effect: str, **kwargs) -> tuple:
 
 
 def _tupled(value):
-    """Turn lists (what JSON gives back for tuples) into tuples, recursively."""
+    """Take a serialized option value back to its canonical tuple form.
+
+    Mappings become sorted tuple-of-pairs (for nested kwargs like
+    ``transform_kwargs``); lists become tuples (for ``units``, ``parents``,
+    etc.).
+    """
+    if isinstance(value, dict):
+        return tuple(sorted((k, _tupled(v)) for k, v in value.items()))
     return tuple(_tupled(v) for v in value) if isinstance(value, list) else value
+
+
+def _mapped(value):
+    """Serialize one option value: kwargs tuples become mappings, tuples lists."""
+    if (
+        isinstance(value, tuple)
+        and value
+        and all(
+            isinstance(v, tuple) and len(v) == 2 and isinstance(v[0], str)
+            for v in value
+        )
+    ):
+        return {k: _mapped(v) for k, v in value}
+    return [_mapped(v) for v in value] if isinstance(value, tuple) else value
 
 
 def _as_term(value) -> Term:
@@ -450,12 +471,19 @@ def complex_intercept(
     Raises
     ------
     ValueError
-        If no parent is given.
+        If no parent is given, or ``allow_interaction=False`` comes with
+        fewer than two parents (an interaction to disallow needs two).
     """
     if not parents:
         raise ValueError(
             "complex_intercept() needs at least one parent. The parentless "
             "baseline is simple_intercept() / SI."
+        )
+    if not allow_interaction and len(parents) < 2:
+        raise ValueError(
+            "allow_interaction=False makes a MULTI-parent intercept additive; "
+            "with one parent there is no interaction to disallow — drop the "
+            "argument."
         )
     kw = tuple(sorted(transform_kwargs.items())) or None
     return Term(
@@ -468,7 +496,7 @@ def complex_intercept(
             units=tuple(units) if units is not None else None,
             activation=activation,
             input_transform=input_transform,
-            allow_interaction=bool(allow_interaction) or len(parents) < 2,
+            allow_interaction=bool(allow_interaction),
         ),
     )
 
@@ -740,11 +768,13 @@ def spec_to_dict(spec: dict[str, NodeSpec]) -> dict:
 
     ``Term.options`` is already canonical — sorted by key, defaults
     dropped — so a term serializes as its three fields and nothing else.
-    The result is JSON-safe: tuples become lists, and :func:`spec_from_dict`
-    turns them back, so a spec round-trips through ``json`` as well as
-    through ``torch.save`` — except when a term carries a *callable*
-    ``input_transform``, which serializes only through pickle
-    (``torch.save``) and only as a module-level function.
+    The result is JSON- and YAML-safe: plain tuples become lists and
+    nested kwargs tuples (``transform_kwargs``) become mappings, which is
+    also how a hand-written YAML spec reads best; :func:`spec_from_dict`
+    accepts both forms and turns them back, so a spec round-trips through
+    ``json``/YAML as well as through ``torch.save`` — except when a term
+    carries a *callable* ``input_transform``, which serializes only
+    through pickle (``torch.save``) and only as a module-level function.
 
     Parameters
     ----------
@@ -764,7 +794,7 @@ def spec_to_dict(spec: dict[str, NodeSpec]) -> dict:
                 {
                     "effect": t.effect,
                     "parents": list(t.parents),
-                    "options": dict(t.options),
+                    "options": {k: _mapped(v) for k, v in t.options},
                 }
                 for t in node.terms
             ],
@@ -810,15 +840,6 @@ def spec_from_dict(d: dict) -> dict[str, NodeSpec]:
     """
     spec: dict[str, NodeSpec] = {}
     for name, nd in d.items():
-        for t in nd["terms"]:
-            if "options" not in t:
-                # 0.3 wrote each setting as its own key next to "effect"
-                raise ValueError(
-                    f"node '{name}': this spec predates 0.4, whose terms carry "
-                    'their settings in an "options" mapping. Checkpoints and '
-                    "specs written by earlier versions do not load — refit and "
-                    "save again."
-                )
         for t in nd["terms"]:
             _check_dict_options(name, t)
         terms = [

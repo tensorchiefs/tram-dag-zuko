@@ -360,7 +360,9 @@ class _FitMixin:
             if any(stops):
                 break
         for cb in cbs:
-            cb.on_fit_end(self, opt)  # before re-centering: restored weights re-center
+            # before the VC re-centering, so weights a callback restores
+            # (EarlyStopping) still take part in it
+            cb.on_fit_end(self, opt)
         self._recenter_vc(vals)
         self.eval()
         return self
@@ -440,7 +442,7 @@ class _FitMixin:
                 "term 'ls'. This spec has cs, ci or vc terms. Use fit() for "
                 "flexible models."
             )
-        self.calibrate(train_df, marginal_init=False)  # L-BFGS needs no warm start
+        self.calibrate(train_df)
         # a callback used manually afterwards must not read a pre-classical
         # validation entry as current — this fit computes none
         self._fit_validated = False

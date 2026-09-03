@@ -237,7 +237,14 @@ class PerNodePlateau(Callback):
                     "PerNodePlateau needs one 'node'-tagged parameter group "
                     "per node — build the optimizer with per_node_adam(flow, lr)"
                 )
-            lr0 = self.lr0.setdefault(g["node"], g.get("initial_lr", g["lr"]))
+            if "initial_lr" not in g:
+                raise ValueError(
+                    "PerNodePlateau needs the 'initial_lr' stamp on every "
+                    "parameter group — build the optimizer with "
+                    "per_node_adam(flow, lr); a bare group's current rate may "
+                    "already be decayed and would silently become the baseline"
+                )
+            lr0 = self.lr0.setdefault(g["node"], g["initial_lr"])
             if lr0 == 0.0:
                 raise ValueError(
                     f"node {g['node']!r} starts at learning rate 0 — build a "

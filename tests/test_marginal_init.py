@@ -1,4 +1,4 @@
-"""Tests for ``calibrate(marginal_init=True)`` — calibrated initialization of each
+"""Tests for ``init_marginals`` — the explicit calibrated initialization of each
 *unconditional* (root) node's transform to the empirical marginal.
 
 What it guarantees:
@@ -80,7 +80,7 @@ def test_marginal_init_only_touches_unconditional_roots():
         for k, v in flow.nodes["x2"].intercept.state_dict().items()
     }
 
-    flow.calibrate(df, marginal_init=True)
+    flow.init_marginals(df)
 
     # the two roots are now calibrated (changed from their zero init)...
     assert not torch.allclose(flow.nodes["x1"].intercept.theta.detach(), root_x1_before)
@@ -95,9 +95,9 @@ def test_marginal_init_only_touches_unconditional_roots():
         assert torch.equal(v.detach(), ci_before[k]), f"ci param {k} changed"
 
 
-def test_marginal_init_on_by_default_calibrates_roots():
+def test_calibrate_never_touches_the_weights():
     flow, df = _mixed_flow_and_df()
-    flow.calibrate(df, marginal_init=False)  # zuko's zero start, on request
+    flow.calibrate(df)  # zuko's zero start: init_marginals is always explicit
     assert torch.allclose(
         flow.nodes["x1"].intercept.theta.detach(),
         torch.zeros_like(flow.nodes["x1"].intercept.theta),
@@ -114,7 +114,9 @@ def test_marginal_init_is_pure_init_same_optimum(ls_chain):
 
     def converged_nll(marginal_init):
         flow = CausalFlowDAG(spec, seed=0)
-        flow.calibrate(obs, marginal_init=marginal_init)
+        flow.calibrate(obs)
+        if marginal_init:
+            flow.init_marginals(obs)
         flow.fit(obs, epochs=1500, learning_rate=1e-2, batch_size=512)
         return sum(flow.nll(obs).values())
 
@@ -135,7 +137,7 @@ def test_marginal_init_does_not_reset_a_loaded_model(tmp_path):
     loaded = CausalFlowDAG.load(tmp_path / "m.pt")
 
     before = loaded.nodes["y"].intercept.theta.detach().clone()
-    loaded.calibrate(df, marginal_init=True)
+    loaded.calibrate(df)  # no-op: the calibrated flag traveled in the checkpoint
     # lr 0: the epoch runs (and would recalibrate, if the flag were lost)
     # without moving any weight
     loaded.fit(df, epochs=1, learning_rate=0.0, batch_size=128)
