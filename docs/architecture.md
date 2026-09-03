@@ -112,10 +112,11 @@ adjacent in nodes.py. A third kind is the trigger for a protocol, not before.
 <!-- AUTOGEN:diagrams (tools/gen_diagrams.py) — do not edit by hand -->
 ## Generated views
 
-Regenerate with ``uv run python tools/gen_diagrams.py`` — the package UML
-comes from pyreverse, the call graphs from a profile trace of one flow
-construction and one three-epoch ``fit`` on a 3-node SI/LS/CS/VC spec
-(tramdag-internal edges only; ``3x`` = once per node).
+Regenerate with ``uv run python tools/gen_diagrams.py`` — the package and
+class UML come from pyreverse (classes: names and inheritance only), the
+call graphs from a profile trace of one flow construction and one
+three-epoch ``fit`` on a 3-node SI/LS/CS/VC spec (tramdag-internal edges
+only; ``3x`` = once per node).
 
 ### Package UML (pyreverse)
 
@@ -165,6 +166,105 @@ classDiagram
   terms --> spec
   fitting ..> flow
   terms ..> nodes
+```
+
+### Class UML (pyreverse)
+
+The built-in terms are conditioners with a term-hook mixin: each concrete
+term class inherits its network from ``conditioners`` and its contract
+from ``ShiftTerm``/``InterceptTerm``.
+
+```mermaid
+classDiagram
+  class AdditiveCITerm {
+  }
+  class AffineUT {
+  }
+  class BernsteinUT {
+  }
+  class CITerm {
+  }
+  class CSTerm {
+  }
+  class Callback {
+  }
+  class CausalFlowDAG {
+  }
+  class ComplexIntercept {
+  }
+  class ComplexShift {
+  }
+  class ContinuousNode {
+  }
+  class EarlyStopping {
+  }
+  class FnTerm {
+  }
+  class InterceptDef {
+  }
+  class InterceptTerm {
+  }
+  class LSTerm {
+  }
+  class LinearShift {
+  }
+  class OrdinalNode {
+  }
+  class PerNodePlateau {
+  }
+  class SITerm {
+  }
+  class ShiftTerm {
+  }
+  class SimpleIntercept {
+  }
+  class SplineUT {
+  }
+  class StandardLogistic {
+  }
+  class Term {
+  }
+  class TermDef {
+  }
+  class VCTerm {
+  }
+  class VaryingCoef {
+  }
+  class _FitMixin {
+  }
+  class _FnCallback {
+  }
+  class _InputTransform {
+  }
+  class _Node {
+  }
+  class _ReadoutsMixin {
+  }
+  class _ScaledUT {
+  }
+  EarlyStopping --|> Callback
+  PerNodePlateau --|> Callback
+  _FnCallback --|> Callback
+  CausalFlowDAG --|> _FitMixin
+  CausalFlowDAG --|> _ReadoutsMixin
+  AdditiveCITerm --|> InterceptTerm
+  CITerm --|> ComplexIntercept
+  CITerm --|> InterceptTerm
+  CSTerm --|> ComplexShift
+  CSTerm --|> ShiftTerm
+  FnTerm --|> ShiftTerm
+  InterceptDef --|> InterceptTerm
+  InterceptTerm --|> TermDef
+  LSTerm --|> LinearShift
+  LSTerm --|> ShiftTerm
+  SITerm --|> SimpleIntercept
+  SITerm --|> InterceptTerm
+  ShiftTerm --|> TermDef
+  VCTerm --|> VaryingCoef
+  VCTerm --|> ShiftTerm
+  AffineUT --|> _ScaledUT
+  BernsteinUT --|> _ScaledUT
+  SplineUT --|> _ScaledUT
 ```
 
 ### Call graph — flow construction (traced)
