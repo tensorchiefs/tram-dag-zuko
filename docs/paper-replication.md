@@ -183,6 +183,17 @@ reference 10000-epoch run (the 2026-09-01 4800-epoch cut was reverted
 
 ## CAREFL benchmark (`carefl.py`) — paper Sec. 5.3, App. C.2
 
+**The Fig. 6 x4 dip, root-caused 2026-09-03**: the flow's parabola bottom
+sits ~0.55 (raw) below the analytic truth near α = 0. It is finite-sample
+tail-quantile variance at the reference's own n_train = 2500 — invariant to
+the training protocol (3000 vs 7000 epochs), to val=train vs held-out, and
+to init seeds (0.586/0.601/0.610 at seeds 7/8/9); the observed noise sits at
+the Laplace 12% quantile, and the fitted conditional's 12% quantile errs
++0.27 at the sparse observation region (x1 = 2, ~190 nearby rows) against
+−0.19 in the dense middle — the obs-anchored counterfactual inherits the
+difference. Fresh 2500-row draws move it (err@α0 0.54/0.31/0.43 at dgp
+seeds 42/43/44), so the paper's single run sits inside the band.
+
 **DGP** (Khemakhem et al. 2021): x1, x2 ~ Laplace(0, 1/√2); x3 = x1 + 0.5 x2³ + ε;
 x4 = −x2 + 0.5 x1² + ε, ε ~ Laplace(0, 1/√2). Counterfactuals are analytic by
 noise abduction. Observation `x_obs`: noise (2, 1.5, 1.4, −1) → (2, 1.5, 5.0875, −0.5) in the
