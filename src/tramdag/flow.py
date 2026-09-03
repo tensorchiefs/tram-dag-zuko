@@ -46,7 +46,6 @@ from .spec import (
 )
 from .terms import ShiftTerm, get_term
 from .transforms import (
-    RANGE_Q,
     StandardLogistic,
     ordinal_pmf,
 )
@@ -311,9 +310,12 @@ class CausalFlowDAG(_FitMixin, _ReadoutsMixin, nn.Module):
     ) -> CausalFlowDAG:
         """Take the data-dependent state from the training rows, once.
 
-        Per continuous node the transform's domain: the train ``RANGE_Q`` /
-        ``1 - RANGE_Q`` quantiles map onto ``[-5, 5]`` (the min-max scaling
-        of the original implementation, made robust to outliers). The
+        Per continuous node the transform's domain: the train ``range_q`` /
+        ``1 - range_q`` quantiles (an intercept-term option, default 5%/95%)
+        map onto ``[-5, 5]``. The default is the min-max scaling of the
+        original implementation made robust to outliers; ``range_q=0.0`` is
+        that min-max scaling itself (the reference comparison scripts'
+        ``scale_df``), placing no data in the linear tails. The
         statistics of every term-level ``input_transform=`` (minmax lo/hi,
         standardize mean/std, a callable's frozen train columns). With
         ``marginal_init`` a calibrated start:
@@ -382,11 +384,12 @@ class CausalFlowDAG(_FitMixin, _ReadoutsMixin, nn.Module):
         return self
 
     def _set_range(self, name: str, train_df: pd.DataFrame) -> None:
-        """Map the train ``RANGE_Q``/1-``RANGE_Q`` quantiles onto the domain."""
-        q = train_df[name].quantile([RANGE_Q, 1.0 - RANGE_Q])
+        """Map the train ``range_q``/1-``range_q`` quantiles onto the domain."""
+        rq = self.nodes[name].ut.range_q
+        q = train_df[name].quantile([rq, 1.0 - rq])
         if q.iloc[1] <= q.iloc[0]:
             raise ValueError(
-                f"node {name!r}: the {RANGE_Q:.0%} and {1 - RANGE_Q:.0%} quantiles "
+                f"node {name!r}: the {rq:.0%} and {1 - rq:.0%} quantiles "
                 f"coincide at {q.iloc[0]}. A continuous node needs a spread of "
                 "values; a level index needs OrdinalNode()."
             )

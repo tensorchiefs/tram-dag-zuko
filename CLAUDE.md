@@ -79,7 +79,9 @@ docs/architecture.md carries the module map and the term-contract diagram.
   Every parent enters through exactly one edge-owning term (VC modifiers exempt —
   they may also appear prognostically).
 - `transforms.py` — monotone 1-D transforms wrapping zuko (`BernsteinUT`, `SplineUT`,
-  `AffineUT`; pre-scaled from train 5%/95% quantiles to [-5,5], zuko's own
+  `AffineUT`; pre-scaled from the train `range_q`/1−`range_q` quantiles to
+  [-5,5] — an intercept option, default 0.05, `SI(range_q=0.0)` = the
+  reference comparisons' min-max `scale_df` domain — zuko's own
   inverse with its closed-form tail) + the ordinal ordered-logit transform
   (`P(Y<=k) = sigmoid(theta_k - shift)`, cutpoints `[t0, t0+cumsum(exp(...))]`).
 - `conditioners.py` — the LS/CS/intercept networks. Default widths and `relu`
@@ -177,11 +179,15 @@ VACA/CAREFL comparisons take one full-batch step per epoch on nTrain = 2500 —
 VACA 10000 epochs at lr 0.001 with the reference's ReduceLROnPlateau
 (factor 0.1, patience 50, min_lr 1e-7; torch's scheduler on the summed
 validation NLL, global as in `update_learning_rate`; restored 1:1
-2026-09-02), CAREFL 3000 at lr 0.002 with the same plateau rule — settled
-2026-09-03 after measuring both: the reference 7000 @ 0.001 wins only the
-draw-noise Fig. 6 point and overtrains x4 (its anneal watches the summed
-NLL), while 3000 wins the held-out MAEs and x4's val NLL (minibatch and
-raw-parent alternatives measurably fail, see docs/paper-replication.md).
+2026-09-02), CAREFL the reference run 1:1 since 2026-09-03 — trained on
+CAREFL's own committed 2500 rows (frozen under
+`experiments/paper/data/carefl-cf` with xObs and the truth/pred curves,
+sd-standardized units) with `val = train`, 7000 @ 0.001, the same plateau
+rule, and `range_q: 0` (the reference's min-max Bernstein domain), which
+puts the Fig. 6 curves on the paper's (fig6 x4 max 0.204 vs CAREFL's own
+0.174; the earlier 3000@0.002-vs-7000 trade-off was an artifact of the
+fresh-draw data; minibatch and raw-parent alternatives measurably fail,
+see docs/paper-replication.md).
 Seeds: the triangle scripts run
 unseeded, the comparison scripts seed R's RNG with 42 (not replayable in
 torch), so every seed here is a repo choice. Init follows each reference:
@@ -193,16 +199,16 @@ the config's seed — both measured on the earlier −3/−2/0 grid; on the ship
 −3/−1/0 grid glorot scored 0.097/0.088/0.019 under the old 10000-epoch
 plateau protocol and 0.096/0.086/0.018 under the restored reference
 protocol). Known, documented deviations: the triangle scripts also
-use 5%/95% quantiles for the Bernstein domain (a match), the comparison
-scripts min-max (`scale_df`) — we keep the quantiles there and scale the
+use 5%/95% quantiles for the Bernstein domain (a match; the comparison
+scripts use min-max, `scale_df` — matched for CAREFL via `range_q: 0`,
+kept at the quantiles for VACA where min-max measures worse,
+0.289/0.040/0.067 vs 0.096/0.080/0.022); both comparisons scale the
 *network inputs* min-max (`input_transform: minmax` on the CI terms; raw parents saturate
 the tanh nets: `do(x2=-3)` error 0.731 → 0.098, and the 2026-09-01 relu/sigmoid
 raw-parent attempts fail too); a bias-free intercept
 output layer; Adam eps 1e-8 vs Keras 1e-7 (no effect);
 `calibrate(marginal_init=False)` in `helpers.py::fit_paper` (`validate_ls`
-keeps the default); CAREFL trains on a fresh 2500-row draw with a separate
-5000-row validation draw and scores in raw units, where the R run trained on
-CAREFL's own `X.csv` with `val = train` and sd-standardized x3/x4.
+keeps the default).
 
 **Each config takes its architecture from *its own* reference script**, and the
 reference uses two different ones. The triangle experiments
@@ -230,11 +236,14 @@ extra control points on, so `n_coeffs=20` is order 21 where the reference's
   **ordinal sign flip**: the paper ADDS the ordinal shift, the
   flow SUBTRACTS → fitted weights −0.2 / +0.3; the C.4 odds-ratio check gives
   OR ≈ e² ≈ 7.4. `vaca`: E[x3|do(x2=a)] = −0.25 + 0.25a (do(x2=−3) is off-manifold
-  extrapolation — looser tolerance). `carefl`: counterfactuals are analytic
-  (`Carefl4.true_counterfactual`); the paper's x_obs is printed in CAREFL's
-  sd-standardized units (x3/x4 divided by 6.01/1.91) — in raw units it is
-  (2, 1.5, 5.0875, −0.5), noise (2, 1.5, 1.4, −1), a typical point. Held-out
-  rows are scored next to it because one point is a noisy yardstick.
+  extrapolation — looser tolerance). `carefl`: trains on CAREFL's own
+  committed rows (`data/carefl-cf`: X.csv, xObs, the analytic truth curves
+  and CAREFL's own predictions, everything in CAREFL's sd-standardized
+  units, x3/x4 divided by 6.0104/1.9114 — external frozen input, no
+  generator here) and scores the Fig. 6 curves point by point against the
+  committed truth; held-out rows (fresh `Carefl4` draws scaled by the
+  committed sds) are scored next to the single xObs because one point is
+  a noisy yardstick.
 - **`validate_ls`** (`experiments/misc/data/magic-mrclean/ls`, seed 7, n=1275, full data,
   final weights): flow = statsmodels = R polr at Age 0.0526, NIHSSa 0.1630,
   T −0.9424; ATE +0.1428 vs +0.1428, true ATE +0.132. The R reference

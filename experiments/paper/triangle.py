@@ -66,8 +66,11 @@ def run(variant: str) -> dict:
         f"n={config['n_train']} for {config['epochs']} epochs "
         f"at lr {config['learning_rate']:g} ..."
     )
-    flow, _, val, trajectory, fit_seconds = fit_paper(
-        generator,
+    train = generator.observational(config["n_train"])
+    val = generator.observational(config["n_val"], seed_offset=1)
+    flow, trajectory, fit_seconds = fit_paper(
+        train,
+        val,
         build_spec(config),
         config,
         out,

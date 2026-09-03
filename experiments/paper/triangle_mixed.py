@@ -186,8 +186,11 @@ def run(variant: str) -> dict:
         f"fitting triangle-mixed/{config['f']} with a {config['shift']} shift "
         f"on n={config['n_train']} for {config['epochs']} epochs ..."
     )
-    flow, _, val, trajectory, fit_seconds = fit_paper(
-        generator,
+    train = generator.observational(config["n_train"])
+    val = generator.observational(config["n_val"], seed_offset=1)
+    flow, trajectory, fit_seconds = fit_paper(
+        train,
+        val,
         build_spec(config),
         config,
         out,

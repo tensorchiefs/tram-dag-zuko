@@ -54,7 +54,11 @@ def build_spec(config: dict) -> dict:
     Every network and transform setting comes from the config, so nothing is
     inherited from a framework default.
     """
-    basis = dict(transform=config["transform"], n_coeffs=config["n_coeffs"])
+    basis = dict(
+        transform=config["transform"],
+        n_coeffs=config["n_coeffs"],
+        range_q=config["range_q"],
+    )
     net = dict(
         units=config["intercept_units"],
         activation=config["activation"],
@@ -127,9 +131,9 @@ def run(variant: str) -> dict:
         f"fitting the flexible flow on the VACA triangle, n={config['n_train']}: "
         f"{config['epochs']} epochs at lr {config['learning_rate']:g} ..."
     )
-    flow, train, val, _, fit_seconds = fit_paper(
-        generator, build_spec(config), config, out
-    )
+    train = generator.observational(config["n_train"])
+    val = generator.observational(config["n_val"], seed_offset=1)
+    flow, _, fit_seconds = fit_paper(train, val, build_spec(config), config, out)
 
     sampled = flow.sample(len(train), seed=config["sample_seed"])
     plot_pairs(

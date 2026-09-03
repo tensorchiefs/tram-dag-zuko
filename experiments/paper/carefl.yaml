@@ -3,59 +3,42 @@
 # Every value the script uses is in this file; it reads no defaults of its own.
 #
 # Protocol = the reference implementation's own comparison run
-# (tensorchiefs/tram-dag, comparison/utils.R with carefl_fig5.r:
-# EPOCHS = 7000), reproduced 1:1 where the framework allows:
-#   * nTrain = 2500 with a separate dgp(5000) validation draw — a repo choice:
-#     carefl_fig5.r sets USE_EXTERNAL_DATA = TRUE, trains on CAREFL's own
-#     data/CAREFL_CF/X.csv and watches the *training* NLL (val = train), with
-#     x3/x4 sd-standardized; we draw from the same SCM and score in raw units;
-#   * one full-batch gradient step per epoch (train_step: one apply_gradients
-#     over all rows);
+# (tensorchiefs/tram-dag, comparison/utils.R with carefl_fig5.r), 1:1:
+#   * trains on CAREFL's own 2500 rows (USE_EXTERNAL_DATA = TRUE reads
+#     data/CAREFL_CF/X.csv, x3/x4 sd-standardized) — frozen here under
+#     data/carefl-cf with the paper's observation and the analytic truth
+#     curves, so Fig. 6 is comparable point by point;
+#   * val = train (carefl_fig5.r's own choice for the external-data run);
+#   * EPOCHS = 7000 at Adam lr 0.001, one full-batch gradient step per epoch
+#     (train_step: one apply_gradients over all rows);
 #   * update_learning_rate: ReduceLROnPlateau on the summed validation NLL,
 #     factor 0.1, patience 50, min_lr 1e-7, no min_delta (strict <);
 #   * make_model: one net per node, dense(10, tanh) -> dense(100, tanh) ->
-#     dense(len_theta), M = 30 so len_theta = 31; final weights, no early stop.
-# The plateau rule is torch's ReduceLROnPlateau on the summed validation NLL,
-# global like the reference's update_learning_rate, and the weights start from
-# Keras' Dense default, glorot_uniform / zero bias (`init: glorot`, make_model's
-# layer_dense).
+#     dense(len_theta), M = 30 so len_theta = 31; final weights, no early stop;
+#   * range_q: 0.0 — the Bernstein domain is the train min/max, scale_df's
+#     min-max scaling (the 5%/95% default measurably misweights the tails
+#     here: fig6_max_abs_err_x4 0.37 -> 0.20, x3 0.20 -> 0.07);
+#   * input_transform: minmax on the CI terms, also scale_df (raw parents
+#     saturate the tanh nets — and relu+raw fails too, see
+#     docs/paper-replication.md).
+# The weights start from Keras' Dense default, glorot_uniform / zero bias
+# (`init: glorot`, make_model's layer_dense).
 #
-# ONE allowed deviation from the R optimization: 3000 epochs at lr 0.002
-# instead of the reference's 7000 at 0.001 (same full-batch steps, same
-# plateau rule). Settled 2026-09-03 after trying BOTH under the fixed
-# benchmark data: the reference protocol wins only the single-observation
-# Fig. 6 curve (x4 0.77->0.59 — draw noise per the ground-truth note),
-# while 3000 @ 0.002 wins four of the six held-out counterfactual MAEs
-# (x4: 0.123/0.097/0.122 vs 0.204/0.134/0.162) AND x4's validation NLL
-# (1.393 vs 1.419): the reference's anneal steps on the SUMMED val NLL,
-# x3 keeps improving while x4 overfits, and the sum hides it — 7000
-# full-batch epochs overtrain x4. Held-out beats one noisy point.
-# Two rejected candidates, both measured 2026-09-01:
-#   * minibatch (batch 256, 400-800 epochs): 3-5x faster still, but the
-#     fig6 curve ends and the do(x2)=+1.5 MAE live in the sparse x2 tail,
-#     which minibatch gradients underweight — cf_mae_x3_do_x2_+1.5 0.40
-#     (bound 0.35), fig6_max_abs_err_x3 5.9 (bound 4.7);
-#   * `activation: relu` + raw parents (undoing the scale_df
-#     workaround; sigmoid saturates on raw Laplace parents just like tanh, so
-#     relu is the only real raw-input candidate): x3 underfits (val NLL 1.46
-#     vs pin 1.403+-0.05) and the fitted x4 Bernstein tail is fragile — one
-#     large-noise held-out row inverted to x4 = 580, cf_mae_x4_do_x1_+0.0 = 4.4
-#     (bound 0.33). Raw parents cannot match the min-max-scaled reference here.
-# Known framework-level deviations, documented in CLAUDE.md: the Bernstein
-# domain comes from the train 5%/95% quantiles, not min-max to [0, 1]
-# (scale_df); the intercept net's output layer has no bias (Keras dense has
-# one); Adam eps 1e-8 vs Keras 1e-7 (measured: no effect); the reference
-# seeds R's RNG with 42, which torch cannot replay, so every seed below is a
-# repo choice.
+# Remaining known deviations, documented in CLAUDE.md: the intercept net's
+# output layer has no bias (Keras dense has one); Adam eps 1e-8 vs Keras
+# 1e-7 (measured: no effect); the reference seeds R's RNG with 42, which
+# torch cannot replay, so every seed below is a repo choice. The earlier
+# protocol era — a fresh SCM draw instead of X.csv, 3000 epochs at lr
+# 0.002, the quantile domain — and its measurements live in
+# docs/paper-replication.md.
 #
 variants:
   # all conditionals complex intercepts
   flexible:
-    n_train: 2500               # nTrain
-    n_val: 5000                 # val = dgp(5000)
-    epochs: 3000                # deviation: 7000 @ 0.001 overtrains x4 (header)
-    learning_rate: 0.002
-    batch_size: 2500            # = n_train: one full-batch step per epoch
+    n_val: 5000                 # fresh standardized draw, scoring only (R holds nothing out)
+    epochs: 7000                # EPOCHS
+    learning_rate: 0.001
+    batch_size: 2500            # = the row count: one full-batch step per epoch
     schedule: plateau           # update_learning_rate
     plateau_patience: 50
     plateau_factor: 0.1
@@ -66,9 +49,10 @@ variants:
     # extra control points on (order 32 against the reference's 30); the
     # free-parameter count is what matches
     n_coeffs: 31
+    range_q: 0.0                # scale_df: the domain is the train min/max
     intercept_units: [10, 100]  # make_model's two dense layers
-    activation: tanh            # make_model's activation (relu+raw rejected, header)
-    dgp_seed: 42                # repo choice
+    activation: tanh            # make_model's activation
+    dgp_seed: 42                # repo choice (held-out scoring draws only)
     init_seed: 7                # repo choice
     init: glorot                # Keras Dense default: glorot_uniform, zero bias
     input_transform: minmax     # per CI term: comparison/utils.R::scale_df — parents scaled to [0, 1]

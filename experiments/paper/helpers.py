@@ -24,7 +24,7 @@ from tramdag import CS, LS, CausalFlowDAG
 
 
 # %% public functions ------------------------------------------------------------------
-def fit_paper(generator, spec: dict, config: dict, out: Path, record=None):
+def fit_paper(train, val, spec: dict, config: dict, out: Path, record=None):
     """Fit the way the paper's R code does: one run, one optimizer, per-epoch read-out.
 
     ``summerof24/*.R`` calls Keras ``fit(epochs = 1)`` in a loop over one
@@ -38,7 +38,9 @@ def fit_paper(generator, spec: dict, config: dict, out: Path, record=None):
     reference — stepped from the epoch callback on ``history["val"]``
     (fit computes it), which is also where the coefficients are read.
 
-    Train and validation are two separate draws, as in R. The reference has
+    ``train`` and ``val`` come from the caller: separate draws where the
+    reference draws them (the triangle scripts, vaca), the frozen X.csv with
+    ``val = train`` where it does that (carefl_fig5.r). The reference has
     no calibrated start, so the flow is calibrated with ``marginal_init=False``.
     The fitted flow is saved to ``out / "flow.pt"``. ``record(flow)``, when
     given, is stored after each epoch with the epoch count — the coefficient
@@ -47,11 +49,9 @@ def fit_paper(generator, spec: dict, config: dict, out: Path, record=None):
     Returns
     -------
     tuple
-        ``(flow, train, val, trajectory, fit_seconds)`` — the last is the
+        ``(flow, trajectory, fit_seconds)`` — the last is the
         wall-clock of the ``fit`` call alone, the CI runtime tripwire.
     """
-    train = generator.observational(config["n_train"])
-    val = generator.observational(config["n_val"], seed_offset=1)
     flow = CausalFlowDAG(spec, seed=config["init_seed"], init=config["init"])
     flow.calibrate(train, marginal_init=False)
     opt = torch.optim.Adam(flow.parameters(), lr=config["learning_rate"])
@@ -88,7 +88,7 @@ def fit_paper(generator, spec: dict, config: dict, out: Path, record=None):
     )
     fit_seconds = round(time.perf_counter() - t0, 1)
     flow.save(out / "flow.pt")
-    return flow, train, val, trajectory, fit_seconds
+    return flow, trajectory, fit_seconds
 
 
 def shift_term(config: dict):

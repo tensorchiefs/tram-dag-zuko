@@ -161,6 +161,16 @@ default the paper replication or the tests had to switch off.
 
 ### Added
 
+- **`range_q` — the transform-domain quantile is an intercept option.**
+  `SI(range_q=0.0)` (any intercept, any basis) calibrates that node's
+  domain to the train min/max instead of the default 5%/95% quantiles —
+  the original implementation's `scale_df` scaling, exactly. The option
+  rides the existing transform-kwargs path, serializes with the spec, and
+  validates to `[0, 0.5)`. The CAREFL replication uses it (measured there:
+  Fig. 6 max errors 0.37 → 0.20 for x4, 0.20 → 0.07 for x3); VACA measured
+  worse with it and keeps the quantile default — the tails matter
+  per-problem, which is why it is per-node.
+
 - **`notebooks/classical_fit_tram_dag.py` is back**, ported to the 0.4 term
   syntax. It had been deleted along with `notebooks/stale/`; the deletion
   moved its ordinal half to `experiments/misc/validate_ls.py` and its

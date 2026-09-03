@@ -1,0 +1,15 @@
+{
+  "source": "Khemakhem et al. (2021) CAREFL Fig. 5 data, committed in tensorchiefs/tram-dag data/CAREFL_CF and consumed by comparison/carefl_fig5.r (USE_EXTERNAL_DATA = TRUE)",
+  "files": {
+    "X.csv": "the 2500 training rows, CAREFL's own draw; x3/x4 sd-standardized",
+    "xObs.csv": "the paper's observation, same units",
+    "xCF_onX1_true.csv": "analytic x4 counterfactual under do(x1 = alpha)",
+    "xCF_onX2_true.csv": "analytic x3 counterfactual under do(x2 = alpha)",
+    "xCF_onX1_pred.csv": "CAREFL's own x4 predictions (the Fig. 6 baseline)",
+    "xCF_onX2_pred.csv": "CAREFL's own x3 predictions"
+  },
+  "alphas": "seq(-3, 2.9, 0.1) - 60 points, the grid of all four curve files",
+  "sd_x3": 6.01039440669,
+  "sd_x4": 1.91141558279,
+  "note": "External frozen input with no generator in this repository (like misc/data/magic-mrclean): x3 and x4 are divided by the sds above, carefl_fig5.r's hardcoded SDX3/SDX4. paper.check_data cannot regenerate this folder and does not list it."
+}

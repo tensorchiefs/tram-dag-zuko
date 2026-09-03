@@ -326,10 +326,23 @@ class _ScaledUT(torch.nn.Module):
     An affine pre-map takes ``[xmin, xmax]`` to ``[-B, B]`` with
     ``B = BOUND``, then a zuko transform maps to the latent scale.
     Subclasses define ``n_params`` and ``_build(theta) -> zuko Transform``.
+
+    Parameters
+    ----------
+    range_q : float, optional
+        Quantile level of the domain pre-map: ``calibrate`` maps the train
+        ``range_q``/``1 - range_q`` quantiles onto ``[-B, B]``. The default
+        ``RANGE_Q`` (5%/95%) is the original implementation's min-max
+        scaling made robust to outliers; ``0.0`` is that min-max scaling
+        itself (``scale_df``), placing no data in the tails. An intercept
+        option: ``SI(range_q=0.0)``.
     """
 
-    def __init__(self):
+    def __init__(self, range_q: float = RANGE_Q):
         super().__init__()
+        if not 0.0 <= range_q < 0.5:
+            raise ValueError(f"range_q must be in [0, 0.5), got {range_q}")
+        self.range_q = range_q
         self.bound = BOUND
         self.register_buffer("xmin", torch.tensor(0.0))
         self.register_buffer("xmax", torch.tensor(1.0))
@@ -487,10 +500,12 @@ class BernsteinUT(_ScaledUT):
     ----------
     n_coeffs : int, optional
         Number of Bernstein coefficients, by default 20.
+    range_q : float, optional
+        Domain quantile level, see ``_ScaledUT``.
     """
 
-    def __init__(self, n_coeffs: int = 20):
-        super().__init__()
+    def __init__(self, n_coeffs: int = 20, range_q: float = RANGE_Q):
+        super().__init__(range_q)
         self._n = n_coeffs
 
     @property
@@ -506,7 +521,8 @@ class BernsteinUT(_ScaledUT):
 
         The coefficients describe the linear map from the pre-scaled domain
         ``[-B, B]`` onto the standard-logistic quantiles
-        ``[logit(RANGE_Q), logit(1-RANGE_Q)]``.
+        ``[logit(range_q), logit(1-range_q)]`` (``RANGE_Q`` when
+        ``range_q=0``, whose own logit is infinite).
 
         Returns
         -------
@@ -526,7 +542,9 @@ class BernsteinUT(_ScaledUT):
         diffs).
         """
         n = self._n
-        q = RANGE_Q
+        # range_q=0 puts the data min/max at -+B; logit(0) is not a target,
+        # so the start keeps the default 5%/95% latent map — an init only.
+        q = self.range_q or RANGE_Q
         a = math.log(q) - math.log(1.0 - q)  # logit(q) = -2.9444 at q=.05
         span = -2.0 * a  # logit(1-q) - logit(q)
         order = n + 1  # constrained control points: n+2
@@ -550,10 +568,12 @@ class SplineUT(_ScaledUT):
     bins : int, optional
         Number of spline bins, by default 8 — zuko's own NSF default, so a
         spline node reproduces upstream unless asked otherwise.
+    range_q : float, optional
+        Domain quantile level, see ``_ScaledUT``.
     """
 
-    def __init__(self, bins: int = 8):
-        super().__init__()
+    def __init__(self, bins: int = 8, range_q: float = RANGE_Q):
+        super().__init__(range_q)
         self.bins = bins
 
     @property
