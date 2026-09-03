@@ -17,23 +17,33 @@ CONFIGS = sorted(EXPERIMENTS.glob("*/*.yaml"))  # the same glob the workflow pla
 
 
 # %% private functions -----------------------------------------------------------------
-def _keys_read(script: Path) -> set[str]:
-    """Keys the script reads as ``config["key"]``, its area helpers included."""
+def _keys_read(script: Path, pattern: str) -> set[str]:
+    """Keys the script reads by string subscript, its area helpers included."""
     source = script.read_text()
     for helper in ("helpers.py", "common.py"):
         sibling = script.parent / helper
         if sibling.exists():
             source += sibling.read_text()
-    return set(re.findall(r"""config\[["']([a-z_0-9]+)["']\]""", source))
+    return set(re.findall(pattern, source))
 
 
 # %% public functions ------------------------------------------------------------------
 @pytest.mark.parametrize("config", CONFIGS, ids=lambda p: f"{p.parent.name}/{p.stem}")
 def test_every_yaml_key_is_read_by_the_script(config):
     document = yaml.safe_load(config.read_text())
-    read = _keys_read(config.with_suffix(".py"))
-    for variant, values in document["variants"].items():
+    if "variants" in document:
+        # variant configs are read through the one `config` dict
+        sections = document["variants"]
+        read = _keys_read(
+            config.with_suffix(".py"), r"""config\[["']([a-z_0-9]+)["']\]"""
+        )
+    else:
+        # workload-shaped configs (bench_training) are read through several
+        # local names, so any string subscript counts as read
+        sections = {**document["workloads"], "lbfgs": document["lbfgs"]}
+        read = _keys_read(config.with_suffix(".py"), r"""\[["']([a-z_0-9]+)["']\]""")
+    for section, values in sections.items():
         unread = set(values) - read
         assert not unread, (
-            f"{config.name}[{variant}]: keys nothing reads: {sorted(unread)}"
+            f"{config.name}[{section}]: keys nothing reads: {sorted(unread)}"
         )

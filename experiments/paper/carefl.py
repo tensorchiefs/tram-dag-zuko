@@ -32,7 +32,6 @@ from common import cli, load_variant, make_output_dir, save_metrics, write_repor
 
 from paper.helpers import finish, fit_paper
 from paper.simulations.carefl import Carefl4
-from tramdag import CI, SI, ContinuousNode
 
 # %% global variables ------------------------------------------------------------------
 DATA = Path(__file__).resolve().parent / "data" / "carefl-cf"
@@ -59,30 +58,6 @@ def load_reference() -> dict:
         "carefl_x3": curve("xCF_onX2_pred.csv"),
         "carefl_x4": curve("xCF_onX1_pred.csv"),
         "sds": {"x3": truth["sd_x3"], "x4": truth["sd_x4"]},
-    }
-
-
-def build_spec(config: dict) -> dict:
-    """Give the all-complex-intercept spec of the 4-variable SCM.
-
-    Every network and transform setting comes from the config, so nothing is
-    inherited from a framework default.
-    """
-    basis = dict(
-        transform=config["transform"],
-        n_coeffs=config["n_coeffs"],
-        range_q=config["range_q"],
-    )
-    net = dict(
-        units=config["intercept_units"],
-        activation=config["activation"],
-        input_transform=config["input_transform"],
-    )
-    return {
-        "x1": ContinuousNode([SI(**basis)]),
-        "x2": ContinuousNode([SI(**basis)]),
-        "x3": ContinuousNode([CI("x1", "x2", **basis, **net)]),
-        "x4": ContinuousNode([CI("x1", "x2", **basis, **net)]),
     }
 
 
@@ -173,12 +148,10 @@ def run(variant: str) -> dict:
     ref = load_reference()
     print(
         f"fitting the flexible flow on CAREFL's own rows, n={len(ref['train'])}: "
-        f"{config['epochs']} epochs at lr {config['learning_rate']:g} ..."
+        f"{config['fit_kwargs']['epochs']} epochs at lr {config['learning_rate']:g} ..."
     )
     # val = train, as in carefl_fig5.r: the plateau rule watches the train NLL
-    flow, _, fit_seconds = fit_paper(
-        ref["train"], ref["train"], build_spec(config), config, out
-    )
+    flow, _, fit_seconds = fit_paper(ref["train"], ref["train"], config, out)
 
     paper_latents = flow.abduct(ref["x_obs"])
     metrics = plot_curves(

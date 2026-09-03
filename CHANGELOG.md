@@ -161,6 +161,14 @@ default the paper replication or the tests had to switch off.
 
 ### Added
 
+- **Specs serialize YAML-readably.** `spec_to_dict` emits nested kwargs
+  tuples (`transform_kwargs`) as mappings and `spec_from_dict` accepts both
+  the mapping and the old list-of-pairs form, so a spec can be written by
+  hand in YAML and round-trips through JSON/YAML unchanged. This is what
+  the experiments' blueprint builds on: every experiment variant now
+  carries its full DAG as a `spec:` block in its sibling YAML
+  (`experiments/README.md`).
+
 - **`range_q` — the transform-domain quantile is an intercept option.**
   `SI(range_q=0.0)` (any intercept, any basis) calibrates that node's
   domain to the train min/max instead of the default 5%/95% quantiles —

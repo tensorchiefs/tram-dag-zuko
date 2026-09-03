@@ -101,8 +101,29 @@ def _options(effect: str, **kwargs) -> tuple:
 
 
 def _tupled(value):
-    """Turn lists (what JSON gives back for tuples) into tuples, recursively."""
+    """Take a serialized option value back to its canonical tuple form.
+
+    Lists are what JSON gives back for tuples; mappings are how nested
+    kwargs (``transform_kwargs``) read best in a hand-written YAML spec —
+    both become the sorted tuple-of-pairs the constructors produce.
+    """
+    if isinstance(value, dict):
+        return tuple(sorted((k, _tupled(v)) for k, v in value.items()))
     return tuple(_tupled(v) for v in value) if isinstance(value, list) else value
+
+
+def _mapped(value):
+    """Serialize one option value: kwargs tuples become mappings, tuples lists."""
+    if (
+        isinstance(value, tuple)
+        and value
+        and all(
+            isinstance(v, tuple) and len(v) == 2 and isinstance(v[0], str)
+            for v in value
+        )
+    ):
+        return {k: _mapped(v) for k, v in value}
+    return [_mapped(v) for v in value] if isinstance(value, tuple) else value
 
 
 def _as_term(value) -> Term:
@@ -740,11 +761,13 @@ def spec_to_dict(spec: dict[str, NodeSpec]) -> dict:
 
     ``Term.options`` is already canonical — sorted by key, defaults
     dropped — so a term serializes as its three fields and nothing else.
-    The result is JSON-safe: tuples become lists, and :func:`spec_from_dict`
-    turns them back, so a spec round-trips through ``json`` as well as
-    through ``torch.save`` — except when a term carries a *callable*
-    ``input_transform``, which serializes only through pickle
-    (``torch.save``) and only as a module-level function.
+    The result is JSON- and YAML-safe: plain tuples become lists and
+    nested kwargs tuples (``transform_kwargs``) become mappings, which is
+    also how a hand-written YAML spec reads best; :func:`spec_from_dict`
+    accepts both forms and turns them back, so a spec round-trips through
+    ``json``/YAML as well as through ``torch.save`` — except when a term
+    carries a *callable* ``input_transform``, which serializes only
+    through pickle (``torch.save``) and only as a module-level function.
 
     Parameters
     ----------
@@ -764,7 +787,7 @@ def spec_to_dict(spec: dict[str, NodeSpec]) -> dict:
                 {
                     "effect": t.effect,
                     "parents": list(t.parents),
-                    "options": dict(t.options),
+                    "options": {k: _mapped(v) for k, v in t.options},
                 }
                 for t in node.terms
             ],

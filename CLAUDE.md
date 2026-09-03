@@ -33,7 +33,15 @@ uv run python -m paper.check_data            # frozen data still regenerates
 ```
 
 Every experiment reads its hyperparameters from its sibling `<script>.yaml` and
-has **no defaults in code**; `experiments/common.py::load_variant` parses it. `experiments/` is split into `paper/`, `benchmarks/` and
+has **no defaults in code**; `experiments/common.py::load_variant` parses it.
+The blueprint (2026-09, experiments/README.md): each variant carries the FULL
+model as `spec:` (`tramdag.spec_from_dict` form — basis, n_coeffs, range_q,
+units, activation, input_transform are term options there, not config keys),
+`flow_kwargs:` (CausalFlowDAG construction) and `fit_kwargs:` (flow.fit
+verbatim); learning_rate/schedule stay top-level (they build the optimizer).
+Deliberately verbose — duplication over indirection. bench_training.yaml is
+workloads-shaped, same rule; perf_machine.py is exempt (curl-and-run single
+file). `experiments/` is split into `paper/`, `benchmarks/` and
 `misc/`, with `experiments/tests/` for the shared `check.py`. `paper` and `misc`
 each own their `data/`, `ground_truth/`, `tests/` and `results/`; `benchmarks/` measures speed on the other two's data and pins
 no ground truth, writing up its numbers in `docs/` instead. Only `common.py`

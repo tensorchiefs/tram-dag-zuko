@@ -1,22 +1,22 @@
-# Hyperparameters of the classical-MLE validation (validate_ls.py).
+# The classical-MLE validation (validate_ls.py): full model spec + every
+# training hyperparameter. The script reads no defaults of its own — `spec`
+# is the whole DAG (tramdag.spec_from_dict), `flow_kwargs` construct the
+# flow; the fitting route is per variant.
 #
-# Every value the script uses is in this file: it reads no defaults of its
-# own.
+# The model: fully connected all-`ls` — every edge a linear shift, which is
+# what makes each node conditional a classical transformation model. The
+# continuous nodes' basis is Bernstein with 20 unconstrained coefficients
+# (zuko ties two more control points on, so order 21). The ordinal nodes
+# have no basis: their intercept is the cutpoint vector. Level counts match
+# the frozen cohort's columns.
 
 cohort_and_model: &cohort_and_model
   cohort: magic-mrclean/ls   # frozen synthetic cohort with a known true effect
-  init_seed: 0               # flow weight initialization
+  flow_kwargs:
+    seed: 0                  # weight init
   shuffle_seed: 0            # minibatch shuffling of the first Adam phase
   batch_size: 256
   good_outcome_levels: 3     # a "good" outcome is level 0, 1 or 2
-  # the model, stated rather than inherited from the framework
-  transform: bernstein       # basis of the continuous nodes
-  n_coeffs: 20               # unconstrained coefficients (zuko ties two
-                             # more control points on, so order 21)
-  # the ordinal nodes' level counts, matching the frozen cohort's columns
-  levels_mrs_pre: 6
-  levels_treatment: 2
-  levels_outcome: 7
   # the Adam route trains to tight convergence in decreasing steps;
   # the classical route ignores these and uses L-BFGS instead
   # (cut from 4000/2000/1000 for CI speed, 2026-09: 2000 epochs land on the
@@ -27,6 +27,40 @@ cohort_and_model: &cohort_and_model
   - [700, 0.001]
   - [500, 0.0001]
   classical_max_iter: 400
+  spec:
+    Age:
+      kind: continuous
+      terms:
+      - {effect: I, parents: [], options: {transform: bernstein, transform_kwargs: {n_coeffs: 20}}}
+    mRS_pre:
+      kind: ordinal
+      levels: 6
+      terms:
+      - {effect: I, parents: [], options: {}}
+      - {effect: LS, parents: [Age], options: {}}
+    NIHSSa:
+      kind: continuous
+      terms:
+      - {effect: I, parents: [], options: {transform: bernstein, transform_kwargs: {n_coeffs: 20}}}
+      - {effect: LS, parents: [Age], options: {}}
+      - {effect: LS, parents: [mRS_pre], options: {}}
+    T:
+      kind: ordinal
+      levels: 2
+      terms:
+      - {effect: I, parents: [], options: {}}
+      - {effect: LS, parents: [Age], options: {}}
+      - {effect: LS, parents: [mRS_pre], options: {}}
+      - {effect: LS, parents: [NIHSSa], options: {}}
+    mRS_3m:
+      kind: ordinal
+      levels: 7
+      terms:
+      - {effect: I, parents: [], options: {}}
+      - {effect: LS, parents: [Age], options: {}}
+      - {effect: LS, parents: [mRS_pre], options: {}}
+      - {effect: LS, parents: [NIHSSa], options: {}}
+      - {effect: LS, parents: [T], options: {}}
 
 variants:
   # multi-phase Adam, trained to the training-data maximum likelihood

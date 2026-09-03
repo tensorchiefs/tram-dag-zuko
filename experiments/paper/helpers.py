@@ -20,11 +20,11 @@ import matplotlib.pyplot as plt
 import numpy as np
 import torch
 
-from tramdag import CS, LS, CausalFlowDAG
+from tramdag import CausalFlowDAG, spec_from_dict
 
 
 # %% public functions ------------------------------------------------------------------
-def fit_paper(train, val, spec: dict, config: dict, out: Path, record=None):
+def fit_paper(train, val, config: dict, out: Path, record=None):
     """Fit the way the paper's R code does: one run, one optimizer, per-epoch read-out.
 
     ``summerof24/*.R`` calls Keras ``fit(epochs = 1)`` in a loop over one
@@ -38,10 +38,14 @@ def fit_paper(train, val, spec: dict, config: dict, out: Path, record=None):
     reference — stepped from the epoch callback on ``history["val"]``
     (fit computes it), which is also where the coefficients are read.
 
-    ``train`` and ``val`` come from the caller: separate draws where the
-    reference draws them (the triangle scripts, vaca), the frozen X.csv with
-    ``val = train`` where it does that (carefl_fig5.r). The reference has
-    no calibrated start, so the flow is calibrated with ``marginal_init=False``.
+    The whole model and every training number come from the config (the
+    experiments' blueprint): ``config["spec"]`` is the serialized DAG
+    (``spec_from_dict``), ``config["flow_kwargs"]`` construct the flow and
+    ``config["fit_kwargs"]`` go into ``flow.fit`` verbatim. ``train`` and
+    ``val`` come from the caller: separate draws where the reference draws
+    them (the triangle scripts, vaca), the frozen X.csv with ``val = train``
+    where it does that (carefl_fig5.r). The reference has no calibrated
+    start, so the flow is calibrated with ``marginal_init=False``.
     The fitted flow is saved to ``out / "flow.pt"``. ``record(flow)``, when
     given, is stored after each epoch with the epoch count — the coefficient
     trajectories of paper Fig. 14, 15 and 19.
@@ -52,7 +56,7 @@ def fit_paper(train, val, spec: dict, config: dict, out: Path, record=None):
         ``(flow, trajectory, fit_seconds)`` — the last is the
         wall-clock of the ``fit`` call alone, the CI runtime tripwire.
     """
-    flow = CausalFlowDAG(spec, seed=config["init_seed"], init=config["init"])
+    flow = CausalFlowDAG(spec_from_dict(config["spec"]), **config["flow_kwargs"])
     flow.calibrate(train, marginal_init=False)
     opt = torch.optim.Adam(flow.parameters(), lr=config["learning_rate"])
     plateau = None
@@ -77,34 +81,16 @@ def fit_paper(train, val, spec: dict, config: dict, out: Path, record=None):
     t0 = time.perf_counter()
     flow.fit(
         train,
-        epochs=config["epochs"],
-        batch_size=config["batch_size"],
         # per-epoch validation only where the protocol consumes it (the
         # plateau rule); the triangle scripts never computed it per epoch
         validation_data=val if plateau is not None else None,
-        seed=config["shuffle_seed"],
         optimizer=opt,
         callbacks=epoch_end,
+        **config["fit_kwargs"],
     )
     fit_seconds = round(time.perf_counter() - t0, 1)
     flow.save(out / "flow.pt")
     return flow, trajectory, fit_seconds
-
-
-def shift_term(config: dict):
-    """Give the x2 -> x3 term of a triangle spec: a linear or complex shift.
-
-    Raises
-    ------
-    ValueError
-        If ``shift`` is neither ``"ls"`` nor ``"cs"``.
-    """
-    shift = config["shift"]
-    if shift == "ls":
-        return LS("x2")
-    if shift == "cs":
-        return CS("x2", units=config["shift_units"], activation=config["activation"])
-    raise ValueError(f"shift must be 'ls' or 'cs', got '{shift}'")
 
 
 def snapshot(flow: CausalFlowDAG, shift: str) -> dict:
