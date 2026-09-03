@@ -1452,7 +1452,7 @@ entry; node-kind behavior lives in four adjacent functions; everything else is
 framework.</strong> The decisions and their refused alternatives are recorded in
 <a href="../adr/001-term-owned-architecture/">ADR 001</a>.</p>
 <h2 id="module-map">Module map<a class="headerlink" href="#module-map" title="Permanent link">&para;</a></h2>
-<div class="highlight"><pre><span></span><code>graph TD
+<pre class="mermaid"><code>graph TD
     subgraph data["pure data"]
         spec["spec.py&lt;br/&gt;DSL: Term, nodes, constructors,&lt;br/&gt;normalization, Kahn sort, (de)serialization"]
     end
@@ -1479,14 +1479,13 @@ framework.</strong> The decisions and their refused alternatives are recorded in
     flow --&gt; fitting
     flow --&gt; readouts
     flow --&gt; scores
-    fitting --&gt; callbacks
-</code></pre></div>
+    fitting --&gt; callbacks</code></pre>
 <p>(<code>spec.py</code> consults the registry lazily, so the data layer stays importable
 without torch executing any model code; <code>fitting.py</code>/<code>readouts.py</code> are
 mixins <code>CausalFlowDAG</code> composes and import <code>flow</code> under <code>TYPE_CHECKING</code>
 only — the graph is acyclic.)</p>
 <h2 id="the-term-contract">The term contract<a class="headerlink" href="#the-term-contract" title="Permanent link">&para;</a></h2>
-<div class="highlight"><pre><span></span><code>classDiagram
+<pre class="mermaid"><code>classDiagram
     class TermDef {
         &lt;&lt;registry entry&gt;&gt;
         effect: str
@@ -1526,8 +1525,7 @@ only — the graph is acyclic.)</p>
     CSTerm --|&gt; ComplexShift : nn
     VCTerm --|&gt; VaryingCoef : nn
     SITerm --|&gt; SimpleIntercept : nn
-    CITerm --|&gt; ComplexIntercept : nn
-</code></pre></div>
+    CITerm --|&gt; ComplexIntercept : nn</code></pre>
 <p>Built-in terms subclass their conditioners, so state-dict paths
 (<code>nodes.&lt;n&gt;.shifts.&lt;key&gt;.…</code>) and the seeded RNG stream are those of 0.4.
 A custom effect subclasses <code>ShiftTerm</code>, sets <code>effect</code>/<code>slot</code>/
@@ -1552,7 +1550,7 @@ comes from pyreverse, the call graphs from a profile trace of one flow
 construction and one three-epoch <code>fit</code> on a 3-node SI/LS/CS/VC spec
 (tramdag-internal edges only; <code>3x</code> = once per node).</p>
 <h3 id="package-uml-pyreverse">Package UML (pyreverse)<a class="headerlink" href="#package-uml-pyreverse" title="Permanent link">&para;</a></h3>
-<div class="highlight"><pre><span></span><code>classDiagram
+<pre class="mermaid"><code>classDiagram
   class tramdag {
   }
   class callbacks {
@@ -1596,10 +1594,9 @@ construction and one three-epoch <code>fit</code> on a 3-node SI/LS/CS/VC spec
   terms --&gt; conditioners
   terms --&gt; spec
   fitting ..&gt; flow
-  terms ..&gt; nodes
-</code></pre></div>
+  terms ..&gt; nodes</code></pre>
 <h3 id="call-graph-flow-construction-traced">Call graph — flow construction (traced)<a class="headerlink" href="#call-graph-flow-construction-traced" title="Permanent link">&para;</a></h3>
-<div class="highlight"><pre><span></span><code>flowchart LR
+<pre class="mermaid"><code>flowchart LR
   subgraph conditioners
     n0["ComplexShift.__init__"]
     n28["LinearShift.__init__"]
@@ -1679,10 +1676,9 @@ construction and one three-epoch <code>fit</code> on a 3-node SI/LS/CS/VC spec
     n16 --&gt; n25
     n16 --&gt; n26
     n29 -- "2x" --&gt; n30
-    n11 -- "2x" --&gt; n29
-</code></pre></div>
+    n11 -- "2x" --&gt; n29</code></pre>
 <h3 id="call-graph-one-fit-traced">Call graph — one fit (traced)<a class="headerlink" href="#call-graph-one-fit-traced" title="Permanent link">&para;</a></h3>
-<div class="highlight"><pre><span></span><code>flowchart LR
+<pre class="mermaid"><code>flowchart LR
   subgraph callbacks
     n0["EarlyStopping.__init__"]
     n1["EarlyStopping._reset"]
@@ -1821,8 +1817,7 @@ construction and one three-epoch <code>fit</code> on a 3-node SI/LS/CS/VC spec
     n44 -- "18x" --&gt; n55
     n56 -- "9x" --&gt; n57
     n45 -- "9x" --&gt; n58
-    n45 -- "9x" --&gt; n56
-</code></pre></div>
+    n45 -- "9x" --&gt; n56</code></pre>
 <!-- AUTOGEN:end -->
 
 
