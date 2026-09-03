@@ -261,23 +261,6 @@ def test_units_reach_the_networks():
     assert flow.nodes["y"].shifts["x1"].net[0].out_features == 8
 
 
-def test_a_pre_0_4_spec_says_it_is_too_old():
-    """0.3 wrote a term's settings as sibling keys, not in "options".
-
-    Without this the loader raises a bare KeyError('options') from inside the
-    comprehension, which does not tell the reader their checkpoint is stale.
-    """
-    old_format = {
-        "x1": {"kind": "continuous", "terms": []},
-        "y": {
-            "kind": "continuous",
-            "terms": [{"effect": "VC", "parents": ["t", "x1"], "penalty": 2.5}],
-        },
-    }
-    with pytest.raises(ValueError, match=r"predates 0\.4"):
-        spec_from_dict(old_format)
-
-
 def test_basis_arguments_apply_without_naming_the_basis():
     """SI(n_coeffs=40) must configure the default basis, not be ignored.
 

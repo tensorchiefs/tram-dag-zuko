@@ -12,6 +12,15 @@ publishing (no token secret), sigstore-sign and create the GitHub release.
 setup outside the repo: the PyPI trusted-publisher registration and the
 `pypi` GitHub environment.
 
+### Removed — 1.0 is a clean cut, no pre-1.0 compatibility
+
+- The 0.3-spec detector in `spec_from_dict` (the "predates 0.4" error):
+  a spec without an `"options"` mapping now fails as malformed input.
+- `load()` no longer defaults a checkpoint's missing `init` field to
+  `"torch"`; every 1.0 checkpoint carries it.
+Checkpoints and serialized specs from any pre-1.0 version do not load —
+refit and save again.
+
 ### Changed — term-owned architecture (docs/adr/001, docs/architecture.md)
 
 The 0.4 monolith split along its seams and every per-effect behavior moved

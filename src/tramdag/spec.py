@@ -834,15 +834,6 @@ def spec_from_dict(d: dict) -> dict[str, NodeSpec]:
     spec: dict[str, NodeSpec] = {}
     for name, nd in d.items():
         for t in nd["terms"]:
-            if "options" not in t:
-                # 0.3 wrote each setting as its own key next to "effect"
-                raise ValueError(
-                    f"node '{name}': this spec predates 0.4, whose terms carry "
-                    'their settings in an "options" mapping. Checkpoints and '
-                    "specs written by earlier versions do not load — refit and "
-                    "save again."
-                )
-        for t in nd["terms"]:
             _check_dict_options(name, t)
         terms = [
             Term(

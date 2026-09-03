@@ -808,7 +808,7 @@ class CausalFlowDAG(_FitMixin, _ReadoutsMixin, nn.Module):
         flow = cls(
             spec_from_dict(ckpt["spec"]),
             device=device,
-            init=ckpt.get("init", "torch"),
+            init=ckpt["init"],
         )
         for name, t in ckpt["state_dict"].items():
             # a callable transform's train buffer takes the checkpoint's shape
