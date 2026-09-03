@@ -45,7 +45,7 @@ def fit_paper(train, val, config: dict, out: Path, record=None):
     ``val`` come from the caller: separate draws where the reference draws
     them (the triangle scripts, vaca), the frozen X.csv with ``val = train``
     where it does that (carefl_fig5.r). The reference has no calibrated
-    start, so the flow is calibrated with ``marginal_init=False``.
+    start, and calibration never touches the weights — no marginal init.
     The fitted flow is saved to ``out / "flow.pt"``. ``record(flow)``, when
     given, is stored after each epoch with the epoch count — the coefficient
     trajectories of paper Fig. 14, 15 and 19.
@@ -57,7 +57,7 @@ def fit_paper(train, val, config: dict, out: Path, record=None):
         wall-clock of the ``fit`` call alone, the CI runtime tripwire.
     """
     flow = CausalFlowDAG(spec_from_dict(config["spec"]), **config["flow_kwargs"])
-    flow.calibrate(train, marginal_init=False)
+    flow.calibrate(train)
     opt = torch.optim.Adam(flow.parameters(), lr=config["learning_rate"])
     plateau = None
     if config["schedule"] == "plateau":

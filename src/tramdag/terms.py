@@ -17,6 +17,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, ClassVar
 
+import numpy as np
 import torch
 from torch import Tensor, nn
 
@@ -27,9 +28,11 @@ from .conditioners import (
     SimpleIntercept,
     VaryingCoef,
 )
-from .spec import OrdinalNode, feat_width
+from .spec import ContinuousNode, OrdinalNode, feat_width
 
 if TYPE_CHECKING:
+    import pandas as pd
+
     from .nodes import _Node
     from .spec import NodeSpec, Term
 
@@ -54,6 +57,66 @@ def get_term(effect: str) -> type[TermDef]:
     return _REGISTRY[effect]
 
 
+# %% private classes -------------------------------------------------------------------
+class _InputTransform(nn.Module):
+    """One term's frozen network-input transform.
+
+    ``calibrate`` takes the statistics from the training rows once:
+    ``"minmax"`` freezes per-column lo/hi, ``"standardize"`` mean/std, and a
+    callable keeps the raw training columns and is applied per batch as
+    ``fn(x, train)`` — so train statistics inside the callable are always the
+    frozen training data, never the batch's.
+    """
+
+    def __init__(self, value, cols: tuple[str, ...]):
+        super().__init__()
+        self.kind = "callable" if callable(value) else value
+        self.fn = value if callable(value) else None
+        self.cols = cols  # the term's continuous parents, in parent order
+        k = len(cols)
+        if self.kind == "minmax":
+            self.register_buffer("lo", torch.zeros(k))
+            self.register_buffer("hi", torch.ones(k))
+        elif self.kind == "standardize":
+            self.register_buffer("mean", torch.zeros(k))
+            self.register_buffer("std", torch.ones(k))
+        else:  # callable: the raw train columns, shaped at calibrate
+            self.register_buffer("train_cols", torch.zeros(0, k))
+
+    def set_stats(self, cols: Tensor) -> None:
+        """Freeze the statistics from the raw ``(n_train, k)`` train columns."""
+        if self.kind == "minmax":
+            self.lo.copy_(cols.min(0).values)
+            self.hi.copy_(cols.max(0).values)
+        elif self.kind == "standardize":
+            self.mean.copy_(cols.mean(0))
+            self.std.copy_(cols.std(0))
+        else:
+            self._buffers["train_cols"] = cols.detach().to(self.train_cols.device)
+
+    def forward(self, x: Tensor, i: int) -> Tensor:
+        """Transform one continuous parent column ``(n, 1)``."""
+        if self.kind == "minmax":
+            return (x - self.lo[i]) / (self.hi[i] - self.lo[i])
+        if self.kind == "standardize":
+            return (x - self.mean[i]) / self.std[i]
+        return self.fn(x, self.train_cols[:, i : i + 1])
+
+
+# %% private functions -----------------------------------------------------------------
+def _attach_input_transform(m, term: Term, parents: tuple, spec: dict) -> None:
+    """Register the term's input transform over its continuous parents.
+
+    Ordinal one-hots pass through untransformed, so a term whose network
+    parents are all ordinal carries none.
+    """
+    if dict(term.options).get("input_transform") is None:
+        return
+    cps = tuple(p for p in parents if isinstance(spec[p], ContinuousNode))
+    if cps:
+        m.add_module("_input_transform", _InputTransform(term.input_transform, cps))
+
+
 # %% public classes --------------------------------------------------------------------
 class TermDef:
     """One effect's definition: its slot and its effect-specific validation.
@@ -69,6 +132,36 @@ class TermDef:
     # the effect's options with their defaults; a constructor value equal to
     # its default stays out of Term.options, so term equality is canonical
     option_defaults: ClassVar[dict] = {}
+
+    @property
+    def input_transform(self):
+        """The term's frozen network-input transform, or ``None``.
+
+        Builds register one (``_attach_input_transform``) when the term
+        declares ``input_transform=`` over continuous parents; a plain class
+        attribute would shadow the registered submodule.
+        """
+        return (
+            self._modules.get("_input_transform") if hasattr(self, "_modules") else None
+        )
+
+    def calibrate(self, train_df: pd.DataFrame) -> None:
+        """Freeze this term's data-dependent state: the input-transform stats.
+
+        ``CausalFlowDAG.calibrate`` calls this once per term; a term without
+        an ``input_transform`` has nothing to freeze.
+        """
+        tr = self.input_transform
+        if tr is None:
+            return
+        cols = torch.stack(
+            [
+                torch.as_tensor(train_df[p].to_numpy(dtype=np.float32).copy())
+                for p in tr.cols
+            ],
+            dim=1,
+        )
+        tr.set_stats(cols)
 
     @staticmethod
     def check_arity(name: str, term: Term) -> None:
@@ -211,7 +304,29 @@ class InterceptTerm(TermDef):
             m = AdditiveCITerm(groups, n_params, spec, term.units, term.activation)
         m.groups = groups
         m.ci_parents = [p for grp in groups for p in grp]
+        _attach_input_transform(m, term, tuple(term.parents), spec)
         return m
+
+    def calibrate(self, train_df: pd.DataFrame, own=None, ut=None) -> None:
+        """Freeze the input stats and set the transform's domain, once.
+
+        ``own`` is the node's own training column and ``ut`` its monotone
+        transform (``None`` for ordinal nodes — cutpoints have no domain):
+        the train ``range_q``/``1 - range_q`` quantiles map onto the
+        pre-scaled domain.
+        """
+        super().calibrate(train_df)
+        if ut is None:
+            return
+        q = own.quantile([ut.range_q, 1.0 - ut.range_q])
+        if q.iloc[1] <= q.iloc[0]:
+            raise ValueError(
+                f"node {own.name!r}: the {ut.range_q:.0%} and "
+                f"{1 - ut.range_q:.0%} quantiles coincide at {q.iloc[0]}. A "
+                "continuous node needs a spread of values; a level index "
+                "needs OrdinalNode()."
+            )
+        ut.set_range(q.iloc[0], q.iloc[1])
 
     def theta_value(self, node: _Node, feats: dict, n: int) -> Tensor:
         """Give the transform parameters, shape ``(n, P)``."""
@@ -362,6 +477,7 @@ class CSTerm(ShiftTerm, ComplexShift):
         m.key = "+".join(ps)  # the parent itself for a single-parent term
         m.parents = ps
         m.net_parents = ps
+        _attach_input_transform(m, term, ps, spec)
         return m
 
     def shift_value(self, node: _Node, feats: dict) -> Tensor:
@@ -406,6 +522,7 @@ class VCTerm(ShiftTerm, VaryingCoef):
         m.on_is_ord = isinstance(spec[on], OrdinalNode)
         m.center_col = term.center or None
         m.finalizes = bool(mods)
+        _attach_input_transform(m, term, mods, spec)
         return m
 
     @staticmethod
@@ -418,7 +535,9 @@ class VCTerm(ShiftTerm, VaryingCoef):
             raise ValueError(
                 f"Node '{name}': VC treatment '{on}' cannot also be a modifier."
             )
-        if term.penalty is None or term.penalty < 0:
+        if term.penalty is None:
+            raise ValueError(f"Node '{name}': VC(penalty=) is required.")
+        if term.penalty < 0:
             raise ValueError(f"Node '{name}': VC penalty must be >= 0.")
         if term.center is not False and not isinstance(term.center, str):
             raise ValueError(
@@ -560,6 +679,7 @@ class FnTerm(ShiftTerm, nn.Module):
         m.key = "+".join(ps)  # the parent itself for a single-parent term
         m.parents = ps
         m.net_parents = ps
+        _attach_input_transform(m, term, ps, spec)
         return m
 
     def shift_value(self, node: _Node, feats: dict) -> Tensor:

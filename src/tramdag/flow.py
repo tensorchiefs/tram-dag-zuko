@@ -305,32 +305,22 @@ class CausalFlowDAG(_FitMixin, _ReadoutsMixin, nn.Module):
             per_node = self.node_log_prob(self._tensorize(df))
         return {k: float(-v.mean()) for k, v in per_node.items()}
 
-    def calibrate(
-        self, train_df: pd.DataFrame, *, marginal_init: bool = True
-    ) -> CausalFlowDAG:
+    def calibrate(self, train_df: pd.DataFrame) -> CausalFlowDAG:
         """Take the data-dependent state from the training rows, once.
 
-        Per continuous node the transform's domain: the train ``range_q`` /
-        ``1 - range_q`` quantiles (an intercept-term option, default 5%/95%)
-        map onto ``[-5, 5]``. The default is the min-max scaling of the
-        original implementation made robust to outliers; ``range_q=0.0`` is
-        that min-max scaling itself (the reference comparison scripts'
-        ``scale_df``), placing no data in the linear tails. The
-        statistics of every term-level ``input_transform=`` (minmax lo/hi,
-        standardize mean/std, a callable's frozen train columns). With
-        ``marginal_init`` a calibrated start:
-        a Bernstein simple intercept starts at the data marginal instead of
-        zuko's default (about 2.5x too steep), an ordinal simple intercept at
-        the marginal class log-odds. The optimum is unchanged, the path to
-        it is shorter (docs/training-speed.md).
+        Every term calibrates itself: the intercept term maps its node's
+        train ``range_q``/``1 - range_q`` quantiles (an intercept option,
+        default 5%/95%) onto the transform's pre-scaled domain — ``0.0`` is
+        the min-max scaling of the reference comparison scripts' ``scale_df``
+        — and every term with an ``input_transform=`` freezes its statistics
+        (minmax lo/hi, standardize mean/std, a callable's frozen train
+        columns).
 
         The first ``fit`` or ``fit_classical`` calls this when it has not run
         yet; a loaded model is already calibrated, and later fits on other rows
-        reuse this state — data on a new scale needs a new flow. Calling it
-        yourself is how to choose ``marginal_init=False`` (the paper
-        replications do, to match a reference that has no such step). To
-        re-apply the calibrated start later — a loaded or already-trained
-        model — call :meth:`init_marginals` directly.
+        reuse this state — data on a new scale needs a new flow. Calibration
+        never touches the weights: a calibrated start is a separate, always
+        explicit step, :meth:`init_marginals`.
 
         Returns
         -------
@@ -343,30 +333,27 @@ class CausalFlowDAG(_FitMixin, _ReadoutsMixin, nn.Module):
             node = self.nodes[name]
             if node.kind == "ordinal":
                 self._check_levels(name, train_df)
-            node.set_input_stats(train_df)
-            if node.kind == "continuous":
-                self._set_range(name, train_df)
+            node.intercept.calibrate(train_df, own=train_df[name], ut=node.ut)
+            for term in node.shifts.values():
+                term.calibrate(train_df)
         self.calibrated.fill_(True)
-        if marginal_init:
-            self.init_marginals(train_df)
         return self
 
     def init_marginals(self, train_df: pd.DataFrame) -> CausalFlowDAG:
         """Set every simple intercept to the marginal of its column — any time.
 
-        The calibrated start, as an explicit step: a Bernstein simple
-        intercept starts at the data marginal instead of zuko's default
-        (about 2.5x too steep), an ordinal simple intercept at the marginal
-        class log-odds; spline/affine intercepts and intercepts with parents
-        are untouched. The optimum is unchanged, the path to it is shorter
-        (docs/training-speed.md). ``calibrate(marginal_init=True)`` — and so
-        the first ``fit`` — runs this once; unlike ``calibrate`` it is NOT
-        guarded by the calibrated flag, so calling it on a loaded or
-        already-trained flow **discards those intercepts' weights** and
-        restarts them at the marginal. An uncalibrated flow takes its ranges
-        from the same rows first. On a calibrated flow the Bernstein start
-        comes from the stored range alone (the canonical map; the df is not
-        read) — only ordinal intercepts re-read the rows.
+        The calibrated start, always explicit — nothing runs it for you: a
+        Bernstein simple intercept starts at the data marginal instead of
+        zuko's default (about 2.5x too steep), an ordinal simple intercept
+        at the marginal class log-odds; spline/affine intercepts and
+        intercepts with parents are untouched. The optimum is unchanged, the
+        path to it is shorter (docs/training-speed.md). It is NOT guarded by
+        the calibrated flag, so calling it on a loaded or already-trained
+        flow **discards those intercepts' weights** and restarts them at the
+        marginal. An uncalibrated flow takes its ranges from the same rows
+        first. On a calibrated flow the Bernstein start comes from the
+        stored range alone (the canonical map; the df is not read) — only
+        ordinal intercepts re-read the rows.
 
         Returns
         -------
@@ -374,7 +361,7 @@ class CausalFlowDAG(_FitMixin, _ReadoutsMixin, nn.Module):
             ``self``.
         """
         if not bool(self.calibrated):
-            self.calibrate(train_df, marginal_init=False)
+            self.calibrate(train_df)
         for name in self.order:
             node = self.nodes[name]
             if node.intercept.has_marginal_start:
@@ -382,18 +369,6 @@ class CausalFlowDAG(_FitMixin, _ReadoutsMixin, nn.Module):
                     self._check_levels(name, train_df)
                 self._marginal_start(name, train_df)
         return self
-
-    def _set_range(self, name: str, train_df: pd.DataFrame) -> None:
-        """Map the train ``range_q``/1-``range_q`` quantiles onto the domain."""
-        rq = self.nodes[name].ut.range_q
-        q = train_df[name].quantile([rq, 1.0 - rq])
-        if q.iloc[1] <= q.iloc[0]:
-            raise ValueError(
-                f"node {name!r}: the {rq:.0%} and {1 - rq:.0%} quantiles "
-                f"coincide at {q.iloc[0]}. A continuous node needs a spread of "
-                "values; a level index needs OrdinalNode()."
-            )
-        self.nodes[name].ut.set_range(q.iloc[0], q.iloc[1])
 
     def _marginal_start(self, name: str, train_df: pd.DataFrame) -> None:
         """Start a simple intercept at the node's data marginal."""

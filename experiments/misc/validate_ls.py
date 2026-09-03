@@ -68,6 +68,10 @@ def fit_flow(observed: pd.DataFrame, config: dict) -> CausalFlowDAG:
     if config["fitter"] == "classical":
         flow.fit_classical(observed, max_iter=config["classical_max_iter"])
     elif config["fitter"] == "adam":
+        # the calibrated start the phase budget was tuned with (an explicit
+        # step — the framework never runs it); the MLE itself is unchanged
+        flow.calibrate(observed)
+        flow.init_marginals(observed)
         for phase, (epochs, learning_rate) in enumerate(config["phases"]):
             flow.fit(
                 observed,

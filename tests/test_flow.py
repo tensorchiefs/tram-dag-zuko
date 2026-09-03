@@ -217,7 +217,7 @@ def test_affine_zero_theta_is_the_logistic_density():
     """
     df = pd.DataFrame({"x": np.linspace(-4.0, 6.0, 400)})
     flow = CausalFlowDAG({"x": ContinuousNode(I(transform="affine"))}, seed=0)
-    flow.calibrate(df, marginal_init=False)
+    flow.calibrate(df)
     with torch.no_grad():
         flow.nodes["x"].intercept.theta.zero_()
     xmin, xmax = (float(v) for v in (flow.nodes["x"].ut.xmin, flow.nodes["x"].ut.xmax))
@@ -239,7 +239,7 @@ def test_range_q_option_sets_the_domain():
     """
     df = pd.DataFrame({"x": np.linspace(-4.0, 6.0, 400)})
     flow = CausalFlowDAG({"x": ContinuousNode(I(range_q=0.0))}, seed=0)
-    flow.calibrate(df, marginal_init=False)
+    flow.calibrate(df)
     ut = flow.nodes["x"].ut
     assert (float(ut.xmin), float(ut.xmax)) == pytest.approx((-4.0, 6.0))
     d = spec_from_dict(spec_to_dict(flow.spec))

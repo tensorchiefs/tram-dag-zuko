@@ -152,10 +152,11 @@ docs/architecture.md carries the module map and the term-contract diagram.
   `(flow, epoch, opt)`, any `True` stops, `on_fit_end` runs before the VC
   re-centering) or bare `on_epoch_end` callables; `tramdag/callbacks.py`
   ships `EarlyStopping` (auto-restores best weights; optional patience),
-  `PerNodePlateau`+`per_node_adam` (they read `history["val"]`); `flow.calibrate(train_df, marginal_init=)`
-  takes the data-dependent state once (ranges, net min-max, calibrated start)
-  and is called by the first fit; `init_marginals(train_df)` re-applies the
-  calibrated start explicitly, any time. Key empirical finding (stroke storyline):
+  `PerNodePlateau`+`per_node_adam` (they read `history["val"]`); `flow.calibrate(train_df)`
+  takes the data-dependent state once (each term calibrates itself: ranges,
+  input-transform stats — never the weights) and is called by the first fit;
+  `init_marginals(train_df)` applies the calibrated start — always an
+  explicit call, nothing runs it for you. Key empirical finding (stroke storyline):
   **flexible (CI/CS) models overfit observational confounding at the MLE and
   need best-validation weights to recover the causal effect; all-`ls` models
   don't** — `callbacks.EarlyStopping` now, see docs/fitting.md.
@@ -215,8 +216,8 @@ kept at the quantiles for VACA where min-max measures worse,
 the tanh nets: `do(x2=-3)` error 0.731 → 0.098, and the 2026-09-01 relu/sigmoid
 raw-parent attempts fail too); a bias-free intercept
 output layer; Adam eps 1e-8 vs Keras 1e-7 (no effect);
-`calibrate(marginal_init=False)` in `helpers.py::fit_paper` (`validate_ls`
-keeps the default).
+no marginal init anywhere in the comparisons (`validate_ls` calls
+`init_marginals` explicitly — the framework never does).
 
 **Each config takes its architecture from *its own* reference script**, and the
 reference uses two different ones. The triangle experiments

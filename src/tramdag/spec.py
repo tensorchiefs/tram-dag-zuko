@@ -471,12 +471,19 @@ def complex_intercept(
     Raises
     ------
     ValueError
-        If no parent is given.
+        If no parent is given, or ``allow_interaction=False`` comes with
+        fewer than two parents (an interaction to disallow needs two).
     """
     if not parents:
         raise ValueError(
             "complex_intercept() needs at least one parent. The parentless "
             "baseline is simple_intercept() / SI."
+        )
+    if not allow_interaction and len(parents) < 2:
+        raise ValueError(
+            "allow_interaction=False makes a MULTI-parent intercept additive; "
+            "with one parent there is no interaction to disallow — drop the "
+            "argument."
         )
     kw = tuple(sorted(transform_kwargs.items())) or None
     return Term(
@@ -489,7 +496,7 @@ def complex_intercept(
             units=tuple(units) if units is not None else None,
             activation=activation,
             input_transform=input_transform,
-            allow_interaction=bool(allow_interaction) or len(parents) < 2,
+            allow_interaction=bool(allow_interaction),
         ),
     )
 

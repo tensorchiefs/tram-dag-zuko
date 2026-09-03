@@ -521,9 +521,14 @@ class BernsteinUT(_ScaledUT):
 
         The coefficients describe the linear map from the pre-scaled domain
         ``[-B, B]`` onto the standard-logistic quantiles
-        ``[logit(range_q), logit(1-range_q)]``. With ``range_q=0`` the
-        target falls back to ``RANGE_Q`` — ``logit(0)`` is undefined, and
-        this is an initialization only.
+        ``[logit(range_q), logit(1-range_q)]``.
+
+        Raises
+        ------
+        ValueError
+            With ``range_q=0``: the domain ends are the data min/max, whose
+            latent quantile target ``logit(0)`` is undefined — skip
+            ``init_marginals`` for a min-max-domain model.
 
         Returns
         -------
@@ -543,9 +548,14 @@ class BernsteinUT(_ScaledUT):
         diffs).
         """
         n = self._n
-        # range_q=0 puts the data min/max at -+B; logit(0) is not a target,
-        # so the start keeps the default 5%/95% latent map — an init only.
-        q = self.range_q or RANGE_Q
+        if self.range_q == 0:
+            raise ValueError(
+                "the marginal start maps the domain ends onto the latent "
+                "range_q quantiles, and logit(0) is undefined — a "
+                "range_q=0 (min-max domain) model has no marginal start; "
+                "skip init_marginals for it"
+            )
+        q = self.range_q
         a = math.log(q) - math.log(1.0 - q)  # logit(q) = -2.9444 at q=.05
         span = -2.0 * a  # logit(1-q) - logit(q)
         order = n + 1  # constrained control points: n+2

@@ -12,6 +12,29 @@ publishing (no token secret), sigstore-sign and create the GitHub release.
 setup outside the repo: the PyPI trusted-publisher registration and the
 `pypi` GitHub environment.
 
+### Changed (breaking) — no magic: calibration is per term, the start is yours
+
+- **`calibrate` never touches the weights.** The `marginal_init` parameter
+  is gone; `flow.init_marginals(train_df)` is the one way to a calibrated
+  start and nothing calls it for you — not the first `fit`, not
+  `fit_classical`. A recipe tuned with the warm start now says so in its
+  own code (`validate_ls` does). With `range_q=0` (a min-max domain) the
+  marginal start is undefined and `init_marginals` raises instead of
+  silently retargeting the 5% quantiles.
+- **Each term calibrates itself.** `calibrate` loops over the node's terms;
+  the intercept term maps its own column's `range_q` quantiles onto the
+  transform domain and every term freezes its own `input_transform`
+  statistics. The `_InputTransform` modules move from the node's
+  `input_transforms` ModuleDict onto the owning term (state-dict paths
+  change: `nodes.X.input_transforms.@I.*` → `nodes.X.intercept.*`,
+  shift keys likewise) — pre-1.0 checkpoints do not load, refit.
+- **Misconfiguration fails plainly.** `PerNodePlateau` refuses an optimizer
+  whose groups lack the `initial_lr` stamp (build it with `per_node_adam`)
+  instead of adopting a possibly-decayed current rate;
+  `CI("a", allow_interaction=False)` raises — with one parent there is no
+  interaction to disallow (it was silently coerced to a joint net);
+  a `VC` without `penalty=` now says "required" instead of "must be >= 0".
+
 ### Removed — 1.0 is a clean cut, no pre-1.0 compatibility
 
 - The 0.3-spec detector in `spec_from_dict` (the "predates 0.4" error):

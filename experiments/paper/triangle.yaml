@@ -26,7 +26,7 @@
 #     train 5%/95% quantiles as in the R script (range_q default 0.05).
 # Every linear layer starts from Keras' random_normal, sd 0.05, on weights
 # and biases (`init: normal`, the LinearMasked layers). A simple intercept's
-# theta is not a linear layer: it starts at zero here (marginal_init=False),
+# theta is not a linear layer: it starts at zero here (no marginal init),
 # as `bernp$beta` does in R.
 # Known deviations, documented in CLAUDE.md: a [-5, 5] instead of a [0, 1]
 # domain (a reparametrization), zuko's tied end control points instead of the
