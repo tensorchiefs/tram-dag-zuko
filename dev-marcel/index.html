@@ -1637,11 +1637,11 @@ always purely additive on the latent scale, and interactions exist only
 <code>[LS("A"), CS("B")]</code> ≡ <code>LS("A") + CS("B")</code>.</p>
 <p>Three knobs on the terms:</p>
 <ul>
-<li><strong><code>transform=</code> on <code>I</code></strong> picks the basis of <code>h_ϑ</code> for a continuous node —
+<li><strong><code>transform=</code> on <code>I</code></strong> picks the class of <code>h_ϑ</code> for a continuous node —
   <code>"bernstein"</code> (default, 20 coefficients, tails extrapolate with the boundary
   slope), <code>"spline"</code> (monotone RQ spline, 23 params at <code>bins=8</code>, fixed tail
   slope) or <code>"affine"</code> (2 params: the latent is exactly logistic). Ordinal
-  nodes have no basis: their intercept is the cutpoint vector,
+  nodes have no transform to pick: their intercept is the cutpoint vector,
   <code>P(x ≤ k) = σ(ϑ_k − shift)</code>.</li>
 <li><strong><code>input_transform=</code> on <code>CI</code>/<code>CS</code>/<code>VC</code></strong> — <code>"minmax"</code>, <code>"standardize"</code>, or
   a callable <code>fn(x, train)</code> — transforms that term's continuous network

@@ -1598,7 +1598,7 @@ are the same object, so <code>LS is linear_shift</code>.</p>
 </tr>
 <tr>
 <td><a class="autorefs autorefs-internal" title="simple_intercept" href="../api/spec/#tramdag.spec.simple_intercept"><code>simple_intercept()</code></a> / <a class="autorefs autorefs-internal" title="simple_intercept" href="../api/spec/#tramdag.spec.simple_intercept"><code>SI</code></a></td>
-<td>The parentless intercept — the paper's SI. Free transform parameters, the same for every row. Carries the basis choice (<code>transform=</code>, default <code>"bernstein"</code>); extra keyword arguments pass straight to the transform class.</td>
+<td>The parentless intercept — the paper's SI. Free transform parameters, the same for every row. Carries the transform choice (<code>transform=</code>, default <code>"bernstein"</code>); extra keyword arguments pass straight to the transform class.</td>
 </tr>
 <tr>
 <td><a class="autorefs autorefs-internal" title="complex_intercept" href="../api/spec/#tramdag.spec.complex_intercept"><code>complex_intercept()</code></a> / <a class="autorefs autorefs-internal" title="complex_intercept" href="../api/spec/#tramdag.spec.complex_intercept"><code>CI</code></a></td>
@@ -1641,8 +1641,8 @@ are the same object, so <code>LS is linear_shift</code>.</p>
 <td>Checkpoint (de)serialization. A term serializes as <code>{effect, parents, options}</code> and nothing else, since <code>options</code> is already canonical. No compatibility shims: <code>spec_from_dict</code> rejects a term without <code>options</code>, the node constructors normalize the formula, and <code>validate_and_sort</code> checks the DAG.</td>
 </tr>
 <tr>
-<td>(<code>_normalize_terms</code>, <code>_as_term</code>, <code>_intercept_basis</code>, <code>_options</code>)</td>
-<td>Formula flattening and per-entry validation (a <code>+</code> sum nested in a list is rejected), the one-parented-<code>I</code> rule plus basis hoisting in one pass, canonical option storage against each effect's <code>option_defaults</code> (a wrong-effect option errors).</td>
+<td>(<code>_normalize_terms</code>, <code>_as_term</code>, <code>_intercept_transform</code>, <code>_options</code>)</td>
+<td>Formula flattening and per-entry validation (a <code>+</code> sum nested in a list is rejected), the one-parented-<code>I</code> rule plus transform hoisting in one pass, canonical option storage against each effect's <code>option_defaults</code> (a wrong-effect option errors).</td>
 </tr>
 <tr>
 <td>(<code>_check_term</code>, <code>_check_node</code>, <code>_check_input_transform</code>, <code>_kahn_sort</code>)</td>
@@ -1665,7 +1665,7 @@ are the same object, so <code>LS is linear_shift</code>.</p>
 </tr>
 <tr>
 <td><a class="autorefs autorefs-internal" title="BernsteinUT" href="../api/transforms/#tramdag.transforms.BernsteinUT"><code>BernsteinUT</code></a></td>
-<td>Bernstein-polynomial transform (default basis, <code>n_coeffs=20</code>). Linear tail extrapolation follows the boundary derivative. <code>marginal_init_theta()</code> gives the calibrated start <code>init_marginals</code> applies.</td>
+<td>Bernstein-polynomial transform (the default, <code>n_coeffs=20</code>). Linear tail extrapolation follows the boundary derivative. <code>marginal_init_theta()</code> gives the calibrated start <code>init_marginals</code> applies.</td>
 </tr>
 <tr>
 <td><a class="autorefs autorefs-internal" title="SplineUT" href="../api/transforms/#tramdag.transforms.SplineUT"><code>SplineUT</code></a></td>
@@ -1677,7 +1677,7 @@ are the same object, so <code>LS is linear_shift</code>.</p>
 </tr>
 <tr>
 <td><a class="autorefs autorefs-internal" title="make_univariate_transform" href="../api/transforms/#tramdag.transforms.make_univariate_transform"><code>make_univariate_transform()</code></a></td>
-<td>Basis registry: name → transform instance.</td>
+<td>Transform registry: name → transform instance.</td>
 </tr>
 <tr>
 <td><a class="autorefs autorefs-internal" title="ordinal_cutpoints" href="../api/transforms/#tramdag.transforms.ordinal_cutpoints"><code>ordinal_cutpoints()</code></a></td>
@@ -1845,7 +1845,7 @@ config in <code>experiments/paper/</code> states <code>units=</code> and <code>a
 </tr>
 <tr>
 <td>(<code>_is_classical</code>)</td>
-<td>Guard for <code>fit_classical</code>: every term's <code>term_is_classical</code> — <code>LS</code>, or a parentless <code>I()</code> basis carrier.</td>
+<td>Guard for <code>fit_classical</code>: every term's <code>term_is_classical</code> — <code>LS</code>, or a parentless <code>I()</code> transform carrier.</td>
 </tr>
 </tbody>
 </table>
@@ -2090,7 +2090,7 @@ default you can read at the call site. Nothing numeric is buried.</p>
 <td><code>"relu"</code> (the reference default classes); <code>"sigmoid"</code> and <code>"tanh"</code> are the paper's</td>
 </tr>
 <tr>
-<td>transform basis</td>
+<td>transform class</td>
 <td><code>I(transform=, **kwargs)</code> (extra kwargs go to the transform class)</td>
 <td><code>"bernstein"</code>, <code>n_coeffs=20</code> unconstrained coefficients (zuko ties two more control points on, so order 21); spline <code>bins=8</code> = zuko's NSF default (the domain is fixed at [-5, 5], <code>transforms.BOUND</code>)</td>
 </tr>

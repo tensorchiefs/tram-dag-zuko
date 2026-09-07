@@ -139,7 +139,7 @@
 # | `[I("X1", "X2")]` | $h_{\boldsymbol{\vartheta}(x_1,x_2)}(x_3)$ | **one joint** `ComplexIntercept` over both parents (they interact) |
 #
 # A list and a `+` sum are interchangeable: `[LS("X1"), CS("X2")]` ==
-# `LS("X1") + CS("X2")`. You select the basis of the monotone transform on the
+# `LS("X1") + CS("X2")`. You select the class of the monotone transform on the
 # intercept term: `I("X1", transform="spline")`.
 #
 # For an **ordinal** target the intercept is not a Bernstein curve but the vector

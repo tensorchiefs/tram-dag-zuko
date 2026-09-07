@@ -1442,7 +1442,7 @@ data sits beyond the 5%/95% pre-scaling range; CLAUDE.md, <code>spec.py</code>, 
 notebook section 6). Upstream: accept boundary derivatives (shape <code>(*, K+1)</code>)
 or an opt-in <code>tails="linear"</code>; identity tails are deliberate in the NSF
 design, so the framing must be back-compatible. Would delete the caveats and
-make <code>spline</code> a first-class basis choice.</p>
+make <code>spline</code> a first-class transform choice.</p>
 <h2 id="3-public-inverse-of-_constrain_theta">3. Public inverse of <code>_constrain_theta</code><a class="headerlink" href="#3-public-inverse-of-_constrain_theta" title="Permanent link">&para;</a></h2>
 <p><code>BernsteinUT.marginal_init_theta</code> closed-form-inverts zuko's <em>private</em>
 <code>_constrain_theta</code> (cumsum-of-softplus), hard-coding its internal

@@ -1918,7 +1918,7 @@ object, so use whichever reads better:</p>
   arguments: without parents it is the paper's simple intercept :func:<code>SI</code>
   (always present, optional to write — the bare names <code>I</code> and <code>SI</code> both
   work in a term list), with parents the complex intercept :func:<code>CI</code>.
-  <code>transform="spline"</code> picks the basis of the monotone transform for a
+  <code>transform="spline"</code> picks the class of the monotone transform for a
   continuous node; extra keyword arguments go straight to the transform
   class (<code>SI(transform="spline", bins=16)</code>).</li>
 <li>:func:<code>LS</code> — <em>linear shift</em>: <code>beta * x</code> (one interpretable weight), one parent.</li>
@@ -2051,7 +2051,7 @@ sorted by key, defaults omitted. Attribute access serves this
 effect's options with their defaults; a key another effect takes
 raises <code>AttributeError</code> instead of answering with a foreign
 default. Keys per effect: <code>penalty</code> and <code>center</code> (VC, see
-:func:<code>VC</code>); <code>transform</code> and <code>transform_kwargs</code> (I, the basis
+:func:<code>VC</code>); <code>transform</code> and <code>transform_kwargs</code> (I, the class
 of the monotone transform, kwargs stored as sorted pairs);
 <code>units</code> and <code>activation</code> (the term's network); <code>fn</code> (Fn, the
 custom shift callable); <code>input_transform</code> (I/CS/VC/Fn: the
@@ -2206,7 +2206,7 @@ through attribute access again would recurse.</p>
               <div class="doc-md-description">
                 <p>The additive formula for <code>h</code>: a list of terms, a <code>+</code> sum, a
 single term, or the bare <code>I</code>. <code>None</code> (default) is a source node. The
-basis of the monotone transform is chosen on the intercept term,
+class of the monotone transform is chosen on the intercept term,
 <code>I(..., transform="spline")</code>; the default is <code>"bernstein"</code>.</p>
               </div>
             </td>
@@ -2251,7 +2251,7 @@ basis of the monotone transform is chosen on the intercept term,
 
     <div class="doc doc-contents ">
 
-        <p>Show the terms and the basis.</p>
+        <p>Show the terms and the transform.</p>
 
 
     </div>
@@ -2271,7 +2271,7 @@ basis of the monotone transform is chosen on the intercept term,
 
     <div class="doc doc-contents ">
 
-        <p>Compare the terms; the basis is derived from them.</p>
+        <p>Compare the terms; the transform is derived from them.</p>
 
 
     </div>
@@ -2532,7 +2532,7 @@ parameters are a free vector, the same for every observation.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Basis of a continuous node's monotone transform: <code>"bernstein"</code>
+                <p>Class of a continuous node's monotone transform: <code>"bernstein"</code>
 (default), <code>"spline"</code> or <code>"affine"</code>. Bernstein is the default
 because zuko's spline extrapolates outside <code>[-B, B]</code> with a <em>fixed</em>
 slope, independent of the fitted parameters, so the ~10% of data
@@ -2703,7 +2703,7 @@ explains why a paper replication sets this explicitly.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Basis of the node's monotone transform, as for
+                <p>Class of the node's monotone transform, as for
 :func:<code>simple_intercept</code>.</p>
               </div>
             </td>
