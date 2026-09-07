@@ -382,11 +382,9 @@ class CausalFlowDAG(_FitMixin, _ReadoutsMixin, nn.Module):
         if not bool(self.calibrated):
             self.calibrate(train_df)
         for name in self.order:
-            node = self.nodes[name]
-            if node.intercept.has_marginal_start:
-                if node.kind == "ordinal":
-                    self._check_levels(name, train_df)
-                self._marginal_start(name, train_df)
+            if self.nodes[name].kind == "ordinal":
+                self._check_levels(name, train_df)
+            self._marginal_start(name, train_df)
         return self
 
     def _marginal_start(self, name: str, train_df: pd.DataFrame) -> None:
@@ -447,14 +445,10 @@ class CausalFlowDAG(_FitMixin, _ReadoutsMixin, nn.Module):
         A VC term re-splits ``beta0``/``b_theta`` so the head sums to zero
         over the train rows; the modelled function does not change.
         """
-        feats: dict[str, Tensor] | None = None
+        feats = self._features(values)
         for name in self.order:
             nd = self.nodes[name]
             for m in nd.shifts.values():
-                if not m.finalizes:
-                    continue
-                if feats is None:
-                    feats = self._features(values)
                 m.finalize(nd, feats)
 
     def _is_classical(self) -> bool:

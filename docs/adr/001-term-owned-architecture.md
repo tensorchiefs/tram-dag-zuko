@@ -24,16 +24,16 @@ drafted against a seven-subsystem survey and judged from three lenses
    module; a first draft used free functions behind one-line delegates and
    the delegate layer was cut as duplication.
 2. The **registry** (`terms.py`): one definition per effect. Built-in shift terms
-   subclass their conditioners (`LSTerm(ShiftTerm, LinearShift)` …), so
+   subclass their conditioners (`LinearShiftTerm(ShiftTerm, LinearShift)` …), so
    checkpoints and RNG draws stay bit-stable; each term owns validation
    (`check_arity`/`edge_parents`), construction (`build`), evaluation
    (`shift_value`/`theta_value`), `post_init`, `regularizer`, post-fit
    `finalize`, `score_columns`, the side-input contract
    (`side_keys`/`check_side`/`live_side`/`extra_columns`), adjacency `cells`,
    `term_is_classical` and its `option_defaults`.
-3. The intercept slot is a term too (`SITerm`/`CITerm`/`AdditiveCITerm`);
+3. The intercept slot is a term too (`SimpleInterceptTerm`/`ComplexInterceptTerm`/`AdditiveInterceptTerm`);
    the theta read is inline in `theta_shift` and the marginal init is a hook
-   (`has_marginal_start`/`marginal_start`, `transform.marginal_init_theta`).
+   (`marginal_start`, `transform.marginal_init_theta`).
 4. **Node kinds stay an if/else in ONE place**: the four adjacent functions
    `kind_log_prob`/`kind_sample`/`kind_abduct`/`kind_marginal_theta` in
    nodes.py. The judges cut the drafted per-kind Head protocol as an n=2

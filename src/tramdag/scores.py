@@ -97,7 +97,7 @@ def node_scores(flow, df: pd.DataFrame, node: str) -> pd.DataFrame:
         If the node has no ``LS`` or ``VC`` term.
     """
     nd = flow._node(node)
-    scored = [m for m in nd.shifts.values() if getattr(m, "scored", False)]
+    scored = [m for m in nd.shifts.values() if m.scored]
     if not scored:
         raise ValueError(
             f"node {node!r} has no LS or VC terms. Shift scores need "

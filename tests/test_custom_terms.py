@@ -52,8 +52,6 @@ class _ScaledLS(ShiftTerm, nn.Module):
     def build(cls, term, spec):
         m = cls(scale=term.scale)
         m.key = term.parents[0]
-        m.parents = tuple(term.parents)
-        m.net_parents = ()
         return m
 
     def shift_value(self, node, feats):
@@ -76,16 +74,10 @@ class _PenShift(ShiftTerm, nn.Module):
     def build(cls, term, spec):
         m = cls()
         m.key = term.parents[0]
-        m.parents = tuple(term.parents)
-        m.net_parents = ()
         return m
 
     def shift_value(self, node, feats):
         return self.w * feats[self.parents[0]][:, 0]
-
-    @property
-    def has_regularizer(self):
-        return True
 
     def regularizer(self):
         self.calls += 1

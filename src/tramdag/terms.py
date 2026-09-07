@@ -38,7 +38,6 @@ from .spec import (
     I,
     OrdinalNode,
     Term,
-    _subclasses,
     feat_width,
 )
 
@@ -53,22 +52,23 @@ if TYPE_CHECKING:
 def module_for(term: Term) -> type[TermDef]:
     """Give the module class that builds ``term``.
 
-    The class is the :class:`TermDef` subclass declaring ``data = type(term)``
-    itself (not by inheritance).
+    A :class:`TermDef` subclass that declares ``data = <Term subclass>``
+    stamps itself onto that class as ``module`` when it is defined
+    (:meth:`TermDef.__init_subclass__`), so subclassing is the registration.
 
     Raises
     ------
     ValueError
         If no module class declares the term's class.
     """
-    for cls in _subclasses(TermDef):
-        if cls.__dict__.get("data") is type(term):
-            return cls
-    raise ValueError(
-        f"no module builds a {type(term).__name__} term. Subclass "
-        f"tramdag.terms.ShiftTerm with `data = {type(term).__name__}` and "
-        "implement build and shift_value."
-    )
+    module = getattr(type(term), "module", None)
+    if module is None:
+        raise ValueError(
+            f"no module builds a {type(term).__name__} term. Subclass "
+            f"tramdag.terms.ShiftTerm with `data = {type(term).__name__}` and "
+            "implement build and shift_value."
+        )
+    return module
 
 
 # %% private classes -------------------------------------------------------------------
@@ -141,6 +141,12 @@ class TermDef:
 
     data: ClassVar[type[Term]]
 
+    def __init_subclass__(cls, **kwargs):
+        """Stamp the module onto the term class it declares with ``data =``."""
+        super().__init_subclass__(**kwargs)
+        if "data" in cls.__dict__:
+            cls.data.module = cls
+
     @property
     def input_transform(self):
         """The term's frozen network-input transform, or ``None``.
@@ -177,21 +183,19 @@ class TermDef:
 class ShiftTerm(TermDef):
     """A shift term's behavior hooks, mixed into its conditioner.
 
-    A built term instance carries ``key`` (its ModuleDict key), ``parents``
-    (the term's written parents) and ``net_parents`` (the parents whose
-    columns feed its *network* — empty for ``LS``, the modifiers for
-    ``VC``); subclasses may add term-specific attributes (``VCTerm`` keeps
-    ``mods``/``on_is_ord``/``center_col``). ``build`` constructs the module
-    exactly as the node used to, so state-dict paths and the seeded RNG
-    stream stay bit-stable.
+    A built term instance carries ``key`` (its ModuleDict key, set by
+    ``build``) and ``parents`` (the term's written parents, set by the
+    node); subclasses may add term-specific attributes
+    (``VaryingCoefficientTerm`` keeps ``mods``/``on_is_ord``/``center_col``).
+    ``build`` constructs the module exactly as the node used to, so
+    state-dict paths and the seeded RNG stream stay bit-stable.
     """
 
     scored: ClassVar[bool] = False  # True when score_columns gives coefficients
-    finalizes = False  # set per instance when a post-fit step is needed
+    order: ClassVar[int] = 0  # shifts sum in this order (VC last: the pinned order)
 
     key: str
     parents: tuple
-    net_parents: tuple = ()  # the parents feeding the term's NETWORK
 
     @classmethod
     def build(cls, term: Term, spec: dict[str, NodeSpec]) -> ShiftTerm:
@@ -210,14 +214,9 @@ class ShiftTerm(TermDef):
     def post_init(self) -> None:
         """Re-apply construction-time invariants after a global weight init."""
 
-    @property
-    def has_regularizer(self) -> bool:
-        """``True`` when :meth:`regularizer` joins the training loss."""
-        return False
-
-    def regularizer(self) -> Tensor:
-        """Give the term's penalty on the total-likelihood scale."""
-        raise NotImplementedError
+    def regularizer(self) -> Tensor | None:
+        """Give the term's penalty on the total-likelihood scale, or ``None``."""
+        return None
 
     def finalize(self, node: _Node, feats: dict) -> None:
         """Run the term's post-fit step (after the after-fit callbacks)."""
@@ -260,7 +259,6 @@ class InterceptTerm(TermDef):
     """
 
     data = I
-    has_marginal_start: ClassVar[bool] = False
 
     groups: list[tuple[str, ...]]
     ci_parents: list[str]
@@ -269,7 +267,7 @@ class InterceptTerm(TermDef):
     def build(cls, term: Term, spec: dict[str, NodeSpec], n_params: int):
         """Construct the node's intercept module from its intercept Term."""
         if not term.parents:
-            m = SITerm(n_params)
+            m = SimpleInterceptTerm(n_params)
             m.groups, m.ci_parents = [], []
             return m
         groups = (
@@ -278,14 +276,16 @@ class InterceptTerm(TermDef):
             else [(p,) for p in term.parents]
         )
         if len(groups) == 1:
-            m = CITerm(
+            m = ComplexInterceptTerm(
                 feat_width(spec, groups[0]),
                 n_params,
                 units=term.units,
                 activation=term.activation,
             )
         else:  # additive intercept: one net per parent, coefficients summed
-            m = AdditiveCITerm(groups, n_params, spec, term.units, term.activation)
+            m = AdditiveInterceptTerm(
+                groups, n_params, spec, term.units, term.activation
+            )
         m.groups = groups
         m.ci_parents = [p for grp in groups for p in grp]
         _attach_input_transform(m, term, tuple(term.parents), spec)
@@ -317,14 +317,11 @@ class InterceptTerm(TermDef):
         raise NotImplementedError
 
     def marginal_start(self, theta: Tensor) -> None:
-        """Set the calibrated marginal start (``has_marginal_start`` only)."""
-        raise NotImplementedError
+        """Set the calibrated marginal start; only a free intercept has one."""
 
 
-class SITerm(InterceptTerm, SimpleIntercept):
+class SimpleInterceptTerm(InterceptTerm, SimpleIntercept):
     """The free simple intercept: one theta vector, no parents."""
-
-    has_marginal_start = True
 
     def theta_value(self, node: _Node, feats: dict, n: int) -> Tensor:
         """Broadcast the free theta over the batch."""
@@ -336,7 +333,7 @@ class SITerm(InterceptTerm, SimpleIntercept):
             self.theta.copy_(theta)
 
 
-class CITerm(InterceptTerm, ComplexIntercept):
+class ComplexInterceptTerm(InterceptTerm, ComplexIntercept):
     """A single (possibly joint multi-parent) complex intercept net."""
 
     def theta_value(self, node: _Node, feats: dict, n: int) -> Tensor:
@@ -344,7 +341,7 @@ class CITerm(InterceptTerm, ComplexIntercept):
         return self(node.net_input(feats, self.ci_parents, "@I"))
 
 
-class AdditiveCITerm(InterceptTerm, nn.Module):
+class AdditiveInterceptTerm(InterceptTerm, nn.Module):
     """``allow_interaction=False``: one net per parent, outputs summed.
 
     Each parent reshapes the transform independently, in unconstrained
@@ -368,18 +365,17 @@ class AdditiveCITerm(InterceptTerm, nn.Module):
         )
 
 
-class LSTerm(ShiftTerm, LinearShift):
+class LinearShiftTerm(ShiftTerm, LinearShift):
     """``LS`` — one raw-unit coefficient per (single) parent."""
 
     data = LS
     scored = True
 
     @classmethod
-    def build(cls, term: Term, spec: dict[str, NodeSpec]) -> LSTerm:
+    def build(cls, term: Term, spec: dict[str, NodeSpec]) -> LinearShiftTerm:
         """One weight per feature of the single parent; keyed by its name."""
         m = cls(feat_width(spec, term.parents))
         m.key = term.parents[0]
-        m.parents = tuple(term.parents)
         return m
 
     def shift_value(self, node: _Node, feats: dict) -> Tensor:
@@ -398,19 +394,17 @@ class LSTerm(ShiftTerm, LinearShift):
         return {self.key: psi[:, 0]}
 
 
-class CSTerm(ShiftTerm, ComplexShift):
+class ComplexShiftTerm(ShiftTerm, ComplexShift):
     """``CS`` — a network shift over its parents."""
 
     data = CS
 
     @classmethod
-    def build(cls, term: Term, spec: dict[str, NodeSpec]) -> CSTerm:
+    def build(cls, term: Term, spec: dict[str, NodeSpec]) -> ComplexShiftTerm:
         """One net over the concatenated parents; keyed 'a' or 'a+b'."""
         ps = tuple(term.parents)
         m = cls(feat_width(spec, ps), units=term.units, activation=term.activation)
         m.key = "+".join(ps)  # the parent itself for a single-parent term
-        m.parents = ps
-        m.net_parents = ps
         _attach_input_transform(m, term, ps, spec)
         return m
 
@@ -419,14 +413,15 @@ class CSTerm(ShiftTerm, ComplexShift):
         return self(node.net_input(feats, self.parents, self.key))
 
 
-class VCTerm(ShiftTerm, VaryingCoef):
+class VaryingCoefficientTerm(ShiftTerm, VaryingCoef):
     """``VC`` — ``beta(modifiers) * x_t``; only the treatment owns an edge."""
 
     data = VC
     scored = True
+    order = 1
 
     @classmethod
-    def build(cls, term: Term, spec: dict[str, NodeSpec]) -> VCTerm:
+    def build(cls, term: Term, spec: dict[str, NodeSpec]) -> VaryingCoefficientTerm:
         """Build the effect head over the modifiers; keyed by the treatment name."""
         on, mods = term.parents[0], tuple(term.parents[1:])
         m = cls(
@@ -436,12 +431,9 @@ class VCTerm(ShiftTerm, VaryingCoef):
             activation=term.activation,
         )
         m.key = on
-        m.parents = tuple(term.parents)
-        m.net_parents = mods
         m.mods = mods
         m.on_is_ord = isinstance(spec[on], OrdinalNode)
         m.center_col = term.center or None
-        m.finalizes = bool(mods)
         _attach_input_transform(m, term, mods, spec)
         return m
 
@@ -475,18 +467,19 @@ class VCTerm(ShiftTerm, VaryingCoef):
         if self.net is not None:
             nn.init.zeros_(self.net[-1].weight)
 
-    @property
-    def has_regularizer(self) -> bool:
-        """Penalized whenever the term has a head to shrink."""
-        return self.net is not None and self.penalty > 0
+    def regularizer(self) -> Tensor | None:
+        """``penalty * ||b_theta weights||^2`` on the total-likelihood scale.
 
-    def regularizer(self) -> Tensor:
-        """``penalty * ||b_theta weights||^2`` on the total-likelihood scale."""
+        ``None`` without a head to shrink (no modifiers, or penalty 0).
+        """
+        if self.net is None or self.penalty == 0:
+            return None
         return self.penalty * self.l2()
 
     def finalize(self, node: _Node, feats: dict) -> None:
         """Re-split ``beta0``/``b_theta``: the head sums to zero over train."""
-        self.recenter(node.net_input(feats, self.mods, self.key))
+        if self.mods:
+            self.recenter(node.net_input(feats, self.mods, self.key))
 
     def score_columns(self, node: _Node, flow, feats: dict, dlds) -> dict:
         """One column, keyed by the treatment: the ``beta0`` score.
@@ -527,7 +520,7 @@ class VCTerm(ShiftTerm, VaryingCoef):
         return list(flow.nodes[self.key].parents) if self.center_col else []
 
 
-class FnTerm(ShiftTerm, nn.Module):
+class FnShiftTerm(ShiftTerm, nn.Module):
     """``Fn`` — a user-supplied shift function over the parent features.
 
     A plain function contributes a fixed (non-trained) offset; an
@@ -542,13 +535,11 @@ class FnTerm(ShiftTerm, nn.Module):
         self.fn = fn  # an nn.Module registers as a submodule here
 
     @classmethod
-    def build(cls, term: Term, spec: dict[str, NodeSpec]) -> FnTerm:
+    def build(cls, term: Term, spec: dict[str, NodeSpec]) -> FnShiftTerm:
         """Wrap the callable; keyed like a CS ('a' or 'a+b')."""
         ps = tuple(term.parents)
         m = cls(term.fn)
         m.key = "+".join(ps)  # the parent itself for a single-parent term
-        m.parents = ps
-        m.net_parents = ps
         _attach_input_transform(m, term, ps, spec)
         return m
 

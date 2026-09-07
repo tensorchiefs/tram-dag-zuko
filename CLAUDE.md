@@ -53,8 +53,9 @@ See `experiments/README.md`.
 Since the 1.0-RC refactor (branch rc/1.0-architecture, docs/adr/001, and
 the 2026-09 term-classes revision): an effect is TWO classes. Its spec
 class is a `tramdag.Term` subclass in `spec.py` — frozen data whose
-annotated attributes are the options (`CS`, `LS`, `VC`, `Fn`, `I`; the
-class name is the serialized effect) and which owns the spec-level rules
+annotated attributes are the options (`Intercept`, `LinearShift`,
+`ComplexShift`, `VaryingCoefficient`, `FnShift`, aliased `I`/`LS`/`CS`/
+`VC`/`Fn`; `effect` is the short name, the serialized form) and which owns the spec-level rules
 (`__post_init__` arity/option checks, `edge_parents`, `cells`,
 `classical`). Its module class in `terms.py` declares `data = <that
 class>` and owns the runtime (build, shift_value/theta_value, post_init,

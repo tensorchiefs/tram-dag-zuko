@@ -8,11 +8,11 @@ positional argument, written as a list or as a ``+`` sum::
     "X3": ContinuousNode(I("X1") + CS("X2"))        # the same, formula style
 
 Each effect is a :class:`Term` subclass, called with the parent(s) it
-depends on. Each has a short name and a pythonic alias — ``I``/``intercept``
-(with ``SI``/``simple_intercept`` and ``CI``/``complex_intercept``),
-``LS``/``linear_shift``, ``CS``/``complex_shift``, ``VC``/``varying_coefficient``
-and ``Fn``/``fn_shift`` — and the two spellings are the same object, so use
-whichever reads better:
+depends on: :class:`Intercept`, :class:`LinearShift`, :class:`ComplexShift`,
+:class:`VaryingCoefficient` and :class:`FnShift`. Their short names ``I``,
+``LS``, ``CS``, ``VC``, ``Fn`` (and ``SI``/``CI`` for the two intercept
+arities) are the notation of the docs and the paper and the same objects, so
+use whichever reads better:
 
 - :func:`I`  — *intercept* term: the parent(s) reshape the monotone transform
   (its Bernstein coefficients / ordinal cutpoints). ``I`` dispatches on its
@@ -144,8 +144,8 @@ def _as_term(value) -> Term:
     TypeError
         If the entry is neither a term nor the bare ``I``.
     """
-    if value is I or value is SI:
-        return I()
+    if value is Intercept or value is simple_intercept:
+        return Intercept()
     if isinstance(value, Term):
         return value
     raise TypeError(
@@ -178,12 +178,12 @@ def _normalize_terms(value):
         The canonical term list; a source node gives ``[I()]``.
     """
     if value is None:
-        return [I()]  # a source node: the free intercept alone
+        return [Intercept()]  # a source node: the free intercept alone
     written = value if isinstance(value, (list, tuple)) else [value]
     items = [_as_term(e) for e in written]
-    intercept_at = [i for i, t in enumerate(items) if isinstance(t, I)]
+    intercept_at = [i for i, t in enumerate(items) if isinstance(t, Intercept)]
     if len(intercept_at) > 1:
-        parented = [t for t in items if isinstance(t, I) and t.parents]
+        parented = [t for t in items if isinstance(t, Intercept) and t.parents]
         if len(parented) > 1:
             raise ValueError(
                 "a formula takes exactly one intercept term. For an additive "
@@ -196,7 +196,7 @@ def _normalize_terms(value):
             "contains the baseline — drop the extra I/SI."
         )
     if not intercept_at:
-        return [I(), *items]  # canonical form: intercept first
+        return [Intercept(), *items]  # canonical form: intercept first
     if intercept_at[0] != 0:
         raise ValueError(
             "the intercept term comes first: write "
@@ -205,50 +205,8 @@ def _normalize_terms(value):
     return items
 
 
-def _configured_transform(terms) -> I | None:
-    """Give the intercept term if it configures the transform, else ``None``.
-
-    Normalization guarantees exactly one intercept, at ``terms[0]``, so the
-    transform has exactly one possible carrier.
-    """
-    intercept_term = terms[0] if terms else None
-    if intercept_term is not None and (
-        intercept_term.transform or intercept_term.transform_kwargs
-    ):
-        return intercept_term
-    return None
-
-
-def _intercept_transform(terms) -> tuple[str, dict]:
-    """Give a continuous node's effective ``(transform, transform_kwargs)``.
-
-    The arguments go straight to the transform class; if they are wrong,
-    that class says so — this layer does not second-guess it.
-    """
-    intercept_term = _configured_transform(terms)
-    if intercept_term is None:
-        return DEFAULT_TRANSFORM, {}
-    name = intercept_term.transform or DEFAULT_TRANSFORM
-    return name, dict(intercept_term.transform_kwargs or ())
-
-
-def _reject_transform(terms) -> None:
-    """Refuse a transform on an ordinal node, whose intercept is the cutpoint vector.
-
-    Raises
-    ------
-    ValueError
-        If the intercept term configures one.
-    """
-    if _configured_transform(terms) is not None:
-        raise ValueError(
-            "I(transform=...) is for continuous nodes. An ordinal node's "
-            "intercept is the cutpoint vector, it has no transform to choose."
-        )
-
-
-def _check_term(name: str, term: Term, spec: dict[str, NodeSpec]) -> tuple[str, ...]:
-    """Validate one term against the spec and give its edge-owning parents.
+def _check_node(name: str, node: NodeSpec, spec: dict[str, NodeSpec]) -> None:
+    """Validate one node against the spec: parents exist, each owns one edge.
 
     A term validates its own shape when it is built (arity, option
     values); what needs the spec — parents exist, the ``VC`` treatment and
@@ -257,30 +215,15 @@ def _check_term(name: str, term: Term, spec: dict[str, NodeSpec]) -> tuple[str, 
     Raises
     ------
     ValueError
-        If a parent is unknown or the term's spec-level rules fail.
-    TypeError
-        If the entry is not a :class:`Term`.
-    """
-    if not isinstance(term, Term):
-        raise TypeError(f"Node '{name}': {term!r} is not a Term.")
-    for p in term.parents:
-        if p not in spec:
-            raise ValueError(f"Node '{name}': unknown parent '{p}'.")
-    return term.edge_parents(name, spec)
-
-
-def _check_node(name: str, node: NodeSpec, spec: dict[str, NodeSpec]) -> None:
-    """Validate one node: its terms, edge ownership, and ordinal levels.
-
-    Raises
-    ------
-    ValueError
-        If a term is malformed, a parent enters through more than one
-        edge-owning term, or an ordinal node has fewer than 2 levels.
+        If a parent is unknown, a term's spec-level rules fail, or a parent
+        enters through more than one edge-owning term.
     """
     seen: set[str] = set()
     for term in node.terms:
-        for p in _check_term(name, term, spec):
+        for p in term.parents:
+            if p not in spec:
+                raise ValueError(f"Node '{name}': unknown parent '{p}'.")
+        for p in term.edge_parents(name, spec):
             if p in seen:
                 raise ValueError(
                     f"Node '{name}': parent '{p}' appears in more than one "
@@ -288,8 +231,6 @@ def _check_node(name: str, node: NodeSpec, spec: dict[str, NodeSpec]) -> None:
                     "edge-owning term. Only VC modifiers may repeat."
                 )
             seen.add(p)
-    if isinstance(node, OrdinalNode) and node.levels < 2:
-        raise ValueError(f"Node '{name}': ordinal levels must be >= 2.")
 
 
 def _kahn_sort(spec: dict[str, NodeSpec]) -> list[str]:
@@ -325,23 +266,23 @@ def feat_width(spec: dict[str, NodeSpec], parents) -> int:
     )
 
 
-def SI(**options) -> I:
+def simple_intercept(**options) -> Intercept:
     """Build the simple-intercept baseline, the paper's SI: ``I()`` without parents.
 
     Parameters
     ----------
     **options
-        As for :class:`I`: ``transform`` and its keyword arguments.
+        As for :class:`Intercept`: ``transform`` and its keyword arguments.
 
     Returns
     -------
-    I
+    Intercept
         The parentless intercept term.
     """
-    return I(**options)
+    return Intercept(**options)
 
 
-def CI(*parents: str, **options) -> I:
+def complex_intercept(*parents: str, **options) -> Intercept:
     """Build the complex intercept, the paper's CI: ``I(*parents)`` with parents.
 
     Parameters
@@ -349,11 +290,11 @@ def CI(*parents: str, **options) -> I:
     *parents : str
         Parent names, at least one.
     **options
-        As for :class:`I`.
+        As for :class:`Intercept`.
 
     Returns
     -------
-    I
+    Intercept
         The parent-conditioned intercept term.
 
     Raises
@@ -366,7 +307,7 @@ def CI(*parents: str, **options) -> I:
             "complex_intercept() needs at least one parent. The parentless "
             "baseline is simple_intercept() / SI."
         )
-    return I(*parents, **options)
+    return Intercept(*parents, **options)
 
 
 def node_parents(node: NodeSpec) -> list[str]:
@@ -413,8 +354,8 @@ def validate_and_sort(spec: dict[str, NodeSpec]) -> list[str]:
     ------
     ValueError
         If a parent is unknown, a parent enters through more than one
-        edge-owning term, an ordinal node has fewer than 2 levels, a VC
-        treatment is unsupported, or the graph has a cycle.
+        edge-owning term, a VC treatment is unsupported, or the graph has a
+        cycle.
     """
     for name, node in spec.items():
         _check_node(name, node, spec)
@@ -537,10 +478,24 @@ class Term:
     cell_tag: ClassVar[str | None] = None  # to_matrix tag; None -> the effect
 
     def __init_subclass__(cls, **kwargs):
-        """Make every subclass a frozen dataclass named after its effect."""
+        """Make every subclass a frozen dataclass named after its effect.
+
+        Raises
+        ------
+        TypeError
+            If an option has no plain default (a ``default_factory`` would
+            make the term unhashable and its serialization non-canonical).
+        """
         super().__init_subclass__(**kwargs)
         cls.effect = cls.__dict__.get("effect", cls.__name__)
-        dataclass(frozen=True, init=False, repr=False)(cls)
+        dataclass(frozen=True, init=False, repr=False)(cls)  # decorates in place
+        missing = [
+            f.name for f in dataclasses.fields(cls) if f.default is dataclasses.MISSING
+        ]
+        if missing:
+            raise TypeError(
+                f"{cls.__name__}: option(s) {missing} need a plain default value."
+            )
 
     def __init__(self, *parents: str, **options):
         names = self.option_names()
@@ -626,8 +581,8 @@ class Term:
         return NotImplemented
 
 
-class I(Term):  # noqa: E742 - the paper's notation; ambiguous only out of context
-    """The intercept term: the parents reshape the monotone transform.
+class Intercept(Term):
+    """The intercept term ``I``: the parents reshape the monotone transform.
 
     Without parents it is the paper's simple intercept **SI** — one free
     parameter vector, the same for every row (the bare names ``I`` and
@@ -652,7 +607,9 @@ class I(Term):  # noqa: E742 - the paper's notation; ambiguous only out of conte
         node accepts none, because its intercept is the cutpoint vector.
     **transform_kwargs
         Any other keyword goes straight to the transform class, for
-        example ``I(transform="spline", bins=16)`` or ``I(n_coeffs=40)``.
+        example ``I(transform="spline", bins=16)`` or ``I(n_coeffs=40)``. A
+        serialized term passes them as one ``transform_kwargs`` mapping; a
+        keyword written out wins over the same key inside that mapping.
     allow_interaction : bool, optional
         ``False`` makes a multi-parent term **additive**: one network per
         parent, their parameter vectors summed in coefficient space. A node
@@ -681,14 +638,15 @@ class I(Term):  # noqa: E742 - the paper's notation; ambiguous only out of conte
         interaction to disallow needs two).
     """
 
+    effect = "I"
+    cell_tag = "CI"
+
     transform: str | type | None = None
     transform_kwargs: tuple | None = None
     units: tuple[int, ...] | None = None
     activation: str | None = None
     input_transform: object = None
     allow_interaction: bool = True
-
-    cell_tag = "CI"
 
     def __init__(self, *parents: str, transform_kwargs=None, **options):
         known = set(self.option_names())
@@ -726,11 +684,11 @@ class I(Term):  # noqa: E742 - the paper's notation; ambiguous only out of conte
         kwargs = dict(opts.pop("transform_kwargs", None) or ())
         args = [repr(p) for p in self.parents]
         args += [f"{k}={v!r}" for k, v in {**opts, **kwargs}.items()]
-        return f"I({', '.join(args)})"
+        return f"{self.effect}({', '.join(args)})"
 
 
-class LS(Term):
-    """The linear shift ``beta * x``: one interpretable raw-unit coefficient.
+class LinearShift(Term):
+    """The linear shift ``LS``: ``beta * x``, one interpretable raw-unit coefficient.
 
     Parameters
     ----------
@@ -744,6 +702,8 @@ class LS(Term):
         If the parent count is not one.
     """
 
+    effect = "LS"
+
     def __post_init__(self) -> None:
         """Refuse any parent count but one."""
         if len(self.parents) != 1:
@@ -755,8 +715,8 @@ class LS(Term):
         return True
 
 
-class CS(Term):
-    """The complex shift: an additive network ``g(x)`` on the latent scale.
+class ComplexShift(Term):
+    """The complex shift ``CS``: an additive network ``g(x)`` on the latent scale.
 
     Parameters
     ----------
@@ -779,6 +739,8 @@ class CS(Term):
         If no parent is given.
     """
 
+    effect = "CS"
+
     units: tuple[int, ...] | None = None
     activation: str | None = None
     input_transform: object = None
@@ -790,8 +752,8 @@ class CS(Term):
         super().__post_init__()
 
 
-class VC(Term):
-    """The varying-coefficient shift ``beta(modifiers) * x_t``.
+class VaryingCoefficient(Term):
+    """The varying-coefficient shift ``VC``: ``beta(modifiers) * x_t``.
 
     The treatment-effect term of issue #28: ``VC("X2", "X3", t="T")`` is
     ``(beta0 + b_theta(x2, x3)) * x_t``, with ``b_theta`` a small network
@@ -866,6 +828,8 @@ class VC(Term):
     uncentered term only.
     """
 
+    effect = "VC"
+
     penalty: float = 1.0
     center: str | bool = False
     units: tuple[int, ...] | None = None
@@ -888,7 +852,7 @@ class VC(Term):
         super().__post_init__()
 
     @classmethod
-    def from_serialized(cls, parents: tuple[str, ...], options: dict) -> VC:
+    def from_serialized(cls, parents: tuple[str, ...], options: dict) -> Term:
         """Rebuild from the serialized parents: the treatment comes first."""
         return cls(*parents[1:], t=parents[0], **options)
 
@@ -929,7 +893,9 @@ class VC(Term):
                 f"treatment, and '{on}' is continuous. E[T|x] centering "
                 "is a follow-up."
             )
-        if self.center and any(isinstance(t, VC) and t.center for t in on_node.terms):
+        if self.center and any(
+            isinstance(t, VaryingCoefficient) and t.center for t in on_node.terms
+        ):
             raise ValueError(
                 f"Node '{name}': treatment '{on}' carries a centered VC term "
                 "itself; chained centering is not supported."
@@ -944,11 +910,11 @@ class VC(Term):
         """Show the modifiers, then ``t=``, then the non-default options."""
         args = [repr(p) for p in self.parents[1:]] + [f"t={self.parents[0]!r}"]
         args += [f"{k}={v!r}" for k, v in self.options().items()]
-        return f"VC({', '.join(args)})"
+        return f"{self.effect}({', '.join(args)})"
 
 
-class Fn(Term):
-    """A custom function shift: ``fn(features)`` joins the additive shifts.
+class FnShift(Term):
+    """The function shift ``Fn``: ``fn(features)`` joins the additive shifts.
 
     The cheapest custom term: ``fn`` takes the term's concatenated parent
     features ``(n, k)`` (continuous raw, ordinal one-hot — through
@@ -975,6 +941,8 @@ class Fn(Term):
     ValueError
         If no parent is given or ``fn`` is not callable.
     """
+
+    effect = "Fn"
 
     fn: object = None
     input_transform: object = None
@@ -1007,7 +975,11 @@ class ContinuousNode:
 
     def __init__(self, terms=None):
         self.terms = _normalize_terms(terms)
-        self.transform, self.transform_kwargs = _intercept_transform(self.terms)
+        # the arguments go straight to the transform class; if they are
+        # wrong, that class says so — this layer does not second-guess it
+        intercept = self.terms[0]
+        self.transform = intercept.transform or DEFAULT_TRANSFORM
+        self.transform_kwargs = dict(intercept.transform_kwargs or ())
 
     def __repr__(self):
         """Show the terms and the transform."""
@@ -1042,8 +1014,15 @@ class OrdinalNode:
 
     def __init__(self, levels: int, terms=None):
         self.levels = int(levels)
+        if self.levels < 2:
+            raise ValueError(f"ordinal levels must be >= 2, got {self.levels}.")
         self.terms = _normalize_terms(terms)
-        _reject_transform(self.terms)
+        intercept = self.terms[0]
+        if intercept.transform or intercept.transform_kwargs:
+            raise ValueError(
+                "I(transform=...) is for continuous nodes. An ordinal node's "
+                "intercept is the cutpoint vector, it has no transform to choose."
+            )
 
     def __repr__(self):
         """Show the levels and the terms."""
@@ -1068,11 +1047,11 @@ NodeSpec = ContinuousNode | OrdinalNode
 
 # %% alias -----------------------------------------------------------------------------
 # The short names are the notation of the docs and the paper, and the
-# spelling nearly every caller uses; the pythonic names are the same objects.
-intercept = I
-simple_intercept = SI
-complex_intercept = CI
-linear_shift = LS
-complex_shift = CS
-varying_coefficient = VC
-fn_shift = Fn
+# spelling nearly every caller uses; they are the classes above, unchanged.
+I = intercept = Intercept  # noqa: E741 - ambiguous only out of context
+SI = simple_intercept
+CI = complex_intercept
+LS = linear_shift = LinearShift
+CS = complex_shift = ComplexShift
+VC = varying_coefficient = VaryingCoefficient
+Fn = fn_shift = FnShift

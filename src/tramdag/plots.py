@@ -26,12 +26,12 @@ from .spec import NodeSpec, node_parents, validate_and_sort
 EDGE_STYLE = {
     "LS": dict(color="0.25", ls="-", lw=1.3),
     "CS": dict(color="C0", ls="-", lw=2.4),
-    "I": dict(color="C1", ls="--", lw=1.8),
+    "CI": dict(color="C1", ls="--", lw=1.8),
     "VC": dict(color="C3", ls="-", lw=2.4),
     "VC mod": dict(color="C3", ls=":", lw=1.4),
     "Fn": dict(color="C2", ls="-.", lw=1.6),
 }
-EDGE_LABEL = {"I": "CI"}  # an intercept edge is a complex intercept
+EDGE_LABEL = {"VCm": "VC mod"}  # to_matrix's tag for a VC modifier
 NODE_FACE = {"continuous": "#e3f2fd", "ordinal": "#fff3e0"}
 NODE_H, ROW_DY = 0.56, 1.1  # layout units: node height, distance between rows
 BULGE = 0.5  # how far an edge that skips a layer bends out, per skipped layer
@@ -88,18 +88,15 @@ def _layout(spec: dict[str, NodeSpec]) -> tuple[dict[str, tuple[float, float]], 
 def _term_edges(child: str, term) -> list[tuple[str, str, str, bool]]:
     """Give ``(parent, child, effect, joint)`` for the edges one term owns.
 
-    A VC term's first parent is the treatment (the edge it owns); its other
-    parents are effect modifiers, drawn dotted as ``"VC mod"``. ``joint`` marks
-    a multi-parent CS or CI, whose parents share one network.
+    Read off the term's adjacency ``cells``: the tag is the effect (``CI``
+    for an intercept edge, ``VCm`` for a VC modifier), with the parent group
+    appended for a multi-parent net — that suffix marks a ``joint`` edge.
     """
-    parents = list(term.parents)
-    if not parents:
-        return []  # a simple intercept owns no edge
-    if term.effect == "VC":
-        treatment = [(parents[0], child, "VC", False)]
-        return treatment + [(m, child, "VC mod", False) for m in parents[1:]]
-    joint = term.effect in ("CS", "I") and len(parents) > 1
-    return [(p, child, term.effect, joint) for p in parents]
+    edges = []
+    for parent, tag in term.cells():
+        effect, joint = tag.split("[")[0], "[" in tag
+        edges.append((parent, child, EDGE_LABEL.get(effect, effect), joint))
+    return edges
 
 
 def _edges(spec: dict[str, NodeSpec]) -> list[tuple[str, str, str, bool]]:
@@ -171,7 +168,7 @@ def _draw_edge(ax, patches, pos, edge, labels: bool, bulge: float) -> None:
     )
     ax.add_patch(arrow)
     if labels:
-        text = EDGE_LABEL.get(effect, effect) + (" joint" if joint else "")
+        text = effect + (" joint" if joint else "")
         # the arc's midpoint: the chord's midpoint pushed out by the bulge
         mx = (x0 + x1) / 2 - bulge * (y1 - y0) / dist
         my = (y0 + y1) / 2 + bulge * (x1 - x0) / dist
@@ -191,9 +188,7 @@ def _legend(ax, effects: set[str]) -> None:
     from matplotlib.lines import Line2D
 
     handles = [
-        Line2D([], [], label=EDGE_LABEL.get(e, e), **EDGE_STYLE[e])
-        for e in EDGE_STYLE
-        if e in effects
+        Line2D([], [], label=e, **EDGE_STYLE[e]) for e in EDGE_STYLE if e in effects
     ]
     if handles:
         ax.legend(

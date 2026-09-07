@@ -4,8 +4,10 @@
 
 ### Changed (breaking) — an effect is a `Term` subclass; the registry is gone
 
-- `I`, `LS`, `CS`, `VC` and `Fn` are classes now (frozen dataclasses), not
-  constructor functions returning one string-tagged `Term`. Every call
+- `Intercept`, `LinearShift`, `ComplexShift`, `VaryingCoefficient` and
+  `FnShift` are the effects, classes now (frozen dataclasses) with `I`, `LS`,
+  `CS`, `VC`, `Fn` as aliases, not constructor functions returning one
+  string-tagged `Term`. Every call
   spelling stays the same — `CS("a", "b", units=[16])`, `I(transform=
   "spline", bins=6)`, `VC("m", t="t")`, the `+` sums, `SI()`/`CI()`, the
   pythonic aliases — and so do YAML specs and checkpoints (`effect` is the
@@ -21,6 +23,12 @@
   `cells`, `term_is_classical`, `option_defaults`) moved onto the term
   classes as `__post_init__`, `edge_parents`, `cells`, `classical`, fields.
 - The ADR 001 refusal of per-effect term classes is revised in place.
+- `ShiftTerm` slims down: `regularizer()` returns `None` instead of pairing
+  with `has_regularizer`; `finalize` decides itself instead of a `finalizes`
+  flag; `marginal_start` is a no-op by default instead of pairing with
+  `has_marginal_start`; `net_parents` is gone (nothing read it); the node
+  sets `parents` after `build`, so a custom `build` sets `key` only; the
+  summation order is the `order` class attribute, not an `isinstance`.
 
 ### Added — `tramdag.plots` (optional extra `tramdag[plots]`)
 

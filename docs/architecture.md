@@ -10,10 +10,10 @@ behavior lives in four adjacent functions; everything else is framework.** The d
 ```mermaid
 graph TD
     subgraph data["pure data"]
-        spec["spec.py<br/>DSL: Term + one subclass per effect<br/>(I LS CS VC Fn), nodes, normalization,<br/>Kahn sort, (de)serialization"]
+        spec["spec.py<br/>DSL: Term + one subclass per effect<br/>(Intercept LinearShift ComplexShift<br/>VaryingCoefficient FnShift = I LS CS VC Fn),<br/>nodes, normalization, Kahn sort, (de)serialization"]
     end
     subgraph torch["torch modules"]
-        terms["terms.py<br/>one module per effect, data = its Term class;<br/>ShiftTerm/InterceptTerm hooks; module_for;<br/>LSTerm CSTerm VCTerm FnTerm,<br/>SITerm CITerm AdditiveCITerm"]
+        terms["terms.py<br/>one module per effect, data = its Term class;<br/>ShiftTerm/InterceptTerm hooks; module_for;<br/>LinearShiftTerm ComplexShiftTerm<br/>VaryingCoefficientTerm FnShiftTerm,<br/>SimpleInterceptTerm ComplexInterceptTerm<br/>AdditiveInterceptTerm"]
         conditioners["conditioners.py<br/>raw nn heads (frozen:<br/>anchors checkpoints + RNG)"]
         transforms["transforms.py<br/>Bernstein/Spline/Affine,<br/>ordinal_* likelihood,<br/>StandardLogistic"]
         nodes["nodes.py<br/>_Node (intercept + shifts),<br/>_InputTransform,<br/>kind_log_prob/sample/abduct/<br/>marginal_theta"]
@@ -60,23 +60,23 @@ classDiagram
         classical
         options() / from_serialized()
     }
-    Term <|-- I
-    Term <|-- LS
-    Term <|-- CS
-    Term <|-- VC
-    Term <|-- Fn
+    Term <|-- Intercept : I
+    Term <|-- LinearShift : LS
+    Term <|-- ComplexShift : CS
+    Term <|-- VaryingCoefficient : VC
+    Term <|-- FnShift : Fn
     class TermDef {
         <<terms.py, module>>
-        data: the Term subclass it builds
+        data: the Term subclass it builds (stamps itself as its .module)
         input_transform / calibrate(train_df)
     }
     class ShiftTerm {
-        key / parents / net_parents
+        key (build) / parents (node) / order
         build(term, spec)
         shift_value(node, feats)
         post_init()
-        has_regularizer / regularizer()
-        finalizes / finalize(node, feats)
+        regularizer() -> Tensor | None
+        finalize(node, feats)
         score_columns(node, flow, feats, dlds, ehat)
         side_columns() / check_column() / live_side() / extra_columns()
     }
@@ -84,22 +84,22 @@ classDiagram
         groups / ci_parents
         build(term, spec, n_params)
         theta_value(node, feats, n)
-        has_marginal_start / marginal_start(theta)
+        marginal_start(theta)
     }
     TermDef <|-- ShiftTerm
     TermDef <|-- InterceptTerm
-    ShiftTerm <|-- LSTerm
-    ShiftTerm <|-- CSTerm
-    ShiftTerm <|-- VCTerm
-    ShiftTerm <|-- FnTerm
-    InterceptTerm <|-- SITerm
-    InterceptTerm <|-- CITerm
-    InterceptTerm <|-- AdditiveCITerm
-    LSTerm --|> LinearShift : nn
-    CSTerm --|> ComplexShift : nn
-    VCTerm --|> VaryingCoef : nn
-    SITerm --|> SimpleIntercept : nn
-    CITerm --|> ComplexIntercept : nn
+    ShiftTerm <|-- LinearShiftTerm
+    ShiftTerm <|-- ComplexShiftTerm
+    ShiftTerm <|-- VaryingCoefficientTerm
+    ShiftTerm <|-- FnShiftTerm
+    InterceptTerm <|-- SimpleInterceptTerm
+    InterceptTerm <|-- ComplexInterceptTerm
+    InterceptTerm <|-- AdditiveInterceptTerm
+    LinearShiftTerm --|> LinearShift : nn
+    ComplexShiftTerm --|> ComplexShift : nn
+    VaryingCoefficientTerm --|> VaryingCoef : nn
+    SimpleInterceptTerm --|> SimpleIntercept : nn
+    ComplexInterceptTerm --|> ComplexIntercept : nn
 ```
 
 Built-in terms subclass their conditioners, so state-dict paths
@@ -107,7 +107,7 @@ Built-in terms subclass their conditioners, so state-dict paths
 A custom effect is two classes: a `tramdag.Term` subclass (its annotated
 attributes are the options; `__post_init__`, `edge_parents`, `cells` its
 rules) and a `ShiftTerm` subclass declaring `data =` that class and
-implementing `build` (which must set `key`/`parents`/`net_parents`) +
+implementing `build` (which must set `key`) +
 `shift_value`. Subclassing is the registration; the cheap path for a
 one-off is `fn_shift`.
 
@@ -193,17 +193,11 @@ from ``ShiftTerm``/``InterceptTerm``.
 
 ```mermaid
 classDiagram
-  class AdditiveCITerm {
+  class AdditiveInterceptTerm {
   }
   class AffineUT {
   }
   class BernsteinUT {
-  }
-  class CITerm {
-  }
-  class CS {
-  }
-  class CSTerm {
   }
   class Callback {
   }
@@ -211,35 +205,41 @@ classDiagram
   }
   class ComplexIntercept {
   }
+  class ComplexInterceptTerm {
+  }
   class ComplexShift {
+  }
+  class ComplexShift {
+  }
+  class ComplexShiftTerm {
   }
   class ContinuousNode {
   }
   class EarlyStopping {
   }
-  class Fn {
+  class FnShift {
   }
-  class FnTerm {
+  class FnShiftTerm {
   }
-  class I {
+  class Intercept {
   }
   class InterceptTerm {
   }
-  class LS {
-  }
-  class LSTerm {
+  class LinearShift {
   }
   class LinearShift {
+  }
+  class LinearShiftTerm {
   }
   class OrdinalNode {
   }
   class PerNodePlateau {
   }
-  class SITerm {
-  }
   class ShiftTerm {
   }
   class SimpleIntercept {
+  }
+  class SimpleInterceptTerm {
   }
   class SplineUT {
   }
@@ -249,11 +249,11 @@ classDiagram
   }
   class TermDef {
   }
-  class VC {
-  }
-  class VCTerm {
-  }
   class VaryingCoef {
+  }
+  class VaryingCoefficient {
+  }
+  class VaryingCoefficientTerm {
   }
   class _FitMixin {
   }
@@ -272,33 +272,33 @@ classDiagram
   _FnCallback --|> Callback
   CausalFlowDAG --|> _FitMixin
   CausalFlowDAG --|> _ReadoutsMixin
-  CS --|> Term
-  Fn --|> Term
-  I --|> Term
-  LS --|> Term
-  VC --|> Term
-  AdditiveCITerm --|> InterceptTerm
-  CITerm --|> ComplexIntercept
-  CITerm --|> InterceptTerm
-  CSTerm --|> ComplexShift
-  CSTerm --|> ShiftTerm
-  FnTerm --|> ShiftTerm
+  ComplexShift --|> Term
+  FnShift --|> Term
+  Intercept --|> Term
+  LinearShift --|> Term
+  VaryingCoefficient --|> Term
+  AdditiveInterceptTerm --|> InterceptTerm
+  ComplexInterceptTerm --|> ComplexIntercept
+  ComplexInterceptTerm --|> InterceptTerm
+  ComplexShiftTerm --|> ComplexShift
+  ComplexShiftTerm --|> ShiftTerm
+  FnShiftTerm --|> ShiftTerm
   InterceptTerm --|> TermDef
-  LSTerm --|> LinearShift
-  LSTerm --|> ShiftTerm
-  SITerm --|> SimpleIntercept
-  SITerm --|> InterceptTerm
+  LinearShiftTerm --|> LinearShift
+  LinearShiftTerm --|> ShiftTerm
   ShiftTerm --|> TermDef
-  VCTerm --|> VaryingCoef
-  VCTerm --|> ShiftTerm
+  SimpleInterceptTerm --|> SimpleIntercept
+  SimpleInterceptTerm --|> InterceptTerm
+  VaryingCoefficientTerm --|> VaryingCoef
+  VaryingCoefficientTerm --|> ShiftTerm
   AffineUT --|> _ScaledUT
   BernsteinUT --|> _ScaledUT
   SplineUT --|> _ScaledUT
-  CS --o CSTerm : data
-  Fn --o FnTerm : data
-  I --o InterceptTerm : data
-  LS --o LSTerm : data
-  VC --o VCTerm : data
+  ComplexShift --o ComplexShiftTerm : data
+  FnShift --o FnShiftTerm : data
+  Intercept --o InterceptTerm : data
+  LinearShift --o LinearShiftTerm : data
+  VaryingCoefficient --o VaryingCoefficientTerm : data
 ```
 
 ### Call graph — flow construction (traced)
@@ -307,8 +307,8 @@ classDiagram
 flowchart LR
   subgraph conditioners
     n0["ComplexShift.__init__"]
-    n25["LinearShift.__init__"]
-    n24["SimpleIntercept.__init__"]
+    n24["LinearShift.__init__"]
+    n23["SimpleIntercept.__init__"]
     n2["VaryingCoef.__init__"]
     n1["_nn"]
   end
@@ -322,28 +322,26 @@ flowchart LR
     n8["_Node._build_shifts"]
   end
   subgraph spec
-    n19["Term.edge_parents"]
-    n20["VC.edge_parents"]
+    n18["Term.edge_parents"]
+    n19["VaryingCoefficient.edge_parents"]
     n17["_check_node"]
-    n18["_check_term"]
-    n21["_kahn_sort"]
-    n26["_subclasses"]
-    n22["feat_width"]
+    n20["_kahn_sort"]
+    n21["feat_width"]
     n9["node_parents"]
     n6["validate_and_sort"]
   end
   subgraph terms
-    n14["CSTerm.build"]
+    n14["ComplexShiftTerm.build"]
     n12["InterceptTerm.build"]
-    n15["LSTerm.build"]
-    n16["VCTerm.build"]
-    n23["_attach_input_transform"]
+    n15["LinearShiftTerm.build"]
+    n16["VaryingCoefficientTerm.build"]
+    n22["_attach_input_transform"]
     n13["module_for"]
   end
   subgraph transforms
-    n27["BernsteinUT.__init__"]
+    n25["BernsteinUT.__init__"]
     n10["BernsteinUT.n_params"]
-    n28["_ScaledUT.__init__"]
+    n26["_ScaledUT.__init__"]
     n11["make_univariate_transform"]
   end
     n0 --> n1
@@ -362,24 +360,22 @@ flowchart LR
     n8 --> n15
     n8 --> n16
     n8 -- "3x" --> n13
-    n17 -- "6x" --> n18
-    n18 -- "5x" --> n19
-    n18 --> n20
-    n21 -- "3x" --> n9
+    n17 -- "5x" --> n18
+    n17 --> n19
+    n20 -- "3x" --> n9
     n6 -- "3x" --> n17
-    n6 --> n21
+    n6 --> n20
     n14 --> n0
+    n14 --> n21
     n14 --> n22
-    n14 --> n23
-    n12 -- "3x" --> n24
-    n15 --> n25
-    n15 --> n22
+    n12 -- "3x" --> n23
+    n15 --> n24
+    n15 --> n21
     n16 --> n2
+    n16 --> n21
     n16 --> n22
-    n16 --> n23
-    n13 -- "6x" --> n26
-    n27 -- "2x" --> n28
-    n11 -- "2x" --> n27
+    n25 -- "2x" --> n26
+    n11 -- "2x" --> n25
 ```
 
 ### Call graph — one fit (traced)
@@ -418,10 +414,10 @@ flowchart LR
     n33["CausalFlowDAG._check_columns"]
     n34["CausalFlowDAG._check_levels"]
     n15["CausalFlowDAG._check_side_columns"]
-    n30["CausalFlowDAG._dtype"]
-    n28["CausalFlowDAG._encode_parent"]
-    n27["CausalFlowDAG._features"]
-    n29["CausalFlowDAG._np_dtype"]
+    n29["CausalFlowDAG._dtype"]
+    n27["CausalFlowDAG._encode_parent"]
+    n26["CausalFlowDAG._features"]
+    n28["CausalFlowDAG._np_dtype"]
     n16["CausalFlowDAG._recenter_vc"]
     n32["CausalFlowDAG._side_feats"]
     n17["CausalFlowDAG._tensorize"]
@@ -434,20 +430,20 @@ flowchart LR
     n38["kind_log_prob"]
   end
   subgraph terms
-    n41["CSTerm.shift_value"]
+    n41["ComplexShiftTerm.shift_value"]
     n35["InterceptTerm.calibrate"]
-    n42["LSTerm.shift_value"]
-    n43["SITerm.theta_value"]
-    n19["ShiftTerm.has_regularizer"]
-    n25["ShiftTerm.side_columns"]
+    n42["LinearShiftTerm.shift_value"]
+    n30["ShiftTerm.finalize"]
+    n19["ShiftTerm.regularizer"]
+    n24["ShiftTerm.side_columns"]
+    n43["SimpleInterceptTerm.theta_value"]
     n36["TermDef.calibrate"]
     n40["TermDef.input_transform"]
-    n31["VCTerm.finalize"]
-    n20["VCTerm.has_regularizer"]
-    n54["VCTerm.regressor"]
-    n24["VCTerm.regularizer"]
-    n44["VCTerm.shift_value"]
-    n26["VCTerm.side_columns"]
+    n31["VaryingCoefficientTerm.finalize"]
+    n54["VaryingCoefficientTerm.regressor"]
+    n20["VaryingCoefficientTerm.regularizer"]
+    n44["VaryingCoefficientTerm.shift_value"]
+    n25["VaryingCoefficientTerm.side_columns"]
   end
   subgraph transforms
     n55["BernsteinUT._build"]
@@ -483,23 +479,24 @@ flowchart LR
     n10 -- "3x" --> n21
     n10 -- "3x" --> n22
     n21 -- "6x" --> n23
-    n21 -- "6x" --> n24
+    n21 -- "6x" --> n20
     n22 -- "3x" --> n23
-    n15 -- "2x" --> n25
-    n15 --> n26
-    n27 -- "30x" --> n28
-    n29 -- "2x" --> n30
-    n16 --> n27
+    n15 -- "2x" --> n24
+    n15 --> n25
+    n26 -- "30x" --> n27
+    n28 -- "2x" --> n29
+    n16 --> n26
+    n16 -- "2x" --> n30
     n16 --> n31
-    n32 -- "18x" --> n25
-    n32 -- "9x" --> n26
+    n32 -- "18x" --> n24
+    n32 -- "9x" --> n25
     n17 -- "2x" --> n33
-    n17 -- "2x" --> n29
+    n17 -- "2x" --> n28
     n18 --> n33
     n18 --> n34
     n18 -- "3x" --> n35
     n18 -- "3x" --> n36
-    n23 -- "9x" --> n27
+    n23 -- "9x" --> n26
     n23 -- "27x" --> n32
     n23 -- "27x" --> n37
     n23 -- "27x" --> n38
@@ -520,7 +517,7 @@ flowchart LR
     n36 -- "6x" --> n40
     n31 --> n52
     n31 --> n39
-    n24 -- "6x" --> n53
+    n20 -- "7x" --> n53
     n44 -- "9x" --> n5
     n44 -- "9x" --> n39
     n44 -- "9x" --> n54

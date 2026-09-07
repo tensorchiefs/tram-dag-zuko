@@ -14,6 +14,7 @@ import pandas as pd
 import torch
 
 from .conditioners import LinearShift
+from .terms import VaryingCoefficientTerm
 
 
 # %% public classes --------------------------------------------------------------------
@@ -88,9 +89,11 @@ class _ReadoutsMixin:
             node has several VC terms.
         """
         nd = self._node(node)
-        from .terms import VCTerm
-
-        vcs = {m.key: m.mods for m in nd.shifts.values() if isinstance(m, VCTerm)}
+        vcs = {
+            m.key: m.mods
+            for m in nd.shifts.values()
+            if isinstance(m, VaryingCoefficientTerm)
+        }
         if not vcs:
             raise ValueError(f"node {node!r} has no VC term.")
         if t is None:

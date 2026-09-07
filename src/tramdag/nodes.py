@@ -25,7 +25,7 @@ from .spec import (
     NodeSpec,
     node_parents,
 )
-from .terms import VCTerm, module_for
+from .terms import module_for
 from .transforms import (
     StandardLogistic,
     make_univariate_transform,
@@ -103,6 +103,7 @@ class _Node(nn.Module):
         self.shifts = nn.ModuleDict()
         for term in terms[1:]:  # terms[0] is the intercept
             m = module_for(term).build(term, spec)
+            m.parents = tuple(term.parents)
             self.shifts[m.key] = m
 
     def net_input(self, feats: dict[str, Tensor], parents, key: str) -> Tensor:
@@ -154,7 +155,7 @@ class _Node(nn.Module):
         theta = self.intercept.theta_value(self, feats, n)
         shift = torch.zeros(n, dtype=theta.dtype, device=theta.device)
         # plain shifts first, then VC (stable sort keeps the pinned order)
-        for m in sorted(self.shifts.values(), key=lambda m: isinstance(m, VCTerm)):
+        for m in sorted(self.shifts.values(), key=lambda m: m.order):
             shift = shift + m.shift_value(self, feats)
         return theta, shift
 

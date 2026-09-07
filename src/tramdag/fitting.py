@@ -347,7 +347,7 @@ class _FitMixin:
             m
             for nd in self.nodes.values()
             for m in nd.shifts.values()
-            if m.has_regularizer
+            if m.regularizer() is not None
         ]
         for cb in cbs:
             cb.on_fit_begin(self, opt)
