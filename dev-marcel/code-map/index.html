@@ -1577,8 +1577,8 @@
 parentheses are private machinery: useful to know, not part of the API.
 The last section lists every training hyperparameter and where it lives.</p>
 <h2 id="specpy-declare-the-model"><code>spec.py</code> — declare the model<a class="headerlink" href="#specpy-declare-the-model" title="Permanent link">&para;</a></h2>
-<p>Every effect is a <code>Term</code> subclass under its pythonic name; the paper's short
-name and a snake_case alias are the same object, so <code>LS is LinearShift</code>.</p>
+<p>Every effect is a <code>Term</code> subclass under its pythonic name; the paper's symbol
+is the same object, so <code>LS is LinearShift</code>.</p>
 <table>
 <thead>
 <tr>
@@ -1597,15 +1597,15 @@ name and a snake_case alias are the same object, so <code>LS is LinearShift</cod
 <td>One additive term of a node's transformation, frozen data; each effect is a subclass whose annotated attributes are its options (defaults dropped on serialization, so equality is canonical). <code>+</code> on terms builds plain lists. Carries the spec-level rules: <code>edge_parents</code>, <code>cells</code>, <code>classical</code>, <code>options()</code>, <code>from_serialized</code>. Subclass <code>Term</code> for a new effect; its module goes in <code>terms.py</code> and read as attributes (<code>term.penalty</code>, <code>term.units</code>, ...).</td>
 </tr>
 <tr>
-<td><a class="autorefs autorefs-internal" title="simple_intercept" href="../api/spec/#tramdag.spec.simple_intercept"><code>simple_intercept()</code></a> / <code>SI</code></td>
+<td><a class="autorefs autorefs-internal" title="SI" href="../api/spec/#tramdag.spec.SI"><code>SI()</code></a></td>
 <td>The parentless intercept — the paper's SI. Free transform parameters, the same for every row. Carries the transform choice (<code>transform=</code>, default <code>"bernstein"</code>); extra keyword arguments pass straight to the transform class.</td>
 </tr>
 <tr>
-<td><a class="autorefs autorefs-internal" title="complex_intercept" href="../api/spec/#tramdag.spec.complex_intercept"><code>complex_intercept()</code></a> / <code>CI</code></td>
+<td><a class="autorefs autorefs-internal" title="CI" href="../api/spec/#tramdag.spec.CI"><code>CI()</code></a></td>
 <td>The parent-conditioned intercept — the paper's CI: the parents reshape the monotone transform. Needs at least one parent. Also carries <code>units=</code> and <code>allow_interaction=</code> (joint vs. additive multi-parent intercept).</td>
 </tr>
 <tr>
-<td><a class="autorefs autorefs-internal" title="Intercept" href="../api/spec/#tramdag.spec.Intercept"><code>Intercept</code></a> / <code>I</code>, <code>intercept</code></td>
+<td><a class="autorefs autorefs-internal" title="Intercept" href="../api/spec/#tramdag.spec.Intercept"><code>Intercept</code></a> / <code>I</code></td>
 <td>The intercept term class: without parents the paper's SI, with parents the CI; <code>SI()</code>/<code>CI()</code> are the two spellings with their arity checked. The bare names <code>I</code> and <code>SI</code> in a term list both mean the simple intercept.</td>
 </tr>
 <tr>
@@ -1614,7 +1614,7 @@ name and a snake_case alias are the same object, so <code>LS is LinearShift</cod
 
   
       dataclass
-  " href="../api/spec/#tramdag.spec.LinearShift"><code>LinearShift</code></a> / <code>LS</code>, <code>linear_shift</code></td>
+  " href="../api/spec/#tramdag.spec.LinearShift"><code>LinearShift</code></a> / <code>LS</code></td>
 <td>Linear shift <code>beta * x</code> — the interpretable log-odds coefficient. Exactly one parent.</td>
 </tr>
 <tr>
@@ -1623,11 +1623,11 @@ name and a snake_case alias are the same object, so <code>LS is LinearShift</cod
 
   
       dataclass
-  " href="../api/spec/#tramdag.spec.ComplexShift"><code>ComplexShift</code></a> / <code>CS</code>, <code>complex_shift</code></td>
+  " href="../api/spec/#tramdag.spec.ComplexShift"><code>ComplexShift</code></a> / <code>CS</code></td>
 <td>Complex shift: an NN <code>g(x)</code>, additive on the latent scale. Several parents form one joint network.</td>
 </tr>
 <tr>
-<td><a class="autorefs autorefs-internal" title="VaryingCoefficient" href="../api/spec/#tramdag.spec.VaryingCoefficient"><code>VaryingCoefficient</code></a> / <code>VC</code>, <code>varying_coefficient</code></td>
+<td><a class="autorefs autorefs-internal" title="VaryingCoefficient" href="../api/spec/#tramdag.spec.VaryingCoefficient"><code>VaryingCoefficient</code></a> / <code>VC</code></td>
 <td>Varying-coefficient shift <code>(beta0 + b_theta(mods)) * x_t</code> — the penalized treatment-effect head (issue #28). <code>center=</code> adds propensity centering (issue #30).</td>
 </tr>
 <tr>

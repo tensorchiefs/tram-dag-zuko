@@ -1596,7 +1596,7 @@ attributes are the options; <code>__post_init__</code>, <code>edge_parents</code
 rules) and a <code>ShiftTerm</code> subclass declaring <code>data =</code> that class and
 implementing <code>build</code> (which must set <code>key</code>) +
 <code>shift_value</code>. Subclassing is the registration; the cheap path for a
-one-off is <code>fn_shift</code>.</p>
+one-off is <code>Fn</code>.</p>
 <h2 id="node-kinds">Node kinds<a class="headerlink" href="#node-kinds" title="Permanent link">&para;</a></h2>
 <p>Two kinds (continuous, ordinal) stay an if/else — in ONE place:
 <code>kind_log_prob</code> / <code>kind_sample</code> / <code>kind_abduct</code> / <code>kind_marginal_theta</code>,

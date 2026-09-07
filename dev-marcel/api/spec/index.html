@@ -1451,10 +1451,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#tramdag.spec.simple_intercept" class="md-nav__link">
+  <a href="#tramdag.spec.SI" class="md-nav__link">
     <span class="md-ellipsis">
       
-        simple_intercept
+        SI
       
     </span>
   </a>
@@ -1462,10 +1462,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#tramdag.spec.complex_intercept" class="md-nav__link">
+  <a href="#tramdag.spec.CI" class="md-nav__link">
     <span class="md-ellipsis">
       
-        complex_intercept
+        CI
       
     </span>
   </a>
@@ -2294,10 +2294,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#tramdag.spec.simple_intercept" class="md-nav__link">
+  <a href="#tramdag.spec.SI" class="md-nav__link">
     <span class="md-ellipsis">
       
-        simple_intercept
+        SI
       
     </span>
   </a>
@@ -2305,10 +2305,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#tramdag.spec.complex_intercept" class="md-nav__link">
+  <a href="#tramdag.spec.CI" class="md-nav__link">
     <span class="md-ellipsis">
       
-        complex_intercept
+        CI
       
     </span>
   </a>
@@ -2408,10 +2408,10 @@ positional argument, written as a list or as a <code>+</code> sum::</p>
 </code></pre>
 <p>Each effect is a :class:<code>Term</code> subclass, called with the parent(s) it
 depends on: :class:<code>Intercept</code>, :class:<code>LinearShift</code>, :class:<code>ComplexShift</code>,
-:class:<code>VaryingCoefficient</code> and :class:<code>FnShift</code>. Their short names <code>I</code>,
-<code>LS</code>, <code>CS</code>, <code>VC</code>, <code>Fn</code> (and <code>SI</code>/<code>CI</code> for the two intercept
-arities) are the notation of the docs and the paper and the same objects, so
-use whichever reads better:</p>
+:class:<code>VaryingCoefficient</code> and :class:<code>FnShift</code>. The paper's symbols
+<code>I</code>, <code>LS</code>, <code>CS</code>, <code>VC</code>, <code>Fn</code> are the same objects (<code>SI</code>/<code>CI</code> build
+the two intercept arities) and the notation of the docs, so use whichever
+reads better:</p>
 <ul>
 <li>:func:<code>I</code>  — <em>intercept</em> term: the parent(s) reshape the monotone transform
   (its Bernstein coefficients / ordinal cutpoints). <code>I</code> dispatches on its
@@ -4353,12 +4353,12 @@ class of the monotone transform is chosen on the intercept term,
 <div class="doc doc-object doc-function">
 
 
-<h3 id="tramdag.spec.simple_intercept" class="doc doc-heading">
-            <span class="doc doc-object-name doc-function-name">simple_intercept</span>
+<h3 id="tramdag.spec.SI" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">SI</span>
 
 
-<a href="#tramdag.spec.simple_intercept" class="headerlink" title="Permanent link">&para;</a></h3>
-<div class="doc-signature highlight"><pre><span></span><code><span class="nf">simple_intercept</span><span class="p">(</span><span class="o">**</span><span class="n">options</span><span class="p">)</span>
+<a href="#tramdag.spec.SI" class="headerlink" title="Permanent link">&para;</a></h3>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">SI</span><span class="p">(</span><span class="o">**</span><span class="n">options</span><span class="p">)</span>
 </code></pre></div>
 
     <div class="doc doc-contents ">
@@ -4426,12 +4426,12 @@ class of the monotone transform is chosen on the intercept term,
 <div class="doc doc-object doc-function">
 
 
-<h3 id="tramdag.spec.complex_intercept" class="doc doc-heading">
-            <span class="doc doc-object-name doc-function-name">complex_intercept</span>
+<h3 id="tramdag.spec.CI" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">CI</span>
 
 
-<a href="#tramdag.spec.complex_intercept" class="headerlink" title="Permanent link">&para;</a></h3>
-<div class="doc-signature highlight"><pre><span></span><code><span class="nf">complex_intercept</span><span class="p">(</span><span class="o">*</span><span class="n">parents</span><span class="p">,</span> <span class="o">**</span><span class="n">options</span><span class="p">)</span>
+<a href="#tramdag.spec.CI" class="headerlink" title="Permanent link">&para;</a></h3>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">CI</span><span class="p">(</span><span class="o">*</span><span class="n">parents</span><span class="p">,</span> <span class="o">**</span><span class="n">options</span><span class="p">)</span>
 </code></pre></div>
 
     <div class="doc doc-contents ">

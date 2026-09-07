@@ -3844,7 +3844,7 @@ prediction convention; training uses the frozen out-of-fold column).</p>
         <p><code>Fn</code> — a user-supplied shift function over the parent features.</p>
 <p>A plain function contributes a fixed (non-trained) offset; an
 <code>nn.Module</code> registers as a submodule and trains with the flow. Built
-by :func:<code>tramdag.spec.fn_shift</code>.</p>
+by :class:<code>tramdag.spec.FnShift</code> (<code>Fn</code>).</p>
 
 
 

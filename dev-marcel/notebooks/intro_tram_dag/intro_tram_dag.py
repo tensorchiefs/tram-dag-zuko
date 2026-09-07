@@ -117,7 +117,7 @@
 # | CS — $g_{ik}(x_k)$ | `CS("X1")` (64-128-64 NN, additive) |
 #
 # `I(...)` dispatches on its arguments: no parents → a simple intercept (`SI`),
-# parents → a complex intercept (`CI`). The explicit names work too.
+# parents → a complex intercept (`CI`). `SI()`/`CI()` spell that out.
 
 # %% [markdown]
 # ### Gallery: a transformation *is* an additive decomposition
