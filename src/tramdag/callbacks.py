@@ -175,6 +175,9 @@ class PerNodePlateau(Callback):
     back as an opt-in callback; `docs/training-speed.md` has its
     measurements.
 
+    After a fit, ``frozen`` is ``{node: epoch}`` — the epoch in which each
+    node left training — so a training figure can mark the freezes.
+
     Parameters
     ----------
     patience, freeze : int
@@ -208,7 +211,8 @@ class PerNodePlateau(Callback):
         self.lr0: dict = {}
         self.best: dict = {}
         self.bad: dict = {}
-        self.frozen: set = set()
+        self.frozen: dict[str, int] = {}
+        self.epoch = 0
 
     def on_fit_begin(self, flow, optimizer) -> None:
         """Start fresh — rates and frozen nodes never carry into the next fit.
@@ -227,10 +231,15 @@ class PerNodePlateau(Callback):
 
     def on_epoch_end(self, flow, epoch: int, optimizer) -> bool:
         """Step on the epoch's validation NLL; ``True`` once every node froze."""
-        return self.step(_last_val(flow), optimizer)
+        return self.step(_last_val(flow), optimizer, epoch)
 
-    def step(self, nll: dict[str, float], optimizer) -> bool:
-        """Step every unfrozen node on its own NLL; ``True`` when all are frozen."""
+    def step(self, nll: dict[str, float], optimizer, epoch: int | None = None) -> bool:
+        """Step every unfrozen node on its own NLL; ``True`` when all are frozen.
+
+        ``epoch`` is recorded for a node that freezes on this step; without
+        it the steps are counted (a hand-driven loop).
+        """
+        self.epoch = self.epoch + 1 if epoch is None else epoch
         for g in optimizer.param_groups:
             if "node" not in g:
                 raise ValueError(
@@ -265,5 +274,5 @@ class PerNodePlateau(Callback):
             g["lr"] = max(g["lr"] * self.factor, self.lr0[name] * 1e-3)
         decayed = g["lr"] <= self.lr0[name] * 1e-2 * (1 + 1e-9)
         if decayed and self.bad[name] >= self.freeze:
-            self.frozen.add(name)
+            self.frozen[name] = self.epoch
             g["lr"] = 0.0
