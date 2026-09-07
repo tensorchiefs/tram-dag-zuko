@@ -206,6 +206,17 @@ def _legend(ax, effects: set[str]) -> None:
         )
 
 
+def _freezes(rates: list) -> dict[str, int]:
+    """Give ``{node: epoch}`` of the first zero rate per node in ``history["lr"]``."""
+    frozen: dict[str, int] = {}
+    for epoch, entry in enumerate(rates, start=1):
+        if isinstance(entry, dict):
+            for node, lr in entry.items():
+                if lr == 0.0 and node not in frozen:
+                    frozen[node] = epoch
+    return frozen
+
+
 def _finish(ax, fig, path):
     fig.tight_layout()
     if path is not None:
@@ -349,9 +360,10 @@ def plot_training(flow, *, frozen=None, ax=None, path=None):
     flow : CausalFlowDAG
         The fitted flow; ``flow.history`` is read.
     frozen : dict[str, int] | PerNodePlateau | None, optional
-        ``{node: epoch}`` of the freezes, as
-        :class:`tramdag.callbacks.PerNodePlateau` records in its ``frozen`` —
-        the callback itself is accepted too. Each freeze is a dashed mark.
+        ``{node: epoch}`` of the freezes, each a dashed mark. By default read
+        off ``flow.history["lr"]`` (the first epoch a node's rate is 0, when
+        the optimizer had per-node groups); pass a dict, or the
+        :class:`tramdag.callbacks.PerNodePlateau` whose ``frozen`` to use.
     ax : matplotlib.axes.Axes | None, optional
         Draw into this axes; by default a new figure.
     path : str | Path | None, optional
@@ -371,7 +383,9 @@ def plot_training(flow, *, frozen=None, ax=None, path=None):
         _, ax = plt.subplots(figsize=(7.5, 3.6))
     for label, curve in curves.items():
         ax.plot(np.arange(1, len(curve) + 1), curve, label=f"{label} NLL (total)")
-    frozen = getattr(frozen, "frozen", frozen) or {}
+    frozen = getattr(frozen, "frozen", frozen)
+    if frozen is None:
+        frozen = _freezes(hist.get("lr", []))
     for name, epoch in sorted(frozen.items(), key=lambda kv: kv[1]):
         ax.axvline(epoch, ls="--", lw=1, color="gray")
         ax.annotate(

@@ -73,9 +73,11 @@ def test_marginals_and_training_draw_from_a_fitted_flow(ls_chain, tmp_path):
     axes = plot_marginals(flow, df, ncols=2, seed=0, path=tmp_path / "m.png")
     assert axes.shape == (1, 2)
     assert (tmp_path / "m.png").exists()
-    ax = plot_training(flow, frozen=plateau, path=tmp_path / "t.png")
+    ax = plot_training(flow, path=tmp_path / "t.png")  # freezes read off history["lr"]
     assert len(ax.lines) == 2 + len(plateau.frozen)  # train, val, one mark per freeze
     assert (tmp_path / "t.png").exists()
+    ax = plot_training(flow, frozen=plateau)  # or from the callback itself
+    assert len(ax.lines) == 2 + len(plateau.frozen)
     # no validation history, no marks: one line
     flow2 = CausalFlowDAG(spec, seed=0)
     flow2.fit(df, epochs=3, batch_size=100)

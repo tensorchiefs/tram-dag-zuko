@@ -12,6 +12,10 @@
 - `PerNodePlateau.frozen` is now `{node: epoch}` — the epoch each node left
   training — instead of a bare set, so a training figure can mark the
   freezes. `step(nll, opt, epoch=None)` records it; `len`/`in` are unchanged.
+- `fit` records the optimizer's learning rate after every epoch in
+  `history["lr"]` (`{node: lr}` with `per_node_adam`'s tagged groups, else a
+  float). `plot_training` reads the freezes off it, so no tracer callback is
+  needed any more.
 - A data frame that lacks a spec column now fails in `_tensorize` with a
   `KeyError` that names the column(s), instead of deep inside a tensor op.
 
