@@ -105,6 +105,10 @@ docs/architecture.md carries the module map and the term-contract diagram.
   pre-0.4 plateau recipe). All read `history["val"]`, which
   `fit(validation_data=|validation_split=)` fills per epoch; `verbose=`
   owns progress printing. Optional; `fit` itself stays one plain loop.
+- `plots.py` — `plot_dag(spec|flow)` (the labelled DAG, layered, one edge
+  style per effect), `plot_marginals`, `plot_training(frozen=)`. matplotlib is
+  the optional extra `tramdag[plots]`, imported on first call — the package
+  import never needs it. `plot_dag` is exported at top level.
 - (no `utils.py` any more: `config_section` moved to
   `experiments/common.py`, `machine_info` to
   `experiments/benchmarks/perf_machine.py` — each next to its only caller, so

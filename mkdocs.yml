@@ -47,6 +47,7 @@ nav:
   - conditioners: api/conditioners.md
   - scores: api/scores.md
   - callbacks: api/callbacks.md
+  - plots: api/plots.md
 
 hooks: [docs/hooks.py]
 

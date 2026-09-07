@@ -91,6 +91,9 @@ name = "tramdag"
 readme = "README.md"
 requires-python = ">=3.10"
 
+[project.optional-dependencies]
+plots = ["matplotlib"]  # tramdag.plots: plot_dag, plot_marginals, plot_training
+
 [project.urls]
 Homepage = "https://github.com/tensorchiefs/tramdag"
 "Method paper (CLeaR 2025)" = "https://arxiv.org/abs/2503.16206"

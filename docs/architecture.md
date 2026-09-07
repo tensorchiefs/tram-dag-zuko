@@ -25,8 +25,10 @@ graph TD
         scores["scores.py<br/>node_scores,<br/>effect_modifier_scan"]
     end
     callbacks["callbacks.py<br/>Callback, EarlyStopping,<br/>PerNodePlateau, per_node_adam"]
+    plots["plots.py<br/>plot_dag, plot_marginals,<br/>plot_training (matplotlib optional)"]
 
     spec --> terms
+    plots --> spec
     terms --> conditioners
     nodes --> terms
     nodes --> spec
@@ -134,6 +136,8 @@ classDiagram
   }
   class nodes {
   }
+  class plots {
+  }
   class readouts {
   }
   class scores {
@@ -145,6 +149,7 @@ classDiagram
   class transforms {
   }
   tramdag --> flow
+  tramdag --> plots
   tramdag --> spec
   tramdag --> terms
   fitting --> callbacks
@@ -158,6 +163,7 @@ classDiagram
   nodes --> spec
   nodes --> terms
   nodes --> transforms
+  plots --> spec
   readouts --> conditioners
   readouts --> terms
   scores --> transforms
@@ -366,13 +372,13 @@ flowchart LR
     n3["_last_val"]
   end
   subgraph conditioners
-    n46["ComplexShift.forward"]
-    n48["LinearShift.forward"]
-    n49["SimpleIntercept.forward"]
+    n47["ComplexShift.forward"]
+    n49["LinearShift.forward"]
+    n50["SimpleIntercept.forward"]
     n6["VaryingCoef.beta"]
     n5["VaryingCoef.forward"]
-    n51["VaryingCoef.l2"]
-    n50["VaryingCoef.recenter"]
+    n52["VaryingCoef.l2"]
+    n51["VaryingCoef.recenter"]
   end
   subgraph fitting
     n7["_FitMixin.fit"]
@@ -385,7 +391,8 @@ flowchart LR
     n21["_val_nll"]
   end
   subgraph flow
-    n32["CausalFlowDAG._check_levels"]
+    n32["CausalFlowDAG._check_columns"]
+    n33["CausalFlowDAG._check_levels"]
     n14["CausalFlowDAG._check_side_columns"]
     n29["CausalFlowDAG._dtype"]
     n27["CausalFlowDAG._encode_parent"]
@@ -398,37 +405,37 @@ flowchart LR
     n22["CausalFlowDAG.node_log_prob"]
   end
   subgraph nodes
-    n37["_Node.net_input"]
-    n35["_Node.theta_shift"]
-    n36["kind_log_prob"]
+    n38["_Node.net_input"]
+    n36["_Node.theta_shift"]
+    n37["kind_log_prob"]
   end
   subgraph terms
-    n39["CSTerm.shift_value"]
-    n33["InterceptTerm.calibrate"]
-    n40["LSTerm.shift_value"]
-    n41["SITerm.theta_value"]
+    n40["CSTerm.shift_value"]
+    n34["InterceptTerm.calibrate"]
+    n41["LSTerm.shift_value"]
+    n42["SITerm.theta_value"]
     n18["ShiftTerm.has_regularizer"]
     n24["ShiftTerm.side_columns"]
-    n34["TermDef.calibrate"]
-    n38["TermDef.input_transform"]
+    n35["TermDef.calibrate"]
+    n39["TermDef.input_transform"]
     n30["VCTerm.finalize"]
     n19["VCTerm.has_regularizer"]
-    n52["VCTerm.regressor"]
+    n53["VCTerm.regressor"]
     n23["VCTerm.regularizer"]
-    n42["VCTerm.shift_value"]
+    n43["VCTerm.shift_value"]
     n25["VCTerm.side_columns"]
   end
   subgraph transforms
-    n53["BernsteinUT._build"]
-    n43["StandardLogistic.log_prob"]
-    n54["_ScaledUT._log_dt_dx"]
-    n55["_ScaledUT._scale"]
-    n44["_ScaledUT.forward"]
-    n47["_ScaledUT.set_range"]
-    n58["_log1mexp"]
-    n56["ordinal_bounds"]
-    n57["ordinal_cutpoints"]
-    n45["ordinal_log_prob"]
+    n54["BernsteinUT._build"]
+    n44["StandardLogistic.log_prob"]
+    n55["_ScaledUT._log_dt_dx"]
+    n56["_ScaledUT._scale"]
+    n45["_ScaledUT.forward"]
+    n48["_ScaledUT.set_range"]
+    n59["_log1mexp"]
+    n57["ordinal_bounds"]
+    n58["ordinal_cutpoints"]
+    n46["ordinal_log_prob"]
   end
     n0 --> n1
     n2 -- "3x" --> n3
@@ -461,40 +468,42 @@ flowchart LR
     n15 --> n30
     n31 -- "18x" --> n24
     n31 -- "9x" --> n25
+    n16 -- "2x" --> n32
     n16 -- "2x" --> n28
     n17 --> n32
-    n17 -- "3x" --> n33
+    n17 --> n33
     n17 -- "3x" --> n34
+    n17 -- "3x" --> n35
     n22 -- "9x" --> n26
     n22 -- "27x" --> n31
-    n22 -- "27x" --> n35
     n22 -- "27x" --> n36
-    n37 -- "19x" --> n38
-    n35 -- "9x" --> n39
-    n35 -- "9x" --> n40
-    n35 -- "27x" --> n41
-    n35 -- "9x" --> n42
-    n36 -- "18x" --> n43
-    n36 -- "18x" --> n44
-    n36 -- "9x" --> n45
-    n39 -- "9x" --> n46
-    n39 -- "9x" --> n37
-    n33 -- "3x" --> n34
-    n33 -- "2x" --> n47
-    n40 -- "9x" --> n48
-    n41 -- "27x" --> n49
-    n34 -- "6x" --> n38
-    n30 --> n50
-    n30 --> n37
-    n23 -- "6x" --> n51
-    n42 -- "9x" --> n5
-    n42 -- "9x" --> n37
-    n42 -- "9x" --> n52
-    n44 -- "18x" --> n53
-    n44 -- "18x" --> n54
-    n44 -- "18x" --> n55
-    n56 -- "9x" --> n57
-    n45 -- "9x" --> n58
-    n45 -- "9x" --> n56
+    n22 -- "27x" --> n37
+    n38 -- "19x" --> n39
+    n36 -- "9x" --> n40
+    n36 -- "9x" --> n41
+    n36 -- "27x" --> n42
+    n36 -- "9x" --> n43
+    n37 -- "18x" --> n44
+    n37 -- "18x" --> n45
+    n37 -- "9x" --> n46
+    n40 -- "9x" --> n47
+    n40 -- "9x" --> n38
+    n34 -- "3x" --> n35
+    n34 -- "2x" --> n48
+    n41 -- "9x" --> n49
+    n42 -- "27x" --> n50
+    n35 -- "6x" --> n39
+    n30 --> n51
+    n30 --> n38
+    n23 -- "6x" --> n52
+    n43 -- "9x" --> n5
+    n43 -- "9x" --> n38
+    n43 -- "9x" --> n53
+    n45 -- "18x" --> n54
+    n45 -- "18x" --> n55
+    n45 -- "18x" --> n56
+    n57 -- "9x" --> n58
+    n46 -- "9x" --> n59
+    n46 -- "9x" --> n57
 ```
 <!-- AUTOGEN:end -->

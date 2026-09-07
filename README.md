@@ -33,8 +33,9 @@ ground truth. Further notebooks are available at [`notebooks/`](notebooks/) like
 ## Install
 
 ```bash
-pip install tramdag            # latest release (PyPI)
-pip install "git+https://github.com/tensorchiefs/tramdag.git@main"   # dev version (track main)
+uv add tramdag                 # latest release (PyPI); pip install tramdag works too
+uv add "tramdag[plots]"        # with matplotlib, for plot_dag / plot_marginals / plot_training
+uv add "tramdag @ git+https://github.com/tensorchiefs/tramdag.git@main"   # dev version (track main)
 uv sync                        # or: dev setup from a clone (tests, experiments)
 ```
 
@@ -99,6 +100,17 @@ flow.effect_modifier_scan(df, "Y", t="T")  # which VC modifiers? (CUSUM
 flow.save("flow.pt")
 flow = CausalFlowDAG.load("flow.pt")
 ```
+
+## See the DAG
+
+```python
+from tramdag import plot_dag
+plot_dag(spec)   # or plot_dag(flow) — layers left to right, one edge style per effect
+```
+
+Continuous nodes are ellipses, ordinal nodes rounded boxes with their level
+count; `LS` is thin gray, `CS` thick blue, a complex intercept dashed orange,
+a `VC` treatment edge red with its modifiers dotted. Needs the `plots` extra.
 
 ## The model in detail: spec → math → networks
 
