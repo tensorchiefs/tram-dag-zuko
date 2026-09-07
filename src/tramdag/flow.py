@@ -163,14 +163,32 @@ class CausalFlowDAG(_FitMixin, _ReadoutsMixin, nn.Module):
         """DataFrame columns -> one ``(n,)`` tensor each, in the model dtype.
 
         ``cols=None`` takes every node, in topological order.
+
+        Raises
+        ------
+        KeyError
+            If the frame lacks one of the columns, by name — a spec/data
+            mismatch would otherwise surface deep inside a tensor op.
         """
+        cols = self.order if cols is None else cols
+        self._check_columns(df, cols)
         dtype = self._np_dtype
         return {
             c: torch.as_tensor(
                 df[c].to_numpy(dtype=dtype, copy=True), device=self.device
             )
-            for c in (self.order if cols is None else cols)
+            for c in cols
         }
+
+    @staticmethod
+    def _check_columns(df: pd.DataFrame, cols) -> None:
+        """Name the columns ``df`` lacks, before any tensor op would."""
+        missing = [c for c in cols if c not in df.columns]
+        if missing:
+            raise KeyError(
+                f"the data frame lacks the column(s) {missing}; this needs "
+                f"{list(cols)}, the frame has {list(df.columns)}"
+            )
 
     def _to_frame(self, values: dict[str, Tensor]) -> pd.DataFrame:
         """Tensors -> DataFrame; an ordinal column goes back as a level index."""
@@ -329,6 +347,7 @@ class CausalFlowDAG(_FitMixin, _ReadoutsMixin, nn.Module):
         """
         if bool(self.calibrated):
             return self
+        self._check_columns(train_df, self.order)
         for name in self.order:
             node = self.nodes[name]
             if node.kind == "ordinal":
