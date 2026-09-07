@@ -9,10 +9,10 @@ positional argument, written as a list or as a ``+`` sum::
 
 Each effect is a :class:`Term` subclass, called with the parent(s) it
 depends on: :class:`Intercept`, :class:`LinearShift`, :class:`ComplexShift`,
-:class:`VaryingCoefficient` and :class:`FnShift`. Their short names ``I``,
-``LS``, ``CS``, ``VC``, ``Fn`` (and ``SI``/``CI`` for the two intercept
-arities) are the notation of the docs and the paper and the same objects, so
-use whichever reads better:
+:class:`VaryingCoefficient` and :class:`FnShift`. The paper's symbols
+``I``, ``LS``, ``CS``, ``VC``, ``Fn`` are the same objects (``SI``/``CI`` build
+the two intercept arities) and the notation of the docs, so use whichever
+reads better:
 
 - :func:`I`  — *intercept* term: the parent(s) reshape the monotone transform
   (its Bernstein coefficients / ordinal cutpoints). ``I`` dispatches on its
@@ -144,7 +144,7 @@ def _as_term(value) -> Term:
     TypeError
         If the entry is neither a term nor the bare ``I``.
     """
-    if value is Intercept or value is simple_intercept:
+    if value is Intercept or value is SI:
         return Intercept()
     if isinstance(value, Term):
         return value
@@ -266,7 +266,7 @@ def feat_width(spec: dict[str, NodeSpec], parents) -> int:
     )
 
 
-def simple_intercept(**options) -> Intercept:
+def SI(**options) -> Intercept:
     """Build the simple-intercept baseline, the paper's SI: ``I()`` without parents.
 
     Parameters
@@ -282,7 +282,7 @@ def simple_intercept(**options) -> Intercept:
     return Intercept(**options)
 
 
-def complex_intercept(*parents: str, **options) -> Intercept:
+def CI(*parents: str, **options) -> Intercept:
     """Build the complex intercept, the paper's CI: ``I(*parents)`` with parents.
 
     Parameters
@@ -304,8 +304,7 @@ def complex_intercept(*parents: str, **options) -> Intercept:
     """
     if not parents:
         raise ValueError(
-            "complex_intercept() needs at least one parent. The parentless "
-            "baseline is simple_intercept() / SI."
+            "CI() needs at least one parent. The parentless baseline is SI()."
         )
     return Intercept(*parents, **options)
 
@@ -950,11 +949,11 @@ class FnShift(Term):
     def __post_init__(self) -> None:
         """Refuse a parentless term and a non-callable ``fn``."""
         if not self.parents:
-            raise ValueError("fn_shift needs at least one parent.")
+            raise ValueError("Fn() needs at least one parent.")
         if not callable(self.fn):
             # a domain error (a wrong option value), not a Python type error
             raise ValueError(  # noqa: TRY004
-                f"fn_shift(fn=) must be callable, got {type(self.fn).__name__}."
+                f"Fn(fn=) must be callable, got {type(self.fn).__name__}."
             )
         super().__post_init__()
 
@@ -1046,12 +1045,10 @@ NodeSpec = ContinuousNode | OrdinalNode
 
 
 # %% alias -----------------------------------------------------------------------------
-# The short names are the notation of the docs and the paper, and the
-# spelling nearly every caller uses; they are the classes above, unchanged.
-I = intercept = Intercept  # noqa: E741 - ambiguous only out of context
-SI = simple_intercept
-CI = complex_intercept
-LS = linear_shift = LinearShift
-CS = complex_shift = ComplexShift
-VC = varying_coefficient = VaryingCoefficient
-Fn = fn_shift = FnShift
+# The paper's symbols are the notation of the docs and the spelling nearly
+# every caller uses; they are the classes above, unchanged.
+I = Intercept  # noqa: E741 - ambiguous only out of context
+LS = LinearShift
+CS = ComplexShift
+VC = VaryingCoefficient
+Fn = FnShift

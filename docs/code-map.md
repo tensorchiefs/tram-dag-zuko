@@ -6,18 +6,18 @@ The last section lists every training hyperparameter and where it lives.
 
 ## `spec.py` — declare the model
 
-Every effect is a `Term` subclass under its pythonic name; the paper's short
-name and a snake_case alias are the same object, so `LS is LinearShift`.
+Every effect is a `Term` subclass under its pythonic name; the paper's symbol
+is the same object, so `LS is LinearShift`.
 
 | Name | Role |
 |---|---|
 | [`Term`][tramdag.spec.Term] | One additive term of a node's transformation, frozen data; each effect is a subclass whose annotated attributes are its options (defaults dropped on serialization, so equality is canonical). `+` on terms builds plain lists. Carries the spec-level rules: `edge_parents`, `cells`, `classical`, `options()`, `from_serialized`. Subclass `Term` for a new effect; its module goes in `terms.py` and read as attributes (`term.penalty`, `term.units`, ...). |
-| [`simple_intercept()`][tramdag.spec.simple_intercept] / `SI` | The parentless intercept — the paper's SI. Free transform parameters, the same for every row. Carries the transform choice (`transform=`, default `"bernstein"`); extra keyword arguments pass straight to the transform class. |
-| [`complex_intercept()`][tramdag.spec.complex_intercept] / `CI` | The parent-conditioned intercept — the paper's CI: the parents reshape the monotone transform. Needs at least one parent. Also carries `units=` and `allow_interaction=` (joint vs. additive multi-parent intercept). |
-| [`Intercept`][tramdag.spec.Intercept] / `I`, `intercept` | The intercept term class: without parents the paper's SI, with parents the CI; `SI()`/`CI()` are the two spellings with their arity checked. The bare names `I` and `SI` in a term list both mean the simple intercept. |
-| [`LinearShift`][tramdag.spec.LinearShift] / `LS`, `linear_shift` | Linear shift `beta * x` — the interpretable log-odds coefficient. Exactly one parent. |
-| [`ComplexShift`][tramdag.spec.ComplexShift] / `CS`, `complex_shift` | Complex shift: an NN `g(x)`, additive on the latent scale. Several parents form one joint network. |
-| [`VaryingCoefficient`][tramdag.spec.VaryingCoefficient] / `VC`, `varying_coefficient` | Varying-coefficient shift `(beta0 + b_theta(mods)) * x_t` — the penalized treatment-effect head (issue #28). `center=` adds propensity centering (issue #30). |
+| [`SI()`][tramdag.spec.SI] | The parentless intercept — the paper's SI. Free transform parameters, the same for every row. Carries the transform choice (`transform=`, default `"bernstein"`); extra keyword arguments pass straight to the transform class. |
+| [`CI()`][tramdag.spec.CI] | The parent-conditioned intercept — the paper's CI: the parents reshape the monotone transform. Needs at least one parent. Also carries `units=` and `allow_interaction=` (joint vs. additive multi-parent intercept). |
+| [`Intercept`][tramdag.spec.Intercept] / `I` | The intercept term class: without parents the paper's SI, with parents the CI; `SI()`/`CI()` are the two spellings with their arity checked. The bare names `I` and `SI` in a term list both mean the simple intercept. |
+| [`LinearShift`][tramdag.spec.LinearShift] / `LS` | Linear shift `beta * x` — the interpretable log-odds coefficient. Exactly one parent. |
+| [`ComplexShift`][tramdag.spec.ComplexShift] / `CS` | Complex shift: an NN `g(x)`, additive on the latent scale. Several parents form one joint network. |
+| [`VaryingCoefficient`][tramdag.spec.VaryingCoefficient] / `VC` | Varying-coefficient shift `(beta0 + b_theta(mods)) * x_t` — the penalized treatment-effect head (issue #28). `center=` adds propensity centering (issue #30). |
 | [`ContinuousNode`][tramdag.spec.ContinuousNode] | Continuous variable: monotone 1-D transform plus shifts. `terms` is the first positional argument. |
 | [`OrdinalNode`][tramdag.spec.OrdinalNode] | Ordinal variable with `levels` classes: ordered logit (cutpoints) plus shifts. |
 | [`node_parents()`][tramdag.spec.node_parents] | Ordered de-duplicated parent names of a node (the canonical term list is `node.terms`). |

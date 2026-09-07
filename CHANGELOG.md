@@ -5,9 +5,11 @@
 ### Changed (breaking) — an effect is a `Term` subclass; the registry is gone
 
 - `Intercept`, `LinearShift`, `ComplexShift`, `VaryingCoefficient` and
-  `FnShift` are the effects, classes now (frozen dataclasses) with `I`, `LS`,
-  `CS`, `VC`, `Fn` as aliases, not constructor functions returning one
-  string-tagged `Term`. Every call
+  `FnShift` are the effects, classes now (frozen dataclasses) with the paper's
+  symbols `I`, `LS`, `CS`, `VC`, `Fn` as aliases, not constructor functions
+  returning one string-tagged `Term`. The snake_case names (`linear_shift`,
+  `complex_shift`, `varying_coefficient`, `fn_shift`, `intercept`,
+  `simple_intercept`, `complex_intercept`) are gone; `SI()` and `CI()` stay. Every call
   spelling stays the same — `CS("a", "b", units=[16])`, `I(transform=
   "spline", bins=6)`, `VC("m", t="t")`, the `+` sums, `SI()`/`CI()`, the
   pythonic aliases — and so do YAML specs and checkpoints (`effect` is the

@@ -40,7 +40,7 @@ drafted against a seven-subsystem survey and judged from three lenses
    abstraction — a third node kind earns the protocol.
 5. Extension points: a `Term` subclass plus a `ShiftTerm` subclass declaring
    `data =` it (subclassing is the registration — see the 2026-09 revision
-   below) and `fn_shift` (a callable / `nn.Module` in the additive shifts);
+   below) and `Fn` (a callable / `nn.Module` in the additive shifts);
    `I(transform=<_ScaledUT subclass>)` for a custom transform.
 
 ## Refused (deliberately, so a later proposal can find the reasoning)

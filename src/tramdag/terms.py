@@ -525,7 +525,7 @@ class FnShiftTerm(ShiftTerm, nn.Module):
 
     A plain function contributes a fixed (non-trained) offset; an
     ``nn.Module`` registers as a submodule and trains with the flow. Built
-    by :func:`tramdag.spec.fn_shift`.
+    by :class:`tramdag.spec.FnShift` (``Fn``).
     """
 
     data = Fn

@@ -21,17 +21,10 @@ from .spec import (
     OrdinalNode,
     Term,
     VaryingCoefficient,
-    complex_intercept,
-    complex_shift,
-    fn_shift,
-    intercept,
-    linear_shift,
     node_parents,
-    simple_intercept,
     spec_from_dict,
     spec_to_dict,
     validate_and_sort,
-    varying_coefficient,
 )
 
 # %% global variables ------------------------------------------------------------------
@@ -52,17 +45,10 @@ __all__ = [
     "OrdinalNode",
     "Term",
     "VaryingCoefficient",
-    "complex_intercept",
-    "complex_shift",
-    "fn_shift",
-    "intercept",
-    "linear_shift",
     "node_parents",
     "plot_dag",
-    "simple_intercept",
     "spec_from_dict",
     "spec_to_dict",
     "validate_and_sort",
-    "varying_coefficient",
 ]
 __version__ = version("tramdag")

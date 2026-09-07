@@ -229,24 +229,20 @@ def test_malformed_serialized_spec_is_rejected():
         validate_and_sort(spec_from_dict(spec_with(unknown_parent)))
 
 
-def test_short_aliases_are_the_definitions():
-    """LS is linear_shift, and both spellings build the same spec."""
+def test_paper_symbols_are_the_classes():
+    """I/LS/CS/VC/Fn are the term classes; SI/CI build the intercept arities."""
     import tramdag as td
 
-    assert (
-        td.intercept,
-        td.linear_shift,
-        td.complex_shift,
-        td.varying_coefficient,
-    ) == (I, LS, CS, VC)
-    short = ContinuousNode(I("x") + LS("y") + CS("z") + VC("z", t="y"))
-    long = ContinuousNode(
-        td.intercept("x")
-        + td.linear_shift("y")
-        + td.complex_shift("z")
-        + td.varying_coefficient("z", t="y")
+    assert (td.I, td.LS, td.CS, td.VC, td.Fn) == (
+        td.Intercept,
+        td.LinearShift,
+        td.ComplexShift,
+        td.VaryingCoefficient,
+        td.FnShift,
     )
-    assert short.terms == long.terms
+    assert SI() == I()
+    assert CI("a") == I("a")
+    assert not hasattr(td, "linear_shift")
 
 
 def test_units_reach_the_networks():

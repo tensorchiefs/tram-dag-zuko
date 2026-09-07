@@ -109,7 +109,7 @@ attributes are the options; `__post_init__`, `edge_parents`, `cells` its
 rules) and a `ShiftTerm` subclass declaring `data =` that class and
 implementing `build` (which must set `key`) +
 `shift_value`. Subclassing is the registration; the cheap path for a
-one-off is `fn_shift`.
+one-off is `Fn`.
 
 ## Node kinds
 

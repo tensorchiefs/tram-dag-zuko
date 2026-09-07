@@ -66,7 +66,7 @@ subclassing is the registration (no registry, no `register_term`).
 Node-kind branches live ONLY in nodes.py's four kind_* functions;
 `fitting.py`/`readouts.py` are mixins CausalFlowDAG composes (methods
 defined once, no delegate layer); public: `flow.shift_curve`,
-`fn_shift`/`Fn`, `ordinal_bounds`, spec exports
+`Fn`, `ordinal_bounds`, spec exports
 (`spec_to_dict`/`spec_from_dict`/`validate_and_sort`/`node_parents`),
 `effect_modifier_scan(column=)`. docs/architecture.md carries the module
 map and the term-contract diagram.
@@ -79,9 +79,8 @@ map and the term-contract diagram.
   shift), `CS(*parents)` (complex shift MLP), `VC(*modifiers, t=, penalty=)`
   (varying-coefficient effect head `beta(modifiers)·x_t`, small penalized
   zero-init net; read out with `flow.varying_coef` — see
-  docs/varying-coefficients.md), `Fn(*parents, fn=)`. Each has a pythonic
-  long name (`simple_intercept`, `complex_shift`, ...) aliased to the same
-  object. `transform=` on an intercept picks the monotone transform class and **extra
+  docs/varying-coefficients.md), `Fn(*parents, fn=)`. The paper's symbols
+  are the classes (`LS is LinearShift`); there are no snake_case aliases. `transform=` on an intercept picks the monotone transform class and **extra
   keyword arguments pass straight to the transform class**
   (`SI(transform="spline", bins=16)`); `units=[...]` on CI/CS/VC sizes the
   term's network. A node takes at most ONE intercept term with parents; a

@@ -1,7 +1,7 @@
-"""Custom shift terms: ``fn_shift`` and the two-class effect contract.
+"""Custom shift terms: ``Fn`` and the two-class effect contract.
 
 The extension contract of 1.0: a callable (or ``nn.Module``) drops into the
-additive shifts via ``fn_shift``; a whole new effect is a ``tramdag.Term``
+additive shifts via ``Fn``; a whole new effect is a ``tramdag.Term``
 subclass (its options and checks) plus a ``tramdag.terms.ShiftTerm`` subclass
 declaring ``data =`` that term class. Subclassing is the registration:
 checkpoints carry the effect NAME only, so loading a custom spec needs the
@@ -14,7 +14,7 @@ import pytest
 import torch
 from torch import nn
 
-from tramdag import CausalFlowDAG, ContinuousNode, Fn, Term, fn_shift, spec_from_dict
+from tramdag import CausalFlowDAG, ContinuousNode, Fn, Term, spec_from_dict
 from tramdag.terms import ShiftTerm, module_for
 
 
@@ -92,9 +92,8 @@ class Orphan(Term):
 def test_fn_shift_offsets_the_latent_and_round_trips(ls_chain, tmp_path):
     """A module-level fn shifts u by fn(x) exactly and survives a checkpoint."""
     df = ls_chain["draw"](600, 0)[["x1", "x2"]]
-    flow = CausalFlowDAG(_two_node(fn_shift("x1", fn=_double)), seed=0)
+    flow = CausalFlowDAG(_two_node(Fn("x1", fn=_double)), seed=0)
     flow.fit(df, epochs=5, batch_size=200)
-    assert Fn is fn_shift
     # the shift really is fn (the grid read-out goes through shift_value)
     grid = np.linspace(-2, 2, 9)
     np.testing.assert_allclose(
@@ -108,7 +107,7 @@ def test_fn_shift_offsets_the_latent_and_round_trips(ls_chain, tmp_path):
 def test_fn_shift_lambda_refuses_to_save(ls_chain, tmp_path):
     """A lambda fn fails at save() with the picklable-function message."""
     df = ls_chain["draw"](200, 0)[["x1", "x2"]]
-    flow = CausalFlowDAG(_two_node(fn_shift("x1", fn=lambda x: x[:, 0])), seed=0)
+    flow = CausalFlowDAG(_two_node(Fn("x1", fn=lambda x: x[:, 0])), seed=0)
     flow.fit(df, epochs=1, batch_size=200)
     with pytest.raises(ValueError, match="module-level function"):
         flow.save(tmp_path / "m.pt")
@@ -118,7 +117,7 @@ def test_fn_shift_nn_module_trains(ls_chain):
     """An nn.Module fn registers as a submodule and its parameters move."""
     df = ls_chain["draw"](600, 0)[["x1", "x2"]]
     net = nn.Linear(1, 1)
-    flow = CausalFlowDAG(_two_node(fn_shift("x1", fn=net)), seed=0)
+    flow = CausalFlowDAG(_two_node(Fn("x1", fn=net)), seed=0)
     before = net.weight.detach().clone()
     flow.fit(df, epochs=10, batch_size=200, learning_rate=1e-2)
     assert not torch.equal(before, net.weight.detach())
@@ -128,9 +127,9 @@ def test_fn_shift_nn_module_trains(ls_chain):
 def test_fn_shift_validates_its_arguments():
     """No parents and a non-callable fn both refuse loudly."""
     with pytest.raises(ValueError, match="at least one parent"):
-        fn_shift(fn=_double)
+        Fn(fn=_double)
     with pytest.raises(ValueError, match="must be callable"):
-        fn_shift("x1", fn=3)
+        Fn("x1", fn=3)
 
 
 def test_custom_effect_builds_fits_and_round_trips(ls_chain, tmp_path):
@@ -183,7 +182,7 @@ def test_custom_regularizer_joins_the_loss(ls_chain):
 def test_shift_curve_covers_fn_terms(ls_chain):
     """shift_curve evaluates through shift_value, so an Fn term works."""
     df = ls_chain["draw"](300, 0)[["x1", "x2"]]
-    flow = CausalFlowDAG(_two_node(fn_shift("x1", fn=_double)), seed=0)
+    flow = CausalFlowDAG(_two_node(Fn("x1", fn=_double)), seed=0)
     flow.fit(df, epochs=1, batch_size=150)
     grid = np.linspace(-1, 1, 5)
     np.testing.assert_allclose(
