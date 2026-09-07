@@ -96,7 +96,7 @@ def make_univariate_transform(name, **kwargs) -> _ScaledUT:
     ----------
     name : str | type[_ScaledUT]
         One of the registered names — ``"bernstein"``, ``"spline"``,
-        ``"affine"`` — or a ``_ScaledUT`` subclass itself, the custom-basis
+        ``"affine"`` — or a ``_ScaledUT`` subclass itself, the custom-transform
         hatch (``I(transform=MyUT)``; note a class in a spec serializes
         through pickle only, like a callable ``input_transform``).
     **kwargs

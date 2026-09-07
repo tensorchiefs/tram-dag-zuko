@@ -98,7 +98,7 @@ def test_i_dispatches_to_si_and_ci():
         CI()
 
 
-def test_bare_i_can_carry_the_source_basis():
+def test_bare_i_can_carry_the_source_transform():
     assert ContinuousNode([I(transform="affine")]).transform == "affine"
 
 
@@ -261,11 +261,11 @@ def test_units_reach_the_networks():
     assert flow.nodes["y"].shifts["x1"].net[0].out_features == 8
 
 
-def test_basis_arguments_apply_without_naming_the_basis():
-    """SI(n_coeffs=40) must configure the default basis, not be ignored.
+def test_transform_arguments_apply_without_naming_the_transform():
+    """SI(n_coeffs=40) must configure the default transform, not be ignored.
 
     The effective transform used to be read only from a term that also set
-    `transform=`, so basis arguments on their own were silently dropped and
+    `transform=`, so transform arguments on their own were silently dropped and
     the reader got the default order with no indication.
     """
     node = ContinuousNode([SI(n_coeffs=40)])
@@ -325,7 +325,7 @@ def test_wrong_effect_option_errors_instead_of_defaulting():
 
 
 def test_transform_accepts_a_custom_class():
-    """``I(transform=<class>)`` builds a custom basis (pickle-only serialization)."""
+    """``I(transform=<class>)`` builds a custom transform (pickle-only checkpoint)."""
     from tramdag.transforms import BernsteinUT
 
     spec = {"x": ContinuousNode([I(transform=BernsteinUT, n_coeffs=7)])}

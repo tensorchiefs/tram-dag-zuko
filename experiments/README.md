@@ -100,7 +100,7 @@ top to bottom):
 
 - `spec:` — the full DAG in `tramdag.spec_from_dict` form: per node `kind`
   (+ `levels` for ordinal), and one `{effect, parents, options}` entry per
-  term. Everything about the model — basis, `n_coeffs`, `range_q`, network
+  term. Everything about the model — transform, `n_coeffs`, `range_q`, network
   `units`/`activation`, `input_transform` — is a term option here, not a
   separate config key.
 - `flow_kwargs:` — passed to `CausalFlowDAG(spec, **flow_kwargs)` verbatim

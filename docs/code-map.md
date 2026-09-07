@@ -12,7 +12,7 @@ are the same object, so `LS is linear_shift`.
 | Name | Role |
 |---|---|
 | [`Term`][tramdag.spec.Term] | One additive term of a node's transformation: the frozen triple `(effect, parents, options)`. `+` on terms builds plain lists. Effect-specific settings live in `options` and read as attributes (`term.penalty`, `term.units`, ...). |
-| [`simple_intercept()`][tramdag.spec.simple_intercept] / [`SI`][tramdag.spec.simple_intercept] | The parentless intercept — the paper's SI. Free transform parameters, the same for every row. Carries the basis choice (`transform=`, default `"bernstein"`); extra keyword arguments pass straight to the transform class. |
+| [`simple_intercept()`][tramdag.spec.simple_intercept] / [`SI`][tramdag.spec.simple_intercept] | The parentless intercept — the paper's SI. Free transform parameters, the same for every row. Carries the transform choice (`transform=`, default `"bernstein"`); extra keyword arguments pass straight to the transform class. |
 | [`complex_intercept()`][tramdag.spec.complex_intercept] / [`CI`][tramdag.spec.complex_intercept] | The parent-conditioned intercept — the paper's CI: the parents reshape the monotone transform. Needs at least one parent. Also carries `units=` and `allow_interaction=` (joint vs. additive multi-parent intercept). |
 | [`intercept()`][tramdag.spec.intercept] / [`I`][tramdag.spec.intercept] | The fallback: dispatches on its arguments to `SI` (no parents) or `CI` (parents). The bare names `I` and `SI` in a term list both mean the simple intercept. |
 | [`linear_shift()`][tramdag.spec.linear_shift] / [`LS`][tramdag.spec.linear_shift] | Linear shift `beta * x` — the interpretable log-odds coefficient. Exactly one parent. |
@@ -23,7 +23,7 @@ are the same object, so `LS is linear_shift`.
 | [`node_parents()`][tramdag.spec.node_parents] | Ordered de-duplicated parent names of a node (the canonical term list is `node.terms`). |
 | [`validate_and_sort()`][tramdag.spec.validate_and_sort] | Edge-ownership validation plus Kahn topological sort. The returned order makes the flow triangular. |
 | [`spec_to_dict()`][tramdag.spec.spec_to_dict] / [`spec_from_dict()`][tramdag.spec.spec_from_dict] | Checkpoint (de)serialization. A term serializes as `{effect, parents, options}` and nothing else, since `options` is already canonical. No compatibility shims: `spec_from_dict` rejects a term without `options`, the node constructors normalize the formula, and `validate_and_sort` checks the DAG. |
-| (`_normalize_terms`, `_as_term`, `_intercept_basis`, `_options`) | Formula flattening and per-entry validation (a `+` sum nested in a list is rejected), the one-parented-`I` rule plus basis hoisting in one pass, canonical option storage against each effect's `option_defaults` (a wrong-effect option errors). |
+| (`_normalize_terms`, `_as_term`, `_intercept_transform`, `_options`) | Formula flattening and per-entry validation (a `+` sum nested in a list is rejected), the one-parented-`I` rule plus transform hoisting in one pass, canonical option storage against each effect's `option_defaults` (a wrong-effect option errors). |
 | (`_check_term`, `_check_node`, `_check_input_transform`, `_kahn_sort`) | The stages behind `validate_and_sort`: the generic checks (effect known, parents exist, `input_transform` shape) plus each entry's own rules (LS arity, the VC treatment/centering block — on the term classes), edge-ownership bookkeeping, the topological sort. |
 
 ## `transforms.py` — the monotone map h and the ordinal transform
@@ -31,10 +31,10 @@ are the same object, so `LS is linear_shift`.
 | Name | Role |
 |---|---|
 | [`StandardLogistic`][tramdag.transforms.StandardLogistic] | The TRAM base distribution: `log_prob`, `sample` (generator-aware), `icdf`. |
-| [`BernsteinUT`][tramdag.transforms.BernsteinUT] | Bernstein-polynomial transform (default basis, `n_coeffs=20`). Linear tail extrapolation follows the boundary derivative. `marginal_init_theta()` gives the calibrated start `init_marginals` applies. |
+| [`BernsteinUT`][tramdag.transforms.BernsteinUT] | Bernstein-polynomial transform (the default, `n_coeffs=20`). Linear tail extrapolation follows the boundary derivative. `marginal_init_theta()` gives the calibrated start `init_marginals` applies. |
 | [`SplineUT`][tramdag.transforms.SplineUT] | Monotone rational-quadratic spline (`bins=8`). Tails extrapolate with a *fixed* slope — the structural reason spline trails Bernstein on tail-heavy data. |
 | [`AffineUT`][tramdag.transforms.AffineUT] | Monotone affine transform: the node-conditional is a logistic GLM. |
-| [`make_univariate_transform()`][tramdag.transforms.make_univariate_transform] | Basis registry: name → transform instance. |
+| [`make_univariate_transform()`][tramdag.transforms.make_univariate_transform] | Transform registry: name → transform instance. |
 | [`ordinal_cutpoints()`][tramdag.transforms.ordinal_cutpoints] | Unconstrained `(n, K-1)` → increasing cutpoints with ±inf ends. Port of the original parametrization. |
 | [`ordinal_log_prob()`][tramdag.transforms.ordinal_log_prob] | `log P(Y=y)`, computed in log-space. Load-bearing: the naive sigmoid difference saturates in float32 and freezes nodes at init. Do not simplify. |
 | [`ordinal_pmf()`][tramdag.transforms.ordinal_pmf] / [`ordinal_sample()`][tramdag.transforms.ordinal_sample] / [`ordinal_abduct()`][tramdag.transforms.ordinal_abduct] | Class probabilities / latent → level / truncated-logistic latent recovery (Pearl step 1) for ordinal nodes. |
@@ -83,7 +83,7 @@ config in `experiments/paper/` states `units=` and `activation=` itself.
 | [`save()`][tramdag.flow.CausalFlowDAG.save] / [`load()`][tramdag.flow.CausalFlowDAG.load] | Checkpoints with history and provenance (version, time, device). `load` requires a complete checkpoint and fails loudly otherwise. |
 | (`_node`, `_encode_parent`, `_features`, `_tensorize`, `_generator`, `_dtype`, `_np_dtype`) | Node lookup with one shared error; parent encoding (continuous raw, ordinal one-hot); `_tensorize(df, cols=None)` for any column subset; seeded-generator and dtype plumbing. |
 | (`_check_side_columns`, `_binary_p1`, `_side_feats`, `_query_side_columns`, `_recenter_vc`) | The generic side-column plumbing (each term names/validates/recomputes its own columns via the `ShiftTerm` hooks) plus the binary propensity fit and the post-fit `finalize` loop. |
-| (`_is_classical`) | Guard for `fit_classical`: every term's `term_is_classical` — `LS`, or a parentless `I()` basis carrier. |
+| (`_is_classical`) | Guard for `fit_classical`: every term's `term_is_classical` — `LS`, or a parentless `I()` transform carrier. |
 
 
 ## `terms.py` — the effect registry (the 1.0 architecture's core)
@@ -173,7 +173,7 @@ default you can read at the call site. Nothing numeric is buried.
 | training budget | `fit(epochs=)` | **required** — a fixed default is wrong in both directions ([training-speed](training-speed.md)) |
 | network widths | `units=` on `I`/`CS`/`VC` | (8, 8) / (64, 128, 64) — parity with the PyTorch reference's default classes; VC's (16,) has no counterpart there and comes from the recovery measurement |
 | activation | `activation=` on `I`/`CS`/`VC` | `"relu"` (the reference default classes); `"sigmoid"` and `"tanh"` are the paper's |
-| transform basis | `I(transform=, **kwargs)` (extra kwargs go to the transform class) | `"bernstein"`, `n_coeffs=20` unconstrained coefficients (zuko ties two more control points on, so order 21); spline `bins=8` = zuko's NSF default (the domain is fixed at [-5, 5], `transforms.BOUND`) |
+| transform class | `I(transform=, **kwargs)` (extra kwargs go to the transform class) | `"bernstein"`, `n_coeffs=20` unconstrained coefficients (zuko ties two more control points on, so order 21); spline `bins=8` = zuko's NSF default (the domain is fixed at [-5, 5], `transforms.BOUND`) |
 | shuffling / weight init | `fit(seed=)` / `CausalFlowDAG(seed=)` | init happens at construction — the constructor seed is the reproducibility knob |
 | weight init | `CausalFlowDAG(init=)` | `"torch"` (`nn.Linear` Kaiming-uniform); `"glorot"` = Keras `Dense` default, glorot-uniform weights and zero biases — the paper's reference; decisive under its full-batch protocol |
 | network inputs | `CI/CS/VC(input_transform=)` | `None` (raw parents); `"minmax"` / `"standardize"` transform that term's continuous parents with statistics frozen at `calibrate`, and a callable `fn(x, train)` gets the frozen raw train column — LS and the VC treatment stay raw |

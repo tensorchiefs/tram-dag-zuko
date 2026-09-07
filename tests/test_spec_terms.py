@@ -132,7 +132,7 @@ def test_ls_coefficients_shape_and_agreement_with_the_modules():
     assert coefs["y"]["t"].shape == (3,)  # one per ordinal level
 
 
-def test_ordinal_node_refuses_a_basis():
+def test_ordinal_node_refuses_a_transform():
     """An ordinal intercept is the cutpoint vector; I(transform=) has no meaning."""
     with pytest.raises(ValueError, match="cutpoint vector"):
         OrdinalNode(3, [I(transform="spline")])

@@ -19,7 +19,7 @@ object, so use whichever reads better:
   arguments: without parents it is the paper's simple intercept :func:`SI`
   (always present, optional to write — the bare names ``I`` and ``SI`` both
   work in a term list), with parents the complex intercept :func:`CI`.
-  ``transform="spline"`` picks the basis of the monotone transform for a
+  ``transform="spline"`` picks the class of the monotone transform for a
   continuous node; extra keyword arguments go straight to the transform
   class (``SI(transform="spline", bins=16)``).
 - :func:`LS` — *linear shift*: ``beta * x`` (one interpretable weight), one parent.
@@ -197,11 +197,11 @@ def _normalize_terms(value):
     return items
 
 
-def _configured_basis(terms):
-    """Give the intercept term if it configures a basis, else ``None``.
+def _configured_transform(terms):
+    """Give the intercept term if it configures the transform, else ``None``.
 
     Normalization guarantees exactly one intercept, at ``terms[0]``, so the
-    basis has exactly one possible carrier.
+    transform has exactly one possible carrier.
     """
     intercept_term = terms[0] if terms else None
     if intercept_term is not None and (
@@ -211,31 +211,31 @@ def _configured_basis(terms):
     return None
 
 
-def _intercept_basis(terms) -> tuple[str, dict]:
+def _intercept_transform(terms) -> tuple[str, dict]:
     """Give a continuous node's effective ``(transform, transform_kwargs)``.
 
     The arguments go straight to the transform class; if they are wrong,
     that class says so — this layer does not second-guess it.
     """
-    intercept_term = _configured_basis(terms)
+    intercept_term = _configured_transform(terms)
     if intercept_term is None:
         return DEFAULT_TRANSFORM, {}
     name = intercept_term.transform or DEFAULT_TRANSFORM
     return name, dict(intercept_term.transform_kwargs or ())
 
 
-def _reject_basis(terms) -> None:
-    """Refuse a basis on an ordinal node, whose intercept is the cutpoint vector.
+def _reject_transform(terms) -> None:
+    """Refuse a transform on an ordinal node, whose intercept is the cutpoint vector.
 
     Raises
     ------
     ValueError
-        If the intercept term configures a basis.
+        If the intercept term configures one.
     """
-    if _configured_basis(terms) is not None:
+    if _configured_transform(terms) is not None:
         raise ValueError(
             "I(transform=...) is for continuous nodes. An ordinal node's "
-            "intercept is the cutpoint vector, it has no basis to choose."
+            "intercept is the cutpoint vector, it has no transform to choose."
         )
 
 
@@ -399,7 +399,7 @@ def simple_intercept(
     Parameters
     ----------
     transform : str | None, optional
-        Basis of a continuous node's monotone transform: ``"bernstein"``
+        Class of a continuous node's monotone transform: ``"bernstein"``
         (default), ``"spline"`` or ``"affine"``. Bernstein is the default
         because zuko's spline extrapolates outside ``[-B, B]`` with a *fixed*
         slope, independent of the fitted parameters, so the ~10% of data
@@ -459,7 +459,7 @@ def complex_intercept(
         PyTorch reference — see :mod:`tramdag.conditioners`, which also
         explains why a paper replication sets this explicitly.
     transform : str | None, optional
-        Basis of the node's monotone transform, as for
+        Class of the node's monotone transform, as for
         :func:`simple_intercept`.
     **transform_kwargs
         Forwarded to the transform class.
@@ -928,7 +928,7 @@ class Term:
         effect's options with their defaults; a key another effect takes
         raises ``AttributeError`` instead of answering with a foreign
         default. Keys per effect: ``penalty`` and ``center`` (VC, see
-        :func:`VC`); ``transform`` and ``transform_kwargs`` (I, the basis
+        :func:`VC`); ``transform`` and ``transform_kwargs`` (I, the class
         of the monotone transform, kwargs stored as sorted pairs);
         ``units`` and ``activation`` (the term's network); ``fn`` (Fn, the
         custom shift callable); ``input_transform`` (I/CS/VC/Fn: the
@@ -982,7 +982,7 @@ class ContinuousNode:
     terms : Term | list[Term] | None, optional
         The additive formula for ``h``: a list of terms, a ``+`` sum, a
         single term, or the bare ``I``. ``None`` (default) is a source node. The
-        basis of the monotone transform is chosen on the intercept term,
+        class of the monotone transform is chosen on the intercept term,
         ``I(..., transform="spline")``; the default is ``"bernstein"``.
     """
 
@@ -990,16 +990,16 @@ class ContinuousNode:
 
     def __init__(self, terms=None):
         self.terms = _normalize_terms(terms)
-        self.transform, self.transform_kwargs = _intercept_basis(self.terms)
+        self.transform, self.transform_kwargs = _intercept_transform(self.terms)
 
     def __repr__(self):
-        """Show the terms and the basis."""
+        """Show the terms and the transform."""
         return f"ContinuousNode({self.terms!r}, transform={self.transform!r})"
 
     def __eq__(self, other):
-        """Compare the terms; the basis is derived from them."""
+        """Compare the terms; the transform is derived from them."""
         # transform/transform_kwargs are derived from the terms, so equal
-        # term lists already imply an equal basis
+        # term lists already imply an equal transform
         return isinstance(other, ContinuousNode) and self.terms == other.terms
 
     def __hash__(self):
@@ -1026,7 +1026,7 @@ class OrdinalNode:
     def __init__(self, levels: int, terms=None):
         self.levels = int(levels)
         self.terms = _normalize_terms(terms)
-        _reject_basis(self.terms)
+        _reject_transform(self.terms)
 
     def __repr__(self):
         """Show the levels and the terms."""

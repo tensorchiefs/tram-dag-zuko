@@ -35,7 +35,7 @@ uv run python -m paper.check_data            # frozen data still regenerates
 Every experiment reads its hyperparameters from its sibling `<script>.yaml` and
 has **no defaults in code**; `experiments/common.py::load_variant` parses it.
 The blueprint (2026-09, experiments/README.md): each variant carries the FULL
-model as `spec:` (`tramdag.spec_from_dict` form — basis, n_coeffs, range_q,
+model as `spec:` (`tramdag.spec_from_dict` form — transform, n_coeffs, range_q,
 units, activation, input_transform are term options there, not config keys),
 `flow_kwargs:` (CausalFlowDAG construction) and `fit_kwargs:` (flow.fit
 verbatim); learning_rate/schedule stay top-level (they build the optimizer).
@@ -74,7 +74,7 @@ docs/architecture.md carries the module map and the term-contract diagram.
   `beta(modifiers)·x_t`, small penalized zero-init net; read out with
   `flow.varying_coef` — see docs/varying-coefficients.md). Each has a pythonic
   long name (`simple_intercept`, `complex_shift`, ...) aliased to the same
-  object. `transform=` on an intercept picks the monotone basis and **extra
+  object. `transform=` on an intercept picks the monotone transform class and **extra
   keyword arguments pass straight to the transform class**
   (`SI(transform="spline", bins=16)`); `units=[...]` on CI/CS/VC sizes the
   term's network. A node takes at most ONE intercept term with parents; a

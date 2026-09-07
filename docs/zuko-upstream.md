@@ -27,7 +27,7 @@ data sits beyond the 5%/95% pre-scaling range; CLAUDE.md, `spec.py`, demo
 notebook section 6). Upstream: accept boundary derivatives (shape `(*, K+1)`)
 or an opt-in `tails="linear"`; identity tails are deliberate in the NSF
 design, so the framing must be back-compatible. Would delete the caveats and
-make `spline` a first-class basis choice.
+make `spline` a first-class transform choice.
 
 ## 3. Public inverse of `_constrain_theta`
 

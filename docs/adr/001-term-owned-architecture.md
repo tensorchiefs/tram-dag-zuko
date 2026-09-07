@@ -40,7 +40,7 @@ drafted against a seven-subsystem survey and judged from three lenses
    abstraction — a third node kind earns the protocol.
 5. Extension points: `register_term` (a `ShiftTerm` subclass under its own
    effect name) and `fn_shift` (a callable / `nn.Module` in the additive
-   shifts); `I(transform=<_ScaledUT subclass>)` for a custom basis.
+   shifts); `I(transform=<_ScaledUT subclass>)` for a custom transform.
 
 ## Refused (deliberately, so a later proposal can find the reasoning)
 

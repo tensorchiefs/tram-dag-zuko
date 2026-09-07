@@ -139,11 +139,11 @@ always purely additive on the latent scale, and interactions exist only
 
 Three knobs on the terms:
 
-- **`transform=` on `I`** picks the basis of `h_ϑ` for a continuous node —
+- **`transform=` on `I`** picks the class of `h_ϑ` for a continuous node —
   `"bernstein"` (default, 20 coefficients, tails extrapolate with the boundary
   slope), `"spline"` (monotone RQ spline, 23 params at `bins=8`, fixed tail
   slope) or `"affine"` (2 params: the latent is exactly logistic). Ordinal
-  nodes have no basis: their intercept is the cutpoint vector,
+  nodes have no transform to pick: their intercept is the cutpoint vector,
   `P(x ≤ k) = σ(ϑ_k − shift)`.
 - **`input_transform=` on `CI`/`CS`/`VC`** — `"minmax"`, `"standardize"`, or
   a callable `fn(x, train)` — transforms that term's continuous network
