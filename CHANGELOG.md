@@ -2,6 +2,23 @@
 
 ## 1.0.0-rc (unreleased, branch rc/1.0-architecture)
 
+### Added — `tramdag.plots` (optional extra `tramdag[plots]`)
+
+- `plot_dag(spec | flow)`: the labelled DAG, layered left to right, one edge
+  style per effect (LS, CS, CI, VC with modifiers, Fn; `joint` for a
+  multi-parent net). Exported as `tramdag.plot_dag`. `plot_marginals(flow,
+  df)` and `plot_training(flow, frozen=)` join it. matplotlib is imported on
+  the first call, so the package import never needs it.
+- `PerNodePlateau.frozen` is now `{node: epoch}` — the epoch each node left
+  training — instead of a bare set, so a training figure can mark the
+  freezes. `step(nll, opt, epoch=None)` records it; `len`/`in` are unchanged.
+- `fit` records the optimizer's learning rate after every epoch in
+  `history["lr"]` (`{node: lr}` with `per_node_adam`'s tagged groups, else a
+  float). `plot_training` reads the freezes off it, so no tracer callback is
+  needed any more.
+- A data frame that lacks a spec column now fails in `_tensorize` with a
+  `KeyError` that names the column(s), instead of deep inside a tensor op.
+
 ### Changed — tag-driven releases (the skeleton convention)
 
 The version is now the git tag: hatch-vcs derives it (`no-local-version`),

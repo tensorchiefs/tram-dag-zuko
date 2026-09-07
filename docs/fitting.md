@@ -82,8 +82,11 @@ learning rates and freezing (a callback, below) and the all-`ls` classical fit.
   and only the head calibrates — no leakage) makes `fit` compute the
   per-node validation NLL after every epoch, once, into
   `flow.history["val"]` (`validation_batch_size=` chunks the pass). The
-  shipped callbacks read it there. `verbose=N` prints every Nth epoch plus
-  the final one (0, the default, is silent).
+  shipped callbacks read it there. `flow.history["lr"]` records the
+  optimizer's rate after every epoch (`{node: lr}` with `per_node_adam`), so
+  a schedule's decisions are on record without a callback of your own.
+  `verbose=N` prints every Nth epoch plus the final one (0, the default, is
+  silent).
 - **`callbacks=`** — one entry or a list. A
   [`tramdag.callbacks.Callback`](../src/tramdag/callbacks.py) hooks
   `on_fit_begin` / `on_epoch_end` / `on_fit_end` (its docstring is the

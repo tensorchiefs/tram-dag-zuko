@@ -102,9 +102,15 @@ docs/architecture.md carries the module map and the term-contract diagram.
   `EarlyStopping` (best-validation weights restored automatically at fit
   end; optional stopping `patience`) and
   `PerNodePlateau` + `per_node_adam` (per-node lr decay and freezing, the
-  pre-0.4 plateau recipe). All read `history["val"]`, which
-  `fit(validation_data=|validation_split=)` fills per epoch; `verbose=`
-  owns progress printing. Optional; `fit` itself stays one plain loop.
+  pre-0.4 plateau recipe; `frozen = {node: epoch}` afterwards). All read
+  `history["val"]`, which `fit(validation_data=|validation_split=)` fills
+  per epoch; `fit` also records the optimizer's rate per epoch in
+  `history["lr"]`; `verbose=` owns progress printing. Optional; `fit` itself
+  stays one plain loop.
+- `plots.py` — `plot_dag(spec|flow)` (the labelled DAG, layered, one edge
+  style per effect), `plot_marginals`, `plot_training(frozen=)`. matplotlib is
+  the optional extra `tramdag[plots]`, imported on first call — the package
+  import never needs it. `plot_dag` is exported at top level.
 - (no `utils.py` any more: `config_section` moved to
   `experiments/common.py`, `machine_info` to
   `experiments/benchmarks/perf_machine.py` — each next to its only caller, so

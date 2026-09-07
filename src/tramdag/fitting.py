@@ -137,6 +137,16 @@ def _epoch_pass(
         )
 
 
+def _learning_rates(opt) -> dict[str, float] | float | list[float]:
+    """Give the optimizer's current rate(s): per node when the groups are tagged."""
+    groups = opt.param_groups
+    if all("node" in g for g in groups):
+        return {g["node"]: float(g["lr"]) for g in groups}
+    if len(groups) == 1:
+        return float(groups[0]["lr"])
+    return [float(g["lr"]) for g in groups]
+
+
 def _log_epoch(
     flow, epoch: int, epochs: int, verbose: int, stopped: bool, has_val: bool
 ):
@@ -250,7 +260,11 @@ class _FitMixin:
             Validation rows, one column per node. When given (or split off),
             the per-node validation NLL is computed after every epoch and
             appended to ``flow.history["val"]`` — once, centrally; the
-            shipped callbacks read it there.
+            shipped callbacks read it there. ``flow.history["lr"]`` gets the
+            optimizer's learning rate after every epoch (``{node: lr}`` with
+            :func:`per_node_adam`'s tagged groups, else a float, or a list
+            for several untagged groups), so a schedule's decisions are on
+            record without a callback of your own.
         validation_split : float | None, optional
             Keras' rule: the LAST fraction of ``train_df`` becomes the
             validation set, without shuffling, and only the remaining rows
@@ -349,6 +363,8 @@ class _FitMixin:
             )
             # every callback runs (a stop must not skip a monitoring one)
             stops = [bool(cb.on_epoch_end(self, epoch, opt)) for cb in cbs]
+            # after the callbacks, so a scheduler's decision for this epoch shows
+            self.history.setdefault("lr", []).append(_learning_rates(opt))
             _log_epoch(
                 self,
                 epoch,

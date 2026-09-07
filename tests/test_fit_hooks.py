@@ -252,9 +252,18 @@ def test_per_node_plateau_stops_early_and_keeps_the_mle(ls_chain):
         optimizer=opt,
         callbacks=sched,
     )
-    assert sched.frozen == {"x1", "x2"}
+    assert set(sched.frozen) == {"x1", "x2"}
     assert all(g["lr"] == 0.0 for g in opt.param_groups)
     assert len(flow.history["train"]) < 4000
+    # each node's freeze epoch is a real epoch of this fit, the last one the stop
+    assert max(sched.frozen.values()) == len(flow.history["train"])
+    assert min(sched.frozen.values()) >= 1
+    # the per-node rates are on record, one entry per epoch, after the callback
+    rates = flow.history["lr"]
+    assert len(rates) == len(flow.history["train"])
+    assert rates[0] == {"x1": 1e-2, "x2": 1e-2}
+    assert rates[-1] == {"x1": 0.0, "x2": 0.0}
+    assert all(rates[e - 1][n] == 0.0 for n, e in sched.frozen.items())
     assert float(flow.ls_coefficients()["x2"]["x1"][0]) == pytest.approx(1.2, abs=0.1)
 
 
