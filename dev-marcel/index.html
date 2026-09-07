@@ -346,6 +346,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#see-the-dag" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        See the DAG
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#the-model-in-detail-spec-math-networks" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1278,6 +1289,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="api/plots/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    plots
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -1327,6 +1366,17 @@
     <span class="md-ellipsis">
       
         30 seconds of API
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#see-the-dag" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        See the DAG
       
     </span>
   </a>
@@ -1440,8 +1490,9 @@ live and walks L1 → L2 → L3, every answer checked against analytic
 ground truth. Further notebooks are available at <a href="https://github.com/tensorchiefs/tramdag/tree/dev-marcel/notebooks"><code>notebooks/</code></a> like the didactic walkthrough of the model:
 <a href="notebooks/intro_tram_dag/"><code>notebooks/intro_tram_dag.py</code></a>.</p>
 <h2 id="install">Install<a class="headerlink" href="#install" title="Permanent link">&para;</a></h2>
-<div class="highlight"><pre><span></span><code>pip<span class="w"> </span>install<span class="w"> </span>tramdag<span class="w">            </span><span class="c1"># latest release (PyPI)</span>
-pip<span class="w"> </span>install<span class="w"> </span><span class="s2">"git+https://github.com/tensorchiefs/tramdag.git@main"</span><span class="w">   </span><span class="c1"># dev version (track main)</span>
+<div class="highlight"><pre><span></span><code>uv<span class="w"> </span>add<span class="w"> </span>tramdag<span class="w">                 </span><span class="c1"># latest release (PyPI); pip install tramdag works too</span>
+uv<span class="w"> </span>add<span class="w"> </span><span class="s2">"tramdag[plots]"</span><span class="w">        </span><span class="c1"># with matplotlib, for plot_dag / plot_marginals / plot_training</span>
+uv<span class="w"> </span>add<span class="w"> </span><span class="s2">"tramdag @ git+https://github.com/tensorchiefs/tramdag.git@main"</span><span class="w">   </span><span class="c1"># dev version (track main)</span>
 uv<span class="w"> </span>sync<span class="w">                        </span><span class="c1"># or: dev setup from a clone (tests, experiments)</span>
 </code></pre></div>
 <p>Pin the dev install to a commit for reproducibility, e.g. <code>...tramdag.git@&lt;sha&gt;</code>.</p>
@@ -1502,6 +1553,13 @@ uv<span class="w"> </span>sync<span class="w">                        </span><sp
 <span class="n">flow</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="s2">"flow.pt"</span><span class="p">)</span>
 <span class="n">flow</span> <span class="o">=</span> <span class="n">CausalFlowDAG</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="s2">"flow.pt"</span><span class="p">)</span>
 </code></pre></div>
+<h2 id="see-the-dag">See the DAG<a class="headerlink" href="#see-the-dag" title="Permanent link">&para;</a></h2>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">tramdag</span><span class="w"> </span><span class="kn">import</span> <span class="n">plot_dag</span>
+<span class="n">plot_dag</span><span class="p">(</span><span class="n">spec</span><span class="p">)</span>   <span class="c1"># or plot_dag(flow) — layers left to right, one edge style per effect</span>
+</code></pre></div>
+<p>Continuous nodes are ellipses, ordinal nodes rounded boxes with their level
+count; <code>LS</code> is thin gray, <code>CS</code> thick blue, a complex intercept dashed orange,
+a <code>VC</code> treatment edge red with its modifiers dotted. Needs the <code>plots</code> extra.</p>
 <h2 id="the-model-in-detail-spec-math-networks">The model in detail: spec → math → networks<a class="headerlink" href="#the-model-in-detail-spec-math-networks" title="Permanent link">&para;</a></h2>
 <p>Per node, the transformation is additive on the latent (log-odds) scale — one
 intercept term <code>I</code> plus any number of shifts (notation:

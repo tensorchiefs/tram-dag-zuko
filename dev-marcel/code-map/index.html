@@ -741,6 +741,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#plotspy-the-figures-matplotlib-optional-tramdagplots" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        plots.py — the figures (matplotlib optional: tramdag[plots])
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#what-is-not-in-the-package" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1337,6 +1348,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/plots/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    plots
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -1474,6 +1513,17 @@
     <span class="md-ellipsis">
       
         callbacks.py — the shipped fit callbacks
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#plotspy-the-figures-matplotlib-optional-tramdagplots" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        plots.py — the figures (matplotlib optional: tramdag[plots])
       
     </span>
   </a>
@@ -1722,7 +1772,7 @@ config in <code>experiments/paper/</code> states <code>units=</code> and <code>a
 </tr>
 <tr>
 <td><a class="autorefs autorefs-internal" title="fit" href="../api/flow/#tramdag.flow.CausalFlowDAG.fit"><code>fit()</code></a></td>
-<td>Joint maximum likelihood: one minibatch Adam loop over all parameters (exact per node, because the NLL decomposes), final weights kept. Keras-shaped validation (<code>validation_data=</code>/<code>validation_split=</code> fill <code>history["val"]</code> per epoch, <code>validation_batch_size=</code> chunks the pass) and progress (<code>verbose=</code>). Hooks: <code>optimizer=</code> (any torch optimizer, for schedulers) and <code>callbacks=</code> (one entry or a list; a <code>Callback</code> hooks <code>on_fit_begin</code>/<code>on_epoch_end</code>/<code>on_fit_end</code>, a bare callable is an <code>on_epoch_end</code> hook <code>cb(flow, epoch, opt)</code> — any <code>True</code> stops); the recipes in <code>callbacks.py</code> read <code>history["val"]</code>. A centered VC's out-of-fold propensities ride the training frame as the column its <code>center=</code> names. A second call continues training.</td>
+<td>Joint maximum likelihood: one minibatch Adam loop over all parameters (exact per node, because the NLL decomposes), final weights kept. Keras-shaped validation (<code>validation_data=</code>/<code>validation_split=</code> fill <code>history["val"]</code> per epoch, <code>validation_batch_size=</code> chunks the pass), the optimizer's rate after every epoch in <code>history["lr"]</code> (<code>{node: lr}</code> with <code>per_node_adam</code>), and progress (<code>verbose=</code>). Hooks: <code>optimizer=</code> (any torch optimizer, for schedulers) and <code>callbacks=</code> (one entry or a list; a <code>Callback</code> hooks <code>on_fit_begin</code>/<code>on_epoch_end</code>/<code>on_fit_end</code>, a bare callable is an <code>on_epoch_end</code> hook <code>cb(flow, epoch, opt)</code> — any <code>True</code> stops); the recipes in <code>callbacks.py</code> read <code>history["val"]</code>. A centered VC's out-of-fold propensities ride the training frame as the column its <code>center=</code> names. A second call continues training.</td>
 </tr>
 <tr>
 <td><a class="autorefs autorefs-internal" title="fit_classical" href="../api/flow/#tramdag.flow.CausalFlowDAG.fit_classical"><code>fit_classical()</code></a></td>
@@ -1935,11 +1985,38 @@ contract diagram.</p>
 </tr>
 <tr>
 <td><a class="autorefs autorefs-internal" title="PerNodePlateau" href="../api/callbacks/#tramdag.callbacks.PerNodePlateau"><code>PerNodePlateau</code></a></td>
-<td>Per-node lr decay and freezing on each node's own validation NLL (from <code>history["val"]</code>); stops the fit once every node froze. The pre-0.4 <code>fit(schedule="plateau")</code> recipe, opt-in. <code>step(nll, opt)</code> for a hand-computed NLL.</td>
+<td>Per-node lr decay and freezing on each node's own validation NLL (from <code>history["val"]</code>); stops the fit once every node froze, and records <code>frozen = {node: epoch}</code>. The pre-0.4 <code>fit(schedule="plateau")</code> recipe, opt-in. <code>step(nll, opt)</code> for a hand-computed NLL.</td>
 </tr>
 <tr>
 <td><a class="autorefs autorefs-internal" title="per_node_adam" href="../api/callbacks/#tramdag.callbacks.per_node_adam"><code>per_node_adam()</code></a></td>
 <td>Adam with one <code>node</code>-tagged parameter group per node — the optimizer <code>PerNodePlateau</code> needs.</td>
+</tr>
+</tbody>
+</table>
+<h2 id="plotspy-the-figures-matplotlib-optional-tramdagplots"><code>plots.py</code> — the figures (matplotlib optional: <code>tramdag[plots]</code>)<a class="headerlink" href="#plotspy-the-figures-matplotlib-optional-tramdagplots" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Name</th>
+<th>Role</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a class="autorefs autorefs-internal" title="plot_dag" href="../api/plots/#tramdag.plots.plot_dag"><code>plot_dag()</code></a></td>
+<td>The labelled DAG of a spec or flow: layered left to right, ellipses for continuous and rounded boxes for ordinal nodes, every edge drawn by the term that owns it (LS / CS / CI / VC + modifiers / Fn, <code>joint</code> for a multi-parent net). Exported as <code>tramdag.plot_dag</code>.</td>
+</tr>
+<tr>
+<td><a class="autorefs autorefs-internal" title="plot_marginals" href="../api/plots/#tramdag.plots.plot_marginals"><code>plot_marginals()</code></a></td>
+<td>Observed vs sampled marginal per node, one panel each.</td>
+</tr>
+<tr>
+<td><a class="autorefs autorefs-internal" title="plot_training" href="../api/plots/#tramdag.plots.plot_training"><code>plot_training()</code></a></td>
+<td>Summed train/val NLL per epoch, with the freeze marks read off <code>history["lr"]</code> (or a given <code>frozen=</code>).</td>
+</tr>
+<tr>
+<td>(<code>_layout</code>, <code>_edges</code>)</td>
+<td>Longest-path layers with one barycenter sweep; the edge list with the VC treatment/modifier split. matplotlib is imported on the first call, never at package import.</td>
 </tr>
 </tbody>
 </table>

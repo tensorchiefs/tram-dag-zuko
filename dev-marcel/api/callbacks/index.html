@@ -16,6 +16,8 @@
         <link rel="prev" href="../scores/">
       
       
+        <link rel="next" href="../plots/">
+      
       
         
       
@@ -1381,6 +1383,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plots/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    plots
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -2007,6 +2037,8 @@ group rates (a <code>LambdaLR</code> even resets frozen nodes to <code>initial_l
 This is the pre-0.4 <code>fit(schedule="plateau", freeze_patience=)</code> recipe,
 back as an opt-in callback; <code>docs/training-speed.md</code> has its
 measurements.</p>
+<p>After a fit, <code>frozen</code> is <code>{node: epoch}</code> — the epoch in which each
+node left training — so a training figure can mark the freezes.</p>
 
 
 <p><span class="doc-section-title">Parameters:</span></p>
@@ -2167,12 +2199,15 @@ fresh optimizer, a fresh callback or a second flow all stay correct.</p>
 
 
 <a href="#tramdag.callbacks.PerNodePlateau.step" class="headerlink" title="Permanent link">&para;</a></h4>
-<div class="doc-signature highlight"><pre><span></span><code><span class="nf">step</span><span class="p">(</span><span class="n">nll</span><span class="p">,</span> <span class="n">optimizer</span><span class="p">)</span>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">step</span><span class="p">(</span><span class="n">nll</span><span class="p">,</span> <span class="n">optimizer</span><span class="p">,</span> <span class="n">epoch</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span>
 </code></pre></div>
 
     <div class="doc doc-contents ">
 
         <p>Step every unfrozen node on its own NLL; <code>True</code> when all are frozen.</p>
+<p><code>epoch</code> (1-based, as <code>fit</code> counts) is recorded for a node that
+freezes on this step; without it the steps are counted from 1 (a
+hand-driven loop).</p>
 
 
     </div>

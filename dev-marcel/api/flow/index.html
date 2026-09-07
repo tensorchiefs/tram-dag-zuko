@@ -1470,6 +1470,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plots/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    plots
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -3932,7 +3960,11 @@ full-batch step per epoch.</p>
                 <p>Validation rows, one column per node. When given (or split off),
 the per-node validation NLL is computed after every epoch and
 appended to <code>flow.history["val"]</code> — once, centrally; the
-shipped callbacks read it there.</p>
+shipped callbacks read it there. <code>flow.history["lr"]</code> gets the
+optimizer's learning rate after every epoch (<code>{node: lr}</code> with
+:func:<code>per_node_adam</code>'s tagged groups, else a float, or a list
+for several untagged groups), so a schedule's decisions are on
+record without a callback of your own.</p>
               </div>
             </td>
             <td>

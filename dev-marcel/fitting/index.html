@@ -1305,6 +1305,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/plots/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    plots
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -1528,8 +1556,11 @@ learning rates and freezing (a callback, below) and the all-<code>ls</code> clas
   and only the head calibrates — no leakage) makes <code>fit</code> compute the
   per-node validation NLL after every epoch, once, into
   <code>flow.history["val"]</code> (<code>validation_batch_size=</code> chunks the pass). The
-  shipped callbacks read it there. <code>verbose=N</code> prints every Nth epoch plus
-  the final one (0, the default, is silent).</li>
+  shipped callbacks read it there. <code>flow.history["lr"]</code> records the
+  optimizer's rate after every epoch (<code>{node: lr}</code> with <code>per_node_adam</code>), so
+  a schedule's decisions are on record without a callback of your own.
+  <code>verbose=N</code> prints every Nth epoch plus the final one (0, the default, is
+  silent).</li>
 <li><strong><code>callbacks=</code></strong> — one entry or a list. A
   <a href="https://github.com/tensorchiefs/tramdag/blob/dev-marcel/src/tramdag/callbacks.py"><code>tramdag.callbacks.Callback</code></a> hooks
   <code>on_fit_begin</code> / <code>on_epoch_end</code> / <code>on_fit_end</code> (its docstring is the
