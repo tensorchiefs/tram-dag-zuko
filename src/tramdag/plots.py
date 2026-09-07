@@ -383,9 +383,15 @@ def plot_training(flow, *, frozen=None, ax=None, path=None):
         _, ax = plt.subplots(figsize=(7.5, 3.6))
     for label, curve in curves.items():
         ax.plot(np.arange(1, len(curve) + 1), curve, label=f"{label} NLL (total)")
+    # zoom past the initial drop: the top is the curves' level after 10 % of the epochs
+    lo = min(c.min() for c in curves.values())
+    hi = max(c[len(c) // 10] for c in curves.values())
+    if hi > lo:
+        ax.set_ylim(lo - 0.05 * (hi - lo), hi)
     frozen = getattr(frozen, "frozen", frozen)
     if frozen is None:
         frozen = _freezes(hist.get("lr", []))
+    # after the zoom, so the annotations hang from the visible top
     for name, epoch in sorted(frozen.items(), key=lambda kv: kv[1]):
         ax.axvline(epoch, ls="--", lw=1, color="gray")
         ax.annotate(
@@ -396,11 +402,6 @@ def plot_training(flow, *, frozen=None, ax=None, path=None):
             fontsize=8,
             color="gray",
         )
-    # zoom past the initial drop: the top is the curves' level after 10 % of the epochs
-    lo = min(c.min() for c in curves.values())
-    hi = max(c[len(c) // 10] for c in curves.values())
-    if hi > lo:
-        ax.set_ylim(lo - 0.05 * (hi - lo), hi)
     ax.set_xlabel("epoch"), ax.set_ylabel("NLL"), ax.legend(frameon=False)
     ax.set_title("training")
     return _finish(ax, ax.figure, path)
