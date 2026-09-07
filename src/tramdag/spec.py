@@ -197,45 +197,46 @@ def _normalize_terms(value):
     return items
 
 
-def _intercept_basis(terms, *, ordinal: bool):
-    """Read the basis choice off the intercept term.
+def _configured_basis(terms):
+    """Give the intercept term if it configures a basis, else ``None``.
 
     Normalization guarantees exactly one intercept, at ``terms[0]``, so the
     basis has exactly one possible carrier.
+    """
+    intercept_term = terms[0] if terms else None
+    if intercept_term is not None and (
+        intercept_term.transform or intercept_term.transform_kwargs
+    ):
+        return intercept_term
+    return None
 
-    Parameters
-    ----------
-    terms : list[Term] | None
-        The node's canonical term list.
-    ordinal : bool
-        ``True`` for an ordinal node, whose intercept is the cutpoint
-        vector and therefore has no basis to choose.
 
-    Returns
-    -------
-    tuple[str, dict]
-        The effective ``(transform, transform_kwargs)`` of the node.
+def _intercept_basis(terms) -> tuple[str, dict]:
+    """Give a continuous node's effective ``(transform, transform_kwargs)``.
+
+    The arguments go straight to the transform class; if they are wrong,
+    that class says so — this layer does not second-guess it.
+    """
+    intercept_term = _configured_basis(terms)
+    if intercept_term is None:
+        return DEFAULT_TRANSFORM, {}
+    name = intercept_term.transform or DEFAULT_TRANSFORM
+    return name, dict(intercept_term.transform_kwargs or ())
+
+
+def _reject_basis(terms) -> None:
+    """Refuse a basis on an ordinal node, whose intercept is the cutpoint vector.
 
     Raises
     ------
     ValueError
-        If an ordinal node's intercept configures a basis.
+        If the intercept term configures a basis.
     """
-    intercept_term = terms[0] if terms else None
-    configured = intercept_term is not None and (
-        intercept_term.transform or intercept_term.transform_kwargs
-    )
-    if configured and ordinal:
+    if _configured_basis(terms) is not None:
         raise ValueError(
             "I(transform=...) is for continuous nodes. An ordinal node's "
             "intercept is the cutpoint vector, it has no basis to choose."
         )
-    if not configured:
-        return DEFAULT_TRANSFORM, {}
-    # the arguments go straight to the transform class; if they are wrong,
-    # that class says so — this layer does not second-guess it
-    name = intercept_term.transform or DEFAULT_TRANSFORM
-    return name, dict(intercept_term.transform_kwargs or ())
 
 
 def feat_width(spec: dict[str, NodeSpec], parents) -> int:
@@ -989,9 +990,7 @@ class ContinuousNode:
 
     def __init__(self, terms=None):
         self.terms = _normalize_terms(terms)
-        self.transform, self.transform_kwargs = _intercept_basis(
-            self.terms, ordinal=False
-        )
+        self.transform, self.transform_kwargs = _intercept_basis(self.terms)
 
     def __repr__(self):
         """Show the terms and the basis."""
@@ -1027,7 +1026,7 @@ class OrdinalNode:
     def __init__(self, levels: int, terms=None):
         self.levels = int(levels)
         self.terms = _normalize_terms(terms)
-        _intercept_basis(self.terms, ordinal=True)
+        _reject_basis(self.terms)
 
     def __repr__(self):
         """Show the levels and the terms."""
