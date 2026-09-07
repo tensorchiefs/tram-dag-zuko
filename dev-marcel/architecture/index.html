@@ -1497,17 +1497,17 @@
 
 
 <h1 id="architecture">Architecture<a class="headerlink" href="#architecture" title="Permanent link">&para;</a></h1>
-<p>Nine modules, one rule: <strong>term-specific behavior lives on the term's registry
-entry; node-kind behavior lives in four adjacent functions; everything else is
-framework.</strong> The decisions and their refused alternatives are recorded in
+<p>Ten modules, one rule: <strong>term-specific behavior lives on the effect's two
+classes — its <code>Term</code> subclass (spec) and its module (<code>terms.py</code>); node-kind
+behavior lives in four adjacent functions; everything else is framework.</strong> The decisions and their refused alternatives are recorded in
 <a href="../adr/001-term-owned-architecture/">ADR 001</a>.</p>
 <h2 id="module-map">Module map<a class="headerlink" href="#module-map" title="Permanent link">&para;</a></h2>
 <pre class="mermaid"><code>graph TD
     subgraph data["pure data"]
-        spec["spec.py&lt;br/&gt;DSL: Term, nodes, constructors,&lt;br/&gt;normalization, Kahn sort, (de)serialization"]
+        spec["spec.py&lt;br/&gt;DSL: Term + one subclass per effect&lt;br/&gt;(Intercept LinearShift ComplexShift&lt;br/&gt;VaryingCoefficient FnShift = I LS CS VC Fn),&lt;br/&gt;nodes, normalization, Kahn sort, (de)serialization"]
     end
     subgraph torch["torch modules"]
-        terms["terms.py&lt;br/&gt;registry: one TermDef per effect;&lt;br/&gt;ShiftTerm/InterceptTerm hooks;&lt;br/&gt;LSTerm CSTerm VCTerm FnTerm,&lt;br/&gt;SITerm CITerm AdditiveCITerm"]
+        terms["terms.py&lt;br/&gt;one module per effect, data = its Term class;&lt;br/&gt;ShiftTerm/InterceptTerm hooks; module_for;&lt;br/&gt;LinearShiftTerm ComplexShiftTerm&lt;br/&gt;VaryingCoefficientTerm FnShiftTerm,&lt;br/&gt;SimpleInterceptTerm ComplexInterceptTerm&lt;br/&gt;AdditiveInterceptTerm"]
         conditioners["conditioners.py&lt;br/&gt;raw nn heads (frozen:&lt;br/&gt;anchors checkpoints + RNG)"]
         transforms["transforms.py&lt;br/&gt;Bernstein/Spline/Affine,&lt;br/&gt;ordinal_* likelihood,&lt;br/&gt;StandardLogistic"]
         nodes["nodes.py&lt;br/&gt;_Node (intercept + shifts),&lt;br/&gt;_InputTransform,&lt;br/&gt;kind_log_prob/sample/abduct/&lt;br/&gt;marginal_theta"]
@@ -1532,29 +1532,40 @@ framework.</strong> The decisions and their refused alternatives are recorded in
     flow --&gt; readouts
     flow --&gt; scores
     fitting --&gt; callbacks</code></pre>
-<p>(<code>spec.py</code> consults the registry lazily, so the data layer stays importable
+<p>(<code>spec.py</code> imports nothing from <code>terms.py</code>, so the data layer stays importable
 without torch executing any model code; <code>fitting.py</code>/<code>readouts.py</code> are
 mixins <code>CausalFlowDAG</code> composes and import <code>flow</code> under <code>TYPE_CHECKING</code>
 only — the graph is acyclic.)</p>
 <h2 id="the-term-contract">The term contract<a class="headerlink" href="#the-term-contract" title="Permanent link">&para;</a></h2>
 <pre class="mermaid"><code>classDiagram
+    class Term {
+        &lt;&lt;spec.py, frozen data&gt;&gt;
+        parents
+        effect: the class name
+        option fields with defaults
+        __post_init__(): arity, option values
+        edge_parents(name, spec)
+        cells()
+        classical
+        options() / from_serialized()
+    }
+    Term &lt;|-- Intercept : I
+    Term &lt;|-- LinearShift : LS
+    Term &lt;|-- ComplexShift : CS
+    Term &lt;|-- VaryingCoefficient : VC
+    Term &lt;|-- FnShift : Fn
     class TermDef {
-        &lt;&lt;registry entry&gt;&gt;
-        effect: str
-        slot: "intercept"|"shift"
-        option_defaults: dict
-        check_arity(name, term)
-        edge_parents(name, term, spec)
-        cells(term)
-        term_is_classical(term)
+        &lt;&lt;terms.py, module&gt;&gt;
+        data: the Term subclass it builds (stamps itself as its .module)
+        input_transform / calibrate(train_df)
     }
     class ShiftTerm {
-        key / parents / net_parents
+        key (build) / parents (node) / order
         build(term, spec)
         shift_value(node, feats)
         post_init()
-        has_regularizer / regularizer()
-        finalizes / finalize(node, feats)
+        regularizer() -&gt; Tensor | None
+        finalize(node, feats)
         score_columns(node, flow, feats, dlds, ehat)
         side_columns() / check_column() / live_side() / extra_columns()
     }
@@ -1562,28 +1573,30 @@ only — the graph is acyclic.)</p>
         groups / ci_parents
         build(term, spec, n_params)
         theta_value(node, feats, n)
-        has_marginal_start / marginal_start(theta)
+        marginal_start(theta)
     }
     TermDef &lt;|-- ShiftTerm
     TermDef &lt;|-- InterceptTerm
-    ShiftTerm &lt;|-- LSTerm
-    ShiftTerm &lt;|-- CSTerm
-    ShiftTerm &lt;|-- VCTerm
-    ShiftTerm &lt;|-- FnTerm
-    InterceptTerm &lt;|-- SITerm
-    InterceptTerm &lt;|-- CITerm
-    InterceptTerm &lt;|-- AdditiveCITerm
-    LSTerm --|&gt; LinearShift : nn
-    CSTerm --|&gt; ComplexShift : nn
-    VCTerm --|&gt; VaryingCoef : nn
-    SITerm --|&gt; SimpleIntercept : nn
-    CITerm --|&gt; ComplexIntercept : nn</code></pre>
+    ShiftTerm &lt;|-- LinearShiftTerm
+    ShiftTerm &lt;|-- ComplexShiftTerm
+    ShiftTerm &lt;|-- VaryingCoefficientTerm
+    ShiftTerm &lt;|-- FnShiftTerm
+    InterceptTerm &lt;|-- SimpleInterceptTerm
+    InterceptTerm &lt;|-- ComplexInterceptTerm
+    InterceptTerm &lt;|-- AdditiveInterceptTerm
+    LinearShiftTerm --|&gt; LinearShift : nn
+    ComplexShiftTerm --|&gt; ComplexShift : nn
+    VaryingCoefficientTerm --|&gt; VaryingCoef : nn
+    SimpleInterceptTerm --|&gt; SimpleIntercept : nn
+    ComplexInterceptTerm --|&gt; ComplexIntercept : nn</code></pre>
 <p>Built-in terms subclass their conditioners, so state-dict paths
 (<code>nodes.&lt;n&gt;.shifts.&lt;key&gt;.…</code>) and the seeded RNG stream are those of 0.4.
-A custom effect subclasses <code>ShiftTerm</code>, sets <code>effect</code>/<code>slot</code>/
-<code>option_defaults</code>, implements <code>build</code> (which must set <code>key</code>/<code>parents</code>/<code>net_parents</code>) +
-<code>shift_value</code>, and registers with
-<code>register_term</code>; the cheap path for a one-off is <code>fn_shift</code>.</p>
+A custom effect is two classes: a <code>tramdag.Term</code> subclass (its annotated
+attributes are the options; <code>__post_init__</code>, <code>edge_parents</code>, <code>cells</code> its
+rules) and a <code>ShiftTerm</code> subclass declaring <code>data =</code> that class and
+implementing <code>build</code> (which must set <code>key</code>) +
+<code>shift_value</code>. Subclassing is the registration; the cheap path for a
+one-off is <code>fn_shift</code>.</p>
 <h2 id="node-kinds">Node kinds<a class="headerlink" href="#node-kinds" title="Permanent link">&para;</a></h2>
 <p>Two kinds (continuous, ordinal) stay an if/else — in ONE place:
 <code>kind_log_prob</code> / <code>kind_sample</code> / <code>kind_abduct</code> / <code>kind_marginal_theta</code>,
@@ -1631,7 +1644,6 @@ only; <code>3x</code> = once per node).</p>
   tramdag --&gt; flow
   tramdag --&gt; plots
   tramdag --&gt; spec
-  tramdag --&gt; terms
   fitting --&gt; callbacks
   flow --&gt; fitting
   flow --&gt; nodes
@@ -1647,7 +1659,6 @@ only; <code>3x</code> = once per node).</p>
   readouts --&gt; conditioners
   readouts --&gt; terms
   scores --&gt; transforms
-  spec --&gt; terms
   terms --&gt; conditioners
   terms --&gt; spec
   fitting ..&gt; flow
@@ -1657,15 +1668,11 @@ only; <code>3x</code> = once per node).</p>
 term class inherits its network from <code>conditioners</code> and its contract
 from <code>ShiftTerm</code>/<code>InterceptTerm</code>.</p>
 <pre class="mermaid"><code>classDiagram
-  class AdditiveCITerm {
+  class AdditiveInterceptTerm {
   }
   class AffineUT {
   }
   class BernsteinUT {
-  }
-  class CITerm {
-  }
-  class CSTerm {
   }
   class Callback {
   }
@@ -1673,31 +1680,41 @@ from <code>ShiftTerm</code>/<code>InterceptTerm</code>.</p>
   }
   class ComplexIntercept {
   }
+  class ComplexInterceptTerm {
+  }
   class ComplexShift {
+  }
+  class ComplexShift {
+  }
+  class ComplexShiftTerm {
   }
   class ContinuousNode {
   }
   class EarlyStopping {
   }
-  class FnTerm {
+  class FnShift {
   }
-  class InterceptDef {
+  class FnShiftTerm {
+  }
+  class Intercept {
   }
   class InterceptTerm {
   }
-  class LSTerm {
+  class LinearShift {
   }
   class LinearShift {
+  }
+  class LinearShiftTerm {
   }
   class OrdinalNode {
   }
   class PerNodePlateau {
   }
-  class SITerm {
-  }
   class ShiftTerm {
   }
   class SimpleIntercept {
+  }
+  class SimpleInterceptTerm {
   }
   class SplineUT {
   }
@@ -1707,9 +1724,11 @@ from <code>ShiftTerm</code>/<code>InterceptTerm</code>.</p>
   }
   class TermDef {
   }
-  class VCTerm {
-  }
   class VaryingCoef {
+  }
+  class VaryingCoefficient {
+  }
+  class VaryingCoefficientTerm {
   }
   class _FitMixin {
   }
@@ -1728,30 +1747,39 @@ from <code>ShiftTerm</code>/<code>InterceptTerm</code>.</p>
   _FnCallback --|&gt; Callback
   CausalFlowDAG --|&gt; _FitMixin
   CausalFlowDAG --|&gt; _ReadoutsMixin
-  AdditiveCITerm --|&gt; InterceptTerm
-  CITerm --|&gt; ComplexIntercept
-  CITerm --|&gt; InterceptTerm
-  CSTerm --|&gt; ComplexShift
-  CSTerm --|&gt; ShiftTerm
-  FnTerm --|&gt; ShiftTerm
-  InterceptDef --|&gt; InterceptTerm
+  ComplexShift --|&gt; Term
+  FnShift --|&gt; Term
+  Intercept --|&gt; Term
+  LinearShift --|&gt; Term
+  VaryingCoefficient --|&gt; Term
+  AdditiveInterceptTerm --|&gt; InterceptTerm
+  ComplexInterceptTerm --|&gt; ComplexIntercept
+  ComplexInterceptTerm --|&gt; InterceptTerm
+  ComplexShiftTerm --|&gt; ComplexShift
+  ComplexShiftTerm --|&gt; ShiftTerm
+  FnShiftTerm --|&gt; ShiftTerm
   InterceptTerm --|&gt; TermDef
-  LSTerm --|&gt; LinearShift
-  LSTerm --|&gt; ShiftTerm
-  SITerm --|&gt; SimpleIntercept
-  SITerm --|&gt; InterceptTerm
+  LinearShiftTerm --|&gt; LinearShift
+  LinearShiftTerm --|&gt; ShiftTerm
   ShiftTerm --|&gt; TermDef
-  VCTerm --|&gt; VaryingCoef
-  VCTerm --|&gt; ShiftTerm
+  SimpleInterceptTerm --|&gt; SimpleIntercept
+  SimpleInterceptTerm --|&gt; InterceptTerm
+  VaryingCoefficientTerm --|&gt; VaryingCoef
+  VaryingCoefficientTerm --|&gt; ShiftTerm
   AffineUT --|&gt; _ScaledUT
   BernsteinUT --|&gt; _ScaledUT
-  SplineUT --|&gt; _ScaledUT</code></pre>
+  SplineUT --|&gt; _ScaledUT
+  ComplexShift --o ComplexShiftTerm : data
+  FnShift --o FnShiftTerm : data
+  Intercept --o InterceptTerm : data
+  LinearShift --o LinearShiftTerm : data
+  VaryingCoefficient --o VaryingCoefficientTerm : data</code></pre>
 <h3 id="call-graph-flow-construction-traced">Call graph — flow construction (traced)<a class="headerlink" href="#call-graph-flow-construction-traced" title="Permanent link">&para;</a></h3>
 <pre class="mermaid"><code>flowchart LR
   subgraph conditioners
     n0["ComplexShift.__init__"]
-    n28["LinearShift.__init__"]
-    n27["SimpleIntercept.__init__"]
+    n24["LinearShift.__init__"]
+    n23["SimpleIntercept.__init__"]
     n2["VaryingCoef.__init__"]
     n1["_nn"]
   end
@@ -1765,30 +1793,26 @@ from <code>ShiftTerm</code>/<code>InterceptTerm</code>.</p>
     n8["_Node._build_shifts"]
   end
   subgraph spec
-    n19["_check_input_transform"]
+    n18["Term.edge_parents"]
+    n19["VaryingCoefficient.edge_parents"]
     n17["_check_node"]
-    n18["_check_term"]
-    n24["_kahn_sort"]
-    n25["feat_width"]
+    n20["_kahn_sort"]
+    n21["feat_width"]
     n9["node_parents"]
     n6["validate_and_sort"]
   end
   subgraph terms
-    n14["CSTerm.build"]
+    n14["ComplexShiftTerm.build"]
     n12["InterceptTerm.build"]
-    n15["LSTerm.build"]
-    n20["LSTerm.check_arity"]
-    n21["TermDef.check_arity"]
-    n22["TermDef.edge_parents"]
-    n16["VCTerm.build"]
-    n23["VCTerm.edge_parents"]
-    n26["_attach_input_transform"]
-    n13["get_term"]
+    n15["LinearShiftTerm.build"]
+    n16["VaryingCoefficientTerm.build"]
+    n22["_attach_input_transform"]
+    n13["module_for"]
   end
   subgraph transforms
-    n29["BernsteinUT.__init__"]
+    n25["BernsteinUT.__init__"]
     n10["BernsteinUT.n_params"]
-    n30["_ScaledUT.__init__"]
+    n26["_ScaledUT.__init__"]
     n11["make_univariate_transform"]
   end
     n0 --&gt; n1
@@ -1806,28 +1830,23 @@ from <code>ShiftTerm</code>/<code>InterceptTerm</code>.</p>
     n8 --&gt; n14
     n8 --&gt; n15
     n8 --&gt; n16
-    n8 -- "6x" --&gt; n13
-    n17 -- "6x" --&gt; n18
-    n18 -- "6x" --&gt; n19
-    n18 --&gt; n20
-    n18 -- "5x" --&gt; n21
-    n18 -- "5x" --&gt; n22
-    n18 --&gt; n23
-    n18 -- "6x" --&gt; n13
-    n24 -- "3x" --&gt; n9
+    n8 -- "3x" --&gt; n13
+    n17 -- "5x" --&gt; n18
+    n17 --&gt; n19
+    n20 -- "3x" --&gt; n9
     n6 -- "3x" --&gt; n17
-    n6 --&gt; n24
+    n6 --&gt; n20
     n14 --&gt; n0
-    n14 --&gt; n25
-    n14 --&gt; n26
-    n12 -- "3x" --&gt; n27
-    n15 --&gt; n28
-    n15 --&gt; n25
+    n14 --&gt; n21
+    n14 --&gt; n22
+    n12 -- "3x" --&gt; n23
+    n15 --&gt; n24
+    n15 --&gt; n21
     n16 --&gt; n2
-    n16 --&gt; n25
-    n16 --&gt; n26
-    n29 -- "2x" --&gt; n30
-    n11 -- "2x" --&gt; n29</code></pre>
+    n16 --&gt; n21
+    n16 --&gt; n22
+    n25 -- "2x" --&gt; n26
+    n11 -- "2x" --&gt; n25</code></pre>
 <h3 id="call-graph-one-fit-traced">Call graph — one fit (traced)<a class="headerlink" href="#call-graph-one-fit-traced" title="Permanent link">&para;</a></h3>
 <pre class="mermaid"><code>flowchart LR
   subgraph callbacks
@@ -1839,70 +1858,71 @@ from <code>ShiftTerm</code>/<code>InterceptTerm</code>.</p>
     n3["_last_val"]
   end
   subgraph conditioners
-    n47["ComplexShift.forward"]
-    n49["LinearShift.forward"]
-    n50["SimpleIntercept.forward"]
+    n48["ComplexShift.forward"]
+    n50["LinearShift.forward"]
+    n51["SimpleIntercept.forward"]
     n6["VaryingCoef.beta"]
     n5["VaryingCoef.forward"]
-    n52["VaryingCoef.l2"]
-    n51["VaryingCoef.recenter"]
+    n53["VaryingCoef.l2"]
+    n52["VaryingCoef.recenter"]
   end
   subgraph fitting
     n7["_FitMixin.fit"]
     n9["_check_fit_sizes"]
     n10["_epoch_pass"]
-    n20["_fit_epoch"]
-    n11["_log_epoch"]
-    n12["_normalize_callbacks"]
-    n13["_split_validation"]
-    n21["_val_nll"]
+    n21["_fit_epoch"]
+    n11["_learning_rates"]
+    n12["_log_epoch"]
+    n13["_normalize_callbacks"]
+    n14["_split_validation"]
+    n22["_val_nll"]
   end
   subgraph flow
-    n32["CausalFlowDAG._check_columns"]
-    n33["CausalFlowDAG._check_levels"]
-    n14["CausalFlowDAG._check_side_columns"]
+    n33["CausalFlowDAG._check_columns"]
+    n34["CausalFlowDAG._check_levels"]
+    n15["CausalFlowDAG._check_side_columns"]
     n29["CausalFlowDAG._dtype"]
     n27["CausalFlowDAG._encode_parent"]
     n26["CausalFlowDAG._features"]
     n28["CausalFlowDAG._np_dtype"]
-    n15["CausalFlowDAG._recenter_vc"]
-    n31["CausalFlowDAG._side_feats"]
-    n16["CausalFlowDAG._tensorize"]
-    n17["CausalFlowDAG.calibrate"]
-    n22["CausalFlowDAG.node_log_prob"]
+    n16["CausalFlowDAG._recenter_vc"]
+    n32["CausalFlowDAG._side_feats"]
+    n17["CausalFlowDAG._tensorize"]
+    n18["CausalFlowDAG.calibrate"]
+    n23["CausalFlowDAG.node_log_prob"]
   end
   subgraph nodes
-    n38["_Node.net_input"]
-    n36["_Node.theta_shift"]
-    n37["kind_log_prob"]
+    n39["_Node.net_input"]
+    n37["_Node.theta_shift"]
+    n38["kind_log_prob"]
   end
   subgraph terms
-    n40["CSTerm.shift_value"]
-    n34["InterceptTerm.calibrate"]
-    n41["LSTerm.shift_value"]
-    n42["SITerm.theta_value"]
-    n18["ShiftTerm.has_regularizer"]
+    n41["ComplexShiftTerm.shift_value"]
+    n35["InterceptTerm.calibrate"]
+    n42["LinearShiftTerm.shift_value"]
+    n30["ShiftTerm.finalize"]
+    n19["ShiftTerm.regularizer"]
     n24["ShiftTerm.side_columns"]
-    n35["TermDef.calibrate"]
-    n39["TermDef.input_transform"]
-    n30["VCTerm.finalize"]
-    n19["VCTerm.has_regularizer"]
-    n53["VCTerm.regressor"]
-    n23["VCTerm.regularizer"]
-    n43["VCTerm.shift_value"]
-    n25["VCTerm.side_columns"]
+    n43["SimpleInterceptTerm.theta_value"]
+    n36["TermDef.calibrate"]
+    n40["TermDef.input_transform"]
+    n31["VaryingCoefficientTerm.finalize"]
+    n54["VaryingCoefficientTerm.regressor"]
+    n20["VaryingCoefficientTerm.regularizer"]
+    n44["VaryingCoefficientTerm.shift_value"]
+    n25["VaryingCoefficientTerm.side_columns"]
   end
   subgraph transforms
-    n54["BernsteinUT._build"]
-    n44["StandardLogistic.log_prob"]
-    n55["_ScaledUT._log_dt_dx"]
-    n56["_ScaledUT._scale"]
-    n45["_ScaledUT.forward"]
-    n48["_ScaledUT.set_range"]
-    n59["_log1mexp"]
-    n57["ordinal_bounds"]
-    n58["ordinal_cutpoints"]
-    n46["ordinal_log_prob"]
+    n55["BernsteinUT._build"]
+    n45["StandardLogistic.log_prob"]
+    n56["_ScaledUT._log_dt_dx"]
+    n57["_ScaledUT._scale"]
+    n46["_ScaledUT.forward"]
+    n49["_ScaledUT.set_range"]
+    n60["_log1mexp"]
+    n58["ordinal_bounds"]
+    n59["ordinal_cutpoints"]
+    n47["ordinal_log_prob"]
   end
     n0 --&gt; n1
     n2 -- "3x" --&gt; n3
@@ -1914,64 +1934,66 @@ from <code>ShiftTerm</code>/<code>InterceptTerm</code>.</p>
     n7 --&gt; n9
     n7 -- "3x" --&gt; n10
     n7 -- "3x" --&gt; n11
-    n7 --&gt; n12
+    n7 -- "3x" --&gt; n12
     n7 --&gt; n13
     n7 --&gt; n14
     n7 --&gt; n15
-    n7 -- "2x" --&gt; n16
-    n7 --&gt; n17
-    n7 -- "2x" --&gt; n18
-    n7 --&gt; n19
-    n10 -- "3x" --&gt; n20
+    n7 --&gt; n16
+    n7 -- "2x" --&gt; n17
+    n7 --&gt; n18
+    n7 -- "2x" --&gt; n19
+    n7 --&gt; n20
     n10 -- "3x" --&gt; n21
-    n20 -- "6x" --&gt; n22
-    n20 -- "6x" --&gt; n23
-    n21 -- "3x" --&gt; n22
-    n14 -- "2x" --&gt; n24
-    n14 --&gt; n25
+    n10 -- "3x" --&gt; n22
+    n21 -- "6x" --&gt; n23
+    n21 -- "6x" --&gt; n20
+    n22 -- "3x" --&gt; n23
+    n15 -- "2x" --&gt; n24
+    n15 --&gt; n25
     n26 -- "30x" --&gt; n27
     n28 -- "2x" --&gt; n29
-    n15 --&gt; n26
-    n15 --&gt; n30
-    n31 -- "18x" --&gt; n24
-    n31 -- "9x" --&gt; n25
-    n16 -- "2x" --&gt; n32
-    n16 -- "2x" --&gt; n28
-    n17 --&gt; n32
-    n17 --&gt; n33
-    n17 -- "3x" --&gt; n34
-    n17 -- "3x" --&gt; n35
-    n22 -- "9x" --&gt; n26
-    n22 -- "27x" --&gt; n31
-    n22 -- "27x" --&gt; n36
-    n22 -- "27x" --&gt; n37
-    n38 -- "19x" --&gt; n39
-    n36 -- "9x" --&gt; n40
-    n36 -- "9x" --&gt; n41
-    n36 -- "27x" --&gt; n42
-    n36 -- "9x" --&gt; n43
-    n37 -- "18x" --&gt; n44
-    n37 -- "18x" --&gt; n45
-    n37 -- "9x" --&gt; n46
-    n40 -- "9x" --&gt; n47
-    n40 -- "9x" --&gt; n38
-    n34 -- "3x" --&gt; n35
-    n34 -- "2x" --&gt; n48
-    n41 -- "9x" --&gt; n49
-    n42 -- "27x" --&gt; n50
-    n35 -- "6x" --&gt; n39
-    n30 --&gt; n51
-    n30 --&gt; n38
-    n23 -- "6x" --&gt; n52
-    n43 -- "9x" --&gt; n5
-    n43 -- "9x" --&gt; n38
-    n43 -- "9x" --&gt; n53
-    n45 -- "18x" --&gt; n54
-    n45 -- "18x" --&gt; n55
-    n45 -- "18x" --&gt; n56
-    n57 -- "9x" --&gt; n58
-    n46 -- "9x" --&gt; n59
-    n46 -- "9x" --&gt; n57</code></pre>
+    n16 --&gt; n26
+    n16 -- "2x" --&gt; n30
+    n16 --&gt; n31
+    n32 -- "18x" --&gt; n24
+    n32 -- "9x" --&gt; n25
+    n17 -- "2x" --&gt; n33
+    n17 -- "2x" --&gt; n28
+    n18 --&gt; n33
+    n18 --&gt; n34
+    n18 -- "3x" --&gt; n35
+    n18 -- "3x" --&gt; n36
+    n23 -- "9x" --&gt; n26
+    n23 -- "27x" --&gt; n32
+    n23 -- "27x" --&gt; n37
+    n23 -- "27x" --&gt; n38
+    n39 -- "19x" --&gt; n40
+    n37 -- "9x" --&gt; n41
+    n37 -- "9x" --&gt; n42
+    n37 -- "27x" --&gt; n43
+    n37 -- "9x" --&gt; n44
+    n38 -- "18x" --&gt; n45
+    n38 -- "18x" --&gt; n46
+    n38 -- "9x" --&gt; n47
+    n41 -- "9x" --&gt; n48
+    n41 -- "9x" --&gt; n39
+    n35 -- "3x" --&gt; n36
+    n35 -- "2x" --&gt; n49
+    n42 -- "9x" --&gt; n50
+    n43 -- "27x" --&gt; n51
+    n36 -- "6x" --&gt; n40
+    n31 --&gt; n52
+    n31 --&gt; n39
+    n20 -- "7x" --&gt; n53
+    n44 -- "9x" --&gt; n5
+    n44 -- "9x" --&gt; n39
+    n44 -- "9x" --&gt; n54
+    n46 -- "18x" --&gt; n55
+    n46 -- "18x" --&gt; n56
+    n46 -- "18x" --&gt; n57
+    n58 -- "9x" --&gt; n59
+    n47 -- "9x" --&gt; n60
+    n47 -- "9x" --&gt; n58</code></pre>
 <!-- AUTOGEN:end -->
 
 

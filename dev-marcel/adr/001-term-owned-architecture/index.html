@@ -1395,29 +1395,36 @@ drafted against a seven-subsystem survey and judged from three lenses
    module; a first draft used free functions behind one-line delegates and
    the delegate layer was cut as duplication.</li>
 <li>The <strong>registry</strong> (<code>terms.py</code>): one definition per effect. Built-in shift terms
-   subclass their conditioners (<code>LSTerm(ShiftTerm, LinearShift)</code> …), so
+   subclass their conditioners (<code>LinearShiftTerm(ShiftTerm, LinearShift)</code> …), so
    checkpoints and RNG draws stay bit-stable; each term owns validation
    (<code>check_arity</code>/<code>edge_parents</code>), construction (<code>build</code>), evaluation
    (<code>shift_value</code>/<code>theta_value</code>), <code>post_init</code>, <code>regularizer</code>, post-fit
    <code>finalize</code>, <code>score_columns</code>, the side-input contract
    (<code>side_keys</code>/<code>check_side</code>/<code>live_side</code>/<code>extra_columns</code>), adjacency <code>cells</code>,
    <code>term_is_classical</code> and its <code>option_defaults</code>.</li>
-<li>The intercept slot is a term too (<code>SITerm</code>/<code>CITerm</code>/<code>AdditiveCITerm</code>);
+<li>The intercept slot is a term too (<code>SimpleInterceptTerm</code>/<code>ComplexInterceptTerm</code>/<code>AdditiveInterceptTerm</code>);
    the theta read is inline in <code>theta_shift</code> and the marginal init is a hook
-   (<code>has_marginal_start</code>/<code>marginal_start</code>, <code>transform.marginal_init_theta</code>).</li>
+   (<code>marginal_start</code>, <code>transform.marginal_init_theta</code>).</li>
 <li><strong>Node kinds stay an if/else in ONE place</strong>: the four adjacent functions
    <code>kind_log_prob</code>/<code>kind_sample</code>/<code>kind_abduct</code>/<code>kind_marginal_theta</code> in
    nodes.py. The judges cut the drafted per-kind Head protocol as an n=2
    abstraction — a third node kind earns the protocol.</li>
-<li>Extension points: <code>register_term</code> (a <code>ShiftTerm</code> subclass under its own
-   effect name) and <code>fn_shift</code> (a callable / <code>nn.Module</code> in the additive
-   shifts); <code>I(transform=&lt;_ScaledUT subclass&gt;)</code> for a custom transform.</li>
+<li>Extension points: a <code>Term</code> subclass plus a <code>ShiftTerm</code> subclass declaring
+   <code>data =</code> it (subclassing is the registration — see the 2026-09 revision
+   below) and <code>fn_shift</code> (a callable / <code>nn.Module</code> in the additive shifts);
+   <code>I(transform=&lt;_ScaledUT subclass&gt;)</code> for a custom transform.</li>
 </ol>
 <h2 id="refused-deliberately-so-a-later-proposal-can-find-the-reasoning">Refused (deliberately, so a later proposal can find the reasoning)<a class="headerlink" href="#refused-deliberately-so-a-later-proposal-can-find-the-reasoning" title="Permanent link">&para;</a></h2>
 <ul>
 <li>No per-kind node protocol (n=2), no new node kinds at 1.0.</li>
-<li>No per-effect <code>Term</code> subclasses in the data layer — <code>Term</code> stays ONE frozen
-  dataclass serialized by effect name; the polymorphism lives once, in terms.py.</li>
+<li>~~No per-effect <code>Term</code> subclasses in the data layer~~ — <strong>revised
+  2026-09-07</strong>: one string-dispatched <code>Term</code> meant the spec knowledge of an
+  effect lived in three places (a constructor, <code>option_defaults</code> served
+  through <code>__getattr__</code>, and static <code>check_arity</code>/<code>edge_parents</code>/<code>cells</code>
+  hooks on the module class), glued by a registry. Each effect is now a
+  <code>Term</code> subclass (its options are dataclass fields, its spec-level rules its
+  methods) and the module class declares <code>data =</code> it; the registry is gone.
+  The runtime polymorphism still lives once, in terms.py.</li>
 <li>No transform/activation registry beyond <code>make_univariate_transform</code> accepting
   a class; no plugin entry points; no config system; no new dependencies.</li>
 <li>No custom latent distribution — the standard logistic IS the TRAM semantics;
