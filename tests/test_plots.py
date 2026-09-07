@@ -84,6 +84,14 @@ def test_marginals_and_training_draw_from_a_fitted_flow(ls_chain, tmp_path):
     assert len(plot_training(flow2).lines) == 1
 
 
+def test_plots_refuse_nothing_to_draw():
+    """An empty spec and an unfitted flow fail by name, not inside matplotlib."""
+    with pytest.raises(ValueError, match="at least one node"):
+        plot_dag({})
+    with pytest.raises(ValueError, match="history is empty"):
+        plot_training(CausalFlowDAG({"x1": ContinuousNode()}))
+
+
 def test_plots_name_the_optional_dependency(monkeypatch):
     """Without matplotlib the error says what to install."""
     monkeypatch.setitem(sys.modules, "matplotlib.pyplot", None)

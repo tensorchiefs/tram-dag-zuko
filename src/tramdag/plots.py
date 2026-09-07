@@ -257,6 +257,8 @@ def plot_dag(
     """
     plt = _plt()
     spec = _spec_of(spec_or_flow)
+    if not spec:
+        raise ValueError("plot_dag needs a spec with at least one node")
     pos, layer_dx = _layout(spec)
     xs, ys = (np.array(v) for v in zip(*pos.values(), strict=True))
     parallel = defaultdict(list)
@@ -376,6 +378,8 @@ def plot_training(flow, *, frozen=None, ax=None, path=None):
     """
     plt = _plt()
     hist = flow.history
+    if not hist.get("train"):
+        raise ValueError("plot_training needs a fitted flow; its history is empty")
     curves = {"train": np.array([sum(d.values()) for d in hist["train"]])}
     if hist.get("val"):
         curves["val"] = np.array([sum(d.values()) for d in hist["val"]])

@@ -236,8 +236,9 @@ class PerNodePlateau(Callback):
     def step(self, nll: dict[str, float], optimizer, epoch: int | None = None) -> bool:
         """Step every unfrozen node on its own NLL; ``True`` when all are frozen.
 
-        ``epoch`` is recorded for a node that freezes on this step; without
-        it the steps are counted (a hand-driven loop).
+        ``epoch`` (1-based, as ``fit`` counts) is recorded for a node that
+        freezes on this step; without it the steps are counted from 1 (a
+        hand-driven loop).
         """
         self.epoch = self.epoch + 1 if epoch is None else epoch
         for g in optimizer.param_groups:
