@@ -6,25 +6,25 @@ The last section lists every training hyperparameter and where it lives.
 
 ## `spec.py` — declare the model
 
-Every term constructor has a pythonic name and a short alias; the two
-are the same object, so `LS is linear_shift`.
+Every effect is a `Term` subclass with a short name and a pythonic alias;
+the two are the same object, so `LS is linear_shift`.
 
 | Name | Role |
 |---|---|
-| [`Term`][tramdag.spec.Term] | One additive term of a node's transformation: the frozen triple `(effect, parents, options)`. `+` on terms builds plain lists. Effect-specific settings live in `options` and read as attributes (`term.penalty`, `term.units`, ...). |
-| [`simple_intercept()`][tramdag.spec.simple_intercept] / [`SI`][tramdag.spec.simple_intercept] | The parentless intercept — the paper's SI. Free transform parameters, the same for every row. Carries the transform choice (`transform=`, default `"bernstein"`); extra keyword arguments pass straight to the transform class. |
-| [`complex_intercept()`][tramdag.spec.complex_intercept] / [`CI`][tramdag.spec.complex_intercept] | The parent-conditioned intercept — the paper's CI: the parents reshape the monotone transform. Needs at least one parent. Also carries `units=` and `allow_interaction=` (joint vs. additive multi-parent intercept). |
-| [`intercept()`][tramdag.spec.intercept] / [`I`][tramdag.spec.intercept] | The fallback: dispatches on its arguments to `SI` (no parents) or `CI` (parents). The bare names `I` and `SI` in a term list both mean the simple intercept. |
-| [`linear_shift()`][tramdag.spec.linear_shift] / [`LS`][tramdag.spec.linear_shift] | Linear shift `beta * x` — the interpretable log-odds coefficient. Exactly one parent. |
-| [`complex_shift()`][tramdag.spec.complex_shift] / [`CS`][tramdag.spec.complex_shift] | Complex shift: an NN `g(x)`, additive on the latent scale. Several parents form one joint network. |
-| [`varying_coefficient()`][tramdag.spec.varying_coefficient] / [`VC`][tramdag.spec.varying_coefficient] | Varying-coefficient shift `(beta0 + b_theta(mods)) * x_t` — the penalized treatment-effect head (issue #28). `center=` adds propensity centering (issue #30). |
+| [`Term`][tramdag.spec.Term] | One additive term of a node's transformation, frozen data; each effect is a subclass whose annotated attributes are its options (defaults dropped on serialization, so equality is canonical). `+` on terms builds plain lists. Carries the spec-level rules: `edge_parents`, `cells`, `classical`, `options()`, `from_serialized`. Subclass `Term` for a new effect; its module goes in `terms.py` and read as attributes (`term.penalty`, `term.units`, ...). |
+| [`SI()`][tramdag.spec.SI] / `simple_intercept` | The parentless intercept — the paper's SI. Free transform parameters, the same for every row. Carries the transform choice (`transform=`, default `"bernstein"`); extra keyword arguments pass straight to the transform class. |
+| [`CI()`][tramdag.spec.CI] / `complex_intercept` | The parent-conditioned intercept — the paper's CI: the parents reshape the monotone transform. Needs at least one parent. Also carries `units=` and `allow_interaction=` (joint vs. additive multi-parent intercept). |
+| [`I`][tramdag.spec.I] / `intercept` | The intercept term class: without parents the paper's SI, with parents the CI; `SI()`/`CI()` are the two spellings with their arity checked. The bare names `I` and `SI` in a term list both mean the simple intercept. |
+| [`LS`][tramdag.spec.LS] / `linear_shift` | Linear shift `beta * x` — the interpretable log-odds coefficient. Exactly one parent. |
+| [`CS`][tramdag.spec.CS] / `complex_shift` | Complex shift: an NN `g(x)`, additive on the latent scale. Several parents form one joint network. |
+| [`VC`][tramdag.spec.VC] / `varying_coefficient` | Varying-coefficient shift `(beta0 + b_theta(mods)) * x_t` — the penalized treatment-effect head (issue #28). `center=` adds propensity centering (issue #30). |
 | [`ContinuousNode`][tramdag.spec.ContinuousNode] | Continuous variable: monotone 1-D transform plus shifts. `terms` is the first positional argument. |
 | [`OrdinalNode`][tramdag.spec.OrdinalNode] | Ordinal variable with `levels` classes: ordered logit (cutpoints) plus shifts. |
 | [`node_parents()`][tramdag.spec.node_parents] | Ordered de-duplicated parent names of a node (the canonical term list is `node.terms`). |
 | [`validate_and_sort()`][tramdag.spec.validate_and_sort] | Edge-ownership validation plus Kahn topological sort. The returned order makes the flow triangular. |
 | [`spec_to_dict()`][tramdag.spec.spec_to_dict] / [`spec_from_dict()`][tramdag.spec.spec_from_dict] | Checkpoint (de)serialization. A term serializes as `{effect, parents, options}` and nothing else, since `options` is already canonical. No compatibility shims: `spec_from_dict` rejects a term without `options`, the node constructors normalize the formula, and `validate_and_sort` checks the DAG. |
-| (`_normalize_terms`, `_as_term`, `_intercept_transform`, `_options`) | Formula flattening and per-entry validation (a `+` sum nested in a list is rejected), the one-parented-`I` rule plus transform hoisting in one pass, canonical option storage against each effect's `option_defaults` (a wrong-effect option errors). |
-| (`_check_term`, `_check_node`, `_check_input_transform`, `_kahn_sort`) | The stages behind `validate_and_sort`: the generic checks (effect known, parents exist, `input_transform` shape) plus each entry's own rules (LS arity, the VC treatment/centering block — on the term classes), edge-ownership bookkeeping, the topological sort. |
+| (`_normalize_terms`, `_as_term`, `_intercept_transform`, `_effect_class`) | Formula flattening and per-entry validation (a `+` sum nested in a list is rejected), the one-parented-`I` rule plus transform hoisting in one pass, canonical option storage against each effect's `option_defaults` (a wrong-effect option errors). |
+| (`_check_term`, `_check_node`, `_kahn_sort`) | The stages behind `validate_and_sort`: parents exist, then each term's `edge_parents` (the VC treatment and centering rules), then edge ownership and the ordinal level count; a term's own shape (arity, option values) is checked when it is built. Kahn's sort emits ready nodes in sorted batches, so the order is deterministic. |
 
 ## `transforms.py` — the monotone map h and the ordinal transform
 
@@ -83,18 +83,19 @@ config in `experiments/paper/` states `units=` and `activation=` itself.
 | [`save()`][tramdag.flow.CausalFlowDAG.save] / [`load()`][tramdag.flow.CausalFlowDAG.load] | Checkpoints with history and provenance (version, time, device). `load` requires a complete checkpoint and fails loudly otherwise. |
 | (`_node`, `_encode_parent`, `_features`, `_tensorize`, `_generator`, `_dtype`, `_np_dtype`) | Node lookup with one shared error; parent encoding (continuous raw, ordinal one-hot); `_tensorize(df, cols=None)` for any column subset; seeded-generator and dtype plumbing. |
 | (`_check_side_columns`, `_binary_p1`, `_side_feats`, `_query_side_columns`, `_recenter_vc`) | The generic side-column plumbing (each term names/validates/recomputes its own columns via the `ShiftTerm` hooks) plus the binary propensity fit and the post-fit `finalize` loop. |
-| (`_is_classical`) | Guard for `fit_classical`: every term's `term_is_classical` — `LS`, or a parentless `I()` transform carrier. |
+| (`_is_classical`) | Guard for `fit_classical`: every term's `classical` — `LS`, or a parentless `I()` transform carrier. |
 
 
-## `terms.py` — the effect registry (the 1.0 architecture's core)
+## `terms.py` — the term modules (the 1.0 architecture's core)
 
-One `TermDef` per effect; see [architecture.md](architecture.md) for the
-contract diagram.
+One module class per effect, declaring the `Term` subclass it builds
+(`data = CS`); see [architecture.md](architecture.md) for the contract
+diagram.
 
 | Name | Role |
 |---|---|
-| [`register_term()`][tramdag.terms.register_term] / [`get_term()`][tramdag.terms.get_term] | The registry: custom effects register a `ShiftTerm` subclass under a new effect name; collisions refuse. |
-| [`ShiftTerm`][tramdag.terms.ShiftTerm] / [`InterceptTerm`][tramdag.terms.InterceptTerm] | The behavior hooks a term owns: validation, `build`, `shift_value`/`theta_value`, `post_init`, `regularizer`, post-fit `finalize`, `score_columns`, the side-input contract, `cells`, `term_is_classical`, `option_defaults`. |
+| [`module_for()`][tramdag.terms.module_for] | The dispatch: the `TermDef` subclass whose own `data` is the term's class. Subclassing is the registration; a term class no module declares fails by name. |
+| [`ShiftTerm`][tramdag.terms.ShiftTerm] / [`InterceptTerm`][tramdag.terms.InterceptTerm] | The behavior hooks a term module owns: `build`, `shift_value`/`theta_value`, `post_init`, `regularizer`, post-fit `finalize`, `score_columns`, the side-input contract; `data` names the `Term` subclass it builds. |
 | [`LSTerm`][tramdag.terms.LSTerm] / [`CSTerm`][tramdag.terms.CSTerm] / [`VCTerm`][tramdag.terms.VCTerm] / [`FnTerm`][tramdag.terms.FnTerm] | The built-in shift terms, subclassing their conditioners (state-dict paths and the seeded RNG stream stay bit-stable). `VCTerm.regressor` is both the forward regressor and the `beta0` score. |
 | [`SITerm`][tramdag.terms.SITerm] / [`CITerm`][tramdag.terms.CITerm] / [`AdditiveCITerm`][tramdag.terms.AdditiveCITerm] | The intercept slot: free theta, one joint net, or one net per parent summed in coefficient space. |
 
@@ -102,7 +103,7 @@ contract diagram.
 
 | Name | Role |
 |---|---|
-| (`_Node`) | One sub-model per variable: builds its intercept and shift terms via the registry; `theta_shift()` sums the terms' `shift_value`s (plain shifts first, then VC); `net_input()` feeds every term network, `input_transform` applied. |
+| (`_Node`) | One sub-model per variable: builds its intercept and shift terms through `module_for`; `theta_shift()` sums the terms' `shift_value`s (plain shifts first, then VC); `net_input()` feeds every term network, `input_transform` applied. |
 | (`_InputTransform`) | One term's frozen network-input transform (minmax / standardize / callable over frozen train columns). |
 | (`kind_log_prob`, `kind_sample`, `kind_abduct`, `kind_marginal_theta`) | The ONLY continuous-vs-ordinal branches in the package, adjacent. |
 | (`_init_linear`) | Keras' `glorot`/`normal` initializers on one linear layer. |

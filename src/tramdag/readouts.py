@@ -14,7 +14,6 @@ import pandas as pd
 import torch
 
 from .conditioners import LinearShift
-from .terms import get_term
 
 
 # %% public classes --------------------------------------------------------------------
@@ -158,7 +157,7 @@ class _ReadoutsMixin:
         for child in self.order:
             for term in self.spec[child].terms:
                 # a VC modifier may share its cell with an edge-owning term
-                for p, tag in get_term(term.effect).cells(term):
+                for p, tag in term.cells():
                     cur = m.loc[p, child]  # cell with a prognostic term -> "+"
                     m.loc[p, child] = f"{cur}+{tag}" if cur else tag
         return m

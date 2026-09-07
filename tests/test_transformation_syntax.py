@@ -299,10 +299,8 @@ def test_spec_survives_a_json_roundtrip():
 
 def test_wrong_effect_option_errors_instead_of_defaulting():
     """A key another effect takes raises — no silent foreign defaults."""
-    from tramdag.spec import _options
-
     with pytest.raises(ValueError, match="takes no option"):
-        _options("CS", penalty=1.0)  # penalty is VC's
+        CS("a", penalty=1.0)  # penalty is VC's
     with pytest.raises(AttributeError):
         _ = LS("x").penalty  # reading a foreign option refuses too
     d = {
@@ -346,15 +344,24 @@ def test_terms_pickle_and_deepcopy():
     assert copy.deepcopy(t) == t
 
 
-def test_hand_built_ls_with_input_transform_refuses():
-    """The raw-unit-coefficient guard fires for a hand-built LS term instead
-    of the option being silently ignored at build time.
+def test_ls_takes_no_input_transform():
+    """An LS weight is the raw-unit coefficient: the option is not one it takes,
+    written or serialized.
     """
-    from tramdag.spec import Term
-
-    spec = {
-        "a": ContinuousNode(),
-        "y": ContinuousNode([Term("LS", ("a",), (("input_transform", "minmax"),))]),
+    with pytest.raises(ValueError, match="takes no option"):
+        LS("a", input_transform="minmax")
+    d = {
+        "a": {"kind": "continuous", "terms": []},
+        "y": {
+            "kind": "continuous",
+            "terms": [
+                {
+                    "effect": "LS",
+                    "parents": ["a"],
+                    "options": {"input_transform": "minmax"},
+                }
+            ],
+        },
     }
-    with pytest.raises(ValueError, match="raw-unit coefficient"):
-        CausalFlowDAG(spec)
+    with pytest.raises(ValueError, match="takes no option"):
+        spec_from_dict(d)

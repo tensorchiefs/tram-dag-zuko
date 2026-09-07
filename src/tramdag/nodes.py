@@ -25,7 +25,7 @@ from .spec import (
     NodeSpec,
     node_parents,
 )
-from .terms import ShiftTerm, VCTerm, get_term
+from .terms import VCTerm, module_for
 from .transforms import (
     StandardLogistic,
     make_univariate_transform,
@@ -84,29 +84,25 @@ class _Node(nn.Module):
         self._build_shifts(terms, spec)
 
     def _build_intercept(self, i_term, n_params: int, spec: dict[str, NodeSpec]):
-        """Build the node's one intercept term module, via the registry.
+        """Build the node's one intercept term module.
 
-        The term class decides its own shape: the free SimpleIntercept
+        The module decides its own shape: the free SimpleIntercept
         theta_0, one joint ComplexIntercept, or one net per parent summed in
         unconstrained coefficient space (``allow_interaction=False``).
         """
-        self.intercept = get_term(i_term.effect).build(i_term, spec, n_params)
+        self.intercept = module_for(i_term).build(i_term, spec, n_params)
 
     def _build_shifts(self, terms, spec: dict[str, NodeSpec]):
-        """Build one shift term module per LS/CS/VC term, via the registry.
+        """Build one shift term module per term after the intercept.
 
-        Each term class constructs itself exactly as this method used to
+        Each module constructs itself exactly as this method used to
         (same widths, same order — the seeded RNG stream is pinned) and
         names its own ModuleDict key: the parent for single-parent terms,
         "a+b" for a joint CS, the treatment for a VC.
         """
         self.shifts = nn.ModuleDict()
-        for term in terms:
-            entry = get_term(term.effect)
-            if entry.slot != "shift":
-                continue
-            assert issubclass(entry, ShiftTerm), term.effect
-            m = entry.build(term, spec)
+        for term in terms[1:]:  # terms[0] is the intercept
+            m = module_for(term).build(term, spec)
             self.shifts[m.key] = m
 
     def net_input(self, feats: dict[str, Tensor], parents, key: str) -> Tensor:

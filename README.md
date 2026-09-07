@@ -6,7 +6,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 > ⚠️ **Status: 1.0 release candidate.** This README documents the
-> **unreleased 1.0** API (term registry, `callbacks=`, `flow.shift_curve`,
+> **unreleased 1.0** API (term classes, `callbacks=`, `flow.shift_curve`,
 > `VC(center="col")`); `0.3.0` on PyPI predates all of it. Until 1.0 ships,
 > install from git to follow the docs below.
 

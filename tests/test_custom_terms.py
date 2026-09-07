@@ -1,23 +1,21 @@
-"""Custom shift terms: ``fn_shift`` and ``register_term``.
+"""Custom shift terms: ``fn_shift`` and the two-class effect contract.
 
 The extension contract of 1.0: a callable (or ``nn.Module``) drops into the
-additive shifts via ``fn_shift``; a whole new effect subclasses
-``tramdag.terms.ShiftTerm`` and registers under its own name. Checkpoints
-carry the effect NAME only, so loading a custom spec needs the class
-registered first — and a lambda ``fn`` refuses to save.
+additive shifts via ``fn_shift``; a whole new effect is a ``tramdag.Term``
+subclass (its options and checks) plus a ``tramdag.terms.ShiftTerm`` subclass
+declaring ``data =`` that term class. Subclassing is the registration:
+checkpoints carry the effect NAME only, so loading a custom spec needs the
+classes imported first — and a lambda ``fn`` refuses to save.
 """
 
 # %% imports ---------------------------------------------------------------------------
-from typing import ClassVar
-
 import numpy as np
 import pytest
 import torch
 from torch import nn
 
-from tramdag import CausalFlowDAG, ContinuousNode, Fn, fn_shift, register_term
-from tramdag.spec import Term, _options
-from tramdag.terms import _REGISTRY, ShiftTerm, get_term
+from tramdag import CausalFlowDAG, ContinuousNode, Fn, Term, fn_shift, spec_from_dict
+from tramdag.terms import ShiftTerm, module_for
 
 
 # %% private functions -------------------------------------------------------------
@@ -28,6 +26,74 @@ def _double(features):
 
 def _two_node(term):
     return {"x1": ContinuousNode(), "x2": ContinuousNode([term])}
+
+
+# %% private classes -------------------------------------------------------------------
+class SLS(Term):
+    """A minimal custom effect: ``w * x`` with a fixed scale option."""
+
+    scale: float = 1.0
+
+    def __post_init__(self):
+        """One parent, like LS."""
+        if len(self.parents) != 1:
+            raise ValueError("SLS() takes exactly one parent.")
+
+
+class _ScaledLS(ShiftTerm, nn.Module):
+    data = SLS
+
+    def __init__(self, scale: float):
+        nn.Module.__init__(self)
+        self.scale = scale
+        self.w = nn.Parameter(torch.zeros(()))
+
+    @classmethod
+    def build(cls, term, spec):
+        m = cls(scale=term.scale)
+        m.key = term.parents[0]
+        m.parents = tuple(term.parents)
+        m.net_parents = ()
+        return m
+
+    def shift_value(self, node, feats):
+        return self.scale * self.w * feats[self.parents[0]][:, 0]
+
+
+class PEN(Term):
+    """A custom penalized term: the regularizer hook must reach the loss."""
+
+
+class _PenShift(ShiftTerm, nn.Module):
+    data = PEN
+
+    def __init__(self):
+        nn.Module.__init__(self)
+        self.w = nn.Parameter(torch.zeros(()))
+        self.calls = 0
+
+    @classmethod
+    def build(cls, term, spec):
+        m = cls()
+        m.key = term.parents[0]
+        m.parents = tuple(term.parents)
+        m.net_parents = ()
+        return m
+
+    def shift_value(self, node, feats):
+        return self.w * feats[self.parents[0]][:, 0]
+
+    @property
+    def has_regularizer(self):
+        return True
+
+    def regularizer(self):
+        self.calls += 1
+        return self.w**2
+
+
+class Orphan(Term):
+    """A term class no module builds."""
 
 
 # %% public functions ------------------------------------------------------------------
@@ -75,109 +141,49 @@ def test_fn_shift_validates_its_arguments():
         fn_shift("x1", fn=3)
 
 
-class _ScaledLS(ShiftTerm, nn.Module):
-    """A minimal custom effect: w * x with a fixed scale, for the registry test."""
-
-    effect = "SLS"
-    slot = "shift"
-    option_defaults: ClassVar[dict] = {"fn": None}  # the scale rides fn
-
-    def __init__(self, scale: float):
-        nn.Module.__init__(self)
-        self.scale = scale
-        self.w = nn.Parameter(torch.zeros(()))
-
-    @classmethod
-    def build(cls, term, spec):
-        m = cls(scale=term.fn)  # smuggle the scale through the fn option
-        m.key = term.parents[0]
-        m.parents = tuple(term.parents)
-        m.net_parents = ()
-        return m
-
-    def shift_value(self, node, feats):
-        return self.scale * self.w * feats[self.parents[0]][:, 0]
-
-
-def test_register_term_round_trip_and_collision(ls_chain):
-    """A registered custom effect builds, fits and refuses re-registration;
-    an unregistered effect name fails with the register_term pointer.
+def test_custom_effect_builds_fits_and_round_trips(ls_chain, tmp_path):
+    """A Term subclass plus a ShiftTerm with ``data =`` is a whole effect:
+    it validates, builds, fits, serializes by name and loads back.
     """
     df = ls_chain["draw"](600, 0)[["x1", "x2"]]
-    if "SLS" not in _REGISTRY:
-        register_term(_ScaledLS)
-    assert get_term("SLS") is _ScaledLS
-    with pytest.raises(ValueError, match="already registered"):
-        register_term(_ScaledLS)
-    term = Term("SLS", ("x1",), _options("SLS", fn=3.0))
+    term = SLS("x1", scale=3.0)
+    assert module_for(term) is _ScaledLS
+    assert term.effect == "SLS"
+    assert repr(term) == "SLS('x1', scale=3.0)"
+    with pytest.raises(ValueError, match="exactly one parent"):
+        SLS("x1", "x2")
+    with pytest.raises(ValueError, match="takes no option"):
+        SLS("x1", scael=3.0)
     flow = CausalFlowDAG(_two_node(term), seed=0)
     flow.fit(df, epochs=10, batch_size=200, learning_rate=1e-1)
     assert float(flow.nodes["x2"].shifts["x1"].w) != 0.0
-    with pytest.raises(ValueError, match="register_term"):
-        CausalFlowDAG(
-            {"x1": ContinuousNode(), "x2": ContinuousNode([Term("NOPE", ("x1",), ())])}
-        )
+    flow.save(tmp_path / "m.pt")
+    loaded = CausalFlowDAG.load(tmp_path / "m.pt")
+    assert loaded.spec == flow.spec
+    assert torch.equal(loaded.log_prob(df), flow.log_prob(df))
 
 
-def test_custom_intercept_slot_refuses_instead_of_misbuilding(ls_chain):
-    """A registered slot='intercept' custom effect must refuse loudly —
-    normalization would otherwise drop it silently from the built model.
+def test_unknown_effect_and_orphan_term_fail_by_name():
+    """A serialized effect no class carries, and a term class no module
+    builds, both say what to define.
     """
-
-    class _CustomI(ShiftTerm):  # slot lies on purpose; class shape irrelevant
-        effect = "MYI"
-        slot = "intercept"
-        option_defaults: ClassVar[dict] = {}
-
-    if "MYI" not in _REGISTRY:
-        register_term(_CustomI)
-    spec = {
-        "x1": ContinuousNode(),
-        "x2": ContinuousNode([Term("MYI", ("x1",), ())]),
+    d = {
+        "x1": {"kind": "continuous", "terms": []},
+        "x2": {
+            "kind": "continuous",
+            "terms": [{"effect": "NOPE", "parents": ["x1"], "options": {}}],
+        },
     }
-    with pytest.raises(ValueError, match="not supported yet"):
-        CausalFlowDAG(spec)
-
-
-class _PenShift(ShiftTerm, nn.Module):
-    """A custom penalized term: the regularizer hook must reach the loss."""
-
-    effect = "PEN"
-    slot = "shift"
-    option_defaults: ClassVar[dict] = {}
-
-    def __init__(self):
-        nn.Module.__init__(self)
-        self.w = nn.Parameter(torch.zeros(()))
-        self.calls = 0
-
-    @classmethod
-    def build(cls, term, spec):
-        m = cls()
-        m.key = term.parents[0]
-        m.parents = tuple(term.parents)
-        m.net_parents = ()
-        return m
-
-    def shift_value(self, node, feats):
-        return self.w * feats[self.parents[0]][:, 0]
-
-    @property
-    def has_regularizer(self):
-        return True
-
-    def regularizer(self):
-        self.calls += 1
-        return self.w**2
+    with pytest.raises(ValueError, match="unknown term effect 'NOPE'"):
+        spec_from_dict(d)
+    with pytest.raises(ValueError, match="data = Orphan"):
+        CausalFlowDAG(_two_node(Orphan("x1")))
 
 
 def test_custom_regularizer_joins_the_loss(ls_chain):
     """Fit adds regularizer()/n — the hook, not VC's internals."""
     df = ls_chain["draw"](300, 0)[["x1", "x2"]]
-    if "PEN" not in _REGISTRY:
-        register_term(_PenShift)
-    spec = {"x1": ContinuousNode(), "x2": ContinuousNode([Term("PEN", ("x1",), ())])}
-    flow = CausalFlowDAG(spec, seed=0)
+    flow = CausalFlowDAG(_two_node(PEN("x1")), seed=0)
     flow.fit(df, epochs=2, batch_size=150)
     assert flow.nodes["x2"].shifts["x1"].calls >= 4  # every minibatch
 

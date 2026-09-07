@@ -1,8 +1,8 @@
 # Architecture
 
-Nine modules, one rule: **term-specific behavior lives on the term's registry
-entry; node-kind behavior lives in four adjacent functions; everything else is
-framework.** The decisions and their refused alternatives are recorded in
+Ten modules, one rule: **term-specific behavior lives on the effect's two
+classes — its `Term` subclass (spec) and its module (`terms.py`); node-kind
+behavior lives in four adjacent functions; everything else is framework.** The decisions and their refused alternatives are recorded in
 [ADR 001](adr/001-term-owned-architecture.md).
 
 ## Module map
@@ -10,10 +10,10 @@ framework.** The decisions and their refused alternatives are recorded in
 ```mermaid
 graph TD
     subgraph data["pure data"]
-        spec["spec.py<br/>DSL: Term, nodes, constructors,<br/>normalization, Kahn sort, (de)serialization"]
+        spec["spec.py<br/>DSL: Term + one subclass per effect<br/>(I LS CS VC Fn), nodes, normalization,<br/>Kahn sort, (de)serialization"]
     end
     subgraph torch["torch modules"]
-        terms["terms.py<br/>registry: one TermDef per effect;<br/>ShiftTerm/InterceptTerm hooks;<br/>LSTerm CSTerm VCTerm FnTerm,<br/>SITerm CITerm AdditiveCITerm"]
+        terms["terms.py<br/>one module per effect, data = its Term class;<br/>ShiftTerm/InterceptTerm hooks; module_for;<br/>LSTerm CSTerm VCTerm FnTerm,<br/>SITerm CITerm AdditiveCITerm"]
         conditioners["conditioners.py<br/>raw nn heads (frozen:<br/>anchors checkpoints + RNG)"]
         transforms["transforms.py<br/>Bernstein/Spline/Affine,<br/>ordinal_* likelihood,<br/>StandardLogistic"]
         nodes["nodes.py<br/>_Node (intercept + shifts),<br/>_InputTransform,<br/>kind_log_prob/sample/abduct/<br/>marginal_theta"]
@@ -40,7 +40,7 @@ graph TD
     fitting --> callbacks
 ```
 
-(`spec.py` consults the registry lazily, so the data layer stays importable
+(`spec.py` imports nothing from `terms.py`, so the data layer stays importable
 without torch executing any model code; `fitting.py`/`readouts.py` are
 mixins `CausalFlowDAG` composes and import `flow` under `TYPE_CHECKING`
 only — the graph is acyclic.)
@@ -49,15 +49,26 @@ only — the graph is acyclic.)
 
 ```mermaid
 classDiagram
+    class Term {
+        <<spec.py, frozen data>>
+        parents
+        effect: the class name
+        option fields with defaults
+        __post_init__(): arity, option values
+        edge_parents(name, spec)
+        cells()
+        classical
+        options() / from_serialized()
+    }
+    Term <|-- I
+    Term <|-- LS
+    Term <|-- CS
+    Term <|-- VC
+    Term <|-- Fn
     class TermDef {
-        <<registry entry>>
-        effect: str
-        slot: "intercept"|"shift"
-        option_defaults: dict
-        check_arity(name, term)
-        edge_parents(name, term, spec)
-        cells(term)
-        term_is_classical(term)
+        <<terms.py, module>>
+        data: the Term subclass it builds
+        input_transform / calibrate(train_df)
     }
     class ShiftTerm {
         key / parents / net_parents
@@ -93,10 +104,12 @@ classDiagram
 
 Built-in terms subclass their conditioners, so state-dict paths
 (`nodes.<n>.shifts.<key>.…`) and the seeded RNG stream are those of 0.4.
-A custom effect subclasses `ShiftTerm`, sets `effect`/`slot`/
-`option_defaults`, implements `build` (which must set `key`/`parents`/`net_parents`) +
-`shift_value`, and registers with
-`register_term`; the cheap path for a one-off is `fn_shift`.
+A custom effect is two classes: a `tramdag.Term` subclass (its annotated
+attributes are the options; `__post_init__`, `edge_parents`, `cells` its
+rules) and a `ShiftTerm` subclass declaring `data =` that class and
+implementing `build` (which must set `key`/`parents`/`net_parents`) +
+`shift_value`. Subclassing is the registration; the cheap path for a
+one-off is `fn_shift`.
 
 ## Node kinds
 
@@ -151,7 +164,6 @@ classDiagram
   tramdag --> flow
   tramdag --> plots
   tramdag --> spec
-  tramdag --> terms
   fitting --> callbacks
   flow --> fitting
   flow --> nodes
@@ -167,7 +179,6 @@ classDiagram
   readouts --> conditioners
   readouts --> terms
   scores --> transforms
-  spec --> terms
   terms --> conditioners
   terms --> spec
   fitting ..> flow
@@ -190,6 +201,8 @@ classDiagram
   }
   class CITerm {
   }
+  class CS {
+  }
   class CSTerm {
   }
   class Callback {
@@ -204,11 +217,15 @@ classDiagram
   }
   class EarlyStopping {
   }
+  class Fn {
+  }
   class FnTerm {
   }
-  class InterceptDef {
+  class I {
   }
   class InterceptTerm {
+  }
+  class LS {
   }
   class LSTerm {
   }
@@ -232,6 +249,8 @@ classDiagram
   }
   class TermDef {
   }
+  class VC {
+  }
   class VCTerm {
   }
   class VaryingCoef {
@@ -253,13 +272,17 @@ classDiagram
   _FnCallback --|> Callback
   CausalFlowDAG --|> _FitMixin
   CausalFlowDAG --|> _ReadoutsMixin
+  CS --|> Term
+  Fn --|> Term
+  I --|> Term
+  LS --|> Term
+  VC --|> Term
   AdditiveCITerm --|> InterceptTerm
   CITerm --|> ComplexIntercept
   CITerm --|> InterceptTerm
   CSTerm --|> ComplexShift
   CSTerm --|> ShiftTerm
   FnTerm --|> ShiftTerm
-  InterceptDef --|> InterceptTerm
   InterceptTerm --|> TermDef
   LSTerm --|> LinearShift
   LSTerm --|> ShiftTerm
@@ -271,6 +294,11 @@ classDiagram
   AffineUT --|> _ScaledUT
   BernsteinUT --|> _ScaledUT
   SplineUT --|> _ScaledUT
+  CS --o CSTerm : data
+  Fn --o FnTerm : data
+  I --o InterceptTerm : data
+  LS --o LSTerm : data
+  VC --o VCTerm : data
 ```
 
 ### Call graph — flow construction (traced)
@@ -279,8 +307,8 @@ classDiagram
 flowchart LR
   subgraph conditioners
     n0["ComplexShift.__init__"]
-    n28["LinearShift.__init__"]
-    n27["SimpleIntercept.__init__"]
+    n25["LinearShift.__init__"]
+    n24["SimpleIntercept.__init__"]
     n2["VaryingCoef.__init__"]
     n1["_nn"]
   end
@@ -294,11 +322,13 @@ flowchart LR
     n8["_Node._build_shifts"]
   end
   subgraph spec
-    n19["_check_input_transform"]
+    n19["Term.edge_parents"]
+    n20["VC.edge_parents"]
     n17["_check_node"]
     n18["_check_term"]
-    n24["_kahn_sort"]
-    n25["feat_width"]
+    n21["_kahn_sort"]
+    n26["_subclasses"]
+    n22["feat_width"]
     n9["node_parents"]
     n6["validate_and_sort"]
   end
@@ -306,18 +336,14 @@ flowchart LR
     n14["CSTerm.build"]
     n12["InterceptTerm.build"]
     n15["LSTerm.build"]
-    n20["LSTerm.check_arity"]
-    n21["TermDef.check_arity"]
-    n22["TermDef.edge_parents"]
     n16["VCTerm.build"]
-    n23["VCTerm.edge_parents"]
-    n26["_attach_input_transform"]
-    n13["get_term"]
+    n23["_attach_input_transform"]
+    n13["module_for"]
   end
   subgraph transforms
-    n29["BernsteinUT.__init__"]
+    n27["BernsteinUT.__init__"]
     n10["BernsteinUT.n_params"]
-    n30["_ScaledUT.__init__"]
+    n28["_ScaledUT.__init__"]
     n11["make_univariate_transform"]
   end
     n0 --> n1
@@ -335,28 +361,25 @@ flowchart LR
     n8 --> n14
     n8 --> n15
     n8 --> n16
-    n8 -- "6x" --> n13
+    n8 -- "3x" --> n13
     n17 -- "6x" --> n18
-    n18 -- "6x" --> n19
+    n18 -- "5x" --> n19
     n18 --> n20
-    n18 -- "5x" --> n21
-    n18 -- "5x" --> n22
-    n18 --> n23
-    n18 -- "6x" --> n13
-    n24 -- "3x" --> n9
+    n21 -- "3x" --> n9
     n6 -- "3x" --> n17
-    n6 --> n24
+    n6 --> n21
     n14 --> n0
-    n14 --> n25
-    n14 --> n26
-    n12 -- "3x" --> n27
-    n15 --> n28
+    n14 --> n22
+    n14 --> n23
+    n12 -- "3x" --> n24
     n15 --> n25
+    n15 --> n22
     n16 --> n2
-    n16 --> n25
-    n16 --> n26
-    n29 -- "2x" --> n30
-    n11 -- "2x" --> n29
+    n16 --> n22
+    n16 --> n23
+    n13 -- "6x" --> n26
+    n27 -- "2x" --> n28
+    n11 -- "2x" --> n27
 ```
 
 ### Call graph — one fit (traced)
@@ -372,70 +395,71 @@ flowchart LR
     n3["_last_val"]
   end
   subgraph conditioners
-    n47["ComplexShift.forward"]
-    n49["LinearShift.forward"]
-    n50["SimpleIntercept.forward"]
+    n48["ComplexShift.forward"]
+    n50["LinearShift.forward"]
+    n51["SimpleIntercept.forward"]
     n6["VaryingCoef.beta"]
     n5["VaryingCoef.forward"]
-    n52["VaryingCoef.l2"]
-    n51["VaryingCoef.recenter"]
+    n53["VaryingCoef.l2"]
+    n52["VaryingCoef.recenter"]
   end
   subgraph fitting
     n7["_FitMixin.fit"]
     n9["_check_fit_sizes"]
     n10["_epoch_pass"]
-    n20["_fit_epoch"]
-    n11["_log_epoch"]
-    n12["_normalize_callbacks"]
-    n13["_split_validation"]
-    n21["_val_nll"]
+    n21["_fit_epoch"]
+    n11["_learning_rates"]
+    n12["_log_epoch"]
+    n13["_normalize_callbacks"]
+    n14["_split_validation"]
+    n22["_val_nll"]
   end
   subgraph flow
-    n32["CausalFlowDAG._check_columns"]
-    n33["CausalFlowDAG._check_levels"]
-    n14["CausalFlowDAG._check_side_columns"]
-    n29["CausalFlowDAG._dtype"]
-    n27["CausalFlowDAG._encode_parent"]
-    n26["CausalFlowDAG._features"]
-    n28["CausalFlowDAG._np_dtype"]
-    n15["CausalFlowDAG._recenter_vc"]
-    n31["CausalFlowDAG._side_feats"]
-    n16["CausalFlowDAG._tensorize"]
-    n17["CausalFlowDAG.calibrate"]
-    n22["CausalFlowDAG.node_log_prob"]
+    n33["CausalFlowDAG._check_columns"]
+    n34["CausalFlowDAG._check_levels"]
+    n15["CausalFlowDAG._check_side_columns"]
+    n30["CausalFlowDAG._dtype"]
+    n28["CausalFlowDAG._encode_parent"]
+    n27["CausalFlowDAG._features"]
+    n29["CausalFlowDAG._np_dtype"]
+    n16["CausalFlowDAG._recenter_vc"]
+    n32["CausalFlowDAG._side_feats"]
+    n17["CausalFlowDAG._tensorize"]
+    n18["CausalFlowDAG.calibrate"]
+    n23["CausalFlowDAG.node_log_prob"]
   end
   subgraph nodes
-    n38["_Node.net_input"]
-    n36["_Node.theta_shift"]
-    n37["kind_log_prob"]
+    n39["_Node.net_input"]
+    n37["_Node.theta_shift"]
+    n38["kind_log_prob"]
   end
   subgraph terms
-    n40["CSTerm.shift_value"]
-    n34["InterceptTerm.calibrate"]
-    n41["LSTerm.shift_value"]
-    n42["SITerm.theta_value"]
-    n18["ShiftTerm.has_regularizer"]
-    n24["ShiftTerm.side_columns"]
-    n35["TermDef.calibrate"]
-    n39["TermDef.input_transform"]
-    n30["VCTerm.finalize"]
-    n19["VCTerm.has_regularizer"]
-    n53["VCTerm.regressor"]
-    n23["VCTerm.regularizer"]
-    n43["VCTerm.shift_value"]
-    n25["VCTerm.side_columns"]
+    n41["CSTerm.shift_value"]
+    n35["InterceptTerm.calibrate"]
+    n42["LSTerm.shift_value"]
+    n43["SITerm.theta_value"]
+    n19["ShiftTerm.has_regularizer"]
+    n25["ShiftTerm.side_columns"]
+    n36["TermDef.calibrate"]
+    n40["TermDef.input_transform"]
+    n31["VCTerm.finalize"]
+    n20["VCTerm.has_regularizer"]
+    n54["VCTerm.regressor"]
+    n24["VCTerm.regularizer"]
+    n44["VCTerm.shift_value"]
+    n26["VCTerm.side_columns"]
   end
   subgraph transforms
-    n54["BernsteinUT._build"]
-    n44["StandardLogistic.log_prob"]
-    n55["_ScaledUT._log_dt_dx"]
-    n56["_ScaledUT._scale"]
-    n45["_ScaledUT.forward"]
-    n48["_ScaledUT.set_range"]
-    n59["_log1mexp"]
-    n57["ordinal_bounds"]
-    n58["ordinal_cutpoints"]
-    n46["ordinal_log_prob"]
+    n55["BernsteinUT._build"]
+    n45["StandardLogistic.log_prob"]
+    n56["_ScaledUT._log_dt_dx"]
+    n57["_ScaledUT._scale"]
+    n46["_ScaledUT.forward"]
+    n49["_ScaledUT.set_range"]
+    n60["_log1mexp"]
+    n58["ordinal_bounds"]
+    n59["ordinal_cutpoints"]
+    n47["ordinal_log_prob"]
   end
     n0 --> n1
     n2 -- "3x" --> n3
@@ -447,63 +471,64 @@ flowchart LR
     n7 --> n9
     n7 -- "3x" --> n10
     n7 -- "3x" --> n11
-    n7 --> n12
+    n7 -- "3x" --> n12
     n7 --> n13
     n7 --> n14
     n7 --> n15
-    n7 -- "2x" --> n16
-    n7 --> n17
-    n7 -- "2x" --> n18
-    n7 --> n19
-    n10 -- "3x" --> n20
+    n7 --> n16
+    n7 -- "2x" --> n17
+    n7 --> n18
+    n7 -- "2x" --> n19
+    n7 --> n20
     n10 -- "3x" --> n21
-    n20 -- "6x" --> n22
-    n20 -- "6x" --> n23
-    n21 -- "3x" --> n22
-    n14 -- "2x" --> n24
-    n14 --> n25
-    n26 -- "30x" --> n27
-    n28 -- "2x" --> n29
+    n10 -- "3x" --> n22
+    n21 -- "6x" --> n23
+    n21 -- "6x" --> n24
+    n22 -- "3x" --> n23
+    n15 -- "2x" --> n25
     n15 --> n26
-    n15 --> n30
-    n31 -- "18x" --> n24
-    n31 -- "9x" --> n25
-    n16 -- "2x" --> n32
-    n16 -- "2x" --> n28
-    n17 --> n32
-    n17 --> n33
-    n17 -- "3x" --> n34
-    n17 -- "3x" --> n35
-    n22 -- "9x" --> n26
-    n22 -- "27x" --> n31
-    n22 -- "27x" --> n36
-    n22 -- "27x" --> n37
-    n38 -- "19x" --> n39
-    n36 -- "9x" --> n40
-    n36 -- "9x" --> n41
-    n36 -- "27x" --> n42
-    n36 -- "9x" --> n43
-    n37 -- "18x" --> n44
-    n37 -- "18x" --> n45
-    n37 -- "9x" --> n46
-    n40 -- "9x" --> n47
-    n40 -- "9x" --> n38
-    n34 -- "3x" --> n35
-    n34 -- "2x" --> n48
-    n41 -- "9x" --> n49
-    n42 -- "27x" --> n50
-    n35 -- "6x" --> n39
-    n30 --> n51
-    n30 --> n38
-    n23 -- "6x" --> n52
-    n43 -- "9x" --> n5
-    n43 -- "9x" --> n38
-    n43 -- "9x" --> n53
-    n45 -- "18x" --> n54
-    n45 -- "18x" --> n55
-    n45 -- "18x" --> n56
-    n57 -- "9x" --> n58
-    n46 -- "9x" --> n59
-    n46 -- "9x" --> n57
+    n27 -- "30x" --> n28
+    n29 -- "2x" --> n30
+    n16 --> n27
+    n16 --> n31
+    n32 -- "18x" --> n25
+    n32 -- "9x" --> n26
+    n17 -- "2x" --> n33
+    n17 -- "2x" --> n29
+    n18 --> n33
+    n18 --> n34
+    n18 -- "3x" --> n35
+    n18 -- "3x" --> n36
+    n23 -- "9x" --> n27
+    n23 -- "27x" --> n32
+    n23 -- "27x" --> n37
+    n23 -- "27x" --> n38
+    n39 -- "19x" --> n40
+    n37 -- "9x" --> n41
+    n37 -- "9x" --> n42
+    n37 -- "27x" --> n43
+    n37 -- "9x" --> n44
+    n38 -- "18x" --> n45
+    n38 -- "18x" --> n46
+    n38 -- "9x" --> n47
+    n41 -- "9x" --> n48
+    n41 -- "9x" --> n39
+    n35 -- "3x" --> n36
+    n35 -- "2x" --> n49
+    n42 -- "9x" --> n50
+    n43 -- "27x" --> n51
+    n36 -- "6x" --> n40
+    n31 --> n52
+    n31 --> n39
+    n24 -- "6x" --> n53
+    n44 -- "9x" --> n5
+    n44 -- "9x" --> n39
+    n44 -- "9x" --> n54
+    n46 -- "18x" --> n55
+    n46 -- "18x" --> n56
+    n46 -- "18x" --> n57
+    n58 -- "9x" --> n59
+    n47 -- "9x" --> n60
+    n47 -- "9x" --> n58
 ```
 <!-- AUTOGEN:end -->

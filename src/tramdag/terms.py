@@ -1,15 +1,16 @@
-"""The effect registry: one definition per term effect.
+"""The term modules: one class per effect, built from the effect's spec class.
 
-Each entry names its slot (``"intercept"`` or ``"shift"``) and owns the
-validation that is specific to its effect — the arity rule of ``LS``, the
-treatment/centering rules of ``VC``. ``spec.py`` consults the registry
-lazily, so the generic checks (parents exist, ``input_transform`` shape,
-edge ownership) stay there and run in the same order as before.
+A spec term (:class:`tramdag.spec.Term` subclass — ``LS``, ``CS``, ``VC``,
+``Fn``, ``I``) is frozen data and carries the spec-level rules; the module
+here declares which term class it builds (``data = CS``) and owns the
+runtime behaviour: ``build``, ``shift_value``/``theta_value``,
+``post_init``, ``regularizer``, ``finalize``, ``score_columns`` and the
+side-input contract. :func:`module_for` finds the module of a term by that
+declaration, so subclassing is the whole registration.
 
-A custom effect subclasses :class:`ShiftTerm` (or, once supported,
-:class:`InterceptTerm`), sets ``effect``/``slot``/``option_defaults``,
-implements ``build`` and ``shift_value``, and calls :func:`register_term`;
-the built-ins register themselves at import.
+A custom effect is two classes: a :class:`tramdag.spec.Term` subclass for
+the options and checks, and a :class:`ShiftTerm` subclass with ``data =``
+that term class, ``build`` and ``shift_value``.
 """
 
 # %% imports ---------------------------------------------------------------------------
@@ -28,33 +29,46 @@ from .conditioners import (
     SimpleIntercept,
     VaryingCoef,
 )
-from .spec import ContinuousNode, OrdinalNode, feat_width
+from .spec import (
+    CS,
+    LS,
+    VC,
+    ContinuousNode,
+    Fn,
+    I,
+    OrdinalNode,
+    Term,
+    _subclasses,
+    feat_width,
+)
 
 if TYPE_CHECKING:
     import pandas as pd
 
     from .nodes import _Node
-    from .spec import NodeSpec, Term
-
-# %% global variables ------------------------------------------------------------------
-_REGISTRY: dict[str, type[TermDef]] = {}
+    from .spec import NodeSpec
 
 
 # %% public functions ------------------------------------------------------------------
-def register_term(cls: type[TermDef]) -> type[TermDef]:
-    """Register a term definition under its ``effect`` name; refuse collisions."""
-    if cls.effect in _REGISTRY:
-        raise ValueError(
-            f"term effect {cls.effect!r} is already registered "
-            f"(by {_REGISTRY[cls.effect].__name__})"
-        )
-    _REGISTRY[cls.effect] = cls
-    return cls
+def module_for(term: Term) -> type[TermDef]:
+    """Give the module class that builds ``term``.
 
+    The class is the :class:`TermDef` subclass declaring ``data = type(term)``
+    itself (not by inheritance).
 
-def get_term(effect: str) -> type[TermDef]:
-    """Give the registered definition of an effect (``KeyError`` if unknown)."""
-    return _REGISTRY[effect]
+    Raises
+    ------
+    ValueError
+        If no module class declares the term's class.
+    """
+    for cls in _subclasses(TermDef):
+        if cls.__dict__.get("data") is type(term):
+            return cls
+    raise ValueError(
+        f"no module builds a {type(term).__name__} term. Subclass "
+        f"tramdag.terms.ShiftTerm with `data = {type(term).__name__}` and "
+        "implement build and shift_value."
+    )
 
 
 # %% private classes -------------------------------------------------------------------
@@ -110,7 +124,7 @@ def _attach_input_transform(m, term: Term, parents: tuple, spec: dict) -> None:
     Ordinal one-hots pass through untransformed, so a term whose network
     parents are all ordinal carries none.
     """
-    if dict(term.options).get("input_transform") is None:
+    if term.input_transform is None:
         return
     cps = tuple(p for p in parents if isinstance(spec[p], ContinuousNode))
     if cps:
@@ -119,19 +133,13 @@ def _attach_input_transform(m, term: Term, parents: tuple, spec: dict) -> None:
 
 # %% public classes --------------------------------------------------------------------
 class TermDef:
-    """One effect's definition: its slot and its effect-specific validation.
+    """What every term module shares: the input transform and its calibration.
 
-    ``check_arity`` runs before the generic parent checks (it carries the
-    errors that must fire even for unknown parents); ``edge_parents`` runs
-    after them and gives the parents that own an edge — every parent for
-    the built-in intercept and shifts, only the treatment for ``VC``.
+    ``data`` names the :class:`tramdag.spec.Term` subclass the module
+    builds; :func:`module_for` dispatches on it.
     """
 
-    effect: ClassVar[str]
-    slot: ClassVar[str]  # "intercept" | "shift"
-    # the effect's options with their defaults; a constructor value equal to
-    # its default stays out of Term.options, so term equality is canonical
-    option_defaults: ClassVar[dict] = {}
+    data: ClassVar[type[Term]]
 
     @property
     def input_transform(self):
@@ -164,33 +172,6 @@ class TermDef:
             dim=1,
         )
         tr.set_stats(cols)
-
-    @staticmethod
-    def check_arity(name: str, term: Term) -> None:
-        """Reject a term whose parent count is wrong for its effect."""
-
-    @staticmethod
-    def edge_parents(name: str, term: Term, spec: dict[str, NodeSpec]) -> tuple:
-        """Validate against the spec; give the edge-owning parents."""
-        return term.parents
-
-    cell_tag: ClassVar[str | None] = None  # to_matrix tag; None -> the effect
-
-    @classmethod
-    def cells(cls, term: Term) -> list[tuple[str, str]]:
-        """Give the term's adjacency cells as ``(parent, tag)`` pairs.
-
-        A multi-parent term carries its parent group as a suffix.
-        """
-        tag = cls.cell_tag or cls.effect
-        if len(term.parents) > 1:
-            tag = f"{tag}{list(term.parents)}"
-        return [(p, tag) for p in term.parents]
-
-    @classmethod
-    def term_is_classical(cls, term: Term) -> bool:
-        """Say whether the exact classical fit handles this term."""
-        return False
 
 
 class ShiftTerm(TermDef):
@@ -278,6 +259,7 @@ class InterceptTerm(TermDef):
     ``ci_parents`` their flat order.
     """
 
+    data = I
     has_marginal_start: ClassVar[bool] = False
 
     groups: list[tuple[str, ...]]
@@ -339,29 +321,6 @@ class InterceptTerm(TermDef):
         raise NotImplementedError
 
 
-@register_term
-class InterceptDef(InterceptTerm):
-    """``I``/``SI``/``CI`` — the registry entry of the intercept slot."""
-
-    effect = "I"
-    slot = "intercept"
-    option_defaults: ClassVar[dict] = {
-        "transform": None,
-        "transform_kwargs": None,
-        "units": None,
-        "activation": None,
-        "allow_interaction": True,
-        "input_transform": None,
-    }
-
-    cell_tag = "CI"
-
-    @classmethod
-    def term_is_classical(cls, term: Term) -> bool:
-        """Say yes only for a parentless ``I()`` — the simple baseline."""
-        return not term.parents
-
-
 class SITerm(InterceptTerm, SimpleIntercept):
     """The free simple intercept: one theta vector, no parents."""
 
@@ -409,31 +368,11 @@ class AdditiveCITerm(InterceptTerm, nn.Module):
         )
 
 
-@register_term
 class LSTerm(ShiftTerm, LinearShift):
     """``LS`` — one raw-unit coefficient per (single) parent."""
 
-    effect = "LS"
-    slot = "shift"
+    data = LS
     scored = True
-
-    @classmethod
-    def term_is_classical(cls, term: Term) -> bool:
-        """Say yes — an LS is a classical transformation-model coefficient."""
-        return True
-
-    @staticmethod
-    def check_arity(name: str, term: Term) -> None:
-        """Refuse any parent count but one, and any input_transform."""
-        if len(term.parents) != 1:
-            raise ValueError(f"Node '{name}': LS term must have exactly one parent.")
-        # reachable only through a hand-built dict — the weight must stay
-        # the interpretable raw-unit coefficient
-        if dict(term.options).get("input_transform") is not None:
-            raise ValueError(
-                f"Node '{name}': a linear shift takes no input_transform — "
-                "its weight is the interpretable raw-unit coefficient."
-            )
 
     @classmethod
     def build(cls, term: Term, spec: dict[str, NodeSpec]) -> LSTerm:
@@ -459,17 +398,10 @@ class LSTerm(ShiftTerm, LinearShift):
         return {self.key: psi[:, 0]}
 
 
-@register_term
 class CSTerm(ShiftTerm, ComplexShift):
     """``CS`` — a network shift over its parents."""
 
-    effect = "CS"
-    slot = "shift"
-    option_defaults: ClassVar[dict] = {
-        "units": None,
-        "activation": None,
-        "input_transform": None,
-    }
+    data = CS
 
     @classmethod
     def build(cls, term: Term, spec: dict[str, NodeSpec]) -> CSTerm:
@@ -487,25 +419,11 @@ class CSTerm(ShiftTerm, ComplexShift):
         return self(node.net_input(feats, self.parents, self.key))
 
 
-@register_term
 class VCTerm(ShiftTerm, VaryingCoef):
     """``VC`` — ``beta(modifiers) * x_t``; only the treatment owns an edge."""
 
-    effect = "VC"
-    slot = "shift"
+    data = VC
     scored = True
-    option_defaults: ClassVar[dict] = {
-        "penalty": 1.0,
-        "center": False,
-        "units": None,
-        "activation": None,
-        "input_transform": None,
-    }
-
-    @classmethod
-    def cells(cls, term: Term) -> list[tuple[str, str]]:
-        """Tag the treatment cell ``VC`` and the modifiers ``VCm``."""
-        return [(term.parents[0], "VC")] + [(p, "VCm") for p in term.parents[1:]]
 
     @classmethod
     def build(cls, term: Term, spec: dict[str, NodeSpec]) -> VCTerm:
@@ -526,54 +444,6 @@ class VCTerm(ShiftTerm, VaryingCoef):
         m.finalizes = bool(mods)
         _attach_input_transform(m, term, mods, spec)
         return m
-
-    @staticmethod
-    def edge_parents(name: str, term: Term, spec: dict[str, NodeSpec]) -> tuple:
-        """Check treatment, penalty and centering; the treatment owns the edge."""
-        if not term.parents:
-            raise ValueError(f"Node '{name}': VC term needs a treatment parent.")
-        on = term.parents[0]
-        if on in term.parents[1:]:
-            raise ValueError(
-                f"Node '{name}': VC treatment '{on}' cannot also be a modifier."
-            )
-        if term.penalty is None or term.penalty < 0:
-            raise ValueError(
-                f"Node '{name}': VC(penalty=) must be a number >= 0 "
-                f"(default 1.0) — got {term.penalty!r}."
-            )
-        if term.center is not False and not isinstance(term.center, str):
-            raise ValueError(
-                f"Node '{name}': VC(center=) names the propensity COLUMN of "
-                "the training frame (out-of-fold P(t=1|pa_t) per row), or is "
-                f"False — got {term.center!r}. Cross-fit the propensities "
-                "outside and merge them as a column."
-            )
-        if term.center and term.center in spec:
-            raise ValueError(
-                f"Node '{name}': the propensity column {term.center!r} "
-                "collides with a node name."
-            )
-        on_node = spec[on]
-        if isinstance(on_node, OrdinalNode) and on_node.levels != 2:
-            raise ValueError(
-                f"Node '{name}': VC treatment '{on}' is ordinal with "
-                f"{on_node.levels} levels. Only a 2-level (binary) "
-                "ordinal treatment is supported. Multi-level is a "
-                "follow-up."
-            )
-        if term.center and not isinstance(on_node, OrdinalNode):
-            raise ValueError(
-                f"Node '{name}': VC(center=...) needs a binary ordinal "
-                f"treatment, and '{on}' is continuous. E[T|x] centering "
-                "is a follow-up."
-            )
-        if term.center and any(t.effect == "VC" and t.center for t in on_node.terms):
-            raise ValueError(
-                f"Node '{name}': treatment '{on}' carries a centered VC term "
-                "itself; chained centering is not supported."
-            )
-        return (on,)
 
     def regressor(self, feats: dict) -> Tensor:
         """Give the ``(n, 1)`` column ``beta`` multiplies — the treatment, raw.
@@ -657,7 +527,6 @@ class VCTerm(ShiftTerm, VaryingCoef):
         return list(flow.nodes[self.key].parents) if self.center_col else []
 
 
-@register_term
 class FnTerm(ShiftTerm, nn.Module):
     """``Fn`` — a user-supplied shift function over the parent features.
 
@@ -666,9 +535,7 @@ class FnTerm(ShiftTerm, nn.Module):
     by :func:`tramdag.spec.fn_shift`.
     """
 
-    effect = "Fn"
-    slot = "shift"
-    option_defaults: ClassVar[dict] = {"fn": None, "input_transform": None}
+    data = Fn
 
     def __init__(self, fn):
         nn.Module.__init__(self)

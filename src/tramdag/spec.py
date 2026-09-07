@@ -7,12 +7,12 @@ positional argument, written as a list or as a ``+`` sum::
     "X3": ContinuousNode([I("X1"), CS("X2")])       # h = h_theta(x1) + g(x2)
     "X3": ContinuousNode(I("X1") + CS("X2"))        # the same, formula style
 
-Term constructors name the parent(s) a term depends on. Each has a
-pythonic name and a short alias — ``intercept``/``I``,
-``simple_intercept``/``SI``, ``complex_intercept``/``CI``,
-``linear_shift``/``LS``, ``complex_shift``/``CS`` and
-``varying_coefficient``/``VC`` — and the two spellings are the same
-object, so use whichever reads better:
+Each effect is a :class:`Term` subclass, called with the parent(s) it
+depends on. Each has a short name and a pythonic alias — ``I``/``intercept``
+(with ``SI``/``simple_intercept`` and ``CI``/``complex_intercept``),
+``LS``/``linear_shift``, ``CS``/``complex_shift``, ``VC``/``varying_coefficient``
+and ``Fn``/``fn_shift`` — and the two spellings are the same object, so use
+whichever reads better:
 
 - :func:`I`  — *intercept* term: the parent(s) reshape the monotone transform
   (its Bernstein coefficients / ordinal cutpoints). ``I`` dispatches on its
@@ -67,37 +67,44 @@ prognostically through the shift *and* modifies the treatment effect.
 # %% imports ---------------------------------------------------------------------------
 from __future__ import annotations
 
+import dataclasses
 from dataclasses import dataclass
+from typing import ClassVar
 
 # %% global variables ------------------------------------------------------------------
 # bernstein, because zuko's spline extrapolates with a fixed slope outside
 # [-B, B] while bernstein follows its own boundary derivative -- see the
-# `transform` parameter of simple_intercept.
+# `transform` parameter of I.
 DEFAULT_TRANSFORM = "bernstein"
+INPUT_TRANSFORMS = ("minmax", "standardize")
 
 
 # %% private functions -----------------------------------------------------------------
-def _option_defaults(effect: str) -> dict:
-    """Give an effect's option defaults from its registry entry."""
-    from .terms import get_term
+def _subclasses(cls) -> list[type]:
+    """Give every subclass of ``cls``, transitively, in definition order."""
+    out = []
+    for sub in cls.__subclasses__():
+        out.append(sub)
+        out.extend(_subclasses(sub))
+    return out
 
-    return get_term(effect).option_defaults
 
+def _effect_class(effect: str) -> type[Term]:
+    """Give the :class:`Term` subclass whose ``effect`` name this is.
 
-def _options(effect: str, **kwargs) -> tuple:
-    """Canonicalize one effect's options: sorted pairs, defaults dropped.
-
-    A key the effect does not take raises — a wrong-effect option must
-    error instead of silently answering with a default.
+    Raises
+    ------
+    ValueError
+        If no term class carries the name — a custom effect must be
+        imported before a spec naming it is loaded.
     """
-    defaults = _option_defaults(effect)
-    unknown = sorted(set(kwargs) - set(defaults))
-    if unknown:
-        raise ValueError(
-            f"effect '{effect}' takes no option(s) {unknown}; "
-            f"it takes {sorted(defaults)}."
-        )
-    return tuple(sorted((k, v) for k, v in kwargs.items() if v != defaults[k]))
+    for cls in _subclasses(Term):
+        if cls.effect == effect:
+            return cls
+    raise ValueError(
+        f"unknown term effect '{effect}'. A custom effect is a tramdag.Term "
+        "subclass; import it before the spec is built or loaded."
+    )
 
 
 def _tupled(value):
@@ -129,15 +136,16 @@ def _mapped(value):
 def _as_term(value) -> Term:
     """Take one entry of a formula to a :class:`Term`.
 
-    The bare name ``I`` stands for ``I()``, the simple-intercept baseline.
+    The bare names ``I`` and ``SI`` stand for ``I()``, the simple-intercept
+    baseline.
 
     Raises
     ------
     TypeError
         If the entry is neither a term nor the bare ``I``.
     """
-    if value in (intercept, simple_intercept):
-        return simple_intercept()
+    if value is I or value is SI:
+        return I()
     if isinstance(value, Term):
         return value
     raise TypeError(
@@ -155,7 +163,7 @@ def _normalize_terms(value):
     a list of lists is a mistake rather than a shape to flatten.
 
     The canonical form starts with the intercept: a formula written
-    without one gets ``SI()`` prepended, so ``terms[0]`` is always the
+    without one gets ``I()`` prepended, so ``terms[0]`` is always the
     intercept term. Exactly one intercept is allowed, and it must come
     first when written.
 
@@ -167,15 +175,15 @@ def _normalize_terms(value):
     Returns
     -------
     list[Term]
-        The canonical term list; a source node gives ``[SI()]``.
+        The canonical term list; a source node gives ``[I()]``.
     """
     if value is None:
-        return [simple_intercept()]  # a source node: the free intercept alone
+        return [I()]  # a source node: the free intercept alone
     written = value if isinstance(value, (list, tuple)) else [value]
     items = [_as_term(e) for e in written]
-    intercept_at = [i for i, t in enumerate(items) if t.effect == "I"]
+    intercept_at = [i for i, t in enumerate(items) if isinstance(t, I)]
     if len(intercept_at) > 1:
-        parented = [t for t in items if t.effect == "I" and t.parents]
+        parented = [t for t in items if isinstance(t, I) and t.parents]
         if len(parented) > 1:
             raise ValueError(
                 "a formula takes exactly one intercept term. For an additive "
@@ -188,7 +196,7 @@ def _normalize_terms(value):
             "contains the baseline — drop the extra I/SI."
         )
     if not intercept_at:
-        return [simple_intercept(), *items]  # canonical form: intercept first
+        return [I(), *items]  # canonical form: intercept first
     if intercept_at[0] != 0:
         raise ValueError(
             "the intercept term comes first: write "
@@ -197,7 +205,7 @@ def _normalize_terms(value):
     return items
 
 
-def _configured_transform(terms):
+def _configured_transform(terms) -> I | None:
     """Give the intercept term if it configures the transform, else ``None``.
 
     Normalization guarantees exactly one intercept, at ``terms[0]``, so the
@@ -239,98 +247,30 @@ def _reject_transform(terms) -> None:
         )
 
 
-def feat_width(spec: dict[str, NodeSpec], parents) -> int:
-    """Total feature width of the parents (ordinal one-hot, continuous raw)."""
-    return sum(
-        spec[p].levels if isinstance(spec[p], OrdinalNode) else 1 for p in parents
-    )
-
-
 def _check_term(name: str, term: Term, spec: dict[str, NodeSpec]) -> tuple[str, ...]:
-    """Validate one term of a node and give its edge-owning parents.
+    """Validate one term against the spec and give its edge-owning parents.
 
-    The effect-specific rules (LS arity, the VC treatment/centering rules)
-    live on the term's registry entry (:mod:`tramdag.terms`); the generic
-    checks — the effect is known, parents exist, ``input_transform`` is
-    well-formed — run here, in the original order.
-
-    Parameters
-    ----------
-    name : str
-        Name of the node the term belongs to, for the error messages.
-    term : Term
-        The term to validate.
-    spec : dict[str, NodeSpec]
-        The DAG specification, to look up parent nodes.
-
-    Returns
-    -------
-    tuple[str, ...]
-        The edge-owning parents: all parents of an I/LS/CS term, only the
-        treatment of a VC term.
+    A term validates its own shape when it is built (arity, option
+    values); what needs the spec — parents exist, the ``VC`` treatment and
+    centering rules — runs here, through the term's ``edge_parents``.
 
     Raises
     ------
     ValueError
-        If the effect is unknown, an LS term has not exactly one parent,
-        a parent is unknown, or a VC term is malformed.
+        If a parent is unknown or the term's spec-level rules fail.
+    TypeError
+        If the entry is not a :class:`Term`.
     """
-    from .terms import get_term
-
-    try:
-        entry = get_term(term.effect)
-    except KeyError:
-        raise ValueError(
-            f"Node '{name}': unknown term effect '{term.effect}'. A custom "
-            "effect must be registered (tramdag.terms.register_term) before "
-            "the spec is built or loaded."
-        ) from None
-    entry.check_arity(name, term)
-    if entry.slot == "intercept" and term.effect != "I":
-        # normalization keys intercepts on effect "I": a custom intercept
-        # slot would silently never build — refuse instead
-        raise ValueError(
-            f"Node '{name}': custom intercept-slot effects are not supported "
-            f"yet — '{term.effect}' registers slot='intercept'. Custom terms "
-            "are shifts (tramdag.terms.ShiftTerm)."
-        )
+    if not isinstance(term, Term):
+        raise TypeError(f"Node '{name}': {term!r} is not a Term.")
     for p in term.parents:
         if p not in spec:
             raise ValueError(f"Node '{name}': unknown parent '{p}'.")
-    _check_input_transform(name, term)
-    return entry.edge_parents(name, term, spec)
-
-
-def _check_input_transform(name: str, term: Term) -> None:
-    """Reject a malformed ``input_transform`` before anything is built.
-
-    Allowed: ``None``, ``"minmax"``, ``"standardize"``, or a callable
-    ``fn(x, train)`` applied per continuous parent column (``train`` is
-    that column's raw training data, frozen at ``calibrate``).
-    """
-    # read the raw options: an effect that does not take the key (LS) must
-    # still be caught here, not silently ignored at build time
-    value = dict(term.options).get("input_transform")
-    if value is None:
-        return
-    if not (callable(value) or value in ("minmax", "standardize")):
-        raise ValueError(
-            f"Node '{name}': input_transform must be 'minmax', 'standardize' "
-            f"or a callable fn(x, train), got {value!r}."
-        )
+    return term.edge_parents(name, spec)
 
 
 def _check_node(name: str, node: NodeSpec, spec: dict[str, NodeSpec]) -> None:
     """Validate one node: its terms, edge ownership, and ordinal levels.
-
-    Parameters
-    ----------
-    name : str
-        Name of the node, for the error messages.
-    node : NodeSpec
-        The node specification.
-    spec : dict[str, NodeSpec]
-        The DAG specification, to look up parent nodes.
 
     Raises
     ------
@@ -358,16 +298,6 @@ def _kahn_sort(spec: dict[str, NodeSpec]) -> list[str]:
     Dependencies are ``pa(x_i)``, the union of all term parents. Ready
     nodes are emitted in sorted batches, so the order is deterministic.
 
-    Parameters
-    ----------
-    spec : dict[str, NodeSpec]
-        The (already validated) DAG specification.
-
-    Returns
-    -------
-    list[str]
-        The node names in topological order.
-
     Raises
     ------
     ValueError
@@ -388,195 +318,43 @@ def _kahn_sort(spec: dict[str, NodeSpec]) -> list[str]:
 
 
 # %% public functions ------------------------------------------------------------------
-def simple_intercept(
-    transform: str | None = None, input_transform=None, **transform_kwargs
-) -> Term:
-    """Build the simple-intercept baseline term — the paper's SI.
-
-    ``SI`` is the exported alias of this function. The term's transform
-    parameters are a free vector, the same for every observation.
-
-    Parameters
-    ----------
-    transform : str | None, optional
-        Class of a continuous node's monotone transform: ``"bernstein"``
-        (default), ``"spline"`` or ``"affine"``. Bernstein is the default
-        because zuko's spline extrapolates outside ``[-B, B]`` with a *fixed*
-        slope, independent of the fitted parameters, so the ~10% of data
-        beyond the 5%/95% pre-scaling range is misweighted whenever the true
-        tail slope differs; Bernstein extrapolates linearly along its own
-        boundary derivative. At most one intercept term per node can set it.
-        An ordinal node accepts none, because its intercept is the cutpoint
-        vector.
-    **transform_kwargs
-        Forwarded to the transform class, for example
-        ``SI(transform="spline", bins=16)``.
-
-    Returns
-    -------
-    Term
-        The intercept term.
-    """
-    if input_transform is not None:
-        raise ValueError(
-            "a simple intercept has no network inputs — input_transform= "
-            "belongs on CI/CS/VC terms."
-        )
-    kw = tuple(sorted(transform_kwargs.items())) or None
-    return Term("I", (), _options("I", transform=transform, transform_kwargs=kw))
-
-
-def complex_intercept(
-    *parents: str,
-    allow_interaction: bool = True,
-    units: list[int] | tuple[int, ...] | None = None,
-    activation: str | None = None,
-    input_transform=None,
-    transform: str | None = None,
-    **transform_kwargs,
-) -> Term:
-    """Build a complex-intercept term — the paper's CI.
-
-    ``CI`` is the exported alias of this function. The parents reshape the
-    monotone transform: its parameters become a function of them.
-
-    Parameters
-    ----------
-    *parents : str
-        Parent names, at least one. With several parents the term is one
-        **joint** network (an interaction).
-    allow_interaction : bool, optional
-        ``False`` makes a multi-parent term **additive** instead: one
-        network per parent, their parameter vectors summed in coefficient
-        space. A node takes at most one intercept term with parents —
-        write an additive intercept with this flag, not with several
-        intercept terms. Default ``True``: one joint network is what the
-        reference implementations do, and the additive form is the variant
-        added here.
-    units : list[int] | tuple[int, ...] | None, optional
-        Hidden layers of the term's network, for example ``units=[16]``
-        for one hidden layer of 16 neurons. Default ``[8, 8]``, from the
-        PyTorch reference — see :mod:`tramdag.conditioners`, which also
-        explains why a paper replication sets this explicitly.
-    transform : str | None, optional
-        Class of the node's monotone transform, as for
-        :func:`simple_intercept`.
-    **transform_kwargs
-        Forwarded to the transform class.
-
-    Returns
-    -------
-    Term
-        The intercept term.
-
-    Raises
-    ------
-    ValueError
-        If no parent is given, or ``allow_interaction=False`` comes with
-        fewer than two parents (an interaction to disallow needs two).
-    """
-    if not parents:
-        raise ValueError(
-            "complex_intercept() needs at least one parent. The parentless "
-            "baseline is simple_intercept() / SI."
-        )
-    if not allow_interaction and len(parents) < 2:
-        raise ValueError(
-            "allow_interaction=False makes a MULTI-parent intercept additive; "
-            "with one parent there is no interaction to disallow — drop the "
-            "argument."
-        )
-    kw = tuple(sorted(transform_kwargs.items())) or None
-    return Term(
-        "I",
-        tuple(parents),
-        _options(
-            "I",
-            transform=transform,
-            transform_kwargs=kw,
-            units=tuple(units) if units is not None else None,
-            activation=activation,
-            input_transform=input_transform,
-            allow_interaction=bool(allow_interaction),
-        ),
+def feat_width(spec: dict[str, NodeSpec], parents) -> int:
+    """Total feature width of the parents (ordinal one-hot, continuous raw)."""
+    return sum(
+        spec[p].levels if isinstance(spec[p], OrdinalNode) else 1 for p in parents
     )
 
 
-def intercept(*parents: str, **kwargs) -> Term:
-    """Build an intercept term, dispatching on the arguments.
-
-    ``I`` is the exported alias of this function, the notation of the docs
-    and the paper. Without parents it is :func:`simple_intercept`; with
-    parents it is :func:`complex_intercept`. The bare name ``I`` in a term
-    list stands for ``I()``.
+def SI(**options) -> I:
+    """Build the simple-intercept baseline, the paper's SI: ``I()`` without parents.
 
     Parameters
     ----------
-    *parents : str
-        Parent names, forwarded to the matching constructor.
-    **kwargs
-        Forwarded to the matching constructor.
+    **options
+        As for :class:`I`: ``transform`` and its keyword arguments.
 
     Returns
     -------
-    Term
-        The intercept term.
+    I
+        The parentless intercept term.
     """
-    if parents:
-        return complex_intercept(*parents, **kwargs)
-    return simple_intercept(**kwargs)
+    return I(**options)
 
 
-def linear_shift(*parents: str) -> Term:
-    """Build a linear-shift term ``beta * x``.
-
-    ``LS`` is the exported alias of this function, the notation of the
-    docs and the paper.
+def CI(*parents: str, **options) -> I:
+    """Build the complex intercept, the paper's CI: ``I(*parents)`` with parents.
 
     Parameters
     ----------
     *parents : str
-        Exactly one parent name.
+        Parent names, at least one.
+    **options
+        As for :class:`I`.
 
     Returns
     -------
-    Term
-        The linear-shift term.
-
-    Raises
-    ------
-    ValueError
-        If the parent count is not one.
-    """
-    if len(parents) != 1:
-        raise ValueError("LS() takes exactly one parent.")
-    return Term("LS", tuple(parents))
-
-
-def complex_shift(
-    *parents: str,
-    units: list[int] | tuple[int, ...] | None = None,
-    activation: str | None = None,
-    input_transform=None,
-) -> Term:
-    """Build a complex-shift term: an additive NN ``g(x)``.
-
-    ``CS`` is the exported alias of this function, the notation of the
-    docs and the paper.
-
-    Parameters
-    ----------
-    *parents : str
-        At least one parent name. Several parents feed one joint network.
-    units : list[int] | tuple[int, ...] | None, optional
-        Hidden layers, for example ``units=[16]``. Default
-        ``[64, 128, 64]``, from the PyTorch reference — see
-        :mod:`tramdag.conditioners`.
-
-    Returns
-    -------
-    Term
-        The complex-shift term.
+    I
+        The parent-conditioned intercept term.
 
     Raises
     ------
@@ -584,131 +362,11 @@ def complex_shift(
         If no parent is given.
     """
     if not parents:
-        raise ValueError("CS() needs at least one parent.")
-    return Term(
-        "CS",
-        tuple(parents),
-        _options(
-            "CS",
-            units=tuple(units) if units else None,
-            activation=activation,
-            input_transform=input_transform,
-        ),
-    )
-
-
-def varying_coefficient(
-    *modifiers: str,
-    t: str,
-    penalty: float = 1.0,
-    center: str | bool = False,
-    units: list[int] | tuple[int, ...] | None = None,
-    activation: str | None = None,
-    input_transform=None,
-) -> Term:
-    """Build a varying-coefficient shift term ``beta(modifiers) * x_t``.
-
-    ``VC`` is the exported alias of this function, the notation of the
-    docs and the paper.
-
-    This is the treatment-effect term of issue #28:
-    ``VC("X2", "X3", t="T")`` is ``(beta0 + b_theta(x2, x3)) * x_t``.
-
-    ``beta(x) = beta0 + b_theta(x)``, with ``b_theta`` a small NN whose
-    weights carry the L2 ``penalty``. The fitting objective is the
-    penalized NLL ``sum_i nll_i + penalty * ||b_theta weights||^2`` on the
-    total-likelihood scale. That is a fixed Gaussian prior whose shrinkage
-    vanishes as n grows. ``beta0`` is not penalized.
-
-    The output of ``b_theta`` is zero-initialized and, after the fit,
-    mean-centered over the training data. ``beta0`` is therefore the
-    interpretable main effect on the log-odds scale — the classical
-    ``Colr``/``LS`` reading when ``beta`` is constant. ``penalty -> inf``,
-    or exactly zero modifiers, reduces the term to ``LS(t)``, so VC-vs-LS
-    is a nested question. Read the fitted effect out with
-    :meth:`CausalFlowDAG.varying_coef`.
-
-    Unlike other effects, VC *modifiers* can also appear in the node's
-    prognostic terms (``CS``/``LS``/``I``). Only ``t`` owns its edge.
-
-    Parameters
-    ----------
-    *modifiers : str
-        The effect modifiers — the covariates that enter ``b_theta``.
-        Empty means a constant effect.
-    t : str
-        The treatment (required keyword). Must be a continuous node or a
-        binary (2-level) ordinal node. The term is linear in ``x_t``.
-    penalty : float, optional
-        L2 weight on the ``b_theta`` weights, by default 1.0. Must be
-        >= 0. 1.0 is the value at which ``tests/test_vc_term.py`` recovers
-        the known ``beta(x)`` of the ``vc_hetero`` DGP at corr ~ 0.99. The
-        penalty is on the total-NLL scale, so its effective strength moves
-        with ``n``: raise it for small ``n`` or many modifiers.
-    center : str | False, optional
-        Propensity centering (issue #30), by default ``False``, which is
-        bit-identical to the uncentered term — so a plain ``VC`` stays what
-        it was before centering existed, and every committed number keeps
-        reproducing. ``docs/varying-coefficients.md`` measures a 5-10x bias
-        reduction from turning it on, so turn it on for an effect estimate.
-        A string names the **training-frame column** holding the
-        out-of-fold propensities ``P(t = 1 | pa_t)`` per row — compute them
-        with any cross-fitted classifier OUTSIDE the flow and merge them as
-        a column (in-sample values reintroduce the own-observation bias).
-        The regressor becomes ``beta(x) * (x_t - e_hat(pa_t))`` — the
-        Robinson/R-learner orthogonalization inside the likelihood; every
-        query after the fit recomputes the propensity live from the flow's
-        own treatment node. Requires a binary ordinal ``t``.
-    units : list[int] | tuple[int, ...] | None, optional
-        Hidden layers of ``b_theta``, by default ``[16]`` — see
-        :class:`tramdag.conditioners.VaryingCoef` for why that size.
-    activation : str | None, optional
-        Activation of ``b_theta``'s hidden layers, by default the
-        conditioners' ``relu``.
-
-    Returns
-    -------
-    Term
-        The varying-coefficient term.
-
-    Raises
-    ------
-    ValueError
-        If ``t`` is also a modifier or if ``penalty`` is negative.
-
-    Notes
-    -----
-    With ``center="col"``, training reads **out-of-fold** ``e_hat`` for
-    every row from that column of the training frame — the DML
-    cross-fitting requirement; in-sample centering can be *worse* than
-    none. The values
-    are frozen as data, so no gradient reaches the ``t`` node from this
-    node's loss. Inference (``log_prob``/``sample``/``abduct``/``pmf``)
-    recomputes ``e_hat`` from the flow's own fitted ``t`` node — the
-    full-data fit, the standard DML train/predict split — and always
-    re-derives ``x_t - e_hat`` under ``do``, never from a cache. With
-    centering, ``beta0`` is the effect at the treatment margin (the
-    observed propensities). The LS-nesting reading applies to the
-    uncentered term only.
-    """
-    if t in modifiers:
         raise ValueError(
-            f"VC(): '{t}' cannot be both the treatment (t) and a modifier."
+            "complex_intercept() needs at least one parent. The parentless "
+            "baseline is simple_intercept() / SI."
         )
-    if penalty < 0:
-        raise ValueError(f"VC(): penalty must be >= 0, got {penalty}.")
-    return Term(
-        "VC",
-        (t, *modifiers),
-        _options(
-            "VC",
-            penalty=float(penalty),
-            center=center,
-            units=tuple(units) if units else None,
-            activation=activation,
-            input_transform=input_transform,
-        ),
-    )
+    return I(*parents, **options)
 
 
 def node_parents(node: NodeSpec) -> list[str]:
@@ -737,7 +395,7 @@ def validate_and_sort(spec: dict[str, NodeSpec]) -> list[str]:
 
     Edge ownership: every parent must enter through exactly one
     edge-owning term. Edge-owning are all parents of I/LS/CS terms and
-    the ``on`` of a VC term. VC *modifiers* are exempt — they can repeat
+    the ``t`` of a VC term. VC *modifiers* are exempt — they can repeat
     across terms, because a modifier typically also acts prognostically
     through a CS or LS term.
 
@@ -754,10 +412,9 @@ def validate_and_sort(spec: dict[str, NodeSpec]) -> list[str]:
     Raises
     ------
     ValueError
-        If a term is malformed, a parent is unknown, a parent enters
-        through more than one edge-owning term, an ordinal node has fewer
-        than 2 levels, a VC treatment is unsupported, or the graph has a
-        cycle.
+        If a parent is unknown, a parent enters through more than one
+        edge-owning term, an ordinal node has fewer than 2 levels, a VC
+        treatment is unsupported, or the graph has a cycle.
     """
     for name, node in spec.items():
         _check_node(name, node, spec)
@@ -767,15 +424,16 @@ def validate_and_sort(spec: dict[str, NodeSpec]) -> list[str]:
 def spec_to_dict(spec: dict[str, NodeSpec]) -> dict:
     """Give the serialized representation of a spec, for checkpoints.
 
-    ``Term.options`` is already canonical — sorted by key, defaults
-    dropped — so a term serializes as its three fields and nothing else.
+    A term serializes as its effect name, its parents and the options that
+    differ from their defaults — nothing else, so the form is canonical.
     The result is JSON- and YAML-safe: plain tuples become lists and
     nested kwargs tuples (``transform_kwargs``) become mappings, which is
     also how a hand-written YAML spec reads best; :func:`spec_from_dict`
     accepts both forms and turns them back, so a spec round-trips through
     ``json``/YAML as well as through ``torch.save`` — except when a term
-    carries a *callable* ``input_transform``, which serializes only
-    through pickle (``torch.save``) and only as a module-level function.
+    carries a *callable* (``input_transform``, ``fn``), which serializes
+    only through pickle (``torch.save``) and only as a module-level
+    function.
 
     Parameters
     ----------
@@ -795,7 +453,7 @@ def spec_to_dict(spec: dict[str, NodeSpec]) -> dict:
                 {
                     "effect": t.effect,
                     "parents": list(t.parents),
-                    "options": {k: _mapped(v) for k, v in t.options},
+                    "options": {k: _mapped(v) for k, v in t.options().items()},
                 }
                 for t in node.terms
             ],
@@ -806,28 +464,11 @@ def spec_to_dict(spec: dict[str, NodeSpec]) -> dict:
     return out
 
 
-def _check_dict_options(name: str, t: dict) -> None:
-    """Reject stale or misspelled option keys in a serialized term.
-
-    An unknown key would silently break term equality against a freshly
-    constructed spec. An unknown *effect* passes through — validate_and_sort
-    carries the register_term message.
-    """
-    try:
-        known = set(_option_defaults(t["effect"]))
-    except KeyError:
-        return
-    unknown = sorted(set(t["options"]) - known)
-    if unknown:
-        raise ValueError(
-            f"node '{name}': effect '{t['effect']}' takes no option(s) "
-            f"{unknown} — a stale or misspelled key would silently break "
-            "term equality."
-        )
-
-
 def spec_from_dict(d: dict) -> dict[str, NodeSpec]:
     """Rebuild a spec from its serialized form.
+
+    Each term is rebuilt through its class, so a stale or misspelled
+    option key and a wrong arity fail here, by name.
 
     Parameters
     ----------
@@ -838,126 +479,137 @@ def spec_from_dict(d: dict) -> dict[str, NodeSpec]:
     -------
     dict[str, NodeSpec]
         The node specification, keyed by node name.
-    """
-    spec: dict[str, NodeSpec] = {}
-    for name, nd in d.items():
-        for t in nd["terms"]:
-            _check_dict_options(name, t)
-        terms = [
-            Term(
-                t["effect"],
-                tuple(t["parents"]),
-                tuple(sorted((k, _tupled(v)) for k, v in t["options"].items())),
-            )
-            for t in nd["terms"]
-        ] or None
-        if nd["kind"] == "continuous":
-            spec[name] = ContinuousNode(terms)
-        else:
-            spec[name] = OrdinalNode(int(nd["levels"]), terms)
-    return spec
-
-
-def fn_shift(*parents: str, fn, input_transform=None) -> Term:
-    """Give a custom function shift: ``fn(features)`` joins the additive shifts.
-
-    The cheapest custom term: ``fn`` takes the term's concatenated parent
-    features ``(n, k)`` (continuous raw, ordinal one-hot — through
-    ``input_transform`` when given) and returns the shift contribution,
-    shape ``(n,)`` or ``(n, 1)``. A plain function is a fixed offset; an
-    ``nn.Module`` registers as a submodule and trains with the flow.
-
-    Checkpoints pickle ``fn``, so it must be a module-level function or an
-    importable ``nn.Module`` — ``save()`` refuses a lambda. For a whole new
-    effect (own validation, penalty, side inputs) subclass
-    :class:`tramdag.terms.ShiftTerm` and ``register_term`` it instead.
-
-    Parameters
-    ----------
-    *parents : str
-        Parent node names feeding ``fn``.
-    fn : callable | torch.nn.Module
-        The shift function.
-    input_transform : str | callable | None, optional
-        As on :func:`complex_shift`, by default None.
-
-    Returns
-    -------
-    Term
-        The term, effect ``"Fn"``.
 
     Raises
     ------
     ValueError
-        If no parent is given or ``fn`` is not callable.
+        If a term names an unknown effect or an option its effect does
+        not take.
     """
-    if not parents:
-        raise ValueError("fn_shift needs at least one parent.")
-    if not callable(fn):
-        # a domain error (a wrong option value), not a Python type error
-        raise ValueError(  # noqa: TRY004
-            f"fn_shift(fn=) must be callable, got {type(fn).__name__}."
-        )
-    return Term(
-        "Fn", tuple(parents), _options("Fn", fn=fn, input_transform=input_transform)
-    )
+    spec: dict[str, NodeSpec] = {}
+    for name, nd in d.items():
+        terms = []
+        for t in nd["terms"]:
+            cls = _effect_class(t["effect"])
+            options = {k: _tupled(v) for k, v in t["options"].items()}
+            try:
+                terms.append(cls.from_serialized(tuple(t["parents"]), options))
+            except ValueError as err:
+                raise ValueError(f"node '{name}': {err}") from None
+        if nd["kind"] == "continuous":
+            spec[name] = ContinuousNode(terms or None)
+        else:
+            spec[name] = OrdinalNode(int(nd["levels"]), terms or None)
+    return spec
 
 
 # %% public classes --------------------------------------------------------------------
-@dataclass(frozen=True)
+@dataclass(frozen=True, init=False, repr=False)
 class Term:
-    """One additive term of a node's transformation.
+    """One additive term of a node's transformation; each effect is a subclass.
 
     Terms add: ``I("a") + CS("b")`` is the same transformation as
-    ``[I("a"), CS("b")]``. Build terms with the constructors :func:`I`,
-    :func:`LS`, :func:`CS`, :func:`VC` and :func:`Fn`, not directly.
+    ``[I("a"), CS("b")]``. A term is frozen data — hashable, comparable,
+    serializable by :func:`spec_to_dict` — and knows the spec-level rules
+    of its effect (``edge_parents``, ``cells``, ``classical``). The module
+    that trains it lives in :mod:`tramdag.terms` and declares which term
+    class it builds (``data = CS``).
+
+    Subclass to add an effect: the class name is the effect name (its
+    serialized ``effect``), every annotated attribute with a default is an
+    option, and ``__post_init__`` holds the construction-time checks::
+
+        class Scaled(Term):
+            scale: float = 1.0
 
     Attributes
     ----------
-    effect : str
-        A registered effect name: ``"I"``, ``"LS"``, ``"CS"``, ``"VC"``,
-        ``"Fn"``, or a :func:`tramdag.terms.register_term` custom name.
     parents : tuple[str, ...]
         Ordered parent names the term depends on. Empty only for the bare
-        simple-intercept ``I()``. For a ``VC`` term, ``parents[0]`` is the
-        treatment (``on``) and the rest are the effect modifiers; every
+        simple intercept ``I()``. For a :class:`VC` term, ``parents[0]`` is
+        the treatment ``t`` and the rest are the effect modifiers; every
         other built-in term's parents all own their edges.
-    options : tuple[tuple[str, object], ...]
-        Effect-specific settings as canonical ``(key, value)`` pairs:
-        sorted by key, defaults omitted. Attribute access serves this
-        effect's options with their defaults; a key another effect takes
-        raises ``AttributeError`` instead of answering with a foreign
-        default. Keys per effect: ``penalty`` and ``center`` (VC, see
-        :func:`VC`); ``transform`` and ``transform_kwargs`` (I, the class
-        of the monotone transform, kwargs stored as sorted pairs);
-        ``units`` and ``activation`` (the term's network); ``fn`` (Fn, the
-        custom shift callable); ``input_transform`` (I/CS/VC/Fn: the
-        network-input transform); ``allow_interaction`` (multi-parent I:
-        one joint net or one net per parent).
     """
 
-    effect: str
-    parents: tuple[str, ...]
-    options: tuple = ()  # canonical (key, value) pairs; defaults dropped
+    parents: tuple[str, ...] = ()
 
-    def __getattr__(self, name: str):
-        """Serve this effect's options, with their defaults.
+    effect: ClassVar[str] = "Term"
+    cell_tag: ClassVar[str | None] = None  # to_matrix tag; None -> the effect
 
-        A key another effect takes raises AttributeError instead of
-        answering with a foreign default. Reads ``effect`` from __dict__:
-        pickle/deepcopy probe dunders on an empty instance, and going
-        through attribute access again would recurse.
+    def __init_subclass__(cls, **kwargs):
+        """Make every subclass a frozen dataclass named after its effect."""
+        super().__init_subclass__(**kwargs)
+        cls.effect = cls.__dict__.get("effect", cls.__name__)
+        dataclass(frozen=True, init=False, repr=False)(cls)
+
+    def __init__(self, *parents: str, **options):
+        names = self.option_names()
+        unknown = sorted(set(options) - set(names))
+        if unknown:
+            raise ValueError(
+                f"effect '{self.effect}' takes no option(s) {unknown}; "
+                f"it takes {sorted(names)}."
+            )
+        object.__setattr__(self, "parents", tuple(parents))
+        for f in dataclasses.fields(self):
+            if f.name != "parents":
+                object.__setattr__(self, f.name, options.get(f.name, f.default))
+        self.__post_init__()
+
+    def __post_init__(self) -> None:
+        """Check the term's own shape; subclasses extend this."""
+        value = getattr(self, "input_transform", None)
+        if value is not None and not (callable(value) or value in INPUT_TRANSFORMS):
+            raise ValueError(
+                f"{self.effect}(): input_transform must be 'minmax', "
+                f"'standardize' or a callable fn(x, train), got {value!r}."
+            )
+        units = getattr(self, "units", None)
+        if units is not None:
+            object.__setattr__(self, "units", tuple(units))
+
+    @classmethod
+    def option_names(cls) -> list[str]:
+        """Give the option names this effect takes."""
+        return [f.name for f in dataclasses.fields(cls) if f.name != "parents"]
+
+    @classmethod
+    def from_serialized(cls, parents: tuple[str, ...], options: dict) -> Term:
+        """Rebuild a term from its serialized parents and options."""
+        return cls(*parents, **options)
+
+    def options(self) -> dict:
+        """Give the options that differ from their defaults, by name."""
+        return {
+            f.name: getattr(self, f.name)
+            for f in dataclasses.fields(self)
+            if f.name != "parents" and getattr(self, f.name) != f.default
+        }
+
+    @property
+    def classical(self) -> bool:
+        """Say whether the exact classical fit (``fit_classical``) handles this term."""
+        return False
+
+    def edge_parents(self, name: str, spec: dict[str, NodeSpec]) -> tuple[str, ...]:
+        """Validate against the spec; give the parents that own an edge."""
+        return self.parents
+
+    def cells(self) -> list[tuple[str, str]]:
+        """Give the term's adjacency cells as ``(parent, tag)`` pairs.
+
+        A multi-parent term carries its parent group as a suffix.
         """
-        effect = self.__dict__.get("effect")
-        if effect is None:
-            raise AttributeError(name)
-        try:
-            defaults = _option_defaults(effect)
-        except KeyError:
-            defaults = {}
-        if name in defaults:
-            return dict(self.options).get(name, defaults[name])
-        raise AttributeError(name)
+        tag = self.cell_tag or self.effect
+        if len(self.parents) > 1:
+            tag = f"{tag}{list(self.parents)}"
+        return [(p, tag) for p in self.parents]
+
+    def __repr__(self):
+        """Show the call that builds the term: parents, then non-default options."""
+        args = [repr(p) for p in self.parents]
+        args += [f"{k}={v!r}" for k, v in self.options().items()]
+        return f"{self.effect}({', '.join(args)})"
 
     def __add__(self, other: Term | list[Term]) -> list[Term]:
         """Concatenate into a plain term list."""
@@ -972,6 +624,371 @@ class Term:
         if isinstance(other, list):
             return [*other, self]
         return NotImplemented
+
+
+class I(Term):  # noqa: E742 - the paper's notation; ambiguous only out of context
+    """The intercept term: the parents reshape the monotone transform.
+
+    Without parents it is the paper's simple intercept **SI** — one free
+    parameter vector, the same for every row (the bare names ``I`` and
+    ``SI`` in a term list both mean ``I()``). With parents it is the
+    complex intercept **CI**: the transform parameters become a function
+    of them. :func:`SI` and :func:`CI` are the two spellings with their
+    arity checked.
+
+    Parameters
+    ----------
+    *parents : str
+        Parent names. Several parents form one **joint** network (an
+        interaction) unless ``allow_interaction=False``.
+    transform : str | type | None, optional
+        Class of a continuous node's monotone transform: ``"bernstein"``
+        (default), ``"spline"``, ``"affine"``, or a ``_ScaledUT`` subclass.
+        Bernstein is the default because zuko's spline extrapolates outside
+        ``[-B, B]`` with a *fixed* slope, independent of the fitted
+        parameters, so the ~10% of data beyond the 5%/95% pre-scaling range
+        is misweighted whenever the true tail slope differs; Bernstein
+        extrapolates linearly along its own boundary derivative. An ordinal
+        node accepts none, because its intercept is the cutpoint vector.
+    **transform_kwargs
+        Any other keyword goes straight to the transform class, for
+        example ``I(transform="spline", bins=16)`` or ``I(n_coeffs=40)``.
+    allow_interaction : bool, optional
+        ``False`` makes a multi-parent term **additive**: one network per
+        parent, their parameter vectors summed in coefficient space. A node
+        takes at most one intercept term with parents — write an additive
+        intercept with this flag, not with several intercept terms. Default
+        ``True``: one joint network is what the reference implementations
+        do.
+    units : list[int] | tuple[int, ...] | None, optional
+        Hidden layers of the term's network, for example ``units=[16]``.
+        Default ``[8, 8]``, from the PyTorch reference — see
+        :mod:`tramdag.conditioners`, which also explains why a paper
+        replication sets this explicitly.
+    activation : str | None, optional
+        Activation of the network's hidden layers, by default the
+        conditioners' ``relu``.
+    input_transform : str | callable | None, optional
+        ``"minmax"``, ``"standardize"`` or a callable ``fn(x, train)``
+        applied per continuous parent column (``train`` is that column's
+        raw training data, frozen at ``calibrate``). Parents only.
+
+    Raises
+    ------
+    ValueError
+        If a parentless term carries ``input_transform``, or
+        ``allow_interaction=False`` comes with fewer than two parents (an
+        interaction to disallow needs two).
+    """
+
+    transform: str | type | None = None
+    transform_kwargs: tuple | None = None
+    units: tuple[int, ...] | None = None
+    activation: str | None = None
+    input_transform: object = None
+    allow_interaction: bool = True
+
+    cell_tag = "CI"
+
+    def __init__(self, *parents: str, transform_kwargs=None, **options):
+        known = set(self.option_names())
+        extra = {k: options.pop(k) for k in list(options) if k not in known}
+        kwargs = {**dict(transform_kwargs or ()), **extra}
+        super().__init__(
+            *parents,
+            transform_kwargs=tuple(sorted(kwargs.items())) or None,
+            **options,
+        )
+
+    def __post_init__(self) -> None:
+        """Refuse network options without parents, and a lone additive flag."""
+        if not self.parents and self.input_transform is not None:
+            raise ValueError(
+                "a simple intercept has no network inputs — input_transform= "
+                "belongs on CI/CS/VC terms."
+            )
+        if not self.allow_interaction and len(self.parents) < 2:
+            raise ValueError(
+                "allow_interaction=False makes a MULTI-parent intercept additive; "
+                "with one parent there is no interaction to disallow — drop the "
+                "argument."
+            )
+        super().__post_init__()
+
+    @property
+    def classical(self) -> bool:
+        """Say yes only for a parentless ``I()`` — the simple baseline."""
+        return not self.parents
+
+    def __repr__(self):
+        """Show the transform's keyword arguments as they were written."""
+        opts = self.options()
+        kwargs = dict(opts.pop("transform_kwargs", None) or ())
+        args = [repr(p) for p in self.parents]
+        args += [f"{k}={v!r}" for k, v in {**opts, **kwargs}.items()]
+        return f"I({', '.join(args)})"
+
+
+class LS(Term):
+    """The linear shift ``beta * x``: one interpretable raw-unit coefficient.
+
+    Parameters
+    ----------
+    *parents : str
+        Exactly one parent name. The weight stays the interpretable
+        raw-unit coefficient, so an LS takes no ``input_transform``.
+
+    Raises
+    ------
+    ValueError
+        If the parent count is not one.
+    """
+
+    def __post_init__(self) -> None:
+        """Refuse any parent count but one."""
+        if len(self.parents) != 1:
+            raise ValueError("LS() takes exactly one parent.")
+
+    @property
+    def classical(self) -> bool:
+        """Say yes — an LS is a classical transformation-model coefficient."""
+        return True
+
+
+class CS(Term):
+    """The complex shift: an additive network ``g(x)`` on the latent scale.
+
+    Parameters
+    ----------
+    *parents : str
+        At least one parent name. Several parents feed one joint network;
+        ``CS("a") + CS("b")`` are two additive terms instead.
+    units : list[int] | tuple[int, ...] | None, optional
+        Hidden layers, for example ``units=[16]``. Default
+        ``[64, 128, 64]``, from the PyTorch reference — see
+        :mod:`tramdag.conditioners`.
+    activation : str | None, optional
+        Activation of the hidden layers, by default the conditioners'
+        ``relu``.
+    input_transform : str | callable | None, optional
+        As for :class:`I`.
+
+    Raises
+    ------
+    ValueError
+        If no parent is given.
+    """
+
+    units: tuple[int, ...] | None = None
+    activation: str | None = None
+    input_transform: object = None
+
+    def __post_init__(self) -> None:
+        """Refuse a parentless network."""
+        if not self.parents:
+            raise ValueError("CS() needs at least one parent.")
+        super().__post_init__()
+
+
+class VC(Term):
+    """The varying-coefficient shift ``beta(modifiers) * x_t``.
+
+    The treatment-effect term of issue #28: ``VC("X2", "X3", t="T")`` is
+    ``(beta0 + b_theta(x2, x3)) * x_t``, with ``b_theta`` a small network
+    whose weights carry the L2 ``penalty``. The fitting objective is the
+    penalized NLL ``sum_i nll_i + penalty * ||b_theta weights||^2`` on the
+    total-likelihood scale — a fixed Gaussian prior whose shrinkage
+    vanishes as n grows. ``beta0`` is not penalized.
+
+    The output of ``b_theta`` is zero-initialized and, after the fit,
+    mean-centered over the training data, so ``beta0`` is the
+    interpretable main effect on the log-odds scale — the classical
+    ``Colr``/``LS`` reading when ``beta`` is constant. ``penalty -> inf``,
+    or exactly zero modifiers, reduces the term to ``LS(t)``, so VC-vs-LS
+    is a nested question. Read the fitted effect out with
+    :meth:`CausalFlowDAG.varying_coef`.
+
+    Unlike other effects, VC *modifiers* can also appear in the node's
+    prognostic terms (``CS``/``LS``/``I``). Only ``t`` owns its edge.
+
+    Parameters
+    ----------
+    *modifiers : str
+        The effect modifiers — the covariates that enter ``b_theta``.
+        Empty means a constant effect.
+    t : str
+        The treatment (required keyword). Must be a continuous node or a
+        binary (2-level) ordinal node. The term is linear in ``x_t``.
+    penalty : float, optional
+        L2 weight on the ``b_theta`` weights, by default 1.0. Must be
+        >= 0. 1.0 is the value at which ``tests/test_vc_term.py`` recovers
+        the known ``beta(x)`` of the ``vc_hetero`` DGP at corr ~ 0.99. The
+        penalty is on the total-NLL scale, so its effective strength moves
+        with ``n``: raise it for small ``n`` or many modifiers.
+    center : str | False, optional
+        Propensity centering (issue #30), by default ``False``, which is
+        bit-identical to the uncentered term. A string names the
+        **training-frame column** holding the out-of-fold propensities
+        ``P(t = 1 | pa_t)`` per row — compute them with any cross-fitted
+        classifier OUTSIDE the flow and merge them as a column (in-sample
+        values reintroduce the own-observation bias). The regressor becomes
+        ``beta(x) * (x_t - e_hat(pa_t))`` — the Robinson/R-learner
+        orthogonalization inside the likelihood; every query after the fit
+        recomputes the propensity live from the flow's own treatment node.
+        Requires a binary ordinal ``t``. ``docs/varying-coefficients.md``
+        measures a 5-10x bias reduction from turning it on.
+    units : list[int] | tuple[int, ...] | None, optional
+        Hidden layers of ``b_theta``, by default ``[16]`` — see
+        :class:`tramdag.conditioners.VaryingCoef` for why that size.
+    activation : str | None, optional
+        Activation of ``b_theta``'s hidden layers, by default the
+        conditioners' ``relu``.
+    input_transform : str | callable | None, optional
+        As for :class:`I`, over the modifiers.
+
+    Raises
+    ------
+    ValueError
+        If ``t`` is also a modifier or if ``penalty`` is negative.
+
+    Notes
+    -----
+    With ``center="col"``, training reads **out-of-fold** ``e_hat`` for
+    every row from that column of the training frame — the DML
+    cross-fitting requirement; in-sample centering can be *worse* than
+    none. The values are frozen as data, so no gradient reaches the ``t``
+    node from this node's loss. Inference (``log_prob``/``sample``/
+    ``abduct``/``pmf``) recomputes ``e_hat`` from the flow's own fitted
+    ``t`` node — the full-data fit, the standard DML train/predict split —
+    and always re-derives ``x_t - e_hat`` under ``do``, never from a
+    cache. With centering, ``beta0`` is the effect at the treatment margin
+    (the observed propensities). The LS-nesting reading applies to the
+    uncentered term only.
+    """
+
+    penalty: float = 1.0
+    center: str | bool = False
+    units: tuple[int, ...] | None = None
+    activation: str | None = None
+    input_transform: object = None
+
+    def __init__(self, *modifiers: str, t: str, **options):
+        super().__init__(t, *modifiers, **options)
+
+    def __post_init__(self) -> None:
+        """Refuse a treatment that is also a modifier, and a negative penalty."""
+        t, modifiers = self.parents[0], self.parents[1:]
+        if t in modifiers:
+            raise ValueError(
+                f"VC(): '{t}' cannot be both the treatment (t) and a modifier."
+            )
+        if self.penalty is None or self.penalty < 0:
+            raise ValueError(f"VC(): penalty must be >= 0, got {self.penalty}.")
+        object.__setattr__(self, "penalty", float(self.penalty))
+        super().__post_init__()
+
+    @classmethod
+    def from_serialized(cls, parents: tuple[str, ...], options: dict) -> VC:
+        """Rebuild from the serialized parents: the treatment comes first."""
+        return cls(*parents[1:], t=parents[0], **options)
+
+    def edge_parents(self, name: str, spec: dict[str, NodeSpec]) -> tuple[str, ...]:
+        """Check the treatment and the centering; only the treatment owns an edge.
+
+        Raises
+        ------
+        ValueError
+            If the centering column is malformed or collides with a node,
+            the treatment is a multi-level ordinal, or centering meets a
+            continuous or an itself-centered treatment.
+        """
+        on = self.parents[0]
+        if self.center is not False and not isinstance(self.center, str):
+            raise ValueError(
+                f"Node '{name}': VC(center=) names the propensity COLUMN of "
+                "the training frame (out-of-fold P(t=1|pa_t) per row), or is "
+                f"False — got {self.center!r}. Cross-fit the propensities "
+                "outside and merge them as a column."
+            )
+        if self.center and self.center in spec:
+            raise ValueError(
+                f"Node '{name}': the propensity column {self.center!r} "
+                "collides with a node name."
+            )
+        on_node = spec[on]
+        if isinstance(on_node, OrdinalNode) and on_node.levels != 2:
+            raise ValueError(
+                f"Node '{name}': VC treatment '{on}' is ordinal with "
+                f"{on_node.levels} levels. Only a 2-level (binary) "
+                "ordinal treatment is supported. Multi-level is a "
+                "follow-up."
+            )
+        if self.center and not isinstance(on_node, OrdinalNode):
+            raise ValueError(
+                f"Node '{name}': VC(center=...) needs a binary ordinal "
+                f"treatment, and '{on}' is continuous. E[T|x] centering "
+                "is a follow-up."
+            )
+        if self.center and any(isinstance(t, VC) and t.center for t in on_node.terms):
+            raise ValueError(
+                f"Node '{name}': treatment '{on}' carries a centered VC term "
+                "itself; chained centering is not supported."
+            )
+        return (on,)
+
+    def cells(self) -> list[tuple[str, str]]:
+        """Tag the treatment cell ``VC`` and the modifiers ``VCm``."""
+        return [(self.parents[0], "VC")] + [(p, "VCm") for p in self.parents[1:]]
+
+    def __repr__(self):
+        """Show the modifiers, then ``t=``, then the non-default options."""
+        args = [repr(p) for p in self.parents[1:]] + [f"t={self.parents[0]!r}"]
+        args += [f"{k}={v!r}" for k, v in self.options().items()]
+        return f"VC({', '.join(args)})"
+
+
+class Fn(Term):
+    """A custom function shift: ``fn(features)`` joins the additive shifts.
+
+    The cheapest custom term: ``fn`` takes the term's concatenated parent
+    features ``(n, k)`` (continuous raw, ordinal one-hot — through
+    ``input_transform`` when given) and returns the shift contribution,
+    shape ``(n,)`` or ``(n, 1)``. A plain function is a fixed offset; an
+    ``nn.Module`` registers as a submodule and trains with the flow.
+
+    Checkpoints pickle ``fn``, so it must be a module-level function or an
+    importable ``nn.Module`` — ``save()`` refuses a lambda. For a whole new
+    effect (own options, penalty, side inputs) subclass :class:`Term` and
+    :class:`tramdag.terms.ShiftTerm` instead.
+
+    Parameters
+    ----------
+    *parents : str
+        Parent node names feeding ``fn``.
+    fn : callable | torch.nn.Module
+        The shift function (required).
+    input_transform : str | callable | None, optional
+        As for :class:`CS`, by default None.
+
+    Raises
+    ------
+    ValueError
+        If no parent is given or ``fn`` is not callable.
+    """
+
+    fn: object = None
+    input_transform: object = None
+
+    def __post_init__(self) -> None:
+        """Refuse a parentless term and a non-callable ``fn``."""
+        if not self.parents:
+            raise ValueError("fn_shift needs at least one parent.")
+        if not callable(self.fn):
+            # a domain error (a wrong option value), not a Python type error
+            raise ValueError(  # noqa: TRY004
+                f"fn_shift(fn=) must be callable, got {type(self.fn).__name__}."
+            )
+        super().__post_init__()
 
 
 class ContinuousNode:
@@ -1050,13 +1067,12 @@ NodeSpec = ContinuousNode | OrdinalNode
 
 
 # %% alias -----------------------------------------------------------------------------
-# The short aliases are the notation of the docs and the paper, and the
-# spelling nearly every caller uses; the long names above are their
-# definitions, so `I is intercept` and the bare `I` sugar keeps working.
-I = intercept  # noqa: E741 - ambiguous only out of context
-SI = simple_intercept
-CI = complex_intercept
-LS = linear_shift
-Fn = fn_shift
-CS = complex_shift
-VC = varying_coefficient
+# The short names are the notation of the docs and the paper, and the
+# spelling nearly every caller uses; the pythonic names are the same objects.
+intercept = I
+simple_intercept = SI
+complex_intercept = CI
+linear_shift = LS
+complex_shift = CS
+varying_coefficient = VC
+fn_shift = Fn

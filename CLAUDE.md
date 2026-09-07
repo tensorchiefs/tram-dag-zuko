@@ -50,29 +50,35 @@ See `experiments/README.md`.
 
 ## Architecture (src/tramdag/)
 
-Since the 1.0-RC refactor (branch rc/1.0-architecture, docs/adr/001):
-term-specific behavior lives on the effect's registry entry in `terms.py`
-(validation, build, shift_value/theta_value, post_init, regularizer,
-finalize, score_columns, side inputs, cells, term_is_classical,
-option_defaults — built-ins subclass their conditioners so checkpoints and
-the seeded RNG stream stay bit-stable); node-kind branches live ONLY in
-nodes.py's four kind_* functions; `fitting.py`/`readouts.py` are mixins
-CausalFlowDAG composes (methods defined once, no delegate layer); new public:
-`flow.shift_curve`, `fn_shift`/`Fn`, `register_term`, `ordinal_bounds`,
-spec exports (`spec_to_dict`/`spec_from_dict`/`validate_and_sort`/
-`node_parents`), `effect_modifier_scan(column=)`. Custom effects:
-subclass `tramdag.terms.ShiftTerm`, register under a new effect name.
-docs/architecture.md carries the module map and the term-contract diagram.
+Since the 1.0-RC refactor (branch rc/1.0-architecture, docs/adr/001, and
+the 2026-09 term-classes revision): an effect is TWO classes. Its spec
+class is a `tramdag.Term` subclass in `spec.py` — frozen data whose
+annotated attributes are the options (`CS`, `LS`, `VC`, `Fn`, `I`; the
+class name is the serialized effect) and which owns the spec-level rules
+(`__post_init__` arity/option checks, `edge_parents`, `cells`,
+`classical`). Its module class in `terms.py` declares `data = <that
+class>` and owns the runtime (build, shift_value/theta_value, post_init,
+regularizer, finalize, score_columns, side inputs — built-ins subclass
+their conditioners so checkpoints and the seeded RNG stream stay
+bit-stable); `terms.module_for(term)` dispatches on `data`, so
+subclassing is the registration (no registry, no `register_term`).
+Node-kind branches live ONLY in nodes.py's four kind_* functions;
+`fitting.py`/`readouts.py` are mixins CausalFlowDAG composes (methods
+defined once, no delegate layer); public: `flow.shift_curve`,
+`fn_shift`/`Fn`, `ordinal_bounds`, spec exports
+(`spec_to_dict`/`spec_from_dict`/`validate_and_sort`/`node_parents`),
+`effect_modifier_scan(column=)`. docs/architecture.md carries the module
+map and the term-contract diagram.
 
 - `spec.py` — user-facing DAG spec: `{name: ContinuousNode|OrdinalNode}`, each node
   declares its transformation as the first positional argument — a list of terms
-  or a `+` sum (`I("a") + LS("b")`). Term constructors: `SI()` (simple
-  intercept, no parents), `CI(*parents)` (complex intercept — transform params
-  from parents), `I(*parents)` (the fallback, dispatching on its arguments),
-  `LS(parent)` (linear shift), `CS(*parents)` (complex shift MLP),
-  `VC(*modifiers, t=, penalty=)` (varying-coefficient effect head
-  `beta(modifiers)·x_t`, small penalized zero-init net; read out with
-  `flow.varying_coef` — see docs/varying-coefficients.md). Each has a pythonic
+  or a `+` sum (`I("a") + LS("b")`). Term classes: `I(*parents)` (the
+  intercept — without parents the paper's SI, with parents the CI; `SI()`
+  and `CI(*parents)` are the arity-checked spellings), `LS(parent)` (linear
+  shift), `CS(*parents)` (complex shift MLP), `VC(*modifiers, t=, penalty=)`
+  (varying-coefficient effect head `beta(modifiers)·x_t`, small penalized
+  zero-init net; read out with `flow.varying_coef` — see
+  docs/varying-coefficients.md), `Fn(*parents, fn=)`. Each has a pythonic
   long name (`simple_intercept`, `complex_shift`, ...) aliased to the same
   object. `transform=` on an intercept picks the monotone transform class and **extra
   keyword arguments pass straight to the transform class**

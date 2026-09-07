@@ -38,15 +38,22 @@ drafted against a seven-subsystem survey and judged from three lenses
    `kind_log_prob`/`kind_sample`/`kind_abduct`/`kind_marginal_theta` in
    nodes.py. The judges cut the drafted per-kind Head protocol as an n=2
    abstraction — a third node kind earns the protocol.
-5. Extension points: `register_term` (a `ShiftTerm` subclass under its own
-   effect name) and `fn_shift` (a callable / `nn.Module` in the additive
-   shifts); `I(transform=<_ScaledUT subclass>)` for a custom transform.
+5. Extension points: a `Term` subclass plus a `ShiftTerm` subclass declaring
+   `data =` it (subclassing is the registration — see the 2026-09 revision
+   below) and `fn_shift` (a callable / `nn.Module` in the additive shifts);
+   `I(transform=<_ScaledUT subclass>)` for a custom transform.
 
 ## Refused (deliberately, so a later proposal can find the reasoning)
 
 - No per-kind node protocol (n=2), no new node kinds at 1.0.
-- No per-effect `Term` subclasses in the data layer — `Term` stays ONE frozen
-  dataclass serialized by effect name; the polymorphism lives once, in terms.py.
+- ~~No per-effect `Term` subclasses in the data layer~~ — **revised
+  2026-09-07**: one string-dispatched `Term` meant the spec knowledge of an
+  effect lived in three places (a constructor, `option_defaults` served
+  through `__getattr__`, and static `check_arity`/`edge_parents`/`cells`
+  hooks on the module class), glued by a registry. Each effect is now a
+  `Term` subclass (its options are dataclass fields, its spec-level rules its
+  methods) and the module class declares `data =` it; the registry is gone.
+  The runtime polymorphism still lives once, in terms.py.
 - No transform/activation registry beyond `make_univariate_transform` accepting
   a class; no plugin entry points; no config system; no new dependencies.
 - No custom latent distribution — the standard logistic IS the TRAM semantics;

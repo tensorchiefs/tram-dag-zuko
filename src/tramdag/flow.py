@@ -44,7 +44,7 @@ from .spec import (
     spec_to_dict,
     validate_and_sort,
 )
-from .terms import ShiftTerm, get_term
+from .terms import ShiftTerm
 from .transforms import (
     StandardLogistic,
     ordinal_pmf,
@@ -459,11 +459,7 @@ class CausalFlowDAG(_FitMixin, _ReadoutsMixin, nn.Module):
 
     def _is_classical(self) -> bool:
         """Say whether every term is one the exact classical fit handles."""
-        return all(
-            get_term(term.effect).term_is_classical(term)
-            for node in self.spec.values()
-            for term in node.terms
-        )
+        return all(term.classical for node in self.spec.values() for term in node.terms)
 
     @torch.no_grad()
     def sample(

@@ -2,6 +2,26 @@
 
 ## 1.0.0-rc (unreleased, branch rc/1.0-architecture)
 
+### Changed (breaking) — an effect is a `Term` subclass; the registry is gone
+
+- `I`, `LS`, `CS`, `VC` and `Fn` are classes now (frozen dataclasses), not
+  constructor functions returning one string-tagged `Term`. Every call
+  spelling stays the same — `CS("a", "b", units=[16])`, `I(transform=
+  "spline", bins=6)`, `VC("m", t="t")`, the `+` sums, `SI()`/`CI()`, the
+  pythonic aliases — and so do YAML specs and checkpoints (`effect` is the
+  class name). Options are typed fields with defaults; an option the effect
+  does not take fails at construction, so a hand-built or serialized term
+  can no longer carry a foreign key. `Term.options` (the canonical pairs)
+  and `Term.__getattr__` are gone; `term.options()` gives the non-default
+  options.
+- `tramdag.terms` keeps the modules only. `register_term`, `get_term` and
+  the registry are removed: a module class declares `data = <Term
+  subclass>` and `module_for(term)` finds it, so subclassing is the whole
+  registration. The spec-level hooks (`check_arity`, `edge_parents`,
+  `cells`, `term_is_classical`, `option_defaults`) moved onto the term
+  classes as `__post_init__`, `edge_parents`, `cells`, `classical`, fields.
+- The ADR 001 refusal of per-effect term classes is revised in place.
+
 ### Added — `tramdag.plots` (optional extra `tramdag[plots]`)
 
 - `plot_dag(spec | flow)`: the labelled DAG, layered left to right, one edge
