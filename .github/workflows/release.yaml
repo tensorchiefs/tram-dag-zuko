@@ -20,7 +20,7 @@ jobs:
     - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d   # v10.0.1
     - name: Build the sdist and wheel
       run: uv build
-    - uses: actions/upload-artifact@v4
+    - uses: actions/upload-artifact@v7
       with:
         name: python-package-distributions
         path: dist/
